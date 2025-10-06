@@ -1,0 +1,245 @@
+# Ansible Role: Aruba AOS-CX Switch
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/your-namespace/aruba_cx_switch)
+
+Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as the source of truth.
+
+## Features
+
+- ✅ **VRF Configuration** - Creates VRFs with RD and route-targets
+- ✅ **VLAN Management** - Idempotent VLAN creation and cleanup
+- ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
+- ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support
+- ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
+- ✅ **Loopback Interfaces** - With VRF support
+- ✅ **Virtual Chassis Support** - Works with VSX/stacked switches
+- ✅ **Idempotent Mode** - Removes configurations not in NetBox
+- ✅ **NetBox Integration** - Uses NetBox as single source of truth
+
+## Requirements
+
+### Ansible Collections
+
+```yaml
+collections:
+  - arubanetworks.aoscx >= 4.0.0
+  - netbox.netbox >= 3.0.0
+```
+
+Install with:
+```bash
+ansible-galaxy collection install arubanetworks.aoscx netbox.netbox
+```
+
+### Python Libraries
+
+```bash
+pip install pynetbox
+```
+
+### NetBox Configuration
+
+This role requires the NetBox dynamic inventory plugin with specific settings:
+
+```yaml
+# inventory.netbox.yml
+plugin: netbox.netbox.nb_inventory
+api_endpoint: "{{ netbox_url }}"
+token: "{{ netbox_token }}"
+validate_certs: false
+interfaces: true
+fetch_all: true
+
+compose:
+  ansible_network_os: custom_fields.ansible_network_os
+  device_id: id
+
+group_by:
+  - device_roles
+  - sites
+  - platforms
+```
+
+## Role Variables
+
+See [defaults/main.yml](defaults/main.yml) for all available variables.
+
+### Core Variables
+
+```yaml
+# Enable/disable features
+aoscx_configure_vrfs: true
+aoscx_configure_vlans: true
+aoscx_configure_l2_interfaces: true
+aoscx_configure_l3_interfaces: true
+aoscx_configure_loopback: true
+
+# Idempotent mode - removes configs not in NetBox
+aoscx_idempotent_mode: false
+
+# Save configuration after changes
+aoscx_save_config: true
+
+# Debug output
+aoscx_debug: false
+```
+
+### NetBox Connection
+
+```yaml
+netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
+netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+```
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+---
+- name: Configure Aruba CX Switches
+  hosts: aoscx_switches
+  gather_facts: false
+  
+  roles:
+    - role: aruba_cx_switch
+      vars:
+        aoscx_idempotent_mode: true
+        aoscx_debug: false
+```
+
+### Example with Tags
+
+```yaml
+---
+- name: Configure VLANs and L2 Interfaces Only
+  hosts: aoscx_switches
+  gather_facts: false
+  
+  roles:
+    - role: aruba_cx_switch
+  
+  tags:
+    - vlans
+    - l2_interfaces
+```
+
+## Usage Examples
+
+### Basic Configuration
+
+```bash
+# Configure everything
+ansible-playbook site.yml
+
+# Configure specific components
+ansible-playbook site.yml --tags vlans,l2_interfaces
+
+# Configure in idempotent mode (removes extra configs)
+ansible-playbook site.yml -e aoscx_idempotent_mode=true
+
+# Debug mode
+DEBUG_ANSIBLE=true ansible-playbook site.yml -v
+```
+
+### Layer 2 Configuration Only
+
+```bash
+ansible-playbook site.yml --tags layer2
+```
+
+### Layer 3 Configuration Only
+
+```bash
+ansible-playbook site.yml --tags layer3
+```
+
+### Don't Save Configuration (Testing)
+
+```bash
+ansible-playbook site.yml -e aoscx_save_config=false
+```
+
+## Tags
+
+- `always` - Always runs (fact gathering)
+- `facts`, `gather` - Fact gathering
+- `vrfs` - VRF configuration
+- `vlans` - VLAN configuration
+- `l2_interfaces` - L2 interface configuration
+- `l3_interfaces` - L3 interface configuration
+- `loopback` - Loopback interface configuration
+- `layer2` - All L2 configuration (VLANs + L2 interfaces)
+- `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks)
+- `routing` - Routing protocol configuration
+- `idempotent` - Cleanup tasks (requires `aoscx_idempotent_mode: true`)
+- `save` - Save configuration
+
+## VRF Handling
+
+### Built-in VRFs
+
+These VRFs are automatically filtered and not configured:
+- `default` / `Default` - Default routing instance
+- `Global` / `global` - Alias for default VRF
+- `mgmt` / `MGMT` - Management VRF (non-configurable)
+
+### Custom VRFs
+
+Custom VRFs are:
+1. Created with `aoscx_vrf` module
+2. Configured with RD and route-targets from NetBox
+3. Attached to interfaces before IP configuration
+
+## Virtual Chassis Support
+
+This role supports AOS-CX virtual chassis (VSX):
+- VLANs are queried using `available_on_device` (shared across chassis)
+- IP addresses are per-chassis-member (from interface objects)
+- Each member is configured independently
+
+## Idempotent Mode
+
+When `aoscx_idempotent_mode: true`:
+- ✅ Removes VLANs not in NetBox (except VLAN 1)
+- ✅ Removes VLAN assignments from interfaces not in NetBox
+- ✅ Cleans up trunk allowed VLANs
+
+**Warning**: Use with caution in production - this removes configurations!
+
+## License
+
+MIT
+
+## Author Information
+
+Created by Arne Opdal
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## Changelog
+
+### Version 1.0.0 (2024-10-05)
+- Initial release
+- VRF configuration support
+- VLAN management with idempotent mode
+- L2 interface configuration (access/trunk/LAG)
+- L3 interface configuration (physical/VLAN/LAG/loopback)
+- Virtual chassis support
+- NetBox integration
+
+## Support
+
+For issues and questions:
+- GitHub Issues: https://github.com/your-org/ansible-role-aruba-cx-switch/issues
+- Documentation: https://github.com/your-org/ansible-role-aruba-cx-switch/wiki
+

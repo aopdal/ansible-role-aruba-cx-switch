@@ -1,0 +1,111 @@
+---
+# Configure VRFs on AOS-CX switches
+
+- name: Get VRFs in use on device
+  ansible.builtin.set_fact:
+    vrfs_in_use: "{{ interfaces | get_vrfs_in_use(ip_addresses | default([])) }}"
+
+- name: Debug - Show VRF filtering
+  ansible.builtin.debug:
+    msg:
+      - "VRFs in use (configurable): {{ vrfs_in_use.vrf_names }}"
+      - "Total configurable VRFs: {{ vrfs_in_use.vrf_names | length }}"
+      - "Built-in VRFs filtered: default, Default, Global, global, mgmt, MGMT"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Get VRF details from NetBox using pynetbox
+  ansible.builtin.set_fact:
+    netbox_vrfs: "{{ lookup('netbox.netbox.nb_lookup', 'vrfs',
+                     api_filter='name=' + item,
+                     api_endpoint=netbox_url,
+                     token=netbox_token,
+                     validate_certs=false) }}"
+  loop: "{{ vrfs_in_use.vrf_names }}"
+  register: vrf_details_raw
+  when: vrfs_in_use.vrf_names | length > 0
+
+- name: Build VRF details dictionary
+  ansible.builtin.set_fact:
+    vrf_details: >-
+      {{
+        vrf_details | default({}) | combine({
+          item.item: item.ansible_facts.netbox_vrfs[0] if item.ansible_facts.netbox_vrfs | length > 0 else {}
+        })
+      }}
+  loop: "{{ vrf_details_raw.results }}"
+  loop_control:
+    label: "VRF: {{ item.item }}"
+  when:
+    - vrf_details_raw is defined
+    - vrf_details_raw.results is defined
+    - item.ansible_facts is defined
+    - item.ansible_facts.netbox_vrfs is defined
+
+- name: Debug - Show VRF details
+  ansible.builtin.debug:
+    var: vrf_details
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 2
+    - vrf_details is defined
+
+- name: Create VRFs
+  arubanetworks.aoscx.aoscx_vrf:
+    name: "{{ item }}"
+    state: create
+  loop: "{{ vrfs_in_use.vrf_names }}"
+  loop_control:
+    label: "VRF: {{ item }}"
+  when: vrfs_in_use.vrf_names | length > 0
+
+- name: Configure VRF Route Distinguisher (RD)
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - rd {{ vrf_details[item].rd }}
+    parents: vrf {{ item }}
+    match: line
+  loop: "{{ vrfs_in_use.vrf_names }}"
+  loop_control:
+    label: "VRF: {{ item }} RD: {{ vrf_details[item].rd | default('none') }}"
+  when:
+    - vrfs_in_use.vrf_names | length > 0
+    - vrf_details is defined
+    - vrf_details[item] is defined
+    - vrf_details[item].rd is defined
+    - vrf_details[item].rd != none
+    - vrf_details[item].rd != ''
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+- name: Configure VRF Route Target Export
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ vrf_details[item].export_targets | map('regex_replace', '^(.*)$', 'route-target export \\1') | list }}"
+    parents: vrf {{ item }}
+    match: line
+  loop: "{{ vrfs_in_use.vrf_names }}"
+  loop_control:
+    label: "VRF: {{ item }} Export Targets: {{ vrf_details[item].export_targets | default([]) | length }}"
+  when:
+    - vrfs_in_use.vrf_names | length > 0
+    - vrf_details is defined
+    - vrf_details[item] is defined
+    - vrf_details[item].export_targets is defined
+    - vrf_details[item].export_targets | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+- name: Configure VRF Route Target Import
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ vrf_details[item].import_targets | map('regex_replace', '^(.*)$', 'route-target import \\1') | list }}"
+    parents: vrf {{ item }}
+    match: line
+  loop: "{{ vrfs_in_use.vrf_names }}"
+  loop_control:
+    label: "VRF: {{ item }} Import Targets: {{ vrf_details[item].import_targets | default([]) | length }}"
+  when:
+    - vrfs_in_use.vrf_names | length > 0
+    - vrf_details is defined
+    - vrf_details[item] is defined
+    - vrf_details[item].import_targets is defined
+    - vrf_details[item].import_targets | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"

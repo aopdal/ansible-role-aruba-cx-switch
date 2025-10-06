@@ -1,0 +1,52 @@
+---
+# Configure physical L3 interfaces
+
+- name: Configure physical L3 interfaces (default VRF) - IPv4 only
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ item.interface_name }}"
+    ipv4:
+      - "{{ item.address }}"
+    vrf: default
+  loop: "{{ l3_interfaces.physical_default_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }}"
+  when: l3_interfaces.physical_default_vrf | length > 0
+
+- name: Configure physical L3 interfaces (default VRF) - IPv6 only
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ item.interface_name }}"
+    ipv6:
+      - "{{ item.address }}"
+    vrf: default
+  loop: "{{ l3_interfaces.physical_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }}"
+  when: l3_interfaces.physical_default_vrf | length > 0
+
+- name: Configure physical L3 interfaces (custom VRF) - IPv4
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - vrf attach {{ item.vrf }}
+      - ip address {{ item.address }}
+    parents: interface {{ item.interface_name }}
+    match: line
+  loop: "{{ l3_interfaces.physical_custom_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
+  when: l3_interfaces.physical_custom_vrf | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+- name: Configure physical L3 interfaces (custom VRF) - IPv6
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - vrf attach {{ item.vrf }}
+      - ipv6 address {{ item.address }}
+    parents: interface {{ item.interface_name }}
+    match: line
+  loop: "{{ l3_interfaces.physical_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
+  when: l3_interfaces.physical_custom_vrf | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"

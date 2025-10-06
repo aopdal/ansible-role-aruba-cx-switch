@@ -1,0 +1,126 @@
+---
+# Main task file for aruba_cx_switch role
+
+- name: Include fact gathering tasks
+  ansible.builtin.include_tasks: gather_facts.yml
+  when: aoscx_gather_facts | bool
+  tags:
+    - always
+    - facts
+    - gather
+
+# VRFs should be configured before L3 interfaces
+- name: Include VRF configuration tasks
+  ansible.builtin.include_tasks: configure_vrfs.yml
+  when: aoscx_configure_vrfs | bool
+  tags:
+    - vrfs
+    - layer3
+    - routing
+
+# VLANs should be configured before interfaces
+- name: Include VLAN configuration tasks
+  ansible.builtin.include_tasks: configure_vlans.yml
+  when: aoscx_configure_vlans | bool
+  tags:
+    - vlans
+    - layer2
+
+# L2 interfaces (non-idempotent mode - for initial config)
+- name: Include L2 interface configuration tasks
+  ansible.builtin.include_tasks: configure_l2_interfaces.yml
+  when:
+    - aoscx_configure_l2_interfaces | bool
+    - not (aoscx_idempotent_mode | bool)
+  tags:
+    - interfaces
+    - l2_interfaces
+    - layer2
+
+# L2 interfaces (idempotent mode - removes unwanted configs)
+- name: Include L2 interface configuration tasks (idempotent)
+  ansible.builtin.include_tasks: configure_l2_interfaces_idempotent.yml
+  when:
+    - aoscx_configure_l2_interfaces | bool
+    - aoscx_idempotent_mode | bool
+  tags:
+    - interfaces
+    - l2_interfaces
+    - layer2
+    - idempotent
+
+# VLAN cleanup should happen AFTER interfaces are cleaned up
+- name: Include VLAN cleanup tasks
+  ansible.builtin.include_tasks: cleanup_vlans.yml
+  when:
+    - aoscx_configure_vlans | bool
+    - aoscx_idempotent_mode | bool
+  tags:
+    - vlans
+    - layer2
+    - cleanup
+    - idempotent
+
+- name: Include L3 interface configuration tasks
+  ansible.builtin.include_tasks: configure_l3_interfaces.yml
+  when: aoscx_configure_l3_interfaces | bool
+  tags:
+    - interfaces
+    - l3_interfaces
+    - layer3
+
+- name: Include loopback configuration tasks
+  ansible.builtin.include_tasks: configure_loopback.yml
+  when: aoscx_configure_loopback | bool
+  tags:
+    - loopback
+    - layer3
+
+- name: Include EVPN configuration tasks
+  ansible.builtin.include_tasks: configure_evpn.yml
+  when: aoscx_configure_evpn | bool
+  tags:
+    - evpn
+    - overlay
+
+- name: Include VXLAN configuration tasks
+  ansible.builtin.include_tasks: configure_vxlan.yml
+  when: aoscx_configure_vxlan | bool
+  tags:
+    - vxlan
+    - overlay
+
+- name: Include OSPF configuration tasks
+  ansible.builtin.include_tasks: configure_ospf.yml
+  when: aoscx_configure_ospf | bool
+  tags:
+    - ospf
+    - routing
+    - layer3
+
+- name: Include BGP configuration tasks
+  ansible.builtin.include_tasks: configure_bgp.yml
+  when: aoscx_configure_bgp | bool
+  tags:
+    - bgp
+    - routing
+    - layer3
+
+- name: Include VSX configuration tasks
+  ansible.builtin.include_tasks: configure_vsx.yml
+  when: aoscx_configure_vsx | bool
+  tags:
+    - vsx
+    - ha
+
+# Save configuration if changes were made
+- name: Save configuration when modified
+  arubanetworks.aoscx.aoscx_config:
+    save_when: modified
+  vars:
+    ansible_connection: network_cli
+  when: aoscx_save_config | bool
+  tags:
+    - always
+    - save
+    - config

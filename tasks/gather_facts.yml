@@ -1,0 +1,26 @@
+---
+# Gather facts from AOS-CX switches
+
+- name: Gather device facts
+  arubanetworks.aoscx.aoscx_facts:
+    gather_network_resources:
+      - interfaces
+      - vlans
+  register: device_facts_result
+  tags:
+    - always
+
+- name: Debug - Show device facts structure
+  ansible.builtin.debug:
+    msg:
+      - "ansible_facts keys: {{ ansible_facts.keys() | list if ansible_facts is defined else 'ansible_facts not defined' }}"
+      - "Has network_resources: {{ 'network_resources' in ansible_facts if ansible_facts is defined else false }}"
+      - >-
+        Interfaces found: {{ ansible_facts.network_resources.interfaces.keys() | list | length
+        if ansible_facts.network_resources.interfaces is defined else 0 }}
+      - "VLANs found: {{ ansible_facts.network_resources.vlans.keys() | list | length if ansible_facts.network_resources.vlans is defined else 0 }}"
+  when:
+    - aoscx_debug | bool
+    - ansible_verbosity >= 1
+  tags:
+    - always

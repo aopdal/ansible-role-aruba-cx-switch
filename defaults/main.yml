@@ -1,0 +1,29 @@
+---
+# Default variables for aruba_cx_switch role
+
+# Enable/disable fact gathering
+aoscx_gather_facts: true
+
+# Enable debug output
+aoscx_debug: false
+
+# Configuration options
+aoscx_configure_vrfs: true
+aoscx_configure_vlans: true
+aoscx_configure_l2_interfaces: true
+aoscx_configure_l3_interfaces: true
+aoscx_configure_loopback: true
+aoscx_configure_evpn: false
+aoscx_configure_vxlan: false
+aoscx_configure_ospf: false
+aoscx_configure_bgp: false
+aoscx_configure_vsx: false
+
+# Idempotency mode - when true, removes configs not in NetBox
+aoscx_idempotent_mode: false
+
+# Save configuration after changes
+aoscx_save_config: true
+
+# Connection settings
+aoscx_connection_type: network_cli  # or httpapi

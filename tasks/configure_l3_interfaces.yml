@@ -1,0 +1,108 @@
+---
+# Configure L3 interfaces with IP addresses
+
+- name: Extract interfaces with IP addresses
+  ansible.builtin.set_fact:
+    interfaces_with_ips: "{{ interfaces | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list }}"
+
+- name: Debug - Show interfaces with IPs
+  ansible.builtin.debug:
+    msg:
+      - "Interfaces with IP addresses: {{ interfaces_with_ips | length }}"
+      - "Sample: {{ interfaces_with_ips[:3] | map(attribute='name') | list }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Flatten interface/IP combinations
+  ansible.builtin.set_fact:
+    interface_ips: >-
+      {{
+        interfaces_with_ips | map('combine', {'_ip_list': []}) | list |
+        map('combine', {
+          '_ip_list': interfaces_with_ips |
+            selectattr('ip_addresses', 'defined') |
+            map(attribute='ip_addresses') |
+            flatten
+        })
+      }}
+
+# Actually, let's use a simpler approach with a loop
+- name: Build interface IP address list
+  ansible.builtin.set_fact:
+    interface_ips: []
+
+- name: Process each interface with IPs
+  ansible.builtin.set_fact:
+    interface_ips: "{{ interface_ips + [item_combo] }}"
+  vars:
+    item_combo:
+      interface: "{{ item.0 }}"
+      interface_name: "{{ item.0.name }}"
+      interface_type: "{{ item.0.type.value if item.0.type is defined and item.0.type.value is defined else 'unknown' }}"
+      address: "{{ item.1.address }}"
+      vrf: "{{ item.1.vrf.name if item.1.vrf is defined and item.1.vrf.name is defined else 'default' }}"
+      description: "{{ item.0.description | default('') }}"
+      enabled: "{{ item.0.enabled | default(true) }}"
+  loop: "{{ interfaces_with_ips | subelements('ip_addresses', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }} - {{ item.1.address }}"
+
+- name: Debug - Show processed interface IPs
+  ansible.builtin.debug:
+    msg:
+      - "Total interface/IP combinations: {{ interface_ips | length }}"
+      - "Sample: {{ interface_ips[:3] }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Get VLAN interfaces
+  ansible.builtin.set_fact:
+    vlan_interfaces: "{{ interfaces | get_vlan_interfaces }}"
+
+- name: Debug - Show VLAN interfaces
+  ansible.builtin.debug:
+    msg:
+      - "VLAN interfaces found: {{ vlan_interfaces | length }}"
+      - "VLAN interface names: {{ vlan_interfaces | map(attribute='name') | list }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Create VLAN interfaces (SVIs)
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: "{{ item.enabled }}"
+    description: "{{ item.description | default(omit) }}"
+    state: create
+  loop: "{{ vlan_interfaces }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: vlan_interfaces | length > 0
+
+- name: Categorize L3 interfaces
+  ansible.builtin.set_fact:
+    l3_interfaces: "{{ interface_ips | categorize_l3_interfaces }}"
+
+- name: Debug - Show L3 categorization
+  ansible.builtin.debug:
+    msg:
+      - "Physical (default VRF): {{ l3_interfaces.physical_default_vrf | length }}"
+      - "Physical (custom VRF): {{ l3_interfaces.physical_custom_vrf | length }}"
+      - "VLAN (default VRF): {{ l3_interfaces.vlan_default_vrf | length }}"
+      - "VLAN (custom VRF): {{ l3_interfaces.vlan_custom_vrf | length }}"
+      - "LAG (default VRF): {{ l3_interfaces.lag_default_vrf | length }}"
+      - "LAG (custom VRF): {{ l3_interfaces.lag_custom_vrf | length }}"
+      - "Loopback: {{ l3_interfaces.loopback | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+# Configure physical interfaces
+- name: Include physical L3 interface configuration
+  ansible.builtin.include_tasks: configure_l3_physical.yml
+
+# Configure VLAN interfaces
+- name: Include VLAN L3 interface configuration
+  ansible.builtin.include_tasks: configure_l3_vlan.yml
+
+# Configure LAG interfaces
+- name: Include LAG L3 interface configuration
+  ansible.builtin.include_tasks: configure_l3_lag.yml
+
+# Configure loopback interfaces
+- name: Include loopback interface configuration
+  ansible.builtin.include_tasks: configure_l3_loopback.yml

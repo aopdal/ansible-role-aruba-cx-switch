@@ -1,0 +1,58 @@
+---
+# Configure physical L2 interfaces
+
+- name: Configure access interfaces (physical)
+  arubanetworks.aoscx.aoscx_l2_interface:
+    interface: "{{ item.name }}"
+    vlan_mode: access
+    vlan_access: "{{ item.untagged_vlan.vid }}"
+  loop: "{{ l2_interfaces.access }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces.access | length > 0
+
+- name: Configure tagged interfaces with untagged VLAN (physical)
+  arubanetworks.aoscx.aoscx_l2_interface:
+    interface: "{{ item.name }}"
+    vlan_mode: trunk
+    vlan_trunks: "{{ [item.untagged_vlan.vid] + item.tagged_vlans | map(attribute='vid') | list }}"
+    native_vlan_id: "{{ item.untagged_vlan.vid }}"
+  loop: "{{ l2_interfaces.tagged_with_untagged }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces.tagged_with_untagged | length > 0
+
+- name: Configure tagged interfaces without untagged VLAN (physical)
+  arubanetworks.aoscx.aoscx_l2_interface:
+    interface: "{{ item.name }}"
+    vlan_mode: trunk
+    vlan_trunks: "{{ item.tagged_vlans | map(attribute='vid') | list }}"
+    native_vlan_id: "{{ item.tagged_vlans.0.vid }}"
+    native_vlan_tag: true
+  loop: "{{ l2_interfaces.tagged_no_untagged }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces.tagged_no_untagged | length > 0
+
+- name: Configure tagged-all interfaces with untagged VLAN (physical)
+  arubanetworks.aoscx.aoscx_l2_interface:
+    interface: "{{ item.name }}"
+    vlan_mode: trunk
+    trunk_allowed_all: true
+    native_vlan_id: "{{ item.untagged_vlan.vid }}"
+  loop: "{{ l2_interfaces.tagged_all_with_untagged }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces.tagged_all_with_untagged | length > 0
+
+- name: Configure tagged-all interfaces without untagged VLAN (physical)
+  arubanetworks.aoscx.aoscx_l2_interface:
+    interface: "{{ item.name }}"
+    vlan_mode: trunk
+    trunk_allowed_all: true
+    native_vlan_id: "1"
+    native_vlan_tag: true
+  loop: "{{ l2_interfaces.tagged_all_no_untagged }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces.tagged_all_no_untagged | length > 0

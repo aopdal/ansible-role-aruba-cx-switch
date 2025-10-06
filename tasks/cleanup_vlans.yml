@@ -1,0 +1,33 @@
+---
+# Cleanup VLANs after interfaces have been cleaned up
+
+- name: Re-gather facts after interface cleanup
+  arubanetworks.aoscx.aoscx_facts:
+    gather_network_resources:
+      - vlans
+  register: device_facts_after_cleanup
+
+- name: Re-calculate VLANs in use
+  ansible.builtin.set_fact:
+    vlans_in_use_after: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
+
+- name: Re-determine VLAN changes needed
+  ansible.builtin.set_fact:
+    vlan_changes_after: "{{ vlans | get_vlans_needing_changes(vlans_in_use_after, ansible_facts | default({})) }}"
+
+- name: Debug - Show VLANs to delete
+  ansible.builtin.debug:
+    msg:
+      - "VLANs to delete after cleanup: {{ vlan_changes_after.vlans_to_delete }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Delete unused VLANs (after interface cleanup)
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: "{{ item }}"
+    state: delete
+  loop: "{{ vlan_changes_after.vlans_to_delete }}"
+  loop_control:
+    label: "VLAN {{ item }}"
+  when:
+    - vlan_changes_after.vlans_to_delete | length > 0
+    - item != 1  # Never delete VLAN 1

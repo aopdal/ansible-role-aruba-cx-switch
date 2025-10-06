@@ -1,0 +1,38 @@
+---
+# Remove VLANs that shouldn't be on interfaces
+
+- name: Remove VLANs from physical interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item.vlans_to_remove | map('regex_replace', '^(.*)$', 'no vlan trunk allowed \\1') | list }}"
+    parents: "interface {{ item.interface }}"
+    match: line
+  loop: "{{ interfaces_needing_changes.cleanup | rejectattr('is_lag', 'equalto', true) | rejectattr('is_mclag', 'equalto', true) | list }}"
+  loop_control:
+    label: "Interface: {{ item.interface }} - Removing VLANs: {{ item.vlans_to_remove }}"
+  when: item.vlans_to_remove | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+- name: Remove VLANs from LAG interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item.vlans_to_remove | map('regex_replace', '^(.*)$', 'no vlan trunk allowed \\1') | list }}"
+    parents: "interface {{ item.interface | replace('lag', 'lag ') }}"
+    match: line
+  loop: "{{ interfaces_needing_changes.cleanup | selectattr('is_lag', 'equalto', true) | rejectattr('is_mclag', 'equalto', true) | list }}"
+  loop_control:
+    label: "Interface: {{ item.interface }} - Removing VLANs: {{ item.vlans_to_remove }}"
+  when: item.vlans_to_remove | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+- name: Remove VLANs from MCLAG interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item.vlans_to_remove | map('regex_replace', '^(.*)$', 'no vlan trunk allowed \\1') | list }}"
+    parents: "interface {{ item.interface | replace('lag', 'lag ') }} multi-chassis"
+    match: line
+  loop: "{{ interfaces_needing_changes.cleanup | selectattr('is_mclag', 'equalto', true) | list }}"
+  loop_control:
+    label: "Interface: {{ item.interface }} - Removing VLANs: {{ item.vlans_to_remove }}"
+  when: item.vlans_to_remove | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
