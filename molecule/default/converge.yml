@@ -1,0 +1,59 @@
+---
+# Converge playbook for Molecule testing
+- name: Converge
+  hosts: all
+  gather_facts: true
+
+  vars:
+    # Mock NetBox connection
+    netbox_url: "http://localhost:8000"
+    netbox_token: "mock_token_for_testing"
+
+    # Mock device data
+    device_id: 1
+    ansible_network_os: "arubanetworks.aoscx.aoscx"
+
+    # Test VRFs
+    netbox_vrfs:
+      - name: "MGMT"
+        rd: "65000:100"
+        route_targets:
+          - "65000:100"
+
+    # Test VLANs
+    netbox_vlans:
+      - id: 100
+        vid: 100
+        name: "DATA"
+      - id: 200
+        vid: 200
+        name: "VOICE"
+
+    # Test interfaces
+    netbox_interfaces:
+      - name: "1/1/1"
+        type: "1000base-t"
+        mode: "access"
+        untagged_vlan:
+          vid: 100
+        enabled: true
+      - name: "1/1/2"
+        type: "1000base-t"
+        mode: "trunk"
+        tagged_vlans:
+          - vid: 100
+          - vid: 200
+        enabled: true
+
+    # Enable features for testing
+    aoscx_gather_facts: false  # Skip fact gathering in tests
+    aoscx_configure_vrfs: false  # Disabled in check mode
+    aoscx_configure_vlans: false  # Disabled in check mode
+    aoscx_configure_l2_interfaces: false  # Disabled in check mode
+    aoscx_configure_l3_interfaces: false  # Disabled in check mode
+    aoscx_configure_loopback: false  # Disabled in check mode
+    aoscx_save_config: false
+    aoscx_debug: true
+
+  roles:
+    - role: aopdal.aruba_cx_switch

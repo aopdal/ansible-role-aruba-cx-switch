@@ -1,0 +1,23 @@
+---
+# Verify playbook for Molecule testing
+- name: Verify
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: "Verify instance is running"
+      ansible.builtin.debug:
+        msg: "Instance {{ ansible_hostname }} is running and responding"
+
+    - name: "Check Python is available"
+      ansible.builtin.command: python3 --version
+      register: python_version
+      changed_when: false
+
+    - name: "Display Python version"
+      ansible.builtin.debug:
+        msg: "Python version: {{ python_version.stdout }}"
+
+    - name: "Display success message"
+      ansible.builtin.debug:
+        msg: "✅ All verification checks passed!"

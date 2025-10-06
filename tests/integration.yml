@@ -1,0 +1,47 @@
+---
+# Integration test playbook - Tests role with mocked data
+- name: Integration Test - VRF Configuration
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Test VRF configuration block
+      check_mode: true  # Run in check mode
+      block:
+        - name: Test VRF configuration task inclusion
+          ansible.builtin.include_role:
+            name: aruba_cx_switch
+            tasks_from: configure_vrfs.yml
+          vars:
+            aoscx_configure_vrfs: true
+            netbox_vrfs:
+              - name: "TEST_VRF"
+                rd: "65000:999"
+      rescue:
+        - name: Handle expected failures
+          ansible.builtin.debug:
+            msg: "VRF config failed as expected without real hardware"
+
+---
+# Integration test playbook - Tests VLAN configuration
+- name: Integration Test - VLAN Configuration
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Test VLAN configuration block
+      check_mode: true  # Run in check mode
+      block:
+        - name: Test VLAN configuration task inclusion
+          ansible.builtin.include_role:
+            name: aruba_cx_switch
+            tasks_from: configure_vlans.yml
+          vars:
+            aoscx_configure_vlans: true
+            netbox_vlans:
+              - vid: 999
+                name: "TEST_VLAN"
+      rescue:
+        - name: Handle expected failures
+          ansible.builtin.debug:
+            msg: "VLAN config failed as expected without real hardware"

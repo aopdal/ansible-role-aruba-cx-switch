@@ -2,22 +2,20 @@
 # meta/main.yml
 galaxy_info:
   role_name: aruba_cx_switch
+  namespace: aopdal
   author: Arne Opdal
   description: Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as source of truth
   company: Your Company
-  
+
   license: MIT
-  
+
   min_ansible_version: "2.12"
-  
+
   platforms:
-    - name: ArubaOS-CX
+    - name: GenericLinux
       versions:
-        - 10.13
-        - 10.14
-        - 10.15
-        - 10.16
-  
+        - all
+
   galaxy_tags:
     - networking
     - aruba

@@ -1,0 +1,81 @@
+---
+# Pre-commit hooks for Ansible role quality checks
+# See https://pre-commit.com for more information
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^tests/output/
+      - id: end-of-file-fixer
+        exclude: ^tests/output/
+      - id: check-yaml
+        args: ['--unsafe']  # Allow custom YAML tags
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-json
+      - id: detect-private-key
+      - id: mixed-line-ending
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: ['-c', '.yamllint']
+        files: \.(yaml|yml)$
+
+  # Using local ansible-lint instead of remote repo to avoid dependency issues
+  - repo: local
+    hooks:
+      - id: ansible-lint
+        name: Ansible-lint
+        entry: bash -c 'source .venv/bin/activate && ansible-lint'
+        language: system
+        files: \.(yaml|yml)$
+        exclude: ^(tests/output/|\.venv/)
+        pass_filenames: false
+
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3
+        files: ^filter_plugins/.*\.py$
+
+  - repo: https://github.com/pycqa/pylint
+    rev: v3.0.3
+    hooks:
+      - id: pylint
+        files: ^filter_plugins/.*\.py$
+        args:
+          - --disable=C0111,C0103,R0903
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        files: ^filter_plugins/.*\.py$
+        args: ['--max-line-length=120']
+
+  - repo: local
+    hooks:
+      - id: ansible-syntax-check
+        name: Ansible Syntax Check
+        entry: bash -c 'ansible-playbook tests/test.yml -i tests/inventory --syntax-check'
+        language: system
+        files: \.(yaml|yml)$
+        pass_filenames: false
+        stages: [manual]  # Only run when explicitly called
+
+      - id: check-role-meta
+        name: Check role meta/main.yml exists
+        entry: bash -c 'test -f meta/main.yml'
+        language: system
+        pass_filenames: false
+        always_run: true

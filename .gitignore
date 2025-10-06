@@ -14,11 +14,18 @@ tests/output/
 tests/inventory/
 .molecule/
 .cache/
+.pytest_cache/
+.tox/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
 
 # IDE
 .vscode/
 .idea/
 *.sublime-*
+*.code-workspace
 
 # OS
 .DS_Store
@@ -32,3 +39,17 @@ Thumbs.db
 .venv
 env/
 venv/
+ENV/
+env.bak/
+venv.bak/
+ENV/
+
+# Documentation builds
+site/
+_build/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~.nib

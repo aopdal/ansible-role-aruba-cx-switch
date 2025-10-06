@@ -1,0 +1,20 @@
+---
+# Prepare playbook for Molecule testing
+# Creates a symlink so the role can be found by its Galaxy name
+- name: Prepare
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Create ansible roles directory
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/roles"
+        state: directory
+        mode: '0755'
+
+    - name: Create symlink for role
+      ansible.builtin.file:
+        src: "{{ playbook_dir }}/../.."
+        dest: "{{ playbook_dir }}/roles/aopdal.aruba_cx_switch"
+        state: link
+        force: true

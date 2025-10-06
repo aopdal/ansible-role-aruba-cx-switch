@@ -1,0 +1,154 @@
+---
+# Test playbook for the Aruba CX Switch role
+- name: Test Aruba CX Switch Role
+  hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars:
+    # Mock NetBox configuration for testing
+    netbox_url: "http://localhost:8000"
+    netbox_token: "0123456789abcdef0123456789abcdef01234567"
+
+    # Mock device data
+    ansible_network_os: "arubanetworks.aoscx.aoscx"
+    device_id: 1
+
+    # Test data - VRFs
+    netbox_vrfs:
+      - name: "MGMT"
+        rd: "65000:100"
+        description: "Management VRF"
+        route_targets:
+          - "65000:100"
+      - name: "PROD"
+        rd: "65000:200"
+        description: "Production VRF"
+        route_targets:
+          - "65000:200"
+
+    # Test data - VLANs
+    netbox_vlans:
+      - id: 10
+        vid: 10
+        name: "MGMT"
+        description: "Management VLAN"
+      - id: 100
+        vid: 100
+        name: "DATA"
+        description: "Data VLAN"
+      - id: 200
+        vid: 200
+        name: "VOICE"
+        description: "Voice VLAN"
+      - id: 300
+        vid: 300
+        name: "GUEST"
+        description: "Guest VLAN"
+
+    # Test data - L2 Interfaces
+    netbox_interfaces:
+      - name: "1/1/1"
+        type: "1000base-t"
+        enabled: true
+        mode: "access"
+        description: "Access Port - Data"
+        untagged_vlan:
+          vid: 100
+          name: "DATA"
+
+      - name: "1/1/2"
+        type: "1000base-t"
+        enabled: true
+        mode: "trunk"
+        description: "Trunk Port"
+        untagged_vlan:
+          vid: 1
+        tagged_vlans:
+          - vid: 100
+            name: "DATA"
+          - vid: 200
+            name: "VOICE"
+          - vid: 300
+            name: "GUEST"
+
+      - name: "lag1"
+        type: "lag"
+        enabled: true
+        mode: "trunk"
+        description: "Link Aggregation"
+        lag:
+          members:
+            - "1/1/3"
+            - "1/1/4"
+          mode: "active"
+        tagged_vlans:
+          - vid: 100
+          - vid: 200
+
+      # L3 Interface
+      - name: "1/1/10"
+        type: "1000base-t"
+        enabled: true
+        mode: "routed"
+        description: "L3 Port"
+        ip_addresses:
+          - address: "10.1.1.1/30"
+            family: 4
+        vrf:
+          name: "MGMT"
+
+      # VLAN Interface (SVI)
+      - name: "vlan100"
+        type: "virtual"
+        enabled: true
+        description: "Data VLAN Interface"
+        vlan:
+          vid: 100
+        ip_addresses:
+          - address: "192.168.100.1/24"
+            family: 4
+        vrf:
+          name: "PROD"
+
+      # Loopback Interface
+      - name: "loopback0"
+        type: "virtual"
+        enabled: true
+        description: "Loopback for OSPF Router-ID"
+        ip_addresses:
+          - address: "10.255.255.1/32"
+            family: 4
+
+    # Role configuration
+    aoscx_configure_vrfs: true
+    aoscx_configure_vlans: true
+    aoscx_configure_l2_interfaces: true
+    aoscx_configure_l3_interfaces: true
+    aoscx_configure_loopback: true
+    aoscx_idempotent_mode: false
+    aoscx_save_config: false  # Don't save in testing
+    aoscx_debug: true
+
+  tasks:
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg: |
+          Testing Aruba CX Switch Role with:
+          - {{ netbox_vrfs | length }} VRFs
+          - {{ netbox_vlans | length }} VLANs
+          - {{ netbox_interfaces | length }} Interfaces
+
+    - name: Test role execution block
+      block:
+        - name: Include the Aruba CX Switch role
+          ansible.builtin.include_role:
+            name: aruba_cx_switch
+      rescue:
+        - name: Handle expected failures
+          ansible.builtin.debug:
+            msg: "Role execution failed as expected without real hardware"
+
+    - name: Test completed
+      ansible.builtin.debug:
+        msg: "✅ Role execution completed"

@@ -1,0 +1,75 @@
+---
+# See https://ansible.readthedocs.io/projects/lint/configuring/
+
+profile: production  # min, basic, moderate, safety, shared, production
+
+# Exclude paths from linting
+exclude_paths:
+  - .git/
+  - .github/
+  - molecule/
+  - tests/output/
+  - .cache/
+  - .molecule/
+
+# Enable specific rules
+enable_list:
+  - yaml
+  - args
+  - fqcn
+  - name[prefix]
+
+# Skip specific rules
+skip_list:
+  - galaxy[no-changelog]  # We'll add changelog later
+  - yaml[line-length]     # Network configs can be long
+  - name[casing]          # Network convention differs
+  - schema[meta]          # Galaxy meta might have custom fields
+  - role-name             # Role name format
+  - galaxy[version-incorrect]  # Version format in galaxy.yml
+
+# Ansible-lint configuration
+kinds:
+  - yaml: "**/*.yaml"
+  - yaml: "**/*.yml"
+  - playbook: "**/*playbook*.yml"
+  - playbook: "**/playbooks/*.yml"
+  - tasks: "**/tasks/*.yml"
+  - vars: "**/vars/*.yml"
+  - vars: "**/defaults/*.yml"
+  - handlers: "**/handlers/*.yml"
+  - meta: "**/meta/*.yml"
+
+# Mock modules and roles for testing
+mock_modules:
+  - aoscx_vrf
+  - aoscx_vlan
+  - aoscx_l2_interface
+  - aoscx_l3_interface
+  - aoscx_vlan_interface
+  - aoscx_interface
+  - aoscx_ospf_router
+  - aoscx_ospf_interface
+  - aoscx_ospf_area
+  - aoscx_bgp
+  - aoscx_bgp_neighbor
+  - aoscx_vxlan
+  - aoscx_evpn
+  - aoscx_vsx
+  - aoscx_config
+  - aoscx_backup
+  - aoscx_checkpoint
+  - aoscx_facts
+
+mock_roles:
+  - aruba_cx_switch
+
+# Warn instead of failing for these rules
+warn_list:
+  - experimental
+  - role-name
+  - yaml[comments]
+
+# Use FQCN for Ansible modules
+use_default_rules: true
+parseable: true

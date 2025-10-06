@@ -1,13 +1,9 @@
 ---
 # requirements.yml
-roles:
-  - name: aruba_cx_switch
-    src: https://github.com/your-org/ansible-role-aruba-cx-switch.git
-    version: main
-
+# Collections required for the role
 collections:
   - name: arubanetworks.aoscx
     version: ">=4.0.0"
-  
+
   - name: netbox.netbox
     version: ">=3.0.0"
