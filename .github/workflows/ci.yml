@@ -74,7 +74,7 @@ jobs:
       matrix:
         distro:
           - ubuntu2204
-          - ubuntu2004
+          - ubuntu2404
     steps:
       - name: Check out the codebase
         uses: actions/checkout@v4
