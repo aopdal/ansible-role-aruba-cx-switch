@@ -38,6 +38,67 @@ ansible-galaxy collection install arubanetworks.aoscx netbox.netbox
 pip install pynetbox
 ```
 
+## Installation
+
+### From GitHub (Private Repository)
+
+Since this role is currently private on GitHub, you'll need SSH access. Add the following to your project's `requirements.yml`:
+
+```yaml
+---
+roles:
+  - name: aopdal.aruba_cx_switch
+    src: git@github.com:aopdal/ansible-role-aruba-cx-switch.git
+    version: main  # or specify a tag like 'v1.0.0'
+    scm: git
+
+collections:
+  - name: arubanetworks.aoscx
+    version: ">=4.0.0"
+  - name: netbox.netbox
+    version: ">=3.0.0"
+```
+
+Install with:
+```bash
+ansible-galaxy install -r requirements.yml
+```
+
+**Note:** Ensure you have SSH access to the repository:
+```bash
+# Test SSH connection
+ssh -T git@github.com
+
+# If needed, add your SSH key
+ssh-add ~/.ssh/id_rsa
+```
+
+### Direct Installation
+
+```bash
+# Install directly from GitHub (SSH)
+ansible-galaxy install git+git@github.com:aopdal/ansible-role-aruba-cx-switch.git,main
+
+# Or using HTTPS (requires authentication for private repos)
+ansible-galaxy install git+https://github.com/aopdal/ansible-role-aruba-cx-switch.git,main
+```
+
+### From Ansible Galaxy (When Published)
+
+Once the role is published to Ansible Galaxy:
+
+```bash
+ansible-galaxy install aopdal.aruba_cx_switch
+```
+
+Or in `requirements.yml`:
+```yaml
+---
+roles:
+  - name: aopdal.aruba_cx_switch
+    version: ">=1.0.0"
+```
+
 ### NetBox Configuration
 
 This role requires the NetBox dynamic inventory plugin with specific settings:
@@ -103,7 +164,7 @@ None.
 - name: Configure Aruba CX Switches
   hosts: aoscx_switches
   gather_facts: false
-  
+
   roles:
     - role: aruba_cx_switch
       vars:
@@ -118,10 +179,10 @@ None.
 - name: Configure VLANs and L2 Interfaces Only
   hosts: aoscx_switches
   gather_facts: false
-  
+
   roles:
     - role: aruba_cx_switch
-  
+
   tags:
     - vlans
     - l2_interfaces
@@ -242,4 +303,3 @@ Contributions are welcome! Please:
 For issues and questions:
 - GitHub Issues: https://github.com/your-org/ansible-role-aruba-cx-switch/issues
 - Documentation: https://github.com/your-org/ansible-role-aruba-cx-switch/wiki
-
