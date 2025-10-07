@@ -23,6 +23,35 @@ This role includes multiple layers of testing:
 
 ## Prerequisites
 
+### 🚀 Option 1: Dev Container (Recommended)
+
+The **easiest way** to run tests is using the VS Code Dev Container, which provides a pre-configured environment:
+
+1. Install [VS Code](https://code.visualstudio.com/) and [Docker](https://www.docker.com/get-started)
+2. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+3. Open this folder in VS Code and click **"Reopen in Container"**
+4. All dependencies are automatically installed! 🎉
+
+**Benefits:**
+- ✅ No manual setup required
+- ✅ Consistent environment for all developers
+- ✅ All tools pre-configured (Python, Ansible, Docker, linters)
+- ✅ Pre-commit hooks automatically installed
+- ✅ Works on Windows, Mac, and Linux
+
+**To run tests in dev container:**
+```bash
+# All commands work out of the box
+make test-quick
+make test
+molecule test
+ansible-lint
+```
+
+### 📦 Option 2: Traditional Setup (Without Docker)
+
+If you prefer not to use Docker or dev containers, you can set up a traditional virtual environment.
+
 ### Install Testing Dependencies
 
 **IMPORTANT: All testing should be done in a virtual environment to avoid conflicts with system packages.**
@@ -153,7 +182,8 @@ MOLECULE_DISTRO=ubuntu2004 molecule test
 ```
 
 Available distros:
-- `ubuntu2204` (default)
+- `ubuntu2404` (default)
+- `ubuntu2204`
 - `ubuntu2004`
 
 Configuration: `molecule/default/molecule.yml`

@@ -17,6 +17,27 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as 
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
 
+## Getting Started
+
+### 🚀 Quick Start (Recommended: Dev Container)
+
+The easiest way to start developing is using the **VS Code Dev Container** which provides a pre-configured environment with all dependencies:
+
+1. **Prerequisites**: Install [VS Code](https://code.visualstudio.com/) and [Docker](https://www.docker.com/get-started)
+2. **Install Extension**: Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+3. **Open in Container**:
+   - Open this folder in VS Code
+   - When prompted, click **"Reopen in Container"** (or press `F1` → `Dev Containers: Reopen in Container`)
+4. **Start Coding**: The container automatically installs all dependencies!
+
+All Python packages, Ansible collections, and tools are pre-configured. No manual setup needed! 🎉
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guidelines.
+
+### 📦 Alternative: Traditional Setup
+
+If you don't have Docker, you can use a traditional virtual environment setup. See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed instructions.
+
 ## Requirements
 
 ### Ansible Collections

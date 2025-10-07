@@ -1,0 +1,86 @@
+{
+  "name": "Ansible Role Development - Aruba AOS-CX",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "VARIANT": "3.12"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": "true"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    }
+  },
+  "containerEnv": {
+    "ANSIBLE_FORCE_COLOR": "true",
+    "ANSIBLE_HOST_KEY_CHECKING": "false",
+    "PY_COLORS": "1"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.ansible",
+        "redhat.vscode-yaml",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "streetsidesoftware.code-spell-checker",
+        "usernamehw.errorlens",
+        "oderwat.indent-rainbow"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.formatting.provider": "black",
+        "python.analysis.typeCheckingMode": "basic",
+        "ansible.python.interpreterPath": "/usr/local/bin/python",
+        "ansible.validation.enabled": true,
+        "ansible.validation.lint.enabled": true,
+        "ansible.validation.lint.path": "/usr/local/bin/ansible-lint",
+        "yaml.schemas": {
+          "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook": [
+            "playbooks/**/*.yml",
+            "playbooks/**/*.yaml",
+            "**/molecule/**/converge.yml",
+            "**/molecule/**/prepare.yml",
+            "**/molecule/**/verify.yml"
+          ],
+          "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/tasks": [
+            "tasks/**/*.yml",
+            "tasks/**/*.yaml",
+            "handlers/**/*.yml"
+          ]
+        },
+        "yaml.customTags": [
+          "!vault"
+        ],
+        "files.associations": {
+          "*.yml": "ansible",
+          "*.yaml": "ansible"
+        },
+        "editor.formatOnSave": true,
+        "editor.rulers": [120],
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "forwardPorts": [],
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "onCreateCommand": "echo '🚀 Dev container created!'",
+  "updateContentCommand": "echo '🔄 Updating container...'",
+  "postStartCommand": "echo '✅ Dev container ready! Run: make test-quick'"
+}

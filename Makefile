@@ -139,6 +139,15 @@ info: ## Display testing information
 		echo "Virtual Environment: ❌ Not created (run 'make venv')"; \
 	fi
 	@echo "Docker: $$(docker --version 2>&1 || echo 'Not installed')"
+	@if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then \
+		echo "Dev Container: ✅ Running in dev container"; \
+	else \
+		echo "Dev Container: ℹ️  Not running in dev container (optional)"; \
+	fi
+	@echo ""
+	@echo "$(BLUE)Development Options:$(NC)"
+	@echo "  🐳 Dev Container: Recommended - See .devcontainer/"
+	@echo "  📦 Virtual Env: Alternative - Run './setup-testing.sh'"
 	@echo ""
 	@echo "$(BLUE)Test Coverage:$(NC)"
 	@echo "  ✅ YAML linting (.yamllint)"
@@ -150,8 +159,10 @@ info: ## Display testing information
 	@echo "  ✅ CI/CD pipeline (.github/workflows/ci.yml)"
 	@echo ""
 	@echo "$(BLUE)Documentation:$(NC)"
-	@echo "  📚 See TESTING.md for comprehensive guide"
-	@echo "  📚 See README.md for role usage"
+	@echo "  📚 QUICKSTART.md - Get started quickly"
+	@echo "  📚 DEVELOPMENT.md - Complete development guide"
+	@echo "  📚 TESTING.md - Testing instructions"
+	@echo "  📚 README.md - Role usage and features"
 
 all: clean setup test ## Clean, setup, and run all tests
 	@echo "$(GREEN)🎉 All done!$(NC)"

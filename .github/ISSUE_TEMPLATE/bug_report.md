@@ -23,8 +23,8 @@ assignees: ''
 
 ## Environment
 - **Ansible Version**: <!-- e.g., 2.15.0 -->
-- **Python Version**: <!-- e.g., 3.11.0 -->
-- **OS**: <!-- e.g., Ubuntu 22.04 -->
+- **Python Version**: <!-- e.g., 3.12.0 -->
+- **OS**: <!-- e.g., Ubuntu 24.04 -->
 - **Role Version**: <!-- e.g., v1.0.0 or commit hash -->
 - **AOS-CX Switch Model**: <!-- e.g., 6300M, 8325 -->
 - **AOS-CX Version**: <!-- e.g., 10.11.0001 -->
