@@ -24,12 +24,28 @@
   register: vrf_details_raw
   when: vrfs_in_use.vrf_names | length > 0
 
+- name: Debug - Show VRF lookup raw results
+  ansible.builtin.debug:
+    msg:
+      - "Item: {{ item.item }}"
+      - "Has ansible_facts: {{ item.ansible_facts is defined }}"
+      - "Has netbox_vrfs: {{ item.ansible_facts.netbox_vrfs is defined if item.ansible_facts is defined else false }}"
+      - "netbox_vrfs type: {{ item.ansible_facts.netbox_vrfs | type_debug if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}"
+      - "netbox_vrfs content: {{ item.ansible_facts.netbox_vrfs if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}"
+  loop: "{{ vrf_details_raw.results }}"
+  loop_control:
+    label: "VRF: {{ item.item }}"
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 2
+    - vrf_details_raw is defined
+    - vrf_details_raw.results is defined
+
 - name: Build VRF details dictionary
   ansible.builtin.set_fact:
     vrf_details: >-
       {{
         vrf_details | default({}) | combine({
-          item.item: item.ansible_facts.netbox_vrfs[0] if item.ansible_facts.netbox_vrfs | length > 0 else {}
+          item.item: item.ansible_facts.netbox_vrfs | first
         })
       }}
   loop: "{{ vrf_details_raw.results }}"
@@ -40,6 +56,8 @@
     - vrf_details_raw.results is defined
     - item.ansible_facts is defined
     - item.ansible_facts.netbox_vrfs is defined
+    - item.ansible_facts.netbox_vrfs is not none
+    - item.ansible_facts.netbox_vrfs | length > 0
 
 - name: Debug - Show VRF details
   ansible.builtin.debug:
