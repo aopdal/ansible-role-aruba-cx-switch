@@ -4,8 +4,9 @@ Custom Ansible filters for NetBox data transformation
 """
 
 # Import from the netbox_filters_lib package (subdirectory)
-from filter_plugins.netbox_filters_lib.utils import collapse_vlan_list
-from filter_plugins.netbox_filters_lib.vlan_filters import (
+# Use relative imports to work when installed as a role
+from .netbox_filters_lib.utils import collapse_vlan_list
+from .netbox_filters_lib.vlan_filters import (
     extract_vlan_ids,
     filter_vlans_in_use,
     extract_evpn_vlans,
@@ -14,18 +15,18 @@ from filter_plugins.netbox_filters_lib.vlan_filters import (
     get_vlans_needing_changes,
     get_vlan_interfaces,
 )
-from filter_plugins.netbox_filters_lib.vrf_filters import (
+from .netbox_filters_lib.vrf_filters import (
     extract_interface_vrfs,
     filter_vrfs_in_use,
     get_vrfs_in_use,
     filter_configurable_vrfs,
 )
-from filter_plugins.netbox_filters_lib.interface_filters import (
+from .netbox_filters_lib.interface_filters import (
     categorize_l2_interfaces,
     categorize_l3_interfaces,
     get_interface_ip_addresses,
 )
-from filter_plugins.netbox_filters_lib.comparison import (
+from .netbox_filters_lib.comparison import (
     compare_interface_vlans,
     get_interfaces_needing_changes,
     get_interfaces_needing_vlan_cleanup,
