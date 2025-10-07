@@ -3,10 +3,20 @@
 Custom Ansible filters for NetBox data transformation
 """
 
+import sys
+import os
+
+# Add the filter_plugins directory to Python path to enable imports
+# This allows the submodule imports to work when installed as a role
+_filter_dir = os.path.dirname(os.path.abspath(__file__))
+if _filter_dir not in sys.path:
+    sys.path.insert(0, _filter_dir)
+
 # Import from the netbox_filters_lib package (subdirectory)
-# Use relative imports to work when installed as a role
-from .netbox_filters_lib.utils import collapse_vlan_list
-from .netbox_filters_lib.vlan_filters import (
+# pylint: disable=wrong-import-position
+# flake8: noqa: E402
+from netbox_filters_lib.utils import collapse_vlan_list
+from netbox_filters_lib.vlan_filters import (
     extract_vlan_ids,
     filter_vlans_in_use,
     extract_evpn_vlans,
@@ -15,18 +25,18 @@ from .netbox_filters_lib.vlan_filters import (
     get_vlans_needing_changes,
     get_vlan_interfaces,
 )
-from .netbox_filters_lib.vrf_filters import (
+from netbox_filters_lib.vrf_filters import (
     extract_interface_vrfs,
     filter_vrfs_in_use,
     get_vrfs_in_use,
     filter_configurable_vrfs,
 )
-from .netbox_filters_lib.interface_filters import (
+from netbox_filters_lib.interface_filters import (
     categorize_l2_interfaces,
     categorize_l3_interfaces,
     get_interface_ip_addresses,
 )
-from .netbox_filters_lib.comparison import (
+from netbox_filters_lib.comparison import (
     compare_interface_vlans,
     get_interfaces_needing_changes,
     get_interfaces_needing_vlan_cleanup,
