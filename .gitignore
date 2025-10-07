@@ -57,3 +57,6 @@ _build/
 # Ansible local development
 .ansible/roles/
 .ansible/.lock
+
+# Molecule test symlinks
+molecule/*/roles/
