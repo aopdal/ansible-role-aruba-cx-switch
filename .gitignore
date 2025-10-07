@@ -53,3 +53,7 @@ _build/
 *.bak
 *.swp
 *~.nib
+
+# Ansible local development
+.ansible/roles/
+.ansible/.lock
