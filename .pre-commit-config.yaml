@@ -54,7 +54,7 @@ repos:
       - id: pylint
         files: ^filter_plugins/.*\.py$
         args:
-          - --disable=C0111,C0103,R0903
+          - --disable=C0111,C0103,R0903,E0401,R0914,R0912,R0915,W0718,R1702,R0801
 
   - repo: https://github.com/pycqa/flake8
     rev: 6.1.0

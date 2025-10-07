@@ -1,19 +1,12 @@
 {
   "name": "Ansible Role Development - Aruba AOS-CX",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "VARIANT": "3.12"
-    }
-  },
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
+      "moby": false,
       "enableNonRootDocker": "true"
     },
-    "ghcr.io/devcontainers/features/git:1": {
-      "version": "latest"
-    }
+    "ghcr.io/devcontainers/features/git:1": {}
   },
   "containerEnv": {
     "ANSIBLE_FORCE_COLOR": "true",
@@ -60,9 +53,7 @@
             "handlers/**/*.yml"
           ]
         },
-        "yaml.customTags": [
-          "!vault"
-        ],
+        "yaml.customTags": ["!vault"],
         "files.associations": {
           "*.yml": "ansible",
           "*.yaml": "ansible"
@@ -76,11 +67,5 @@
     }
   },
   "forwardPorts": [],
-  "remoteUser": "vscode",
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  ],
-  "onCreateCommand": "echo '🚀 Dev container created!'",
-  "updateContentCommand": "echo '🔄 Updating container...'",
-  "postStartCommand": "echo '✅ Dev container ready! Run: make test-quick'"
+  "remoteUser": "vscode"
 }
