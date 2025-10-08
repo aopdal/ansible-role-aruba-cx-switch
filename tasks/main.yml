@@ -49,18 +49,6 @@
     - layer2
     - idempotent
 
-# VLAN cleanup should happen AFTER interfaces are cleaned up
-- name: Include VLAN cleanup tasks
-  ansible.builtin.include_tasks: cleanup_vlans.yml
-  when:
-    - aoscx_configure_vlans | bool
-    - aoscx_idempotent_mode | bool
-  tags:
-    - vlans
-    - layer2
-    - cleanup
-    - idempotent
-
 - name: Include L3 interface configuration tasks
   ansible.builtin.include_tasks: configure_l3_interfaces.yml
   when: aoscx_configure_l3_interfaces | bool
@@ -89,6 +77,19 @@
   tags:
     - vxlan
     - overlay
+
+# VLAN cleanup should happen AFTER all interfaces and overlays are cleaned up
+# This ensures VLANs are not in use on: trunk ports, access ports, SVIs, or EVPN/VXLAN
+- name: Include VLAN cleanup tasks
+  ansible.builtin.include_tasks: cleanup_vlans.yml
+  when:
+    - aoscx_configure_vlans | bool
+    - aoscx_idempotent_mode | bool
+  tags:
+    - vlans
+    - layer2
+    - cleanup
+    - idempotent
 
 - name: Include OSPF configuration tasks
   ansible.builtin.include_tasks: configure_ospf.yml

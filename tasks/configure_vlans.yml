@@ -1,5 +1,11 @@
 ---
-# Configure VLANs on AOS-CX switches (idempotent)
+# Configure VLANs on AOS-CX switches (CREATE only)
+#
+# This task file ONLY creates VLANs from NetBox.
+# VLAN deletion happens in cleanup_vlans.yml AFTER interface cleanup
+# to ensure VLANs are not in use when deleted.
+#
+# Task order: configure_vlans.yml → interface cleanup → cleanup_vlans.yml
 
 - name: Get VLANs available on device from NetBox (if not provided)
   ansible.builtin.uri:
@@ -53,6 +59,7 @@
       - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{ vlan_changes.vlans_to_create | map(attribute='vid') | list }}"
       - "VLANs to delete: {{ vlan_changes.vlans_to_delete | length }} - {{ vlan_changes.vlans_to_delete }}"
       - "VLANs in use: {{ vlan_changes.vlans_in_use | length }}"
+      - "Note: VLAN deletion happens in cleanup_vlans.yml after interface cleanup"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Create VLANs
@@ -66,14 +73,6 @@
     label: "VLAN {{ item.vid }} - {{ item.name }}"
   when: vlan_changes.vlans_to_create | length > 0
 
-- name: Delete unused VLANs
-  arubanetworks.aoscx.aoscx_vlan:
-    vlan_id: "{{ item }}"
-    state: delete
-  loop: "{{ vlan_changes.vlans_to_delete }}"
-  loop_control:
-    label: "VLAN {{ item }}"
-  when:
-    - aoscx_idempotent_mode | bool
-    - vlan_changes.vlans_to_delete | length > 0
-    - item != 1  # Never delete VLAN 1
+# NOTE: VLAN deletion is handled in cleanup_vlans.yml task
+# This runs AFTER interface cleanup to ensure VLANs are not in use
+# when they are deleted. See tasks/main.yml for task ordering.
