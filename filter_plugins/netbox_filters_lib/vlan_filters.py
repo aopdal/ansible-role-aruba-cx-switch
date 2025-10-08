@@ -302,12 +302,25 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
     if device_facts and device_vids:
         available_vids = set(available_vlans.keys())
         for vid in device_vids:
-            # Delete if: on device AND (not in use OR not in NetBox available list)
-            if vid not in vids_in_use and vid in available_vids:
+            # Skip VLAN 1 - never delete the default VLAN
+            if vid == 1:
+                continue
+
+            # Delete if: on device AND not in use
+            # This includes VLANs that are in NetBox but not used,
+            # AND VLANs that are NOT in NetBox at all (orphaned VLANs)
+            if vid not in vids_in_use:
                 vlans_to_delete.append(vid)
-                _debug(f"VLAN {vid} can be deleted (on device but not in use)")
-            elif vid not in available_vids and vid != 1:  # Don't delete VLAN 1
-                _debug(f"VLAN {vid} on device but not in NetBox scope for this device")
+                if vid in available_vids:
+                    _debug(
+                        f"VLAN {vid} can be deleted (on device, in NetBox, "
+                        f"but not in use)"
+                    )
+                else:
+                    _debug(
+                        f"VLAN {vid} can be deleted (on device, NOT in NetBox, "
+                        f"orphaned VLAN)"
+                    )
 
     result = {
         "vlans_to_create": vlans_to_create,
