@@ -247,21 +247,26 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
     # Get VLANs currently on device (if facts provided)
     device_vids = set()
     if device_facts and isinstance(device_facts, dict):
-        if "network_resources" in device_facts:
+        # Try both ansible_network_resources and network_resources paths
+        network_resources = None
+        if "ansible_network_resources" in device_facts:
+            network_resources = device_facts.get("ansible_network_resources", {})
+        elif "network_resources" in device_facts:
             network_resources = device_facts.get("network_resources", {})
-            if network_resources and isinstance(network_resources, dict):
-                vlans_dict = network_resources.get("vlans", {})
-                if vlans_dict and isinstance(vlans_dict, dict):
-                    # AOS-CX stores VLANs as dict keyed by VID
-                    for vid_str in vlans_dict.keys():
-                        try:
-                            device_vids.add(int(vid_str))
-                        except (ValueError, TypeError):
-                            pass
-                    _debug(
-                        f"Found {len(device_vids)} VLANs on device: "
-                        f"{sorted(list(device_vids))}"
-                    )
+
+        if network_resources and isinstance(network_resources, dict):
+            vlans_dict = network_resources.get("vlans", {})
+            if vlans_dict and isinstance(vlans_dict, dict):
+                # AOS-CX stores VLANs as dict keyed by VID
+                for vid_str in vlans_dict.keys():
+                    try:
+                        device_vids.add(int(vid_str))
+                    except (ValueError, TypeError):
+                        pass
+                _debug(
+                    f"Found {len(device_vids)} VLANs on device: "
+                    f"{sorted(list(device_vids))}"
+                )
 
     # Build dict of available VLANs by VID
     available_vlans = {}

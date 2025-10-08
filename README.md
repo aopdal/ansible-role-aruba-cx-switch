@@ -143,22 +143,6 @@ group_by:
   - platforms
 ```
 
-### Filter Plugins
-
-This role includes custom Ansible filters for NetBox data transformation. The filters are organized in a modular structure under `filter_plugins/netbox_filters_lib/` for maintainability.
-
-**Note for Role Users:** The filter plugins are automatically loaded when the role is installed via `ansible-galaxy`. The role handles Python path configuration internally, so no additional setup is required.
-
-**Note for Collection Developers:** If you're converting this role to an Ansible collection, the filter plugin structure is already collection-ready with proper relative imports.
-
-Available filters include:
-- VLAN operations: `extract_vlan_ids`, `filter_vlans_in_use`, `get_vlans_in_use`
-- VRF operations: `extract_interface_vrfs`, `filter_vrfs_in_use`, `get_vrfs_in_use`
-- Interface categorization: `categorize_l2_interfaces`, `categorize_l3_interfaces`
-- Comparison utilities: `compare_interface_vlans`, `get_interfaces_needing_changes`
-
-For detailed filter documentation, see [filter_plugins/netbox_filters_lib/README.md](filter_plugins/netbox_filters_lib/README.md).
-
 ## Role Variables
 
 See [defaults/main.yml](defaults/main.yml) for all available variables.
