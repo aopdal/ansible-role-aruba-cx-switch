@@ -247,12 +247,20 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
     # Get VLANs currently on device (if facts provided)
     device_vids = set()
     if device_facts and isinstance(device_facts, dict):
+        _debug(f"Device facts provided: {list(device_facts.keys())}")
         # Try both ansible_network_resources and network_resources paths
         network_resources = None
         if "ansible_network_resources" in device_facts:
             network_resources = device_facts.get("ansible_network_resources", {})
+            _debug("Using ansible_network_resources path")
         elif "network_resources" in device_facts:
             network_resources = device_facts.get("network_resources", {})
+            _debug("Using network_resources path")
+        else:
+            _debug(
+                f"WARNING: No network_resources found in device_facts. "
+                f"Keys: {list(device_facts.keys())}"
+            )
 
         if network_resources and isinstance(network_resources, dict):
             vlans_dict = network_resources.get("vlans", {})
@@ -267,6 +275,12 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
                     f"Found {len(device_vids)} VLANs on device: "
                     f"{sorted(list(device_vids))}"
                 )
+            else:
+                _debug("WARNING: vlans dict is empty or not a dict")
+        else:
+            _debug("WARNING: network_resources is empty or not a dict")
+    else:
+        _debug("WARNING: No device facts provided to get_vlans_needing_changes!")
 
     # Build dict of available VLANs by VID
     available_vlans = {}
@@ -278,6 +292,7 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
 
     _debug(f"Available VLANs from NetBox: {sorted(list(available_vlans.keys()))}")
     _debug(f"VLANs in use on interfaces: {sorted(list(vids_in_use))}")
+    _debug(f"VLANs on device (from facts): {sorted(list(device_vids))}")
 
     # Determine VLANs to create (in use but not on device or not created yet)
     for vid in vids_in_use:
