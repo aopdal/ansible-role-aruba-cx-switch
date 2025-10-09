@@ -292,6 +292,61 @@ When `aoscx_idempotent_mode: true`:
 
 **Warning**: Use with caution in production - this removes configurations!
 
+## Testing
+
+This role includes comprehensive integration testing documentation and scripts for testing with real/virtual Aruba AOS-CX switches.
+
+### Testing Documentation
+
+- **[Testing Environment](docs/TESTING_ENVIRONMENT.md)** - Complete testing setup guide
+- **[Quick Start](docs/TESTING_QUICK_START.md)** - 30-minute quick start to first test
+- **[Testing Proposal](docs/TESTING_PROPOSAL.md)** - Executive summary for stakeholders
+
+### Testing Architecture
+
+The testing environment uses:
+- **EVE-NG** - Virtual network lab for AOS-CX switches
+- **NetBox** - Source of truth for network configuration
+- **Ansible** - Role execution and validation
+- **pytest** - Automated test validation
+
+### Test Scenarios Covered
+
+1. ✅ VLAN creation and deletion
+2. ✅ Orphaned VLAN cleanup (not in NetBox)
+3. ✅ L2 interface configuration (trunk/access)
+4. ✅ L3 interface configuration (SVIs, routed ports)
+5. ✅ VRF configuration
+6. ✅ Routing protocols (OSPF, BGP)
+7. ✅ EVPN/VXLAN (fabric topology)
+8. ✅ VSX configuration
+9. ✅ Idempotent operations
+
+### Quick Test Setup
+
+```bash
+# 1. Deploy NetBox
+git clone https://github.com/netbox-community/netbox-docker.git
+cd netbox-docker && docker-compose up -d
+
+# 2. Populate test data
+python testing-scripts/populate_netbox.py \
+  --url http://localhost:8000 \
+  --token YOUR_TOKEN \
+  --topology simple
+
+# 3. Run tests
+ansible-playbook -i inventory/hosts.yml playbooks/test_vlans.yml
+
+# 4. Validate
+python testing-scripts/validate_deployment.py \
+  --switches spine1,leaf1 \
+  --netbox-url http://localhost:8000 \
+  --netbox-token YOUR_TOKEN
+```
+
+See [testing-scripts/README.md](testing-scripts/README.md) for detailed script usage.
+
 ## License
 
 MIT
