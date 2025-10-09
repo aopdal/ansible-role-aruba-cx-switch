@@ -218,8 +218,11 @@ ansible-role-aruba-cx-switch/
 ├── requirements-test.txt       # Python testing dependencies
 ├── Makefile                    # Common development tasks
 ├── README.md                   # Role documentation
-├── TESTING.md                  # Testing guide
-└── DEVELOPMENT.md              # This file
+├── docs/                       # Documentation
+│   ├── DEVELOPMENT.md          # This file
+│   ├── TESTING*.md             # Testing guides
+│   └── ...                     # Other documentation
+└── CONTRIBUTING.md             # Contribution guidelines
 ```
 
 ## Development Workflow

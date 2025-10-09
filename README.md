@@ -32,11 +32,11 @@ The easiest way to start developing is using the **VS Code Dev Container** which
 
 All Python packages, Ansible collections, and tools are pre-configured. No manual setup needed! 🎉
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guidelines.
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed development guidelines.
 
 ### 📦 Alternative: Traditional Setup
 
-If you don't have Docker, you can use a traditional virtual environment setup. See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed instructions.
+If you don't have Docker, you can use a traditional virtual environment setup. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed instructions.
 
 ## Requirements
 

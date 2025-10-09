@@ -45,7 +45,8 @@ class NetBoxPopulator:
         """Create manufacturer"""
         print(f"Creating manufacturer: {name}")
         try:
-            self.manufacturer = self.nb.dcim.manufacturers.get(slug=name.lower())
+            self.manufacturer = self.nb.dcim.manufacturers.get(
+                slug=name.lower())
             if self.manufacturer:
                 print(f"  Manufacturer '{name}' already exists")
             else:
@@ -147,7 +148,8 @@ class NetBoxPopulator:
         for i in range(1, interface_count + 1):
             intf_name = f"1/1/{i}"
             try:
-                intf = self.nb.dcim.interfaces.get(device_id=device.id, name=intf_name)
+                intf = self.nb.dcim.interfaces.get(
+                    device_id=device.id, name=intf_name)
                 if not intf:
                     self.nb.dcim.interfaces.create(
                         device=device.id, name=intf_name, type="1000base-t"

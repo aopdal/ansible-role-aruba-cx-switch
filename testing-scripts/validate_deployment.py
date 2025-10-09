@@ -60,7 +60,8 @@ class ConfigValidator:
             return not self._has_errors(hostname)
 
         except Exception as e:
-            self._add_result(hostname, "ERROR", "Connection", f"Failed to connect: {e}")
+            self._add_result(hostname, "ERROR", "Connection",
+                             f"Failed to connect: {e}")
             return False
 
     def _validate_vlans(self, hostname: str, session: Session, nb_device) -> None:
@@ -117,7 +118,8 @@ class ConfigValidator:
                         )
 
         except Exception as e:
-            self._add_result(hostname, "ERROR", "VLANs", f"Failed to get VLANs: {e}")
+            self._add_result(hostname, "ERROR", "VLANs",
+                             f"Failed to get VLANs: {e}")
 
     def _validate_interfaces(
         self, hostname: str, session: Session, nb_device
@@ -136,7 +138,8 @@ class ConfigValidator:
 
                 # Get interface from switch
                 try:
-                    switch_intf = PyaoscxFactory.get_interface(session, nb_intf.name)
+                    switch_intf = PyaoscxFactory.get_interface(
+                        session, nb_intf.name)
 
                     if not switch_intf:
                         self._add_result(
@@ -187,7 +190,8 @@ class ConfigValidator:
             nb_vrfs = self.nb.ipam.vrfs.all()
 
             if not nb_vrfs:
-                self._add_result(hostname, "INFO", "VRFs", "No VRFs defined in NetBox")
+                self._add_result(hostname, "INFO", "VRFs",
+                                 "No VRFs defined in NetBox")
                 return
 
             # Get VRFs from switch
@@ -211,7 +215,8 @@ class ConfigValidator:
                 )
 
         except Exception as e:
-            self._add_result(hostname, "ERROR", "VRFs", f"Failed to get VRFs: {e}")
+            self._add_result(hostname, "ERROR", "VRFs",
+                             f"Failed to get VRFs: {e}")
 
     def _add_result(
         self, hostname: str, status: str, category: str, message: str
@@ -276,14 +281,16 @@ class ConfigValidator:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Validate Aruba CX switch deployment")
+    parser = argparse.ArgumentParser(
+        description="Validate Aruba CX switch deployment")
     parser.add_argument(
         "--switches",
         required=True,
         help="Comma-separated list of switch hostnames (e.g., spine1,leaf1)",
     )
     parser.add_argument("--netbox-url", required=True, help="NetBox URL")
-    parser.add_argument("--netbox-token", required=True, help="NetBox API token")
+    parser.add_argument("--netbox-token", required=True,
+                        help="NetBox API token")
     parser.add_argument("--username", default="admin", help="Switch username")
     parser.add_argument("--password", required=True, help="Switch password")
 
@@ -309,7 +316,8 @@ def main():
         try:
             nb_device = validator.nb.dcim.devices.get(name=hostname)
             if not nb_device or not nb_device.primary_ip4:
-                print(f"ERROR: Cannot find management IP for {hostname} in NetBox")
+                print(
+                    f"ERROR: Cannot find management IP for {hostname} in NetBox")
                 all_passed = False
                 continue
 
