@@ -13,6 +13,7 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as 
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support
 - ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
 - ✅ **Loopback Interfaces** - With VRF support
+- ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
 - ✅ **Virtual Chassis Support** - Works with VSX/stacked switches
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
@@ -156,6 +157,7 @@ aoscx_configure_vlans: true
 aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true
 aoscx_configure_loopback: true
+aoscx_configure_ospf: true
 
 # Idempotent mode - removes configs not in NetBox
 aoscx_idempotent_mode: false
@@ -172,6 +174,56 @@ aoscx_debug: false
 ```yaml
 netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
 netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+```
+
+### OSPF Configuration
+
+Configure OSPF in NetBox using custom fields and config context:
+
+#### Device Custom Fields
+
+```yaml
+# Required custom field on devices
+device_ospf_1_routerid: "10.1.1.1"  # OSPF Router ID
+```
+
+#### Device Config Context
+
+```yaml
+# OSPF VRF and areas configuration
+ospf_1_vrf: "default"  # or specify VRF name
+ospf_areas:
+  - ospf_1_area: "0.0.0.0"      # Backbone area
+  - ospf_1_area: "0.0.0.1"      # Additional areas
+```
+
+#### Interface Custom Fields
+
+```yaml
+# Required custom fields on interfaces
+if_ip_ospf_1_area: "0.0.0.0"           # OSPF area for this interface
+if_ip_ospf_network: "point-to-point"    # Network type (broadcast, point-to-point, etc.)
+```
+
+#### Complete Example
+
+Device custom fields:
+```yaml
+device_ospf_1_routerid: "192.168.1.1"
+```
+
+Device config context:
+```yaml
+ospf_1_vrf: "default"
+ospf_areas:
+  - ospf_1_area: "0.0.0.0"
+  - ospf_1_area: "0.0.0.1"
+```
+
+Interface custom fields (for each OSPF-enabled interface):
+```yaml
+if_ip_ospf_1_area: "0.0.0.0"
+if_ip_ospf_network: "point-to-point"
 ```
 
 ## Dependencies
@@ -256,6 +308,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `loopback` - Loopback interface configuration
 - `layer2` - All L2 configuration (VLANs + L2 interfaces)
 - `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks)
+- `ospf` - OSPF configuration
 - `routing` - Routing protocol configuration
 - `idempotent` - Cleanup tasks (requires `aoscx_idempotent_mode: true`)
 - `save` - Save configuration

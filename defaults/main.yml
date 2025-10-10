@@ -15,7 +15,7 @@ aoscx_configure_l3_interfaces: true
 aoscx_configure_loopback: true
 aoscx_configure_evpn: false
 aoscx_configure_vxlan: false
-aoscx_configure_ospf: false
+aoscx_configure_ospf: true
 aoscx_configure_bgp: false
 aoscx_configure_vsx: false
 

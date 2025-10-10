@@ -14,6 +14,9 @@
     ansible_network_os: "arubanetworks.aoscx.aoscx"
     device_id: 1
 
+    # This simulates the interfaces variable that would come from NetBox inventory
+    interfaces:
+
     # Test data - VRFs
     netbox_vrfs:
       - name: "MGMT"
@@ -46,8 +49,7 @@
         name: "GUEST"
         description: "Guest VLAN"
 
-    # Test data - L2 Interfaces
-    netbox_interfaces:
+    # Test data - L2 Interfaces (this is also the interfaces variable used by OSPF)
       - name: "1/1/1"
         type: "1000base-t"
         enabled: true
@@ -120,12 +122,54 @@
           - address: "10.255.255.1/32"
             family: 4
 
+      # OSPF L3 Interface
+      - name: "1/1/11"
+        type: "1000base-t"
+        enabled: true
+        mode: "routed"
+        description: "OSPF Point-to-Point Link"
+        ip_addresses:
+          - address: "10.1.2.1/30"
+            family: 4
+        vrf:
+          name: "default"
+        custom_fields:
+          if_ip_ospf_1_area: "0.0.0.0"
+          if_ip_ospf_network: "point-to-point"
+
+      # OSPF VLAN Interface
+      - name: "vlan200"
+        type: "virtual"
+        enabled: true
+        description: "OSPF Broadcast Network"
+        vlan:
+          vid: 200
+        ip_addresses:
+          - address: "192.168.200.1/24"
+            family: 4
+        vrf:
+          name: "default"
+        custom_fields:
+          if_ip_ospf_1_area: "0.0.0.1"
+          if_ip_ospf_network: "broadcast"
+
+    # Mock device data with OSPF configuration
+    device:
+      custom_fields:
+        device_ospf_1_routerid: "10.255.255.1"
+      config_context:
+        ospf_1_vrf: "default"
+        ospf_areas:
+          - ospf_1_area: "0.0.0.0"
+          - ospf_1_area: "0.0.0.1"
+
     # Role configuration
     aoscx_configure_vrfs: true
     aoscx_configure_vlans: true
     aoscx_configure_l2_interfaces: true
     aoscx_configure_l3_interfaces: true
     aoscx_configure_loopback: true
+    aoscx_configure_ospf: true
     aoscx_idempotent_mode: false
     aoscx_save_config: false  # Don't save in testing
     aoscx_debug: true
