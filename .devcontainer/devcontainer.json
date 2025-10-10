@@ -43,7 +43,7 @@
         "ansible.python.interpreterPath": "/usr/local/bin/python",
         "ansible.validation.enabled": true,
         "ansible.validation.lint.enabled": true,
-        "ansible.validation.lint.path": "/usr/local/bin/ansible-lint",
+        "ansible.validation.lint.path": "/home/vscode/.local/bin/ansible-lint",
         "yaml.schemas": {
           "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook": [
             "playbooks/**/*.yml",
