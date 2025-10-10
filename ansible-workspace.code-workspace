@@ -1,0 +1,34 @@
+{
+    "folders": [
+        {
+            "name": "🎭 Ansible Role - Aruba CX Switch",
+            "path": "."
+        },
+        {
+            "name": "🧪 Test Environment",
+            "path": "/workspaces/aruba-role-testing"
+        },
+        {
+            "name": "📚 Auto NetOps (read-only)",
+            "path": "/workspaces/auto-netops-ansible"
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "ansible.python.interpreterPath": "/usr/local/bin/python",
+        "ansible.validation.lint.path": "/home/vscode/.local/bin/ansible-lint",
+        "files.exclude": {
+            "**/.git": false,
+            "**/__pycache__": true,
+            "**/*.pyc": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "redhat.ansible",
+            "redhat.vscode-yaml",
+            "ms-python.python",
+            "ms-python.vscode-pylance"
+        ]
+    }
+}

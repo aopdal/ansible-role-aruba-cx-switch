@@ -88,28 +88,72 @@ ls -la
 ]
 ```
 
-## Method 2: Multi-Root Workspace
+## Method 2: Multi-Root Workspace (Show Mounts in Explorer)
 
-Open multiple folders in VS Code at once:
+To see mounted folders in the VS Code Explorer sidebar, use a workspace file.
 
 ### Step 1: Create Workspace File
 
-Create `ansible-workspace.code-workspace`:
+A workspace file `ansible-workspace.code-workspace` is already provided in the repository:
 
 ```json
 {
   "folders": [
     {
-      "name": "Ansible Role",
+      "name": "🎭 Ansible Role - Aruba CX Switch",
       "path": "."
     },
     {
-      "name": "Test Environment",
-      "path": "${env:HOME}/code/aruba-role-testing"
+      "name": "🧪 Test Environment",
+      "path": "/workspaces/aruba-role-testing"
+    },
+    {
+      "name": "📚 Auto NetOps (read-only)",
+      "path": "/workspaces/auto-netops-ansible"
     }
   ],
   "settings": {
     "python.defaultInterpreterPath": "/usr/local/bin/python"
+  }
+}
+```
+
+### Step 2: Open Workspace in Devcontainer
+
+**Inside the devcontainer:**
+
+1. **File** → **Open Workspace from File**
+2. Select `ansible-workspace.code-workspace`
+3. Click **Open**
+
+The Explorer will now show all three folders! 🎉
+
+**Result:**
+```
+EXPLORER
+├── 🎭 Ansible Role - Aruba CX Switch
+│   ├── tasks/
+│   ├── defaults/
+│   └── ...
+├── 🧪 Test Environment
+│   ├── inventory/
+│   ├── playbooks/
+│   └── ...
+└── 📚 Auto NetOps (read-only)
+    ├── roles/
+    └── ...
+```
+
+### Step 3: Customize Folder Names
+
+Edit `ansible-workspace.code-workspace` to:
+- Change folder display names (the `name` field)
+- Add emojis for visual distinction
+- Remove folders you don't need
+
+**Note:** After editing the workspace file, reload the window (F1 → "Developer: Reload Window") to see changes.
+
+### Alternative: Add Folders Manually
   }
 }
 ```

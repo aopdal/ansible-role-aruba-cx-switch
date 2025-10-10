@@ -26,6 +26,7 @@ coverage.xml
 .idea/
 *.sublime-*
 *.code-workspace
+!ansible-workspace.code-workspace
 
 # OS
 .DS_Store

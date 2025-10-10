@@ -6,7 +6,10 @@
       "VARIANT": "3.12"
     }
   },
-  "mounts": [],
+  "mounts": [
+    "source=${localEnv:HOME}/code/aruba-role-testing,target=/workspaces/aruba-role-testing,type=bind",
+    "source=${localEnv:HOME}/code/auto-netops-ansible,target=/workspaces/auto-netops-ansible,type=bind,readonly"
+  ],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "moby": false,
