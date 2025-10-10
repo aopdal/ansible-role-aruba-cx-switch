@@ -24,6 +24,12 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js 20.x LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set working directory
 WORKDIR /workspace
 
@@ -59,5 +65,7 @@ USER vscode
 # Add welcome message
 RUN echo 'echo "🚀 Ansible Role Development Environment"' >> /home/vscode/.bashrc \
     && echo 'echo "📦 Python: $(python --version)"' >> /home/vscode/.bashrc \
-    && echo 'echo "🔧 Quick commands: make test-quick, molecule test"' >> /home/vscode/.bashrc \
+    && echo 'echo "� Node.js: $(node --version)"' >> /home/vscode/.bashrc \
+    && echo 'echo "📦 npm: $(npm --version)"' >> /home/vscode/.bashrc \
+    && echo 'echo "�🔧 Quick commands: make test-quick, molecule test"' >> /home/vscode/.bashrc \
     && echo 'echo ""' >> /home/vscode/.bashrc
