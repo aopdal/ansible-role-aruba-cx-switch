@@ -12,18 +12,28 @@
       - "OSPF Areas in use: {{ ospf_interfaces | map(attribute='custom_fields.if_ip_ospf_1_area') | select | unique | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
+- name: Debug - Show raw config_context and custom_fields
+  ansible.builtin.debug:
+    msg:
+      - "config_context type: {{ config_context | type_debug }}"
+      - "config_context keys: {{ config_context.keys() | list if config_context is mapping else 'Not a mapping' }}"
+      - "config_context.ospf_1_vrf: {{ config_context.ospf_1_vrf | default('NOT FOUND') }}"
+      - "config_context.ospf_areas: {{ config_context.ospf_areas | default('NOT FOUND') }}"
+      - "custom_fields.device_ospf_1_routerid: {{ custom_fields.device_ospf_1_routerid | default('NOT FOUND') }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
 - name: Get OSPF configuration from device custom fields
   ansible.builtin.set_fact:
     ospf_config:
-      vrf: "{{ device.config_context.ospf_1_vrf | default('default') }}"
-      router_id: "{{ device.custom_fields.device_ospf_1_routerid | default(omit) }}"
-      areas: "{{ device.config_context.ospf_areas | default([]) }}"
+      vrf: "{{ config_context.ospf_1_vrf | default('default') }}"
+      router_id: "{{ custom_fields.device_ospf_1_routerid | default('') }}"
+      areas: "{{ config_context.ospf_areas | default([]) }}"
 
 - name: Debug - Show OSPF configuration
   ansible.builtin.debug:
     msg:
       - "OSPF VRF: {{ ospf_config.vrf }}"
-      - "OSPF Router ID: {{ ospf_config.router_id }}"
+      - "OSPF Router ID: {{ ospf_config.router_id | default('Not configured') }}"
       - "OSPF Areas: {{ ospf_config.areas }}"
       - "Interfaces to configure: {{ ospf_interfaces | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
