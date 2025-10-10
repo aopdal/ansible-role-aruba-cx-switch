@@ -5,30 +5,32 @@ FROM mcr.microsoft.com/devcontainers/python:${VARIANT}
 # Install system dependencies
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
-        # Network tools for testing
-        iputils-ping \
-        netcat-openbsd \
-        curl \
-        wget \
-        # Build tools
-        build-essential \
-        # Git tools
-        git \
-        git-lfs \
-        # Shell tools
-        bash-completion \
-        vim \
-        # Additional utilities
-        jq \
-        yamllint \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    # Network tools for testing
+    iputils-ping \
+    netcat-openbsd \
+    curl \
+    wget \
+    # Build tools
+    build-essential \
+    # Git tools
+    git \
+    git-lfs \
+    # Shell tools
+    bash-completion \
+    vim \
+    # Additional utilities
+    jq \
+    yamllint
 
-# Install Node.js 20.x LTS
+# Install Node.js 20.x LTS (separate layer to debug issues)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get update \
     && apt-get install -y nodejs \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && node --version \
+    && npm --version
+
+# Clean up apt cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /workspace
