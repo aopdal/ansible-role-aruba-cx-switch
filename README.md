@@ -44,6 +44,10 @@ interface 1/1/5
 
 The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` support) are bypassed by using raw CLI configuration through `aoscx_config`.
 
+### Important Notes
+
+⚠️ **Idempotency Behavior**: L3 interface tasks using `aoscx_config` may show `changed` status even when the configuration already exists. This is a limitation of the `aoscx_config` module's state detection, but the actual device configuration remains correct and idempotent at the CLI level.
+
 ## Getting Started
 
 ### 🚀 Quick Start (Recommended: Dev Container)
