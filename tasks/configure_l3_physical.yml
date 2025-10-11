@@ -26,27 +26,31 @@
 - name: Configure physical L3 interfaces (custom VRF) - IPv4
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - vrf attach {{ item.vrf }}
+      - vrf attach {{ interface_vrf }}
       - ip address {{ item.address }}
     parents: interface {{ item.interface_name }}
     match: line
   loop: "{{ l3_interfaces.physical_custom_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }}"
   when: l3_interfaces.physical_custom_vrf | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
+    # Get VRF from the interface configuration, not from IP address
+    interface_vrf: "{{ item.interface.vrf.name if item.interface.vrf is defined and item.interface.vrf.name is defined else 'default' }}"
 
 - name: Configure physical L3 interfaces (custom VRF) - IPv6
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - vrf attach {{ item.vrf }}
+      - vrf attach {{ interface_vrf }}
       - ipv6 address {{ item.address }}
     parents: interface {{ item.interface_name }}
     match: line
   loop: "{{ l3_interfaces.physical_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }}"
   when: l3_interfaces.physical_custom_vrf | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
+    # Get VRF from the interface configuration, not from IP address
+    interface_vrf: "{{ item.interface.vrf.name if item.interface.vrf is defined and item.interface.vrf.name is defined else 'default' }}"

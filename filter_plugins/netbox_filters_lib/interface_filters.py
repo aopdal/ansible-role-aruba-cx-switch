@@ -185,68 +185,93 @@ def categorize_l3_interfaces(interfaces):
 
         # Skip management interfaces
         if intf.get("mgmt_only"):
-            _debug(f"Skipping management interface: {intf.get('name')}")
+            interface_name = intf.get("interface_name") or intf.get("name", "unknown")
+            _debug(f"Skipping management interface: {interface_name}")
             continue
 
-        # Get interface type
-        type_obj = intf.get("type")
-        if not type_obj or not isinstance(type_obj, dict):
-            continue
+        # Get interface type - handle both processed and original formats
+        type_value = ""
+        name = ""
 
-        type_value = type_obj.get("value", "")
-        name = intf.get("name", "").lower()
+        # Check for processed format (from interface_ips)
+        if "interface_type" in intf:
+            type_value = intf.get("interface_type", "")
+            name = intf.get("interface_name", "").lower()
+        # Check for original NetBox interface format
+        else:
+            type_obj = intf.get("type")
+            if type_obj and isinstance(type_obj, dict):
+                type_value = type_obj.get("value", "")
+            name = intf.get("name", "").lower()
+
+        if not type_value:
+            continue
 
         # Determine VRF (default to built-in)
+        # Only check interface VRF, NOT IP address VRF
         vrf_name = None
-        vrf_obj = intf.get("vrf")
-        if vrf_obj and isinstance(vrf_obj, dict):
-            vrf_name = vrf_obj.get("name")
+
+        # Check for VRF in the original NetBox interface format
+        if "vrf" in intf and isinstance(intf["vrf"], dict):
+            vrf_name = intf["vrf"].get("name")
+        # Check for VRF in nested interface object (from interface_ips format)
+        elif "interface" in intf:
+            interface_obj = intf["interface"]
+            if isinstance(interface_obj, dict):
+                vrf_obj = interface_obj.get("vrf")
+                if vrf_obj and isinstance(vrf_obj, dict):
+                    vrf_name = vrf_obj.get("name")
+        # Note: We intentionally do NOT check intf["vrf"] as string
+        # because that comes from IP address VRF, not interface VRF
 
         is_builtin_vrf = vrf_name in builtin_vrfs
+
+        # Get interface name for logging
+        interface_name = intf.get("interface_name") or intf.get("name", "unknown")
 
         # Categorize by type and VRF
         if type_value == "virtual" and "loopback" in name:
             result["loopback"].append(intf)
-            _debug(f"Categorized {intf.get('name')} as loopback")
+            _debug(f"Categorized {interface_name} as loopback")
         elif type_value == "virtual" and "vlan" in name:
             if is_builtin_vrf:
                 result["vlan_default_vrf"].append(intf)
                 _debug(
-                    f"Categorized {intf.get('name')} as VLAN interface "
-                    f"(built-in VRF: {vrf_name})"
+                    f"Categorized {interface_name} as VLAN interface "
+                    f"(Interface built-in VRF: {vrf_name})"
                 )
             else:
                 result["vlan_custom_vrf"].append(intf)
                 _debug(
-                    f"Categorized {intf.get('name')} as VLAN interface "
-                    f"(VRF: {vrf_name})"
+                    f"Categorized {interface_name} as VLAN interface "
+                    f"(Interface VRF: {vrf_name})"
                 )
         elif type_value == "lag":
             if is_builtin_vrf:
                 result["lag_default_vrf"].append(intf)
                 _debug(
-                    f"Categorized {intf.get('name')} as LAG interface "
-                    f"(built-in VRF: {vrf_name})"
+                    f"Categorized {interface_name} as LAG interface "
+                    f"(Interface built-in VRF: {vrf_name})"
                 )
             else:
                 result["lag_custom_vrf"].append(intf)
                 _debug(
-                    f"Categorized {intf.get('name')} as LAG interface "
-                    f"(VRF: {vrf_name})"
+                    f"Categorized {interface_name} as LAG interface "
+                    f"(Interface VRF: {vrf_name})"
                 )
         else:
             # Physical interface
             if is_builtin_vrf:
                 result["physical_default_vrf"].append(intf)
                 _debug(
-                    f"Categorized {intf.get('name')} as physical interface "
-                    f"(built-in VRF: {vrf_name})"
+                    f"Categorized {interface_name} as physical interface "
+                    f"(Interface built-in VRF: {vrf_name})"
                 )
             else:
                 result["physical_custom_vrf"].append(intf)
                 _debug(
-                    f"Categorized {intf.get('name')} as physical interface "
-                    f"(VRF: {vrf_name})"
+                    f"Categorized {interface_name} as physical interface "
+                    f"(Interface VRF: {vrf_name})"
                 )
 
     _debug("L3 interface categorization:")

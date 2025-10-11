@@ -51,6 +51,7 @@
     msg:
       - "Total interface/IP combinations: {{ interface_ips | length }}"
       - "Sample: {{ interface_ips[:3] }}"
+      - "Interface 1/1/5 data: {{ interface_ips | selectattr('interface_name', 'equalto', '1/1/5') | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Get VLAN interfaces
@@ -84,6 +85,7 @@
     msg:
       - "Physical (default VRF): {{ l3_interfaces.physical_default_vrf | length }}"
       - "Physical (custom VRF): {{ l3_interfaces.physical_custom_vrf | length }}"
+      - "Physical (custom VRF) details: {{ l3_interfaces.physical_custom_vrf | map(attribute='interface_name') | list }}"
       - "VLAN (default VRF): {{ l3_interfaces.vlan_default_vrf | length }}"
       - "VLAN (custom VRF): {{ l3_interfaces.vlan_custom_vrf | length }}"
       - "LAG (default VRF): {{ l3_interfaces.lag_default_vrf | length }}"
