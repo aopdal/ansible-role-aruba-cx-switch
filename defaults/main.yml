@@ -11,6 +11,8 @@ aoscx_debug: false
 aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
 aoscx_configure_physical_interfaces: true
+aoscx_configure_lag_interfaces: true
+aoscx_configure_mclag_interfaces: true
 aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true
 aoscx_configure_loopback: true

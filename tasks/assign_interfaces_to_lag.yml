@@ -1,0 +1,31 @@
+---
+# Assign physical interfaces to LAG interfaces
+# This must run AFTER LAG and MCLAG interfaces have been created
+
+- name: assign_interfaces_to_lag | Debug physical interfaces to assign to LAGs
+  ansible.builtin.debug:
+    msg:
+      - "Assigning {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }} physical interfaces to LAGs"
+      - "Assignments: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | map(attribute='name') | list | join(', ') }}"
+  when: aoscx_debug | bool
+
+# Assign physical interfaces to LAG (regular LAGs)
+- name: assign_interfaces_to_lag | Assign physical interfaces to LAG
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface {{ item.name }}
+    lines:
+      - "{{ item.lag.name | replace('lag', 'lag ') }}"
+    match: line
+  loop: "{{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list }}"
+  loop_control:
+    label: "Interface: {{ item.name }} -> LAG: {{ item.lag.name }}"
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+- name: assign_interfaces_to_lag | Physical interface LAG assignment summary
+  ansible.builtin.debug:
+    msg:
+      - "Physical Interface LAG Assignment Summary:"
+      - "Total physical interfaces assigned to LAGs: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
+  when: aoscx_debug | bool

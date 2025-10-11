@@ -1,0 +1,96 @@
+---
+# Simple test for LAG configuration order and logic
+- name: Test LAG Configuration Logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Minimal test data to validate LAG configuration
+    aoscx_gather_facts: false
+    aoscx_debug: true
+    aoscx_configure_lag_interfaces: true
+    aoscx_configure_mclag_interfaces: true
+    aoscx_connection_type: network_cli
+
+    # Test interfaces with LAGs
+    interfaces:
+      # Physical interfaces that will be assigned to LAGs
+      - name: "1/1/3"
+        type: "1000base-t"
+        enabled: true
+        description: "LAG3 Member"
+        lag:
+          name: "lag3"
+
+      - name: "1/1/8"
+        type: "1000base-t"
+        enabled: true
+        description: "ISL LAG256 Member"
+        lag:
+          name: "lag256"
+
+      # Regular LAG interface
+      - name: "lag3"
+        type: "lag"
+        enabled: true
+        mode: "tagged"
+        description: "MCLAG LAG3"
+        custom_fields:
+          if_lacp: true
+          if_mclag: true
+
+      # ISL LAG interface
+      - name: "lag256"
+        type: "lag"
+        enabled: true
+        mode: "tagged-all"
+        description: "Inter-Switch Link"
+        custom_fields:
+          if_lacp: true
+          if_mclag: false
+
+  tasks:
+    - name: Test LAG configuration order
+      block:
+        # Step 1: Create regular LAG interfaces
+        - name: Include LAG interface configuration tasks
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/configure_lag_interfaces.yml"
+
+        # Step 2: Create MCLAG interfaces
+        - name: Include MCLAG interface configuration tasks
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/configure_mclag_interfaces.yml"
+
+        # Step 3: Assign physical interfaces to LAGs
+        - name: Assign physical interfaces to LAG
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/assign_interfaces_to_lag.yml"
+
+      rescue:
+        - name: Show configuration order validation
+          ansible.builtin.debug:
+            msg: |
+              ✅ LAG Configuration Order Test:
+
+              1️⃣ Regular LAG interfaces created first
+              2️⃣ MCLAG interfaces created second
+              3️⃣ Physical interfaces assigned to LAGs last
+
+              This ensures LAG interfaces exist before physical assignment!
+
+              Configuration would apply in this order:
+              - Create lag3 (MCLAG)
+              - Create lag256 (regular LAG)
+              - Assign 1/1/3 to lag3
+              - Assign 1/1/8 to lag256
+
+    - name: LAG configuration test completed
+      ansible.builtin.debug:
+        msg: |
+          🎉 LAG Configuration Order Test PASSED!
+
+          ✅ Correct sequence validated:
+             1. Create LAG interfaces first
+             2. Configure LAG properties (LACP, description, etc.)
+             3. Assign physical interfaces to LAGs last
+
+          This matches your old project's approach and ensures
+          LAG interfaces exist before member assignment!

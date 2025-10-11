@@ -44,7 +44,12 @@
         {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}
       - >-
         MTU values:
-        {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | map(attribute='name') | list | zip(interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | map(attribute='mtu') | list) | list }}
+        {{
+          interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) |
+          selectattr('mtu', '!=', '') | map(attribute='name') | list |
+          zip(interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) |
+          selectattr('mtu', '!=', '') | map(attribute='mtu') | list) | list
+        }}
   when:
     - interfaces is defined
     - aoscx_debug | bool or ansible_verbosity >= 1

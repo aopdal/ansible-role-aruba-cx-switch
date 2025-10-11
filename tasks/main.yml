@@ -35,6 +35,36 @@
     - physical_interfaces
     - layer1
 
+# LAG interfaces should be configured after physical but before L2/L3 configuration
+- name: Include LAG interface configuration tasks
+  ansible.builtin.include_tasks: configure_lag_interfaces.yml
+  when: aoscx_configure_lag_interfaces | bool
+  tags:
+    - interfaces
+    - lag_interfaces
+    - layer2
+
+# MCLAG interfaces (Multi-Chassis LAG for VSX)
+- name: Include MCLAG interface configuration tasks
+  ansible.builtin.include_tasks: configure_mclag_interfaces.yml
+  when: aoscx_configure_mclag_interfaces | bool
+  tags:
+    - interfaces
+    - mclag_interfaces
+    - vsx
+
+# Assign physical interfaces to LAG (after LAG/MCLAG creation)
+- name: Assign physical interfaces to LAG
+  ansible.builtin.include_tasks: assign_interfaces_to_lag.yml
+  when:
+    - aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces | bool
+    - interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length > 0
+  tags:
+    - interfaces
+    - lag_interfaces
+    - mclag_interfaces
+    - lag_assignment
+
 # L2 interfaces (non-idempotent mode - for initial config)
 - name: Include L2 interface configuration tasks
   ansible.builtin.include_tasks: configure_l2_interfaces.yml

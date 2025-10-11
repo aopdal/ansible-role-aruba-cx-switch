@@ -1,0 +1,91 @@
+---
+# Configure LAG interfaces - interface creation, description, enable/disable, LACP
+# This must be run before L2/L3 configuration and before assigning physical interfaces to LAG
+
+- name: configure_lag_interfaces | Debug LAG interfaces to configure
+  ansible.builtin.debug:
+    msg:
+      - "Configuring LAG interfaces"
+      - "LAGs found: {{ interfaces | selectattr('type', 'defined') | selectattr('type', 'match', '.*lag.*') | map(attribute='name') | list }}"
+  when: aoscx_debug | bool
+
+# Create LAG interfaces and set basic configuration
+- name: configure_lag_interfaces | Configure LAG interface description
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface {{ item.name | replace("lag", "lag ") }}
+    lines:
+      - description {{ item.description | default('') }}
+    match: line
+  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop_control:
+    label: "Interface: {{ item.name }} - Description: {{ item.description | default('(none)') }}"
+  when:
+    - (item.type.value is defined and item.type.value == 'lag') or (item.type.value is not defined and item.type == 'lag')
+    - item.description is defined
+    - item.description != ""
+    - not (item.custom_fields.if_mclag | default(false))
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+# Enable LAG interfaces (no shutdown)
+- name: configure_lag_interfaces | Configure LAG interface enable (no shutdown)
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface {{ item.name | replace("lag", "lag ") }}
+    lines:
+      - no shutdown
+    match: line
+  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop_control:
+    label: "Interface: {{ item.name }} - Enabled: {{ item.enabled | default(true) }}"
+  when:
+    - (item.type.value is defined and item.type.value == 'lag') or (item.type.value is not defined and item.type == 'lag')
+    - item.enabled | default(true)
+    - not (item.custom_fields.if_mclag | default(false))
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+# Disable LAG interfaces (shutdown)
+- name: configure_lag_interfaces | Configure LAG interface disable (shutdown)
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface {{ item.name | replace("lag", "lag ") }}
+    lines:
+      - shutdown
+    match: line
+  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop_control:
+    label: "Interface: {{ item.name }} - Enabled: {{ item.enabled | default(true) }}"
+  when:
+    - (item.type.value is defined and item.type.value == 'lag') or (item.type.value is not defined and item.type == 'lag')
+    - not (item.enabled | default(true))
+    - not (item.custom_fields.if_mclag | default(false))
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+# Configure LACP mode active on LAG interfaces
+- name: configure_lag_interfaces | Configure LAG LACP mode active
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface {{ item.name | replace("lag", "lag ") }}
+    lines:
+      - lacp mode active
+    match: line
+  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop_control:
+    label: "Interface: {{ item.name }} - LACP: {{ item.custom_fields.if_lacp | default(false) }}"
+  when:
+    - (item.type.value is defined and item.type.value == 'lag') or (item.type.value is not defined and item.type == 'lag')
+    - item.custom_fields.if_lacp | default(false)
+    - not (item.custom_fields.if_mclag | default(false))
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+- name: configure_lag_interfaces | LAG configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "LAG Configuration Summary:"
+      - "Regular LAG interfaces configured"
+      - "Physical interfaces in LAG: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
+  when: aoscx_debug | bool
