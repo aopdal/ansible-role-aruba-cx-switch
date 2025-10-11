@@ -30,8 +30,12 @@
       - "Item: {{ item.item }}"
       - "Has ansible_facts: {{ item.ansible_facts is defined }}"
       - "Has netbox_vrfs: {{ (item.ansible_facts.netbox_vrfs is defined) if (item.ansible_facts is defined) else false }}"
-      - "netbox_vrfs type: {{ item.ansible_facts.netbox_vrfs | type_debug if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}"
-      - "netbox_vrfs content: {{ item.ansible_facts.netbox_vrfs if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}"
+      - >-
+        netbox_vrfs type:
+        {{ item.ansible_facts.netbox_vrfs | type_debug if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}
+      - >-
+        netbox_vrfs content:
+        {{ item.ansible_facts.netbox_vrfs if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}
   loop: "{{ vrf_details_raw.results }}"
   loop_control:
     label: "VRF: {{ item.item }}"

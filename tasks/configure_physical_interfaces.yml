@@ -39,6 +39,12 @@
     msg:
       - "Physical interfaces configured: {{ interfaces | selectattr('type', 'defined') | rejectattr('type', 'in', ['virtual', 'lag']) | list | length }}"
       - "AP_Aruba interfaces: {{ interfaces | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
-      - "Interfaces with custom MTU: {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}"
-      - "MTU values: {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | map(attribute='name') | list | zip(interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | map(attribute='mtu') | list) | list }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
+      - >-
+        Interfaces with custom MTU:
+        {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}
+      - >-
+        MTU values:
+        {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | map(attribute='name') | list | zip(interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | map(attribute='mtu') | list) | list }}
+  when:
+    - interfaces is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1

@@ -36,18 +36,23 @@
       - "Device ID: {{ device_id }}"
       - "VLANs available on device: {{ vlans | length }}"
       - "VLAN IDs: {{ vlans | map(attribute='vid') | list | sort }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
+  when:
+    - vlans is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Get VLANs in use on device
   ansible.builtin.set_fact:
     vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
+  when: interfaces is defined
 
 - name: Debug - Show VLANs in use
   ansible.builtin.debug:
     msg:
       - "VLANs in use (VIDs): {{ vlans_in_use.vids }}"
       - "Total VLANs in use: {{ vlans_in_use.vids | length }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
+  when:
+    - interfaces is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Determine VLAN changes needed
   ansible.builtin.set_fact:

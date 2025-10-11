@@ -1,9 +1,10 @@
 ---
 # Configure L2 interfaces with full idempotency (removes unwanted VLANs)
 
-- name: Get interfaces needing changes
+- name: Analyze interfaces for L2 configuration changes
   ansible.builtin.set_fact:
     interfaces_needing_changes: "{{ interfaces | get_interfaces_needing_changes(ansible_facts | default({})) }}"
+  when: interfaces is defined
 
 - name: Debug - Show interfaces analysis
   ansible.builtin.debug:
@@ -14,7 +15,9 @@
       - >-
         Interfaces already correct (skipped):
         {{ (interfaces | selectattr('mode', 'defined') | list | length) - (interfaces_needing_changes.configure | length) }}
-  when: aoscx_debug | bool or ansible_verbosity >= 1
+  when:
+    - interfaces is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Categorize interfaces that need configuration
   ansible.builtin.set_fact:

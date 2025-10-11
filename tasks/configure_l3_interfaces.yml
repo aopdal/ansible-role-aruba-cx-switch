@@ -1,16 +1,19 @@
 ---
 # Configure L3 interfaces with IP addresses
 
-- name: Extract interfaces with IP addresses
+- name: Extract interfaces for L3 configuration
   ansible.builtin.set_fact:
     interfaces_with_ips: "{{ interfaces | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list }}"
+  when: interfaces is defined
 
 - name: Debug - Show interfaces with IPs
   ansible.builtin.debug:
     msg:
       - "Interfaces with IP addresses: {{ interfaces_with_ips | length }}"
       - "Sample: {{ interfaces_with_ips[:3] | map(attribute='name') | list }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
+  when:
+    - interfaces is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Flatten interface/IP combinations
   ansible.builtin.set_fact:

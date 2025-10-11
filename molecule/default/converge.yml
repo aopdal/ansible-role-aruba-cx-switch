@@ -20,8 +20,28 @@
         route_targets:
           - "65000:100"
 
+    # Test interfaces
+    interfaces:
+      - name: "1/1/1"
+        type:
+          value: "1000base-t"
+        mode: "access"
+        untagged_vlan:
+          vid: 100
+        enabled: true
+        ip_addresses: []
+      - name: "1/1/2"
+        type:
+          value: "1000base-t"
+        mode: "trunk"
+        tagged_vlans:
+          - vid: 100
+          - vid: 200
+        enabled: true
+        ip_addresses: []
+
     # Test VLANs
-    netbox_vlans:
+    vlans:
       - id: 100
         vid: 100
         name: "DATA"
@@ -29,29 +49,15 @@
         vid: 200
         name: "VOICE"
 
-    # Test interfaces
-    netbox_interfaces:
-      - name: "1/1/1"
-        type: "1000base-t"
-        mode: "access"
-        untagged_vlan:
-          vid: 100
-        enabled: true
-      - name: "1/1/2"
-        type: "1000base-t"
-        mode: "trunk"
-        tagged_vlans:
-          - vid: 100
-          - vid: 200
-        enabled: true
-
-    # Enable features for testing
+    # Enable features for testing - all disabled for Molecule testing
     aoscx_gather_facts: false  # Skip fact gathering in tests
-    aoscx_configure_vrfs: false  # Disabled in check mode
-    aoscx_configure_vlans: false  # Disabled in check mode
-    aoscx_configure_l2_interfaces: false  # Disabled in check mode
-    aoscx_configure_l3_interfaces: false  # Disabled in check mode
-    aoscx_configure_loopback: false  # Disabled in check mode
+    aoscx_configure_vrfs: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_vlans: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_physical_interfaces: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_l2_interfaces: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_l3_interfaces: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_loopback: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_ospf: false  # Disabled - no AOS-CX modules in test env
     aoscx_save_config: false
     aoscx_debug: true
 
