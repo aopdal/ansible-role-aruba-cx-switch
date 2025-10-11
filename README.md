@@ -178,7 +178,7 @@ netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
 
 ### OSPF Configuration
 
-Configure OSPF in NetBox using custom fields and config context:
+Configure OSPF in NetBox using custom fields and config context. Supports both single-VRF and multi-VRF configurations.
 
 #### Device Custom Fields
 
@@ -187,10 +187,26 @@ Configure OSPF in NetBox using custom fields and config context:
 device_ospf_1_routerid: "10.1.1.1"  # OSPF Router ID
 ```
 
-#### Device Config Context
+#### Device Config Context - Multi-VRF Format (Recommended)
 
 ```yaml
-# OSPF VRF and areas configuration
+# OSPF configuration supporting multiple VRFs
+ospf_process_id: 1  # Optional, defaults to 1
+ospf_vrfs:
+  - vrf: "default"
+    areas:
+      - area: "0.0.0.0"      # Backbone area
+      - area: "0.0.0.1"      # Additional areas
+  - vrf: "cust_2"
+    areas:
+      - area: "0.0.0.0"
+      - area: "0.0.0.1"
+```
+
+#### Device Config Context - Single-VRF Format (Legacy, still supported)
+
+```yaml
+# Simple single-VRF configuration
 ospf_1_vrf: "default"  # or specify VRF name
 ospf_areas:
   - ospf_1_area: "0.0.0.0"      # Backbone area
@@ -205,7 +221,35 @@ if_ip_ospf_1_area: "0.0.0.0"           # OSPF area for this interface
 if_ip_ospf_network: "point-to-point"    # Network type (broadcast, point-to-point, etc.)
 ```
 
-#### Complete Example
+#### Complete Examples
+
+**Multi-VRF Example:**
+
+Device custom fields:
+```yaml
+device_ospf_1_routerid: "192.168.1.1"
+```
+
+Device config context:
+```yaml
+ospf_process_id: 1
+ospf_vrfs:
+  - vrf: "default"
+    areas:
+      - area: "0.0.0.0"
+      - area: "0.0.0.1"
+  - vrf: "CUSTOMER_A"
+    areas:
+      - area: "0.0.0.0"
+```
+
+Interface custom fields (for each OSPF-enabled interface):
+```yaml
+if_ip_ospf_1_area: "0.0.0.0"
+if_ip_ospf_network: "point-to-point"
+```
+
+**Single-VRF Example (Legacy):**
 
 Device custom fields:
 ```yaml

@@ -12,55 +12,61 @@
       - "OSPF Areas in use: {{ ospf_interfaces | map(attribute='custom_fields.if_ip_ospf_1_area') | select | unique | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
-- name: Debug - Show raw config_context and custom_fields
-  ansible.builtin.debug:
-    msg:
-      - "config_context type: {{ config_context | type_debug }}"
-      - "config_context keys: {{ config_context.keys() | list if config_context is mapping else 'Not a mapping' }}"
-      - "config_context.ospf_1_vrf: {{ config_context.ospf_1_vrf | default('NOT FOUND') }}"
-      - "config_context.ospf_areas: {{ config_context.ospf_areas | default('NOT FOUND') }}"
-      - "custom_fields.device_ospf_1_routerid: {{ custom_fields.device_ospf_1_routerid | default('NOT FOUND') }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
-
-- name: Get OSPF configuration from device custom fields
+- name: Get OSPF configuration from config_context
   ansible.builtin.set_fact:
     ospf_config:
-      vrf: "{{ config_context.ospf_1_vrf | default('default') }}"
+      process_id: "{{ config_context.ospf_process_id | default(1) }}"
       router_id: "{{ custom_fields.device_ospf_1_routerid | default('') }}"
-      areas: "{{ config_context.ospf_areas | default([]) }}"
+      # Support both old single-VRF format and new multi-VRF format
+      vrfs: >-
+        {%- if config_context.ospf_vrfs is defined -%}
+          {{ config_context.ospf_vrfs }}
+        {%- elif config_context.ospf_1_vrf is defined or config_context.ospf_areas is defined -%}
+          [{
+            'vrf': '{{ config_context.ospf_1_vrf | default("default") }}',
+            'areas': {{ config_context.ospf_areas | default([]) | to_json }}
+          }]
+        {%- else -%}
+          []
+        {%- endif -%}
 
 - name: Debug - Show OSPF configuration
   ansible.builtin.debug:
     msg:
-      - "OSPF VRF: {{ ospf_config.vrf }}"
+      - "OSPF Process ID: {{ ospf_config.process_id }}"
       - "OSPF Router ID: {{ ospf_config.router_id | default('Not configured') }}"
-      - "OSPF Areas: {{ ospf_config.areas }}"
+      - "OSPF VRFs: {{ ospf_config.vrfs | length }}"
+      - "OSPF VRF details: {{ ospf_config.vrfs }}"
       - "Interfaces to configure: {{ ospf_interfaces | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
-- name: Configure OSPF router instance
+- name: Configure OSPF router instance for each VRF
   arubanetworks.aoscx.aoscx_ospf_router:
-    vrf: "{{ ospf_config.vrf }}"
-    instance_tag: 1
+    vrf: "{{ item.vrf }}"
+    instance_tag: "{{ ospf_config.process_id }}"
     admin_router_id: "{{ ospf_config.router_id }}"
+  loop: "{{ ospf_config.vrfs }}"
+  loop_control:
+    label: "VRF: {{ item.vrf }}"
   when:
     - ospf_config.router_id is defined
     - ospf_config.router_id | length > 0
+    - ospf_config.vrfs | length > 0
 
-- name: Configure OSPF areas
+- name: Configure OSPF areas for each VRF
   arubanetworks.aoscx.aoscx_ospf_area:
-    vrf: "{{ ospf_config.vrf }}"
-    ospf_id: 1
-    area_id: "{{ item.ospf_1_area }}"
-  loop: "{{ ospf_config.areas }}"
+    vrf: "{{ item.0.vrf }}"
+    ospf_id: "{{ ospf_config.process_id }}"
+    area_id: "{{ item.1.area }}"
+  loop: "{{ ospf_config.vrfs | subelements('areas', skip_missing=True) }}"
   loop_control:
-    label: "Device: {{ inventory_hostname }} Area: {{ item.ospf_1_area }}"
-  when: ospf_config.areas | length > 0
+    label: "VRF: {{ item.0.vrf }} Area: {{ item.1.area }}"
+  when: ospf_config.vrfs | length > 0
 
 - name: Configure OSPF on interfaces with defined VRF
   arubanetworks.aoscx.aoscx_ospf_interface:
     interface_name: "{{ item.name }}"
-    ospf_id: 1
+    ospf_id: "{{ ospf_config.process_id }}"
     area_id: "{{ item.custom_fields.if_ip_ospf_1_area }}"
     type: "{{ item.custom_fields.if_ip_ospf_network | replace('-', '_') }}"
     vrf: "{{ item.vrf.name if item.vrf and item.vrf.name else 'default' }}"
@@ -77,7 +83,7 @@
 - name: Configure OSPF on interfaces with default VRF (no VRF defined)
   arubanetworks.aoscx.aoscx_ospf_interface:
     interface_name: "{{ item.name }}"
-    ospf_id: 1
+    ospf_id: "{{ ospf_config.process_id }}"
     area_id: "{{ item.custom_fields.if_ip_ospf_1_area }}"
     type: "{{ item.custom_fields.if_ip_ospf_network | replace('-', '_') }}"
     vrf: "default"
@@ -93,7 +99,9 @@
 - name: Debug - OSPF configuration summary
   ansible.builtin.debug:
     msg:
+      - "OSPF Process ID: {{ ospf_config.process_id }}"
       - "OSPF Router configured: {{ ospf_config.router_id is defined and ospf_config.router_id | length > 0 }}"
-      - "OSPF Areas configured: {{ ospf_config.areas | length }}"
+      - "OSPF VRFs configured: {{ ospf_config.vrfs | length }}"
+      - "Total OSPF Areas configured: {{ ospf_config.vrfs | map(attribute='areas') | map('default', []) | map('length') | sum }}"
       - "OSPF Interfaces configured: {{ ospf_interfaces | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 0
