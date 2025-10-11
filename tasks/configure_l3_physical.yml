@@ -6,7 +6,8 @@
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ l3_config_lines }}"
     parents: interface {{ item.interface_name }}
-    match: line
+    match: exact
+    replace: line
   loop: "{{ l3_interfaces.physical_default_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }}"
@@ -25,7 +26,8 @@
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ l3_config_lines }}"
     parents: interface {{ item.interface_name }}
-    match: line
+    match: exact
+    replace: line
   loop: "{{ l3_interfaces.physical_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }}"
@@ -44,7 +46,8 @@
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ l3_config_lines }}"
     parents: interface {{ item.interface_name }}
-    match: line
+    match: exact
+    replace: line
   loop: "{{ l3_interfaces.physical_custom_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }}"
@@ -66,7 +69,8 @@
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ l3_config_lines }}"
     parents: interface {{ item.interface_name }}
-    match: line
+    match: exact
+    replace: line
   loop: "{{ l3_interfaces.physical_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }}"
