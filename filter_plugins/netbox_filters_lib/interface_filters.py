@@ -189,6 +189,12 @@ def categorize_l3_interfaces(interfaces):
             _debug(f"Skipping management interface: {interface_name}")
             continue
 
+        # Skip mgmt interface by name (special case not handled by L3 workflow)
+        interface_name = intf.get("interface_name") or intf.get("name", "unknown")
+        if interface_name.lower() == "mgmt":
+            _debug(f"Skipping mgmt interface: {interface_name}")
+            continue
+
         # Get interface type - handle both processed and original formats
         type_value = ""
         name = ""
