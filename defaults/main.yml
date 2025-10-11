@@ -28,3 +28,6 @@ aoscx_save_config: true
 
 # Connection settings
 aoscx_connection_type: network_cli  # or httpapi
+
+# L3 interface settings
+aoscx_l3_counters_enable: true  # Enable l3-counters on L3 interfaces

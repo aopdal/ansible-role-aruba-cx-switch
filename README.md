@@ -11,13 +11,38 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as 
 - ✅ **VLAN Management** - Idempotent VLAN creation and cleanup
 - ✅ **Physical Interface Configuration** - Enable/disable and description
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
-- ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support
+- ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support, ip mtu, and l3-counters
 - ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
 - ✅ **Loopback Interfaces** - With VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
 - ✅ **Virtual Chassis Support** - Works with VSX/stacked switches
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
+
+## Advanced L3 Interface Features
+
+This role uses `aoscx_config` instead of `aoscx_l3_interface` for L3 interface configuration to provide full control over advanced AOS-CX features:
+
+### Supported L3 Interface Features
+
+- **IP MTU Configuration**: Automatically configures `ip mtu` when MTU is defined in NetBox
+- **L3 Counters**: Enables `l3-counters` on all L3 interfaces (configurable via `aoscx_l3_counters_enable`)
+- **VRF Attachment**: Full support for custom VRFs based on interface configuration
+- **IPv4 and IPv6**: Dual-stack support with proper address family handling
+
+### Example Generated Configuration
+
+For interface 1/1/5 with MTU 9198 in VRF "customer_a":
+
+```bash
+interface 1/1/5
+  vrf attach customer_a
+  ip address 10.1.1.1/30
+  ip mtu 9198
+  l3-counters
+```
+
+The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` support) are bypassed by using raw CLI configuration through `aoscx_config`.
 
 ## Getting Started
 
@@ -169,6 +194,9 @@ aoscx_save_config: true
 
 # Debug output
 aoscx_debug: false
+
+# L3 interface settings
+aoscx_l3_counters_enable: true  # Enable l3-counters on L3 interfaces
 ```
 
 ### NetBox Connection
