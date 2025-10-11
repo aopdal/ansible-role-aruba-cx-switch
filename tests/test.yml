@@ -1,21 +1,19 @@
 ---
 # Test playbook for the Aruba CX Switch role
-- name: Test Aruba CX Switch Role
+# NOTE: For comprehensive testing with real NetBox data, see test_real_data.yml
+- name: Test Aruba CX Switch Role (Basic Mock Data)
   hosts: localhost
   gather_facts: false
   connection: local
 
   vars:
-    # Mock NetBox configuration for testing
+    # Mock NetBox configuration for basic testing
     netbox_url: "http://localhost:8000"
     netbox_token: "0123456789abcdef0123456789abcdef01234567"
 
     # Mock device data
     ansible_network_os: "arubanetworks.aoscx.aoscx"
     device_id: 1
-
-    # This simulates the interfaces variable that would come from NetBox inventory
-    interfaces:
 
     # Test data - VRFs
     netbox_vrfs:
@@ -49,7 +47,8 @@
         name: "GUEST"
         description: "Guest VLAN"
 
-    # Test data - L2 Interfaces (this is also the interfaces variable used by OSPF)
+    # This simulates the interfaces variable that would come from NetBox inventory
+    interfaces:
       - name: "1/1/1"
         type: "1000base-t"
         enabled: true
@@ -197,7 +196,7 @@
           Testing Aruba CX Switch Role with:
           - {{ netbox_vrfs | length }} VRFs
           - {{ netbox_vlans | length }} VLANs
-          - {{ netbox_interfaces | length }} Interfaces
+          - {{ interfaces | length }} Interfaces
 
     - name: Test role execution block
       block:

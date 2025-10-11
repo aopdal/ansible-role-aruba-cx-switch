@@ -435,6 +435,19 @@ This role includes comprehensive integration testing documentation and scripts f
 - **[Quick Start](docs/TESTING_QUICK_START.md)** - 30-minute quick start to first test
 - **[Testing Proposal](docs/TESTING_PROPOSAL.md)** - Executive summary for stakeholders
 
+### Test Playbooks
+
+- **[tests/test.yml](tests/test.yml)** - Basic integration test with mock data
+- **[tests/test_real_data.yml](tests/test_real_data.yml)** - Comprehensive test with real NetBox data (z13-cx3)
+
+The real data test includes:
+- **19 interfaces** (physical, LAG, virtual) from production NetBox inventory
+- **Multi-VRF OSPF** (default + z13-cust_2 VRFs)
+- **Complex LAG configurations** (MCLAG, ISL, tagged/access)
+- **VSX and VXLAN features** with real IP addressing schemes
+- **Point-to-point and broadcast OSPF networks**
+- **Production-like device configuration** from actual Aruba deployment
+
 ### Testing Architecture
 
 The testing environment uses:
