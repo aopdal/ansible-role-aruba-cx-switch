@@ -7,6 +7,7 @@
     name: "{{ item.name }}"
     enabled: "{{ item.enabled | default(true) }}"
     description: "{{ item.description | default('') }}"
+    mtu: "{{ item.mtu | default(omit) }}"
   loop: "{{ interfaces }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
@@ -22,6 +23,7 @@
     name: "{{ item.name }}"
     enabled: "{{ item.enabled | default(true) }}"
     description: "{{ item.name }} {{ item.description }}"
+    mtu: "{{ item.mtu | default(omit) }}"
   loop: "{{ interfaces }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
@@ -37,4 +39,6 @@
     msg:
       - "Physical interfaces configured: {{ interfaces | selectattr('type', 'defined') | rejectattr('type', 'in', ['virtual', 'lag']) | list | length }}"
       - "AP_Aruba interfaces: {{ interfaces | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
+      - "Interfaces with custom MTU: {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | list | length }}"
+      - "MTU values: {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | map(attribute='name') | list | zip(interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | map(attribute='mtu') | list) | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
