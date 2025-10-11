@@ -1,0 +1,40 @@
+---
+# Configure basic physical interface settings (enable/disable, description)
+# This must be done before L2/L3 configuration or LAG membership
+
+- name: Enable or disable physical interfaces
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: "{{ item.enabled | default(true) }}"
+    description: "{{ item.description | default('') }}"
+  loop: "{{ interfaces }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
+  when:
+    - item.mgmt_only is not defined or not item.mgmt_only
+    - item.type is defined
+    - (item.type.value is defined and item.type.value not in ["virtual", "lag"]) or
+      (item.type.value is not defined and item.type not in ["virtual", "lag"])
+    - item.description is not defined or item.description != "AP_Aruba"
+
+- name: Enable or disable physical interfaces AP_Aruba (special case for Aruba Central)
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: "{{ item.enabled | default(true) }}"
+    description: "{{ item.name }} {{ item.description }}"
+  loop: "{{ interfaces }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
+  when:
+    - item.mgmt_only is not defined or not item.mgmt_only
+    - item.type is defined
+    - (item.type.value is defined and item.type.value not in ["virtual", "lag"]) or
+      (item.type.value is not defined and item.type not in ["virtual", "lag"])
+    - item.description is defined and item.description == "AP_Aruba"
+
+- name: Debug - Physical interface configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "Physical interfaces configured: {{ interfaces | selectattr('type', 'defined') | rejectattr('type', 'in', ['virtual', 'lag']) | list | length }}"
+      - "AP_Aruba interfaces: {{ interfaces | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1

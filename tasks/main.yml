@@ -26,6 +26,15 @@
     - vlans
     - layer2
 
+# Physical interfaces should be configured before L2/L3 or LAG configuration
+- name: Include physical interface configuration tasks
+  ansible.builtin.include_tasks: configure_physical_interfaces.yml
+  when: aoscx_configure_physical_interfaces | bool
+  tags:
+    - interfaces
+    - physical_interfaces
+    - layer1
+
 # L2 interfaces (non-idempotent mode - for initial config)
 - name: Include L2 interface configuration tasks
   ansible.builtin.include_tasks: configure_l2_interfaces.yml

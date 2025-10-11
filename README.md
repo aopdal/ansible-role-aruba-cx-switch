@@ -9,6 +9,7 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as 
 
 - ✅ **VRF Configuration** - Creates VRFs with RD and route-targets
 - ✅ **VLAN Management** - Idempotent VLAN creation and cleanup
+- ✅ **Physical Interface Configuration** - Enable/disable and description
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support
 - ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
@@ -154,6 +155,7 @@ See [defaults/main.yml](defaults/main.yml) for all available variables.
 # Enable/disable features
 aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
+aoscx_configure_physical_interfaces: true
 aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true
 aoscx_configure_loopback: true
@@ -347,9 +349,11 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `facts`, `gather` - Fact gathering
 - `vrfs` - VRF configuration
 - `vlans` - VLAN configuration
+- `physical_interfaces` - Physical interface configuration (enable/disable)
 - `l2_interfaces` - L2 interface configuration
 - `l3_interfaces` - L3 interface configuration
 - `loopback` - Loopback interface configuration
+- `layer1` - Physical interface configuration
 - `layer2` - All L2 configuration (VLANs + L2 interfaces)
 - `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks)
 - `ospf` - OSPF configuration
