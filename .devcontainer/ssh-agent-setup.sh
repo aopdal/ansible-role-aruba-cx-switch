@@ -7,6 +7,16 @@ check_ssh_agent() {
     if ! ssh-add -l >/dev/null 2>&1; then
         echo "⚠️  SSH agent not responding, attempting reconnection..."
 
+        # Try to find VS Code SSH agent socket first
+        VSCODE_SSH_SOCK=$(find /tmp -name "vscode-ssh-auth-*.sock" 2>/dev/null | head -1)
+        if [ -n "$VSCODE_SSH_SOCK" ] && [ -S "$VSCODE_SSH_SOCK" ]; then
+            export SSH_AUTH_SOCK="$VSCODE_SSH_SOCK"
+            if ssh-add -l >/dev/null 2>&1; then
+                echo "✅ Reconnected to VS Code SSH agent"
+                return 0
+            fi
+        fi
+
         # Try to find WSL2 SSH agent socket
         WSL_SSH_SOCK=$(find /mnt/wslg/runtime-dir -name "ssh-agent.sock" 2>/dev/null | head -1)
         if [ -n "$WSL_SSH_SOCK" ] && [ -S "$WSL_SSH_SOCK" ]; then
@@ -15,9 +25,7 @@ check_ssh_agent() {
                 echo "✅ Reconnected to WSL2 SSH agent"
                 return 0
             fi
-        fi
-
-        # Try existing agent sockets
+        fi        # Try existing agent sockets
         for sock in /tmp/ssh-*/agent.*; do
             if [ -S "$sock" ]; then
                 export SSH_AUTH_SOCK="$sock"
