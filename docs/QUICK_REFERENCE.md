@@ -52,6 +52,67 @@ git commit -m "your message"
 pre-commit run --all-files
 ```
 
+## Tag Usage (Production Playbooks)
+
+### Safe Day-to-Day Operations (Won't Touch Routing)
+```bash
+# Add VLANs (routing protocols skipped)
+ansible-playbook configure_aoscx.yml -l switch-name -t vlans
+
+# Update interfaces only
+ansible-playbook configure_aoscx.yml -l switch-name -t interfaces
+
+# Base configuration (banner, NTP, DNS, timezone)
+ansible-playbook configure_aoscx.yml -l switch-name -t base_config
+
+# LAG configuration
+ansible-playbook configure_aoscx.yml -l switch-name -t lag
+```
+
+### High-Impact Changes (Require Explicit Tags)
+```bash
+# BGP configuration (tag-dependent - safe from accidental runs)
+ansible-playbook configure_aoscx.yml -l switch-name -t bgp
+
+# OSPF configuration (tag-dependent)
+ansible-playbook configure_aoscx.yml -l switch-name -t ospf
+
+# All routing protocols
+ansible-playbook configure_aoscx.yml -l switch-name -t routing
+
+# VSX high-availability (tag-dependent)
+ansible-playbook configure_aoscx.yml -l switch-name -t vsx
+```
+
+### Full Configuration
+```bash
+# Everything (including routing protocols)
+ansible-playbook configure_aoscx.yml -l switch-name
+
+# Check mode (dry-run)
+ansible-playbook configure_aoscx.yml -l switch-name --check
+
+# See what tasks will run
+ansible-playbook configure_aoscx.yml -l switch-name -t vlans --list-tasks
+```
+
+### Verify Tag Behavior
+```bash
+# Verify VLANs won't include routing (should be empty)
+ansible-playbook configure_aoscx.yml -l switch-name -t vlans --list-tasks | grep -E "(BGP|OSPF|VSX)"
+
+# Verify routing tag includes BGP and OSPF (should show 2 lines)
+ansible-playbook configure_aoscx.yml -l switch-name -t routing --list-tasks | grep -E "(BGP|OSPF)"
+```
+
+### Important Notes
+- **Tag-Dependent**: BGP, OSPF, VSX only run when:
+  - Explicitly tagged (`-t bgp`, `-t routing`, `-t vsx`)
+  - No tags specified (full run)
+  - Never run with other tags like `-t vlans`
+- **Always Safe**: VLANs, interfaces, LAGs never trigger routing changes
+- **Cleanup**: Protected by `aoscx_idempotent_mode` variable
+
 ## Testing Commands
 
 **Note:** Makefile handles venv automatically. For manual commands, activate venv first!

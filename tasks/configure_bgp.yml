@@ -1,0 +1,132 @@
+---
+# Configure BGP for EVPN/VXLAN Fabric
+# This task configures BGP with EVPN address family for overlay networking
+
+- name: Debug BGP configuration from NetBox
+  ansible.builtin.debug:
+    msg:
+      - "BGP AS: {{ config_context.bgp_as | default('not set') }}"
+      - "BGP Router ID: {{ custom_fields.device_bgp_routerid | default('not set') }}"
+      - "BGP Enabled: {{ custom_fields.device_bgp | default(false) }}"
+      - "BGP Peers: {{ config_context.bgp_peers | default([]) | length }} configured"
+  when: aoscx_debug_mode | default(false) | bool
+
+- name: Configure BGP router process
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - router bgp {{ config_context.bgp_as }}
+      - bgp router-id {{ custom_fields.device_bgp_routerid }}
+    match: line
+  when:
+    - custom_fields.device_bgp | default(false) | bool
+    - config_context.bgp_as is defined
+    - custom_fields.device_bgp_routerid is defined
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP neighbors for EVPN
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ config_context.bgp_as }}
+      - neighbor {{ item.peer }} remote-as {{ item.remote_as | default(config_context.bgp_as) }}
+      - neighbor {{ item.peer }} update-source {{ item.update_source | default('loopback 0') }}
+      - address-family l2vpn evpn
+      - neighbor {{ item.peer }} send-community extended
+      - neighbor {{ item.peer }} activate
+      - exit-address-family
+  loop: "{{ config_context.bgp_peers | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} Peer: {{ item.peer }}"
+  when:
+    - custom_fields.device_bgp | default(false) | bool
+    - config_context.bgp_peers is defined
+    - config_context.bgp_peers | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP IPv4 unicast neighbors (optional)
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ config_context.bgp_as }}
+      - neighbor {{ item.peer }} remote-as {{ item.remote_as | default(config_context.bgp_as) }}
+      - neighbor {{ item.peer }} update-source {{ item.update_source | default('loopback 0') }}
+      - address-family ipv4 unicast
+      - neighbor {{ item.peer }} activate
+      - exit-address-family
+  loop: "{{ config_context.bgp_ipv4_peers | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} IPv4 Peer: {{ item.peer }}"
+  when:
+    - custom_fields.device_bgp | default(false) | bool
+    - config_context.bgp_ipv4_peers is defined
+    - config_context.bgp_ipv4_peers | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP VRF instances
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - vrf {{ item.name }}
+      - rd {{ item.rd }}
+      - address-family ipv4 unicast
+      - redistribute connected
+      - exit-address-family
+      - address-family ipv6 unicast
+      - redistribute connected
+      - exit-address-family
+    parents: router bgp {{ config_context.bgp_as }}
+    match: line
+  loop: "{{ config_context.bgp_vrfs | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} VRF: {{ item.name }}"
+  when:
+    - custom_fields.device_bgp | default(false) | bool
+    - config_context.bgp_vrfs is defined
+    - config_context.bgp_vrfs | length > 0
+    - item.rd is defined
+    - item.rd != none
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP route reflector settings
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ config_context.bgp_as }}
+      - neighbor {{ item.peer }} route-reflector-client
+  loop: "{{ config_context.bgp_rr_clients | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} RR Client: {{ item.peer }}"
+  when:
+    - custom_fields.device_bgp | default(false) | bool
+    - config_context.bgp_rr_clients is defined
+    - config_context.bgp_rr_clients | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP additional settings
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ config_context.bgp_additional_config }}"
+    parents: router bgp {{ config_context.bgp_as }}
+    match: line
+  when:
+    - custom_fields.device_bgp | default(false) | bool
+    - config_context.bgp_additional_config is defined
+    - config_context.bgp_additional_config | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Display BGP configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "BGP AS {{ config_context.bgp_as }} configured on {{ inventory_hostname }}"
+      - "Router ID: {{ custom_fields.device_bgp_routerid }}"
+      - "EVPN Peers: {{ config_context.bgp_peers | default([]) | length }}"
+      - "IPv4 Peers: {{ config_context.bgp_ipv4_peers | default([]) | length }}"
+      - "VRF Instances: {{ config_context.bgp_vrfs | default([]) | length }}"
+      - "Route Reflector Clients: {{ config_context.bgp_rr_clients | default([]) | length }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - custom_fields.device_bgp | default(false) | bool

@@ -272,7 +272,9 @@
         - ospf
         - routing
         - layer3
-  when: aoscx_configure_ospf | bool
+  when:
+    - aoscx_configure_ospf | bool
+    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
   tags:
     - ospf
     - routing
@@ -286,7 +288,9 @@
         - bgp
         - routing
         - layer3
-  when: aoscx_configure_bgp | bool
+  when:
+    - aoscx_configure_bgp | bool
+    - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
   tags:
     - bgp
     - routing
@@ -299,7 +303,9 @@
       tags:
         - vsx
         - ha
-  when: aoscx_configure_vsx | bool
+  when:
+    - aoscx_configure_vsx | bool
+    - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in ansible_run_tags"
   tags:
     - vsx
     - ha
