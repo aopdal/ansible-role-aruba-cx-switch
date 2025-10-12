@@ -1,0 +1,42 @@
+# code: language=ansible
+---
+# DNS configuration for Aruba CX switches
+#
+# This task configures DNS settings based on NetBox config_context
+#
+# Required/Optional variables in config_context:
+#   - dns_mgmt_nameservers: Management nameservers (dict)
+#   - dns_domain_name: Primary domain name (string)
+#   - dns_domain_list: Additional search domains (dict with numeric keys)
+#   - dns_name_servers: DNS nameservers (dict with numeric keys)
+#   - dns_host_v4_address_mapping: Static host mappings (dict)
+#   - dns_vrf: VRF for DNS traffic (string, optional)
+
+- name: configure_dns | Display DNS configuration debug info
+  ansible.builtin.debug:
+    msg:
+      - "Configuring DNS on {{ inventory_hostname }}"
+      - "Domain name: {{ config_context.dns_domain_name | default('Not configured') }}"
+      - "DNS VRF: {{ config_context.dns_vrf | default('default') }}"
+      - "Management nameservers: {{ config_context.dns_mgmt_nameservers | default({}) | length }} configured"
+      - "DNS nameservers: {{ config_context.dns_name_servers | default({}) | length }} configured"
+      - "Domain list: {{ config_context.dns_domain_list | default({}) | length }} domains"
+      - "Host mappings: {{ config_context.dns_host_v4_address_mapping | default({}) | length }} entries"
+  when: aoscx_debug | bool
+
+- name: configure_dns | Configure DNS settings
+  arubanetworks.aoscx.aoscx_dns:
+    mgmt_nameservers: "{{ config_context.dns_mgmt_nameservers | default(omit) }}"
+    domain_name: "{{ config_context.dns_domain_name | default(omit) }}"
+    domain_list: "{{ config_context.dns_domain_list | default(omit) }}"
+    name_servers: "{{ config_context.dns_name_servers | default(omit) }}"
+    host_v4_address_mapping: "{{ config_context.dns_host_v4_address_mapping | default(omit) }}"
+    vrf: "{{ config_context.dns_vrf | default(omit) }}"
+  when:
+    - config_context is defined
+    - >
+      config_context.dns_domain_name is defined or
+      config_context.dns_mgmt_nameservers is defined or
+      config_context.dns_name_servers is defined or
+      config_context.dns_domain_list is defined or
+      config_context.dns_host_v4_address_mapping is defined

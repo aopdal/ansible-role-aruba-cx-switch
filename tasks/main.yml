@@ -9,6 +9,39 @@
     - facts
     - gather
 
+# Base system configurations should be applied early
+- name: Include banner configuration tasks
+  ansible.builtin.include_tasks: configure_banner.yml
+  when: aoscx_configure_banner | bool
+  tags:
+    - banner
+    - base_config
+    - system
+
+- name: Include timezone configuration tasks
+  ansible.builtin.include_tasks: configure_timezone.yml
+  when: aoscx_configure_timezone | bool
+  tags:
+    - timezone
+    - base_config
+    - system
+
+- name: Include NTP configuration tasks
+  ansible.builtin.include_tasks: configure_ntp.yml
+  when: aoscx_configure_ntp | bool
+  tags:
+    - ntp
+    - base_config
+    - system
+
+- name: Include DNS configuration tasks
+  ansible.builtin.include_tasks: configure_dns.yml
+  when: aoscx_configure_dns | bool
+  tags:
+    - dns
+    - base_config
+    - system
+
 # VRFs should be configured before L3 interfaces
 - name: Include VRF configuration tasks
   ansible.builtin.include_tasks: configure_vrfs.yml

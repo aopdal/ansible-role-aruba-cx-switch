@@ -1,0 +1,32 @@
+# code: language=ansible
+---
+# Timezone configuration for Aruba CX switches
+#
+# This task configures timezone based on NetBox config_context
+#
+# Required variable in config_context:
+#   - timezone: Timezone string (e.g., "europe/oslo", "america/new_york")
+#
+# Example config_context:
+# {
+#     "timezone": "europe/oslo"
+# }
+
+- name: configure_timezone | Display timezone configuration debug info
+  ansible.builtin.debug:
+    msg:
+      - "Configuring timezone on {{ inventory_hostname }}"
+      - "Timezone: {{ config_context.timezone | default('Not configured') }}"
+  when: aoscx_debug | bool
+
+- name: configure_timezone | Configure timezone
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - clock timezone {{ config_context.timezone }}
+    match: line
+  when:
+    - config_context is defined
+    - config_context.timezone is defined
+    - config_context.timezone | length > 0
+  vars:
+    ansible_connection: network_cli

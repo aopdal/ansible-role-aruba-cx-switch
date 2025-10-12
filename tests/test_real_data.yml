@@ -292,12 +292,34 @@
         role: "primary"
         systemmac: "02:01:00:00:01:00"
         timezone: "europe/oslo"
+        motd: |
+          ========================================
+          Welcome to {{ inventory_hostname }}
+          Managed by Ansible - Unauthorized access prohibited
+          ========================================
         mgmt_defaultgateway: "172.20.0.254"
         mgmt_nameserver: "91.90.45.8"
         ntp_vrf: "mgmt"
         ntp_servers:
           - server: "klokke.opdal.net"
+            prefer: true
           - server: "h1-rpi1.opdal.net"
+        dns_domain_name: "ao-test.net"
+        dns_mgmt_nameservers:
+          Primary: "91.90.45.8"
+          Secondary: "1.1.1.1"
+        dns_name_servers:
+          "0": "91.90.45.8"
+          "1": "1.1.1.1"
+          "2": "8.8.8.8"
+        dns_domain_list:
+          "0": "ao-test.net"
+          "1": "opdal.net"
+          "2": "local"
+        dns_host_v4_address_mapping:
+          klokke: "91.90.45.8"
+          jumphost: "172.20.0.100"
+        dns_vrf: "mgmt"
 
     # Role configuration
     aoscx_configure_vrfs: true

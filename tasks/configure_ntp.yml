@@ -1,0 +1,70 @@
+# code: language=ansible
+---
+# NTP configuration for Aruba CX switches
+#
+# This task configures NTP servers and parameters based on NetBox config_context
+#
+# Required variables in config_context:
+#   - ntp_servers: List of NTP servers with optional 'prefer' flag
+#   - ntp_vrf: VRF to use for NTP traffic (typically 'mgmt')
+#
+# Example config_context:
+# {
+#     "ntp_servers": [
+#         {
+#             "prefer": "True",
+#             "server": "klokke.opdal.net"
+#         },
+#         {
+#             "server": "h1-rpi1.opdal.net"
+#         }
+#     ],
+#     "ntp_vrf": "mgmt"
+# }
+
+- name: configure_ntp | Display NTP configuration debug info
+  ansible.builtin.debug:
+    msg:
+      - "Configuring NTP on {{ inventory_hostname }}"
+      - "NTP VRF: {{ config_context.ntp_vrf | default('Not configured') }}"
+      - "NTP servers: {{ config_context.ntp_servers | default([]) | length }} configured"
+  when: aoscx_debug | bool
+
+- name: configure_ntp | Configure preferred NTP servers
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - ntp server {{ item.server }} iburst prefer
+    match: line
+  loop: "{{ config_context.ntp_servers }}"
+  when:
+    - config_context is defined
+    - config_context.ntp_servers is defined
+    - item.prefer is defined
+    - item.prefer | bool
+  vars:
+    ansible_connection: network_cli
+
+- name: configure_ntp | Configure regular NTP servers
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - ntp server {{ item.server }} iburst
+    match: line
+  loop: "{{ config_context.ntp_servers }}"
+  when:
+    - config_context is defined
+    - config_context.ntp_servers is defined
+    - item.prefer is not defined or not (item.prefer | bool)
+  vars:
+    ansible_connection: network_cli
+
+- name: configure_ntp | Configure NTP parameters
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - ntp enable
+      - ntp vrf {{ config_context.ntp_vrf }}
+    match: line
+  when:
+    - config_context is defined
+    - config_context.ntp_vrf is defined
+  vars:
+    ansible_connection: network_cli
