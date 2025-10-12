@@ -1,30 +1,120 @@
 ---
-# Configure BGP for EVPN/VXLAN Fabric
-# This task configures BGP with EVPN address family for overlay networking
+# Configure BGP - Hybrid approach supporting both config_context and netbox-bgp plugin
+#
+# Data Sources (in order of preference):
+# 1. netbox-bgp plugin (via pynetbox API) - preferred for full feature set
+# 2. config_context (fallback) - for simple configurations during migration
+#
+# This allows smooth migration from config_context to netbox-bgp plugin
 
-- name: Debug BGP configuration from NetBox
+- name: Get BGP sessions from NetBox BGP plugin
+  when: aoscx_use_netbox_bgp_plugin | default(true) | bool
+  delegate_to: localhost
+  run_once: true
+  block:
+    - name: Query NetBox BGP plugin for all sessions
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: netbox_bgp_sessions_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Set fact when BGP plugin is available
+      ansible.builtin.set_fact:
+        netbox_bgp_plugin_available: "{{ netbox_bgp_sessions_raw.status == 200 }}"
+        netbox_bgp_sessions_all: "{{ netbox_bgp_sessions_raw.json.results | default([]) }}"
+      run_once: true
+
+    - name: Debug BGP plugin status
+      ansible.builtin.debug:
+        msg: "NetBox BGP plugin: {{ 'Available ✓' if netbox_bgp_plugin_available else 'Not available, using config_context fallback' }}"
+      when: aoscx_debug_mode | default(false) | bool
+
+- name: Filter BGP sessions for this device from plugin
+  ansible.builtin.set_fact:
+    device_bgp_sessions: "{{ netbox_bgp_sessions_all |
+      selectattr('device.name', 'equalto', inventory_hostname) |
+      selectattr('status.value', 'in', ['active', 'planned']) |
+      list }}"
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - netbox_bgp_sessions_all is defined
+
+- name: Debug BGP configuration source
   ansible.builtin.debug:
     msg:
-      - "BGP AS: {{ config_context.bgp_as | default('not set') }}"
-      - "BGP Router ID: {{ custom_fields.device_bgp_routerid | default('not set') }}"
-      - "BGP Enabled: {{ custom_fields.device_bgp | default(false) }}"
-      - "BGP Peers: {{ config_context.bgp_peers | default([]) | length }} configured"
+      - "BGP Configuration Source: {{ 'netbox-bgp plugin' if (device_bgp_sessions | default([]) | length > 0) else 'config_context' }}"
+      - "Device: {{ inventory_hostname }}"
+      - "Plugin Sessions: {{ device_bgp_sessions | default([]) | length }}"
+      - "Config Context BGP AS: {{ config_context.bgp_as | default('not set') }}"
+      - "Config Context Peers: {{ config_context.bgp_peers | default([]) | length }}"
+      - "Custom Field BGP Enabled: {{ custom_fields.device_bgp | default(false) }}"
+      - "Custom Field Router ID: {{ custom_fields.device_bgp_routerid | default('not set') }}"
   when: aoscx_debug_mode | default(false) | bool
 
-- name: Configure BGP router process
+# ============================================================================
+# BGP Router Process Configuration
+# ============================================================================
+
+- name: Configure BGP router process from netbox-bgp plugin
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - router bgp {{ device_bgp_sessions[0].local_as.asn }}
+      - bgp router-id {{ device_bgp_sessions[0].local_address.address.split('/')[0] }}
+    match: line
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP router process from config_context (fallback)
   arubanetworks.aoscx.aoscx_config:
     lines:
       - router bgp {{ config_context.bgp_as }}
       - bgp router-id {{ custom_fields.device_bgp_routerid }}
     match: line
   when:
+    - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)
     - custom_fields.device_bgp | default(false) | bool
     - config_context.bgp_as is defined
     - custom_fields.device_bgp_routerid is defined
   vars:
     ansible_connection: network_cli
 
-- name: Configure BGP neighbors for EVPN
+# ============================================================================
+# BGP EVPN Neighbors Configuration
+# ============================================================================
+
+- name: Configure BGP EVPN neighbors from netbox-bgp plugin
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - neighbor {{ item.remote_address.address.split('/')[0] }} remote-as {{ item.remote_as.asn }}
+      - neighbor {{ item.remote_address.address.split('/')[0] }} update-source {{ item.local_address.address.split('/')[0] }}
+      - address-family l2vpn evpn
+      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
+      - neighbor {{ item.remote_address.address.split('/')[0] }} activate
+      - exit-address-family
+  loop: "{{ device_bgp_sessions | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }})"
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP neighbors for EVPN from config_context (fallback)
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -45,7 +135,11 @@
   vars:
     ansible_connection: network_cli
 
-- name: Configure BGP IPv4 unicast neighbors (optional)
+# ============================================================================
+# BGP IPv4 Unicast Neighbors (config_context only for now)
+# ============================================================================
+
+- name: Configure BGP IPv4 unicast neighbors from config_context
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -65,7 +159,11 @@
   vars:
     ansible_connection: network_cli
 
-- name: Configure BGP VRF instances
+# ============================================================================
+# BGP VRF Instances (config_context only for now)
+# ============================================================================
+
+- name: Configure BGP VRF instances from config_context
   arubanetworks.aoscx.aoscx_config:
     lines:
       - vrf {{ item.name }}
@@ -90,7 +188,11 @@
   vars:
     ansible_connection: network_cli
 
-- name: Configure BGP route reflector settings
+# ============================================================================
+# BGP Route Reflector Settings (config_context only for now)
+# ============================================================================
+
+- name: Configure BGP route reflector settings from config_context
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -106,7 +208,11 @@
   vars:
     ansible_connection: network_cli
 
-- name: Configure BGP additional settings
+# ============================================================================
+# BGP Additional Configuration (config_context only for now)
+# ============================================================================
+
+- name: Configure BGP additional settings from config_context
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ config_context.bgp_additional_config }}"
     parents: router bgp {{ config_context.bgp_as }}
@@ -118,10 +224,32 @@
   vars:
     ansible_connection: network_cli
 
-- name: Display BGP configuration summary
+# ============================================================================
+# Configuration Summary
+# ============================================================================
+
+- name: Display BGP configuration summary from netbox-bgp plugin
   ansible.builtin.debug:
     msg:
-      - "BGP AS {{ config_context.bgp_as }} configured on {{ inventory_hostname }}"
+      - "=== BGP Configuration (netbox-bgp plugin) ==="
+      - "Device: {{ inventory_hostname }}"
+      - "Local AS: {{ device_bgp_sessions[0].local_as.asn }}"
+      - "Router ID: {{ device_bgp_sessions[0].local_address.address.split('/')[0] }}"
+      - "Total Sessions: {{ device_bgp_sessions | length }}"
+      - "Active Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'active') | list | length }}"
+      - "Planned Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'planned') | list | length }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+
+- name: Display BGP configuration summary from config_context
+  ansible.builtin.debug:
+    msg:
+      - "=== BGP Configuration (config_context) ==="
+      - "Device: {{ inventory_hostname }}"
+      - "BGP AS: {{ config_context.bgp_as }}"
       - "Router ID: {{ custom_fields.device_bgp_routerid }}"
       - "EVPN Peers: {{ config_context.bgp_peers | default([]) | length }}"
       - "IPv4 Peers: {{ config_context.bgp_ipv4_peers | default([]) | length }}"
@@ -129,4 +257,5 @@
       - "Route Reflector Clients: {{ config_context.bgp_rr_clients | default([]) | length }}"
   when:
     - aoscx_debug_mode | default(false) | bool
+    - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)
     - custom_fields.device_bgp | default(false) | bool

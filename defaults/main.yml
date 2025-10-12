@@ -29,6 +29,11 @@ aoscx_configure_vsx: false
 # Idempotency mode - when true, removes configs not in NetBox
 aoscx_idempotent_mode: false
 
+# NetBox BGP plugin settings
+aoscx_use_netbox_bgp_plugin: true  # Try to use netbox-bgp plugin, fallback to config_context
+aoscx_netbox_validate_certs: true  # Validate SSL certificates when querying NetBox API
+aoscx_no_log: false  # Set to true to hide sensitive data in logs
+
 # Save configuration after changes
 aoscx_save_config: true
 
