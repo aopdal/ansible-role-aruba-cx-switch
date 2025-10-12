@@ -1,0 +1,37 @@
+---
+# Quick test for base config tags
+- name: Test Base Config Tags
+  hosts: localhost
+  gather_facts: false
+  vars:
+    config_context:
+      motd: "Test banner message"
+      timezone: "europe/oslo"
+      ntp_vrf: "mgmt"
+      ntp_servers:
+        - server: "pool.ntp.org"
+
+    aoscx_configure_banner: true
+    aoscx_configure_timezone: true
+    aoscx_configure_ntp: true
+    aoscx_configure_dns: false
+    aoscx_debug: true
+
+  tasks:
+    - name: Show what config_context contains
+      ansible.builtin.debug:
+        msg:
+          - "config_context.motd: {{ config_context.motd | default('NOT DEFINED') }}"
+          - "config_context.timezone: {{ config_context.timezone | default('NOT DEFINED') }}"
+          - "config_context.ntp_vrf: {{ config_context.ntp_vrf | default('NOT DEFINED') }}"
+
+    - name: Include banner configuration (with proper tag inheritance)
+      ansible.builtin.include_tasks:
+        file: "{{ playbook_dir }}/../tasks/configure_banner.yml"
+        apply:
+          tags:
+            - banner
+            - base_config
+      when: aoscx_configure_banner | bool
+      tags:
+        - always
