@@ -22,6 +22,9 @@
     "ANSIBLE_HOST_KEY_CHECKING": "false",
     "PY_COLORS": "1"
   },
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "${localEnv:SSH_AUTH_SOCK}"
+  },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {
     "vscode": {
