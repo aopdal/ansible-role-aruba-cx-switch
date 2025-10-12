@@ -20,7 +20,7 @@ Use the `apply:` parameter with `include_tasks` to apply tags to all tasks withi
     - system
 ```
 
-### After (Working)
+### After (Working - Corrected)
 ```yaml
 - name: Include banner configuration tasks
   ansible.builtin.include_tasks:
@@ -32,14 +32,43 @@ Use the `apply:` parameter with `include_tasks` to apply tags to all tasks withi
         - system
   when: aoscx_configure_banner | bool
   tags:
-    - always
+    - banner
+    - base_config
+    - system
 ```
 
 ## Key Changes
 
 1. **`apply:` parameter**: Tags are now applied to all tasks within the included file
-2. **`tags: always`** on the include: Ensures the include itself is evaluated even with tag filtering
-3. **Tag inheritance**: Tasks inside `configure_banner.yml` now inherit the tags
+2. **Matching tags**: The `tags:` on the include **must match** the `apply: tags:` to ensure proper filtering
+3. **Tag inheritance**: Tasks inside `configure_banner.yml` now inherit the tags and the include itself is filtered
+
+## Why Tags Must Match
+
+**Problem with `tags: always`:**
+```yaml
+tags:
+  - always  # ❌ This causes the include to ALWAYS run, regardless of tag filters
+```
+
+When using `tags: always`, the include is evaluated even when you run with specific tags like `-t vlans`. This causes:
+- Banner/NTP/DNS includes run even when you only want VLANs
+- Unnecessary task evaluations
+- Confusing output showing unrelated includes
+
+**Solution with matching tags:**
+```yaml
+tags:
+  - banner
+  - base_config
+  - system  # ✅ Include only runs when these tags are selected
+```
+
+Now when you run:
+- `-t vlans` → Only VLAN includes run
+- `-t base_config` → Only base config includes run
+- `-t banner` → Only banner include runs
+- No tags → All includes run (default behavior)
 
 ## Updated Inventory
 

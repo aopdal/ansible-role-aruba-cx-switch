@@ -20,7 +20,9 @@
         - system
   when: aoscx_configure_banner | bool
   tags:
-    - always
+    - banner
+    - base_config
+    - system
 
 - name: Include timezone configuration tasks
   ansible.builtin.include_tasks:
@@ -32,7 +34,9 @@
         - system
   when: aoscx_configure_timezone | bool
   tags:
-    - always
+    - timezone
+    - base_config
+    - system
 
 - name: Include NTP configuration tasks
   ansible.builtin.include_tasks:
@@ -44,7 +48,9 @@
         - system
   when: aoscx_configure_ntp | bool
   tags:
-    - always
+    - ntp
+    - base_config
+    - system
 
 - name: Include DNS configuration tasks
   ansible.builtin.include_tasks:
@@ -56,11 +62,19 @@
         - system
   when: aoscx_configure_dns | bool
   tags:
-    - always
+    - dns
+    - base_config
+    - system
 
 # VRFs should be configured before L3 interfaces
 - name: Include VRF configuration tasks
-  ansible.builtin.include_tasks: configure_vrfs.yml
+  ansible.builtin.include_tasks:
+    file: configure_vrfs.yml
+    apply:
+      tags:
+        - vrfs
+        - layer3
+        - routing
   when: aoscx_configure_vrfs | bool
   tags:
     - vrfs
@@ -69,7 +83,12 @@
 
 # VLANs should be configured before interfaces
 - name: Include VLAN configuration tasks
-  ansible.builtin.include_tasks: configure_vlans.yml
+  ansible.builtin.include_tasks:
+    file: configure_vlans.yml
+    apply:
+      tags:
+        - vlans
+        - layer2
   when: aoscx_configure_vlans | bool
   tags:
     - vlans
@@ -77,7 +96,13 @@
 
 # Physical interfaces should be configured before L2/L3 or LAG configuration
 - name: Include physical interface configuration tasks
-  ansible.builtin.include_tasks: configure_physical_interfaces.yml
+  ansible.builtin.include_tasks:
+    file: configure_physical_interfaces.yml
+    apply:
+      tags:
+        - interfaces
+        - physical_interfaces
+        - layer1
   when: aoscx_configure_physical_interfaces | bool
   tags:
     - interfaces
@@ -86,7 +111,13 @@
 
 # LAG interfaces should be configured after physical but before L2/L3 configuration
 - name: Include LAG interface configuration tasks
-  ansible.builtin.include_tasks: configure_lag_interfaces.yml
+  ansible.builtin.include_tasks:
+    file: configure_lag_interfaces.yml
+    apply:
+      tags:
+        - interfaces
+        - lag_interfaces
+        - layer2
   when: aoscx_configure_lag_interfaces | bool
   tags:
     - interfaces
@@ -95,7 +126,13 @@
 
 # MCLAG interfaces (Multi-Chassis LAG for VSX)
 - name: Include MCLAG interface configuration tasks
-  ansible.builtin.include_tasks: configure_mclag_interfaces.yml
+  ansible.builtin.include_tasks:
+    file: configure_mclag_interfaces.yml
+    apply:
+      tags:
+        - interfaces
+        - mclag_interfaces
+        - vsx
   when: aoscx_configure_mclag_interfaces | bool
   tags:
     - interfaces
@@ -104,7 +141,14 @@
 
 # Assign physical interfaces to LAG (after LAG/MCLAG creation)
 - name: Assign physical interfaces to LAG
-  ansible.builtin.include_tasks: assign_interfaces_to_lag.yml
+  ansible.builtin.include_tasks:
+    file: assign_interfaces_to_lag.yml
+    apply:
+      tags:
+        - interfaces
+        - lag_interfaces
+        - mclag_interfaces
+        - lag_assignment
   when:
     - aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces | bool
     - interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length > 0
@@ -116,7 +160,13 @@
 
 # L2 interfaces (non-idempotent mode - for initial config)
 - name: Include L2 interface configuration tasks
-  ansible.builtin.include_tasks: configure_l2_interfaces.yml
+  ansible.builtin.include_tasks:
+    file: configure_l2_interfaces.yml
+    apply:
+      tags:
+        - interfaces
+        - l2_interfaces
+        - layer2
   when:
     - aoscx_configure_l2_interfaces | bool
     - not (aoscx_idempotent_mode | bool)
@@ -127,7 +177,14 @@
 
 # L2 interfaces (idempotent mode - removes unwanted configs)
 - name: Include L2 interface configuration tasks (idempotent)
-  ansible.builtin.include_tasks: configure_l2_interfaces_idempotent.yml
+  ansible.builtin.include_tasks:
+    file: configure_l2_interfaces_idempotent.yml
+    apply:
+      tags:
+        - interfaces
+        - l2_interfaces
+        - layer2
+        - idempotent
   when:
     - aoscx_configure_l2_interfaces | bool
     - aoscx_idempotent_mode | bool
@@ -138,7 +195,13 @@
     - idempotent
 
 - name: Include L3 interface configuration tasks
-  ansible.builtin.include_tasks: configure_l3_interfaces.yml
+  ansible.builtin.include_tasks:
+    file: configure_l3_interfaces.yml
+    apply:
+      tags:
+        - interfaces
+        - l3_interfaces
+        - layer3
   when: aoscx_configure_l3_interfaces | bool
   tags:
     - interfaces
@@ -146,21 +209,36 @@
     - layer3
 
 - name: Include loopback configuration tasks
-  ansible.builtin.include_tasks: configure_loopback.yml
+  ansible.builtin.include_tasks:
+    file: configure_loopback.yml
+    apply:
+      tags:
+        - loopback
+        - layer3
   when: aoscx_configure_loopback | bool
   tags:
     - loopback
     - layer3
 
 - name: Include EVPN configuration tasks
-  ansible.builtin.include_tasks: configure_evpn.yml
+  ansible.builtin.include_tasks:
+    file: configure_evpn.yml
+    apply:
+      tags:
+        - evpn
+        - overlay
   when: aoscx_configure_evpn | bool
   tags:
     - evpn
     - overlay
 
 - name: Include VXLAN configuration tasks
-  ansible.builtin.include_tasks: configure_vxlan.yml
+  ansible.builtin.include_tasks:
+    file: configure_vxlan.yml
+    apply:
+      tags:
+        - vxlan
+        - overlay
   when: aoscx_configure_vxlan | bool
   tags:
     - vxlan
@@ -169,7 +247,14 @@
 # VLAN cleanup should happen AFTER all interfaces and overlays are cleaned up
 # This ensures VLANs are not in use on: trunk ports, access ports, SVIs, or EVPN/VXLAN
 - name: Include VLAN cleanup tasks
-  ansible.builtin.include_tasks: cleanup_vlans.yml
+  ansible.builtin.include_tasks:
+    file: cleanup_vlans.yml
+    apply:
+      tags:
+        - vlans
+        - layer2
+        - cleanup
+        - idempotent
   when:
     - aoscx_configure_vlans | bool
     - aoscx_idempotent_mode | bool
@@ -180,7 +265,13 @@
     - idempotent
 
 - name: Include OSPF configuration tasks
-  ansible.builtin.include_tasks: configure_ospf.yml
+  ansible.builtin.include_tasks:
+    file: configure_ospf.yml
+    apply:
+      tags:
+        - ospf
+        - routing
+        - layer3
   when: aoscx_configure_ospf | bool
   tags:
     - ospf
@@ -188,7 +279,13 @@
     - layer3
 
 - name: Include BGP configuration tasks
-  ansible.builtin.include_tasks: configure_bgp.yml
+  ansible.builtin.include_tasks:
+    file: configure_bgp.yml
+    apply:
+      tags:
+        - bgp
+        - routing
+        - layer3
   when: aoscx_configure_bgp | bool
   tags:
     - bgp
@@ -196,7 +293,12 @@
     - layer3
 
 - name: Include VSX configuration tasks
-  ansible.builtin.include_tasks: configure_vsx.yml
+  ansible.builtin.include_tasks:
+    file: configure_vsx.yml
+    apply:
+      tags:
+        - vsx
+        - ha
   when: aoscx_configure_vsx | bool
   tags:
     - vsx
