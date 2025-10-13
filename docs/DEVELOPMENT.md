@@ -1,12 +1,6 @@
 # Development Guide
 
-This guide covers everything you need to know to develop and contribute to the Aruba AOS-CX The dev container includes:
-
-**Base Image:** Python 3.12 (Debian-based)
-
-**Installed Tools:**
-- Python 3.12 with pip
-- Ansible & ansible-lintAnsible role.
+This guide covers everything you need to know to develop and contribute to the Aruba AOS-CX Ansible role.
 
 ## Table of Contents
 
@@ -513,6 +507,30 @@ pip install -r requirements-test.txt
 # Reinstall collections
 ansible-galaxy collection install -r requirements.yml --force
 ```
+
+#### SSH Agent Issues (Dev Container)
+
+**Problem:** `git push` fails with "Permission denied (publickey)" or `ssh-add -l` shows "Error connecting to agent"
+
+**Solutions:**
+```bash
+# Reconnect to SSH agent (use source, not sh!)
+source .devcontainer/reconnect-ssh.sh
+
+# Verify SSH agent is working
+ssh-add -l
+
+# Should show your SSH keys. If not, check:
+# 1. SSH agent is running on host (Windows/WSL)
+# 2. VS Code is configured to forward SSH agent
+# 3. Rebuild container to apply SSH forwarding
+
+# Quick test
+ssh -T git@github.com
+# Should respond with: "Hi username! You've successfully authenticated..."
+```
+
+**Note:** The `reconnect-ssh.sh` script must be **sourced** (not executed with `sh`) so the `SSH_AUTH_SOCK` environment variable is exported to your current shell.
 
 #### Molecule Tests Fail
 

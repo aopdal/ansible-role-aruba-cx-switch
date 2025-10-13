@@ -7,6 +7,48 @@ This directory contains all documentation for the `ansible-role-aruba-cx-switch`
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide for using the role
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference for common tasks
 
+## Configuration Guides
+
+### Base System Configuration
+- **[BASE_CONFIGURATION.md](BASE_CONFIGURATION.md)** - Base system settings
+  - Banner, timezone, NTP, and DNS configuration
+  - Configuration flags and NetBox variables
+  - Task execution order
+
+- **[DNS_CONFIGURATION.md](DNS_CONFIGURATION.md)** - DNS configuration examples
+  - Complete config_context examples
+  - Domain name, nameservers, and host mappings
+  - Management vs. non-management VRF setup
+
+### Routing Protocols
+
+- **[BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)** - BGP/EVPN configuration guide
+  - Complete EVPN/VXLAN fabric setup
+  - Route reflector configuration
+  - IPv4 unicast and EVPN address families
+  - VRF route distinguishers
+
+- **[BGP_SUMMARY.md](BGP_SUMMARY.md)** - BGP configuration summary
+- **[BGP_MIGRATION_GUIDE.md](BGP_MIGRATION_GUIDE.md)** - Migration from config_context to NetBox BGP plugin
+- **[BGP_EVPN_FABRIC_EXAMPLE.md](BGP_EVPN_FABRIC_EXAMPLE.md)** - Complete fabric example
+- **[BGP_HYBRID_CONFIGURATION.md](BGP_HYBRID_CONFIGURATION.md)** - Hybrid config_context + plugin approach
+- **[BGP_HYBRID_SUMMARY.md](BGP_HYBRID_SUMMARY.md)** - Hybrid approach summary
+- **[NETBOX_BGP_PLUGIN.md](NETBOX_BGP_PLUGIN.md)** - NetBox BGP plugin integration guide
+  - Plugin installation and setup
+  - Data models and API usage
+  - Advantages over config_context
+
+### Tag-Dependent Configuration
+
+- **[TAG_DEPENDENT_SUMMARY.md](TAG_DEPENDENT_SUMMARY.md)** - Tag-dependent task overview
+  - BGP, OSPF, and VSX now require explicit tags
+  - Behavior matrix for different tag combinations
+  - Safety improvements for daily operations
+
+- **[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md)** - Technical implementation details
+- **[TAG_DEPENDENT_TESTING.md](TAG_DEPENDENT_TESTING.md)** - Testing tag-dependent tasks
+- **[TAG_INHERITANCE_FIX.md](TAG_INHERITANCE_FIX.md)** - Tag inheritance fixes
+
 ## Development
 
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Complete development guide
@@ -17,6 +59,16 @@ This directory contains all documentation for the `ansible-role-aruba-cx-switch`
   - Contribution workflow
 
 - **[DEVCONTAINER_SETUP.md](DEVCONTAINER_SETUP.md)** - Detailed dev container configuration
+- **[DEVCONTAINER_MOUNTS.md](DEVCONTAINER_MOUNTS.md)** - Mounting additional folders in devcontainer
+  - Access test environments and other projects
+  - Mount syntax and examples
+  - Multi-folder workspace setup
+
+- **[WORKSPACE.md](WORKSPACE.md)** - Multi-folder workspace guide
+  - Using `ansible-workspace.code-workspace`
+  - Working with multiple projects simultaneously
+  - Customization and folder management
+
 - **[SETUP_COMPLETE.md](SETUP_COMPLETE.md)** - Dev environment setup verification
 
 ## Testing
@@ -41,6 +93,9 @@ This directory contains all documentation for the `ansible-role-aruba-cx-switch`
 ## Internal Documentation
 
 - **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - History of code refactoring and improvements
+  - Filter plugin reorganization
+  - Task splitting and optimization
+  - Architecture improvements
 
 ## Root Documentation
 
@@ -52,7 +107,53 @@ The following files are in the repository root for standard compliance:
 
 ## Additional Resources
 
+### Filter Plugins
+- **[../filter_plugins/netbox_filters_lib/README.md](../filter_plugins/netbox_filters_lib/README.md)** - Complete filter plugin documentation
+  - 22 custom filters for NetBox data transformation
+  - Usage examples and real-world workflows
+  - Development guide
+
+### Testing Scripts
 - **[../testing-scripts/](../testing-scripts/)** - Helper scripts for testing environment
   - `populate_netbox.py` - Populate NetBox with test data
   - `validate_deployment.py` - Validate switch configurations
   - `README.md` - Script usage documentation
+
+## Document Categories
+
+### 📚 Quick Reference (2 docs)
+- QUICKSTART.md
+- QUICK_REFERENCE.md
+
+### ⚙️ Configuration Guides (12 docs)
+- BASE_CONFIGURATION.md
+- DNS_CONFIGURATION.md
+- BGP_CONFIGURATION.md
+- BGP_SUMMARY.md
+- BGP_MIGRATION_GUIDE.md
+- BGP_EVPN_FABRIC_EXAMPLE.md
+- BGP_HYBRID_CONFIGURATION.md
+- BGP_HYBRID_SUMMARY.md
+- NETBOX_BGP_PLUGIN.md
+- TAG_DEPENDENT_SUMMARY.md
+- TAG_DEPENDENT_INCLUDES.md
+- TAG_DEPENDENT_TESTING.md
+- TAG_INHERITANCE_FIX.md
+
+### 🔧 Development (5 docs)
+- DEVELOPMENT.md
+- DEVCONTAINER_SETUP.md
+- DEVCONTAINER_MOUNTS.md
+- WORKSPACE.md
+- SETUP_COMPLETE.md
+
+### 🧪 Testing (3 docs)
+- TESTING.md
+- TESTING_ENVIRONMENT.md
+- TESTING_QUICK_START.md
+- TESTING_PROPOSAL.md
+
+### 📋 Internal (1 doc)
+- REFACTORING_SUMMARY.md
+
+**Total: 26 documentation files**
