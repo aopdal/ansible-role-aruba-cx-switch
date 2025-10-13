@@ -1,6 +1,6 @@
 #!/bin/bash
 # SSH Agent Reconnection Script for Dev Container
-# Usage: ./reconnect-ssh.sh
+# Usage: source .devcontainer/reconnect-ssh.sh
 
 echo "🔐 Reconnecting SSH Agent..."
 
@@ -14,7 +14,7 @@ if [ -n "$VSCODE_SSH_SOCK" ] && [ -S "$VSCODE_SSH_SOCK" ]; then
         ssh-add -l
         # Make it permanent for this session
         echo "export SSH_AUTH_SOCK=$SSH_AUTH_SOCK" > ~/.ssh-env
-        exit 0
+        return 0 2>/dev/null || exit 0
     fi
 fi
 
@@ -28,7 +28,7 @@ if [ -n "$WSL_SSH_SOCK" ] && [ -S "$WSL_SSH_SOCK" ]; then
         ssh-add -l
         # Make it permanent for this session
         echo "export SSH_AUTH_SOCK=$SSH_AUTH_SOCK" > ~/.ssh-env
-        exit 0
+        return 0 2>/dev/null || exit 0
     fi
 fi
 
@@ -42,7 +42,7 @@ for sock in /tmp/ssh-*/agent.*; do
             ssh-add -l
             # Make it permanent for this session
             echo "export SSH_AUTH_SOCK=$SSH_AUTH_SOCK" > ~/.ssh-env
-            exit 0
+            return 0 2>/dev/null || exit 0
         fi
     fi
 done
