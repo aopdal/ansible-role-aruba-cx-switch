@@ -128,5 +128,5 @@ Then rebuild: **F1** → **"Dev Containers: Rebuild Container"**
 
 ## See Also
 
-- [DEVCONTAINER_MOUNTS.md](docs/DEVCONTAINER_MOUNTS.md) - Detailed mount configuration guide
-- [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development workflow
+- [DEVCONTAINER_MOUNTS.md](DEVCONTAINER_MOUNTS.md) - Detailed mount configuration guide
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Development workflow

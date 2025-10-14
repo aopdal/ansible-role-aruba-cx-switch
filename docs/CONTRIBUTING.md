@@ -149,7 +149,7 @@ All contributions must pass the following tests:
 - Update `molecule/` tests for new functionality
 - Add integration tests in `tests/` directory
 
-See [docs/TESTING.md](docs/TESTING.md) for detailed testing instructions.
+See [TESTING.md](TESTING.md) for detailed testing instructions.
 
 ## Pull Request Process
 
@@ -264,7 +264,7 @@ def my_filter(value: str) -> str:
 When making changes, update relevant documentation:
 
 - `README.md` - User-facing features
-- `docs/TESTING.md` - Testing procedures
+- `TESTING.md` - Testing procedures
 - `CHANGELOG.md` - User-visible changes
 - `defaults/main.yml` - Variable documentation
 - Inline comments - Complex logic
@@ -287,7 +287,7 @@ Maintainers handle releases:
 
 ## Getting Help
 
-- 📖 Read [docs/TESTING.md](docs/TESTING.md) for testing help
+- 📖 Read [TESTING.md](TESTING.md) for testing help
 - 🐛 Open an issue for bugs
 - 💡 Open an issue for feature requests
 - 💬 Comment on existing issues for questions

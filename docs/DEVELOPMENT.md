@@ -594,7 +594,7 @@ pip install --upgrade ansible-lint
 ### Getting Help
 
 1. **Check existing documentation:**
-   - [README.md](README.md) - Role usage
+   - [Main Documentation](index.md) - Role usage
    - [TESTING.md](TESTING.md) - Testing guide
    - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
 

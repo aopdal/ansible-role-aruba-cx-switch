@@ -1,0 +1,2 @@
+# Exclude README.md from docs/ to avoid conflict with index.md
+README.md

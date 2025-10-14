@@ -56,7 +56,7 @@ pre-commit run --all-files   # Run all pre-commit hooks
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Complete development guide
 - [TESTING.md](TESTING.md) - Testing instructions
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [README.md](README.md) - Role usage and features
+- [Main Documentation](index.md) - Role usage and features
 
 🐛 **Issues?**
 - Check [Troubleshooting section](DEVELOPMENT.md#troubleshooting)

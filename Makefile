@@ -1,4 +1,4 @@
-.PHONY: help install test lint syntax molecule clean pre-commit all venv docs docs-serve docs-build
+.PHONY: help install test lint syntax molecule clean pre-commit all venv docs docs-serve docs-build docs-sync
 
 # Default target
 .DEFAULT_GOAL := help
@@ -169,6 +169,17 @@ docs-install: ## Install documentation dependencies
 	@echo "$(BLUE)Installing documentation dependencies...$(NC)"
 	@pip install -r requirements-docs.txt
 	@echo "$(GREEN)✅ Documentation dependencies installed$(NC)"
+
+docs-sync: ## Sync README.md to docs/index.md
+	@echo "$(BLUE)Syncing README.md to docs/index.md...$(NC)"
+	@cp README.md docs/index.md
+	@# Fix links: Remove 'docs/' prefix since index.md is now inside docs/
+	@sed -i 's|(docs/|(|g' docs/index.md
+	@# Fix links: Make relative paths point to root files (tests/, defaults/, etc.)
+	@sed -i 's|(tests/|(../tests/|g' docs/index.md
+	@sed -i 's|(defaults/|(../defaults/|g' docs/index.md
+	@sed -i 's|(testing-scripts/|(../testing-scripts/|g' docs/index.md
+	@echo "$(GREEN)✅ README.md synced to docs/index.md with fixed links$(NC)"
 
 docs-serve: ## Serve documentation locally at http://127.0.0.1:8000
 	@echo "$(BLUE)Starting documentation server...$(NC)"
