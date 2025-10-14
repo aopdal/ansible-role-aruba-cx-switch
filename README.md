@@ -1,7 +1,7 @@
 # Ansible Role: Aruba AOS-CX Switch
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/your-namespace/aruba_cx_switch)
+[![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/aopdal/aruba_cx_switch)
 
 Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as the source of truth.
 
@@ -511,7 +511,7 @@ Contributions are welcome! Please:
 
 ## Changelog
 
-### Version 1.0.0 (2024-10-05)
+### Version 1.0.0 (2025-10-14)
 - Initial release
 - VRF configuration support
 - VLAN management with idempotent mode
@@ -523,5 +523,5 @@ Contributions are welcome! Please:
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/your-org/ansible-role-aruba-cx-switch/issues
-- Documentation: https://github.com/your-org/ansible-role-aruba-cx-switch/wiki
+- GitHub Issues: https://github.com/aopdal/ansible-role-aruba-cx-switch/issues
+- Documentation: https://github.com/aopdal/ansible-role-aruba-cx-switch/wiki
