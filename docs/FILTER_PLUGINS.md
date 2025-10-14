@@ -1,120 +1,61 @@
-# NetBox Filters Library# NetBox Filters Library
+# NetBox Filters Library
 
+Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX switches.
 
+## Overview
 
-> **📚 Full Documentation**: See **[docs/FILTER_PLUGINS.md](../../docs/FILTER_PLUGINS.md)** for complete documentation.Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX switches.
+This library provides **22 custom filters** organized into 7 focused modules totaling ~1,500 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
 
-
-
-## Quick Overview## Overview
-
-
-
-This library provides **22 custom Ansible filters** for transforming NetBox data for Aruba AOS-CX switches.This library provides **22 custom filters** organized into 7 focused modules totaling ~1,500 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
-
-
-
-### Filter Categories## Structure
-
-
-
-- **VLAN Operations** (7 filters) - VLAN lifecycle management```
-
-- **VRF Operations** (4 filters) - VRF extraction and filteringfilter_plugins/
-
-- **Interface Categorization** (3 filters) - L2/L3 interface processing├── netbox_filters.py          # Main entry point (FilterModule class)
-
-- **State Comparison** (3 filters) - NetBox vs device state comparison└── netbox_filters_lib/        # Package directory
-
-- **OSPF Configuration** (4 filters) - OSPF interface selection and validation    ├── __init__.py            # Package initialization
-
-- **Utilities** (1 filter) - Helper functions    ├── utils.py               # Helper functions (53 lines)
-
-    ├── vlan_filters.py        # VLAN operations (395 lines)
-
-### Quick Example    ├── vrf_filters.py         # VRF operations (194 lines)
-
-    ├── interface_filters.py   # Interface categorization (373 lines)
-
-```yaml    ├── comparison.py          # Comparison logic (279 lines)
-
-# Get VLANs that need to be created or deleted    └── ospf_filters.py        # OSPF operations (116 lines)
-
-- set_fact:```
-
-    vlan_changes: "{{ device_vlans | get_vlans_needing_changes(vlans_in_use, ansible_facts) }}"
-
-    # Returns: { vlans_to_create: [...], vlans_to_delete: [...] }## Modules
-
-
-
-# Categorize L2 interfaces by type### `utils.py` - Helper Functions
-
-- set_fact:Core utilities used across all modules:
-
-    l2_interfaces: "{{ interfaces | categorize_l2_interfaces }}"
-
-    # Returns: { access: [...], tagged_with_untagged: [...], lag_access: [...], ... }- **`_debug(message)`**
-
-```  Print debug messages when `DEBUG_ANSIBLE=true` environment variable is set
-
-
-
-## Documentation- **`collapse_vlan_list(vlan_list)`**
-
-  Format VLAN IDs as compact ranges
-
-For complete documentation including:  Example: `[10, 11, 12, 20, 21]` → `"10-12,20-21"`
-
-- Detailed filter descriptions with parameters
-
-- Real-world usage examples### `vlan_filters.py` - VLAN Operations
-
-- Complete workflow examplesComplete VLAN lifecycle management (7 filters):
-
-- Development guide
-
-- Architecture documentation- **`extract_vlan_ids(interfaces)`**
-
-  Extract all VLAN IDs in use from interfaces
-
-**See: [docs/FILTER_PLUGINS.md](../../docs/FILTER_PLUGINS.md)**  Returns: Sorted list of unique VLAN IDs
-
-
-
-## Module Structure- **`filter_vlans_in_use(vlans, interfaces)`**
-
-  Filter VLAN objects to only those actually in use on interfaces
-
-```  Returns: List of VLAN objects
-
-netbox_filters_lib/
-
-├── README.md              # This file (points to main docs)- **`extract_evpn_vlans(vlans, interfaces, check_noevpn=True)`**
-
-├── __init__.py            # Package initialization  Get VLANs that should be configured for EVPN
-
-├── utils.py               # Helper functions (53 lines)  Checks `vlan_noevpn` custom field and L2VPN termination
-
-├── vlan_filters.py        # VLAN operations (395 lines)  Returns: List of EVPN-enabled VLAN objects
-
-├── vrf_filters.py         # VRF operations (194 lines)
-
-├── interface_filters.py   # Interface categorization (373 lines)- **`extract_vxlan_mappings(vlans, interfaces, use_l2vpn_id=True)`**
-
-├── comparison.py          # Comparison logic (279 lines)  Extract VXLAN VNI to VLAN mappings for VXLAN configuration
-
-└── ospf_filters.py        # OSPF operations (116 lines)  Returns: List of dicts with `vni` and `vlan` keys
+## Structure
 
 ```
+filter_plugins/
+├── netbox_filters.py          # Main entry point (FilterModule class)
+└── netbox_filters_lib/        # Package directory
+    ├── __init__.py            # Package initialization
+    ├── utils.py               # Helper functions (53 lines)
+    ├── vlan_filters.py        # VLAN operations (395 lines)
+    ├── vrf_filters.py         # VRF operations (194 lines)
+    ├── interface_filters.py   # Interface categorization (373 lines)
+    ├── comparison.py          # Comparison logic (279 lines)
+    └── ospf_filters.py        # OSPF operations (116 lines)
+```
+
+## Modules
+
+### `utils.py` - Helper Functions
+Core utilities used across all modules:
+
+- **`_debug(message)`**
+  Print debug messages when `DEBUG_ANSIBLE=true` environment variable is set
+
+- **`collapse_vlan_list(vlan_list)`**
+  Format VLAN IDs as compact ranges
+  Example: `[10, 11, 12, 20, 21]` → `"10-12,20-21"`
+
+### `vlan_filters.py` - VLAN Operations
+Complete VLAN lifecycle management (7 filters):
+
+- **`extract_vlan_ids(interfaces)`**
+  Extract all VLAN IDs in use from interfaces
+  Returns: Sorted list of unique VLAN IDs
+
+- **`filter_vlans_in_use(vlans, interfaces)`**
+  Filter VLAN objects to only those actually in use on interfaces
+  Returns: List of VLAN objects
+
+- **`extract_evpn_vlans(vlans, interfaces, check_noevpn=True)`**
+  Get VLANs that should be configured for EVPN
+  Checks `vlan_noevpn` custom field and L2VPN termination
+  Returns: List of EVPN-enabled VLAN objects
+
+- **`extract_vxlan_mappings(vlans, interfaces, use_l2vpn_id=True)`**
+  Extract VXLAN VNI to VLAN mappings for VXLAN configuration
+  Returns: List of dicts with `vni` and `vlan` keys
 
 - **`get_vlans_in_use(interfaces, vlan_interfaces=None)`**
-
-## Development  Get comprehensive VLAN details with full metadata
-
+  Get comprehensive VLAN details with full metadata
   Returns: Dict with `vlan_ids`, `vlans`, and detailed VLAN info
-
-To add new filters, see the Development section in [docs/FILTER_PLUGINS.md](../../docs/FILTER_PLUGINS.md).
 
 - **`get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None)`**
   Determine which VLANs need to be added or removed

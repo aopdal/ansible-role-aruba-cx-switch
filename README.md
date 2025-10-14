@@ -174,6 +174,41 @@ group_by:
   - platforms
 ```
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the `docs/` folder:
+
+### Essential Reading
+
+- **[docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md)** - **Essential** - Custom filters for NetBox data transformation
+  - 22 filters for VLAN, VRF, interface, and OSPF operations
+  - Real-world examples and workflows
+  - Critical for understanding how the role processes NetBox data
+
+- **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide
+- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Common tasks reference
+
+### Configuration Guides
+
+- **[docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md)** - Base system (banner, NTP, DNS, timezone)
+- **[docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)** - BGP/EVPN fabric configuration
+- **[docs/TAG_DEPENDENT_SUMMARY.md](docs/TAG_DEPENDENT_SUMMARY.md)** - Tag-dependent tasks (BGP, OSPF, VSX)
+
+### Development & Testing
+
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Complete development guide
+- **[docs/TESTING_ENVIRONMENT.md](docs/TESTING_ENVIRONMENT.md)** - Integration testing guide
+- **[docs/README.md](docs/README.md)** - Complete documentation index
+
+### MkDocs Site
+
+View documentation with beautiful formatting:
+
+```bash
+pip install -r requirements-docs.txt
+make docs-serve  # Opens at http://127.0.0.1:8000
+```
+
 ## Role Variables
 
 See [defaults/main.yml](defaults/main.yml) for all available variables.

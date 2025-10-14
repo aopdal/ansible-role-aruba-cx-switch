@@ -70,6 +70,7 @@ nav:
       - Development: DEVELOPMENT.md
   - NetBox Integration:
       - Integration Reference: NETBOX_INTEGRATION.md
+      - Filter Plugins: FILTER_PLUGINS.md  # Essential for data transformation
   - Configuration:
       - Base System:
           - Overview: BASE_CONFIGURATION.md

@@ -26,6 +26,15 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide for using the role
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference for common tasks
 
+## 🔌 Filter Plugins (Essential Reading)
+
+- **[FILTER_PLUGINS.md](FILTER_PLUGINS.md)** - Complete filter plugin reference
+  - **22 custom filters** for NetBox data transformation
+  - Detailed documentation for VLAN, VRF, interface, OSPF operations
+  - Real-world usage examples and complete workflows
+  - Development guide and architecture
+  - **Critical for understanding how the role processes NetBox data**
+
 ## Configuration Guides
 
 ### Base System Configuration
@@ -126,12 +135,6 @@ The following files are in the repository root for standard compliance:
 
 ## Additional Resources
 
-### Filter Plugins
-- **[../filter_plugins/netbox_filters_lib/README.md](../filter_plugins/netbox_filters_lib/README.md)** - Complete filter plugin documentation
-  - 22 custom filters for NetBox data transformation
-  - Usage examples and real-world workflows
-  - Development guide
-
 ### Testing Scripts
 - **[../testing-scripts/](../testing-scripts/)** - Helper scripts for testing environment
   - `populate_netbox.py` - Populate NetBox with test data
@@ -144,7 +147,10 @@ The following files are in the repository root for standard compliance:
 - QUICKSTART.md
 - QUICK_REFERENCE.md
 
-### ⚙️ Configuration Guides (12 docs)
+### 🔌 Filter Plugins (1 doc)
+- FILTER_PLUGINS.md - **Essential for understanding data transformation**
+
+### ⚙️ Configuration Guides (13 docs)
 - BASE_CONFIGURATION.md
 - DNS_CONFIGURATION.md
 - BGP_CONFIGURATION.md
@@ -166,7 +172,7 @@ The following files are in the repository root for standard compliance:
 - WORKSPACE.md
 - SETUP_COMPLETE.md
 
-### 🧪 Testing (3 docs)
+### 🧪 Testing (4 docs)
 - TESTING.md
 - TESTING_ENVIRONMENT.md
 - TESTING_QUICK_START.md
@@ -175,4 +181,4 @@ The following files are in the repository root for standard compliance:
 ### 📋 Internal (1 doc)
 - REFACTORING_SUMMARY.md
 
-**Total: 26 documentation files**
+**Total: 27 documentation files**
