@@ -227,7 +227,9 @@
       tags:
         - evpn
         - overlay
-  when: aoscx_configure_evpn | bool
+  when:
+    - aoscx_configure_evpn | bool
+    - custom_fields.device_evpn | default(false) | bool
   tags:
     - evpn
     - overlay
@@ -239,13 +241,57 @@
       tags:
         - vxlan
         - overlay
-  when: aoscx_configure_vxlan | bool
+  when:
+    - aoscx_configure_vxlan | bool
+    - custom_fields.device_vxlan | default(false) | bool
   tags:
     - vxlan
     - overlay
 
-# VLAN cleanup should happen AFTER all interfaces and overlays are cleaned up
-# This ensures VLANs are not in use on: trunk ports, access ports, SVIs, or EVPN/VXLAN
+# EVPN/VXLAN/VLAN cleanup order is critical (only in idempotent mode):
+# 1. Remove EVPN configuration (no vlan X under evpn)
+# 2. Remove VXLAN VNI and VLAN-to-VNI mappings
+# 3. Delete VLANs themselves
+# This ensures proper cleanup without orphaned configurations
+
+- name: Include EVPN cleanup tasks
+  ansible.builtin.include_tasks:
+    file: cleanup_evpn.yml
+    apply:
+      tags:
+        - evpn
+        - overlay
+        - cleanup
+        - idempotent
+  when:
+    - aoscx_configure_evpn | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
+    - aoscx_idempotent_mode | bool
+  tags:
+    - evpn
+    - overlay
+    - cleanup
+    - idempotent
+
+- name: Include VXLAN cleanup tasks
+  ansible.builtin.include_tasks:
+    file: cleanup_vxlan.yml
+    apply:
+      tags:
+        - vxlan
+        - overlay
+        - cleanup
+        - idempotent
+  when:
+    - aoscx_configure_vxlan | default(false) | bool
+    - custom_fields.device_vxlan | default(false) | bool
+    - aoscx_idempotent_mode | bool
+  tags:
+    - vxlan
+    - overlay
+    - cleanup
+    - idempotent
+
 - name: Include VLAN cleanup tasks
   ansible.builtin.include_tasks:
     file: cleanup_vlans.yml

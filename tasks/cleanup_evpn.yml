@@ -1,0 +1,53 @@
+---
+# tasks/cleanup_evpn.yml
+# ========================
+# Remove EVPN configuration for VLANs that are being deleted
+# This must happen BEFORE VLAN deletion to avoid orphaned EVPN configs
+# Order: cleanup_evpn.yml → cleanup_vxlan.yml → cleanup_vlans.yml
+
+- name: Determine VLANs to remove from EVPN
+  ansible.builtin.set_fact:
+    vlans_to_remove_from_evpn: >-
+      {{
+        vlans | default([])
+        | selectattr('vid', 'in', vlan_changes_after.vlans_to_delete)
+        | selectattr('l2vpn_termination.id', 'defined')
+        | list
+      }}
+  when:
+    - vlan_changes_after is defined
+    - vlan_changes_after.vlans_to_delete is defined
+    - vlan_changes_after.vlans_to_delete | length > 0
+
+- name: Display VLANs to remove from EVPN
+  ansible.builtin.debug:
+    msg: "Removing EVPN configuration for VLAN {{ item.vid }} (VNI {{ item.l2vpn_termination.l2vpn.identifier }})"
+  loop: "{{ vlans_to_remove_from_evpn }}"
+  loop_control:
+    label: "VLAN {{ item.vid }}"
+  when:
+    - vlans_to_remove_from_evpn is defined
+    - vlans_to_remove_from_evpn | length > 0
+
+- name: Remove EVPN configuration for deleted VLANs
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no vlan {{ item.vid }}"
+    parents:
+      - "evpn"
+    match: exact
+    save_when: changed
+  loop: "{{ vlans_to_remove_from_evpn }}"
+  loop_control:
+    label: "VLAN {{ item.vid }}"
+  when:
+    - vlans_to_remove_from_evpn is defined
+    - vlans_to_remove_from_evpn | length > 0
+  register: evpn_cleanup_result
+
+- name: Display EVPN cleanup results
+  ansible.builtin.debug:
+    msg: "EVPN cleanup completed: {{ evpn_cleanup_result.results | selectattr('changed', 'equalto', true) | list | length }} VLANs removed from EVPN"
+  when:
+    - evpn_cleanup_result is defined
+    - evpn_cleanup_result.results is defined

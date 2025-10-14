@@ -1,0 +1,80 @@
+---
+# tasks/cleanup_vxlan.yml
+# ========================
+# Remove VXLAN VNI and VLAN-to-VNI mapping for VLANs that are being deleted
+# Two-step removal process (reverse of configuration):
+#   1. Remove VLAN from VNI (no vlan X under vni Y)
+#   2. Remove VNI from VXLAN interface (no vni Y)
+# This must happen AFTER EVPN cleanup and BEFORE VLAN deletion
+# Order: cleanup_evpn.yml → cleanup_vxlan.yml → cleanup_vlans.yml
+
+- name: Determine VLANs to remove from VXLAN
+  ansible.builtin.set_fact:
+    vlans_to_remove_from_vxlan: >-
+      {{
+        vlans | default([])
+        | selectattr('vid', 'in', vlan_changes_after.vlans_to_delete)
+        | selectattr('l2vpn_termination.id', 'defined')
+        | list
+      }}
+  when:
+    - vlan_changes_after is defined
+    - vlan_changes_after.vlans_to_delete is defined
+    - vlan_changes_after.vlans_to_delete | length > 0
+
+- name: Display VLANs to remove from VXLAN
+  ansible.builtin.debug:
+    msg: "Removing VXLAN mapping for VLAN {{ item.vid }} (VNI {{ item.l2vpn_termination.l2vpn.identifier }})"
+  loop: "{{ vlans_to_remove_from_vxlan }}"
+  loop_control:
+    label: "VLAN {{ item.vid }}"
+  when:
+    - vlans_to_remove_from_vxlan is defined
+    - vlans_to_remove_from_vxlan | length > 0
+
+# Step 1: Remove VLAN from VNI
+# This removes the VLAN-to-VNI mapping under the VNI configuration
+- name: Remove VLAN from VNI (Step 1)
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no vlan {{ item.vid }}"
+    parents:
+      - "interface vxlan 1"
+      - "vni {{ item.l2vpn_termination.l2vpn.identifier }}"
+    match: exact
+    save_when: changed
+  loop: "{{ vlans_to_remove_from_vxlan }}"
+  loop_control:
+    label: "VLAN {{ item.vid }} from VNI {{ item.l2vpn_termination.l2vpn.identifier }}"
+  when:
+    - vlans_to_remove_from_vxlan is defined
+    - vlans_to_remove_from_vxlan | length > 0
+  register: vxlan_vlan_removal_result
+
+# Step 2: Remove VNI from VXLAN interface
+# This removes the VNI itself from the VXLAN interface
+- name: Remove VNI from VXLAN interface (Step 2)
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no vni {{ item.l2vpn_termination.l2vpn.identifier }}"
+    parents:
+      - "interface vxlan 1"
+    match: exact
+    save_when: changed
+  loop: "{{ vlans_to_remove_from_vxlan }}"
+  loop_control:
+    label: "VNI {{ item.l2vpn_termination.l2vpn.identifier }}"
+  when:
+    - vlans_to_remove_from_vxlan is defined
+    - vlans_to_remove_from_vxlan | length > 0
+  register: vxlan_vni_removal_result
+
+- name: Display VXLAN cleanup results
+  ansible.builtin.debug:
+    msg: >-
+      VXLAN cleanup completed:
+      {{ vxlan_vlan_removal_result.results | default([]) | selectattr('changed', 'equalto', true) | list | length }} VLAN-to-VNI mappings removed,
+      {{ vxlan_vni_removal_result.results | default([]) | selectattr('changed', 'equalto', true) | list | length }} VNIs removed
+  when:
+    - vxlan_vlan_removal_result is defined
+    - vxlan_vni_removal_result is defined

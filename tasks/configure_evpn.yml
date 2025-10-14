@@ -1,0 +1,80 @@
+---
+# Configure EVPN on AOS-CX switches
+#
+# This task configures EVPN for VLANs that are:
+# 1. Available on the device (from NetBox)
+# 2. In use on interfaces (access or tagged)
+# 3. Have L2VPN termination defined in NetBox
+#
+# Custom field required: device_evpn (boolean)
+# VLAN field required: l2vpn_termination (NetBox IPAM L2VPN)
+
+- name: Get VLANs in use on device for EVPN
+  ansible.builtin.set_fact:
+    vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
+  when:
+    - interfaces is defined
+    - vlans_in_use is not defined
+
+- name: Debug - VLANs in use for EVPN configuration
+  ansible.builtin.debug:
+    msg:
+      - "Device: {{ inventory_hostname }}"
+      - "EVPN Enabled: {{ custom_fields.device_evpn | default(false) }}"
+      - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }}"
+      - "VLANs available: {{ vlans | default([]) | length }}"
+  when: aoscx_debug_mode | default(false) | bool
+
+- name: Filter VLANs that need EVPN configuration
+  ansible.builtin.set_fact:
+    vlans_for_evpn: "{{ vlans | default([]) |
+      selectattr('vid', 'in', vlans_in_use.vids | default([])) |
+      selectattr('l2vpn_termination', 'defined') |
+      selectattr('l2vpn_termination.id', 'defined') |
+      list }}"
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+    - vlans is defined
+    - vlans_in_use is defined
+
+- name: Debug - VLANs filtered for EVPN
+  ansible.builtin.debug:
+    msg:
+      - "VLANs with EVPN config needed: {{ vlans_for_evpn | default([]) | length }}"
+      - "VLAN IDs: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - vlans_for_evpn is defined
+
+- name: Configure EVPN for VLANs in use
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - evpn
+    lines:
+      - vlan {{ item.vid }}
+    after:
+      - rd auto
+      - route-target export auto
+      - route-target import auto
+    match: line
+  loop: "{{ vlans_for_evpn | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} VLAN: {{ item.vid }} ({{ item.name }})"
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+    - vlans_for_evpn is defined
+    - vlans_for_evpn | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Display EVPN configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "=== EVPN Configuration Summary ==="
+      - "Device: {{ inventory_hostname }}"
+      - "EVPN VLANs configured: {{ vlans_for_evpn | default([]) | length }}"
+      - "VLAN IDs with EVPN: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
+    - vlans_for_evpn is defined

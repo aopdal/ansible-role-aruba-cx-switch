@@ -1,0 +1,108 @@
+---
+# Configure VXLAN on AOS-CX switches
+#
+# This task configures VXLAN (VNIs and VLAN-to-VNI mapping) for VLANs that are:
+# 1. Available on the device (from NetBox)
+# 2. In use on interfaces (access or tagged)
+# 3. Have L2VPN termination defined in NetBox
+#
+# Custom field required: device_vxlan (boolean)
+# VLAN field required: l2vpn_termination.l2vpn.identifier (VNI)
+#
+# Configuration order:
+# 1. Create VNI under interface vxlan 1
+# 2. Assign VLAN to VNI
+
+- name: Get VLANs in use on device for VXLAN
+  ansible.builtin.set_fact:
+    vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
+  when:
+    - interfaces is defined
+    - vlans_in_use is not defined
+
+- name: Debug - VLANs in use for VXLAN configuration
+  ansible.builtin.debug:
+    msg:
+      - "Device: {{ inventory_hostname }}"
+      - "VXLAN Enabled: {{ custom_fields.device_vxlan | default(false) }}"
+      - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }}"
+      - "VLANs available: {{ vlans | default([]) | length }}"
+  when: aoscx_debug_mode | default(false) | bool
+
+- name: Filter VLANs that need VXLAN configuration
+  ansible.builtin.set_fact:
+    vlans_for_vxlan: "{{ vlans | default([]) |
+      selectattr('vid', 'in', vlans_in_use.vids | default([])) |
+      selectattr('l2vpn_termination', 'defined') |
+      selectattr('l2vpn_termination.id', 'defined') |
+      list }}"
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vlans is defined
+    - vlans_in_use is defined
+
+- name: Debug - VLANs filtered for VXLAN
+  ansible.builtin.debug:
+    msg:
+      - "VLANs with VXLAN config needed: {{ vlans_for_vxlan | default([]) | length }}"
+      - "VLAN IDs: {{ vlans_for_vxlan | default([]) | map(attribute='vid') | list | sort }}"
+      - "VNIs: {{ vlans_for_vxlan | default([]) | map(attribute='l2vpn_termination.l2vpn.identifier') | list | sort }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - vlans_for_vxlan is defined
+
+# ============================================================================
+# Step 1: Create VNI under interface vxlan 1
+# ============================================================================
+
+- name: Create VNI on VXLAN interface
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface vxlan 1
+    lines:
+      - vni {{ item.l2vpn_termination.l2vpn.identifier }}
+    match: line
+  loop: "{{ vlans_for_vxlan | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} VNI: {{ item.l2vpn_termination.l2vpn.identifier }} (VLAN {{ item.vid }})"
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vlans_for_vxlan is defined
+    - vlans_for_vxlan | length > 0
+  vars:
+    ansible_connection: network_cli
+
+# ============================================================================
+# Step 2: Assign VLAN to VNI (VLAN-to-VNI mapping)
+# ============================================================================
+
+- name: Assign VLAN to VNI on VXLAN interface
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface vxlan 1
+      - vni {{ item.l2vpn_termination.l2vpn.identifier }}
+    lines:
+      - vlan {{ item.vid }}
+    match: line
+  loop: "{{ vlans_for_vxlan | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} VNI {{ item.l2vpn_termination.l2vpn.identifier }} → VLAN {{ item.vid }}"
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vlans_for_vxlan is defined
+    - vlans_for_vxlan | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Display VXLAN configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "=== VXLAN Configuration Summary ==="
+      - "Device: {{ inventory_hostname }}"
+      - "VXLAN VLANs configured: {{ vlans_for_vxlan | default([]) | length }}"
+      - "VLAN-to-VNI mappings:"
+      - "{% for vlan in vlans_for_vxlan | default([]) %}  VLAN {{ vlan.vid }} → VNI {{ vlan.l2vpn_termination.l2vpn.identifier }}{% endfor %}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - custom_fields.device_vxlan | default(false) | bool
+    - vlans_for_vxlan is defined
