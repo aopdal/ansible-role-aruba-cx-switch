@@ -1,4 +1,4 @@
-.PHONY: help install test lint syntax molecule clean pre-commit all venv
+.PHONY: help install test lint syntax molecule clean pre-commit all venv docs docs-serve docs-build
 
 # Default target
 .DEFAULT_GOAL := help
@@ -163,6 +163,24 @@ info: ## Display testing information
 	@echo "  📚 DEVELOPMENT.md - Complete development guide"
 	@echo "  📚 TESTING.md - Testing instructions"
 	@echo "  📚 README.md - Role usage and features"
+	@echo "  📚 Run 'make docs-serve' for live preview"
+
+docs-install: ## Install documentation dependencies
+	@echo "$(BLUE)Installing documentation dependencies...$(NC)"
+	@pip install -r requirements-docs.txt
+	@echo "$(GREEN)✅ Documentation dependencies installed$(NC)"
+
+docs-serve: ## Serve documentation locally at http://127.0.0.1:8000
+	@echo "$(BLUE)Starting documentation server...$(NC)"
+	@echo "$(GREEN)Visit: http://127.0.0.1:8000$(NC)"
+	@mkdocs serve
+
+docs-build: ## Build documentation static site
+	@echo "$(BLUE)Building documentation...$(NC)"
+	@mkdocs build
+	@echo "$(GREEN)✅ Documentation built in site/ directory$(NC)"
+
+docs: docs-serve ## Alias for docs-serve
 
 all: clean setup test ## Clean, setup, and run all tests
 	@echo "$(GREEN)🎉 All done!$(NC)"

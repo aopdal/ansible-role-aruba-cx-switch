@@ -2,6 +2,25 @@
 
 This directory contains all documentation for the `ansible-role-aruba-cx-switch` Ansible role.
 
+## 📚 Viewing Documentation
+
+### Local Documentation Site (Recommended)
+
+This role uses **MkDocs with Material theme** for beautiful, searchable documentation.
+
+```bash
+# Install dependencies (first time only)
+pip install -r requirements-docs.txt
+
+# Start live preview at http://127.0.0.1:8000
+make docs-serve
+```
+
+⚠️ **Note:** GitHub Pages is disabled while the repo is private (requires public repo or paid plan).
+See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
+
+---
+
 ## Getting Started
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide for using the role

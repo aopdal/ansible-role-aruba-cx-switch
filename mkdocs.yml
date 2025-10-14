@@ -1,0 +1,104 @@
+---
+site_name: Aruba CX Switch Ansible Role
+site_description: Production-ready Ansible role for managing Aruba CX switches with NetBox integration
+site_author: aopdal
+# site_url: https://aopdal.github.io/ansible-role-aruba-cx-switch  # Uncomment when repo is public
+
+repo_name: aopdal/ansible-role-aruba-cx-switch
+repo_url: https://github.com/aopdal/ansible-role-aruba-cx-switch
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+nav:
+  - Home: README.md
+  - Getting Started:
+      - Quick Start: docs/QUICKSTART.md
+      - Setup Guide: docs/SETUP_COMPLETE.md
+      - Development: docs/DEVELOPMENT.md
+  - NetBox Integration:
+      - Integration Reference: docs/NETBOX_INTEGRATION.md
+  - Configuration:
+      - Base System:
+          - Overview: docs/BASE_CONFIGURATION.md
+          - DNS: docs/DNS_CONFIGURATION.md
+      - VLANs: docs/VLAN_CONFIGURATION.md
+      - EVPN & VXLAN:
+          - Overview: docs/EVPN_VXLAN_CONFIGURATION.md
+          - Configuration Modes: docs/EVPN_VXLAN_MODES.md
+          - Cleanup Process: docs/EVPN_VXLAN_CLEANUP_SUMMARY.md
+          - Idempotent Mode: docs/EVPN_VXLAN_IDEMPOTENT_MODE.md
+          - Summary: docs/EVPN_VXLAN_SUMMARY.md
+      - BGP:
+          - Hybrid Configuration: docs/BGP_HYBRID_CONFIGURATION.md
+          - NetBox BGP Plugin: docs/NETBOX_BGP_PLUGIN.md
+          - Migration Guide: docs/BGP_MIGRATION_GUIDE.md
+          - Summary: docs/BGP_HYBRID_SUMMARY.md
+  - Testing:
+      - Testing Guide: docs/TESTING.md
+      - Quick Start: docs/TESTING_QUICK_START.md
+      - Environment: docs/TESTING_ENVIRONMENT.md
+  - Reference:
+      - Quick Reference: docs/QUICK_REFERENCE.md
+      - Documentation Site: docs/DOCUMENTATION_SITE.md  # How to use MkDocs
+      - Workspace Setup: docs/WORKSPACE.md
+      - DevContainer Setup: docs/DEVCONTAINER_SETUP.md
+      - DevContainer Mounts: docs/DEVCONTAINER_MOUNTS.md
+  - Contributing:
+      - Guide: CONTRIBUTING.md
+      - Changelog: CHANGELOG.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/aopdal
+  version:
+    provider: mike
