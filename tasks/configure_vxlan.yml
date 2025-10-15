@@ -5,6 +5,7 @@
 # 1. Available on the device (from NetBox)
 # 2. In use on interfaces (access or tagged)
 # 3. Have L2VPN termination defined in NetBox
+# 4. Not already configured for VXLAN (idempotent check)
 #
 # Custom field required: device_vxlan (boolean)
 # VLAN field required: l2vpn_termination.l2vpn.identifier (VNI)
@@ -12,6 +13,34 @@
 # Configuration order:
 # 1. Create VNI under interface vxlan 1
 # 2. Assign VLAN to VNI
+
+- name: Gather current VXLAN VNI configuration from device
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show interface vxlan 1
+  register: vxlan_config_output
+  vars:
+    ansible_connection: network_cli
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+  changed_when: false
+  failed_when: false
+
+- name: Parse existing VXLAN VNI-to-VLAN mappings from device
+  ansible.builtin.set_fact:
+    existing_vxlan_mappings: "{{ vxlan_config_output.stdout[0] | regex_findall('vni (\\d+)\\s+vlan (\\d+)') | map('map', 'int') | list if vxlan_config_output.stdout is defined and vxlan_config_output.stdout | length > 0 else [] }}"
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vxlan_config_output is defined
+    - vxlan_config_output.stdout is defined
+
+- name: Extract existing VNIs and VLANs
+  ansible.builtin.set_fact:
+    existing_vxlan_vnis: "{{ existing_vxlan_mappings | map(attribute='0') | list if existing_vxlan_mappings is defined else [] }}"
+    existing_vxlan_vlans: "{{ existing_vxlan_mappings | map(attribute='1') | list if existing_vxlan_mappings is defined else [] }}"
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - existing_vxlan_mappings is defined
 
 - name: Get VLANs in use on device for VXLAN
   ansible.builtin.set_fact:
@@ -35,6 +64,7 @@
       selectattr('vid', 'in', vlans_in_use.vids | default([])) |
       selectattr('l2vpn_termination', 'defined') |
       selectattr('l2vpn_termination.id', 'defined') |
+      rejectattr('vid', 'in', existing_vxlan_vlans | default([])) |
       list }}"
   when:
     - custom_fields.device_vxlan | default(false) | bool
@@ -44,15 +74,17 @@
 - name: Debug - VLANs filtered for VXLAN
   ansible.builtin.debug:
     msg:
-      - "VLANs with VXLAN config needed: {{ vlans_for_vxlan | default([]) | length }}"
-      - "VLAN IDs: {{ vlans_for_vxlan | default([]) | map(attribute='vid') | list | sort }}"
-      - "VNIs: {{ vlans_for_vxlan | default([]) | map(attribute='l2vpn_termination.l2vpn.identifier') | list | sort }}"
+      - "VLANs already configured with VXLAN: {{ existing_vxlan_vlans | default([]) | length }} - {{ existing_vxlan_vlans | default([]) | sort }}"
+      - "VNIs already configured: {{ existing_vxlan_vnis | default([]) | length }} - {{ existing_vxlan_vnis | default([]) | sort }}"
+      - "VLANs needing VXLAN config: {{ vlans_for_vxlan | default([]) | length }}"
+      - "VLAN IDs to configure: {{ vlans_for_vxlan | default([]) | map(attribute='vid') | list | sort }}"
+      - "VNIs to configure: {{ vlans_for_vxlan | default([]) | map(attribute='l2vpn_termination.l2vpn.identifier') | list | sort }}"
   when:
     - aoscx_debug_mode | default(false) | bool
     - vlans_for_vxlan is defined
 
 # ============================================================================
-# Step 1: Create VNI under interface vxlan 1
+# Step 1: Create VNI under interface vxlan 1 (only new ones)
 # ============================================================================
 
 - name: Create VNI on VXLAN interface
@@ -73,7 +105,7 @@
     ansible_connection: network_cli
 
 # ============================================================================
-# Step 2: Assign VLAN to VNI (VLAN-to-VNI mapping)
+# Step 2: Assign VLAN to VNI (VLAN-to-VNI mapping) (only new ones)
 # ============================================================================
 
 - name: Assign VLAN to VNI on VXLAN interface
@@ -99,8 +131,9 @@
     msg:
       - "=== VXLAN Configuration Summary ==="
       - "Device: {{ inventory_hostname }}"
-      - "VXLAN VLANs configured: {{ vlans_for_vxlan | default([]) | length }}"
-      - "VLAN-to-VNI mappings:"
+      - "VXLAN VLANs already configured: {{ existing_vxlan_vlans | default([]) | length }}"
+      - "VXLAN VLANs newly configured: {{ vlans_for_vxlan | default([]) | length }}"
+      - "Newly configured VLAN-to-VNI mappings:"
       - "{% for vlan in vlans_for_vxlan | default([]) %}  VLAN {{ vlan.vid }} → VNI {{ vlan.l2vpn_termination.l2vpn.identifier }}{% endfor %}"
   when:
     - aoscx_debug_mode | default(false) | bool

@@ -5,9 +5,30 @@
 # 1. Available on the device (from NetBox)
 # 2. In use on interfaces (access or tagged)
 # 3. Have L2VPN termination defined in NetBox
+# 4. Not already configured for EVPN (idempotent check)
 #
 # Custom field required: device_evpn (boolean)
 # VLAN field required: l2vpn_termination (NetBox IPAM L2VPN)
+
+- name: Gather current EVPN configuration from device
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show evpn vlan | include "VLAN ID"
+  register: evpn_config_output
+  vars:
+    ansible_connection: network_cli
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+  changed_when: false
+  failed_when: false
+
+- name: Parse existing EVPN VLANs from device
+  ansible.builtin.set_fact:
+    existing_evpn_vlans: "{{ evpn_config_output.stdout[0] | regex_findall('(\\d+)') | map('int') | list if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0 else [] }}"
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+    - evpn_config_output is defined
+    - evpn_config_output.stdout is defined
 
 - name: Get VLANs in use on device for EVPN
   ansible.builtin.set_fact:
@@ -31,6 +52,7 @@
       selectattr('vid', 'in', vlans_in_use.vids | default([])) |
       selectattr('l2vpn_termination', 'defined') |
       selectattr('l2vpn_termination.id', 'defined') |
+      rejectattr('vid', 'in', existing_evpn_vlans | default([])) |
       list }}"
   when:
     - custom_fields.device_evpn | default(false) | bool
@@ -40,13 +62,14 @@
 - name: Debug - VLANs filtered for EVPN
   ansible.builtin.debug:
     msg:
-      - "VLANs with EVPN config needed: {{ vlans_for_evpn | default([]) | length }}"
-      - "VLAN IDs: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
+      - "VLANs already configured with EVPN: {{ existing_evpn_vlans | default([]) | length }} - {{ existing_evpn_vlans | default([]) | sort }}"
+      - "VLANs needing EVPN config: {{ vlans_for_evpn | default([]) | length }}"
+      - "VLAN IDs to configure: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
   when:
     - aoscx_debug_mode | default(false) | bool
     - vlans_for_evpn is defined
 
-- name: Configure EVPN for VLANs in use
+- name: Configure EVPN for VLANs in use (only new ones)
   arubanetworks.aoscx.aoscx_config:
     parents:
       - evpn
@@ -72,8 +95,9 @@
     msg:
       - "=== EVPN Configuration Summary ==="
       - "Device: {{ inventory_hostname }}"
-      - "EVPN VLANs configured: {{ vlans_for_evpn | default([]) | length }}"
-      - "VLAN IDs with EVPN: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
+      - "EVPN VLANs already configured: {{ existing_evpn_vlans | default([]) | length }}"
+      - "EVPN VLANs newly configured: {{ vlans_for_evpn | default([]) | length }}"
+      - "Newly configured VLAN IDs: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
   when:
     - aoscx_debug_mode | default(false) | bool
     - custom_fields.device_evpn | default(false) | bool
