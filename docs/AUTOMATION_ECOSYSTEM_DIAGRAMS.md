@@ -216,9 +216,9 @@ graph TB
 | Feature | BGP | OSPF | EVPN | VXLAN | VSX | VRFs |
 |---------|:---:|:----:|:----:|:-----:|:---:|:----:|
 | **BGP**    | ● | ○ | ● | ○ | ● | ● |
-| **OSPF**   | ○ | ● | × | × | ● | ● |
-| **EVPN**   | ● | × | ● | ● | ● | ○ |
-| **VXLAN**  | ○ | × | ● | ● | ● | ○ |
+| **OSPF**   | ○ | ● | ● | ● | ● | ● |
+| **EVPN**   | ● | ● | ● | ● | ● | ○ |
+| **VXLAN**  | ○ | ● | ● | ● | ● | ○ |
 | **VSX**    | ● | ● | ● | ● | ● | ● |
 | **VRFs**   | ● | ● | ○ | ○ | ● | ● |
 
@@ -226,6 +226,8 @@ graph TB
 - ● = Required/Strongly recommended
 - ○ = Compatible/Optional
 - × = Incompatible/Not supported together
+
+**Note:** OSPF is commonly used in EVPN/VXLAN fabrics for underlay routing (loopback reachability between leafs and spines), while eBGP handles the overlay (EVPN control plane).
 
 ---
 

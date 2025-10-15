@@ -59,15 +59,38 @@ chmod 755 /var/www/html/docs
 
 Go to your repository settings: **Settings → Secrets and variables → Actions → New repository secret**
 
-Add these secrets:
+> **⚠️ Important:** Add secrets as **Repository secrets**, NOT Environment secrets!
+>
+> - ✅ **Repository secrets** - Available to all workflows (what you need)
+> - ❌ **Environment secrets** - Only available when using environment protection rules
+>
+> Path: **Settings → Secrets and variables → Actions → Repository secrets tab → New repository secret**
 
-| Secret Name | Value | Example |
-|------------|-------|---------|
-| `DEPLOY_HOST` | Your server hostname or IP | `docs.example.com` or `192.168.1.100` |
-| `DEPLOY_USER` | SSH username | `deploy` or `www-data` |
-| `DEPLOY_PATH` | Path on server | `/var/www/html/docs/` |
-| `DEPLOY_PORT` | SSH port (optional) | `22` (default) or `2222` |
-| `DEPLOY_KEY` | Private SSH key | Contents of `~/.ssh/github_deploy_key` |
+Add these secrets (**all are required** except DEPLOY_PORT):
+
+| Secret Name | Value | Example | Required |
+|------------|-------|---------|----------|
+| `DEPLOY_HOST` | Your server hostname or IP | `docs.example.com` or `192.168.1.100` | ✅ Yes |
+| `DEPLOY_USER` | SSH username | `deploy` or `www-data` | ✅ Yes |
+| `DEPLOY_PATH` | Path on server (must end with `/`) | `/var/www/html/docs/` | ✅ Yes |
+| `DEPLOY_PORT` | SSH port | `22` (default) or `2222` | ⚠️ Optional |
+| `DEPLOY_KEY` | Private SSH key | Contents of `~/.ssh/github_deploy_key` | ✅ Yes |
+
+> **⚠️ Important Notes:**
+> - `DEPLOY_PATH` **must not be empty** and should end with a trailing slash `/`
+> - All required secrets must be set before the workflow will run
+> - The workflow will fail with a clear error message if any required secret is missing
+
+**Quick Visual Guide:**
+
+```
+GitHub Repository
+└── Settings
+    └── Secrets and variables
+        └── Actions
+            ├── 🟢 Repository secrets ← Add secrets HERE (correct!)
+            └── 🔴 Environment secrets ← NOT here (won't work)
+```
 
 #### How to Add DEPLOY_KEY Secret:
 
@@ -216,6 +239,42 @@ The workflow runs when:
 2. **Manual trigger** via GitHub Actions UI
 
 ## Troubleshooting
+
+### Missing or Empty Secrets
+
+**Error:** `The remote_path can not be empty` (See: [GitHub Issue #44](https://github.com/Burnett01/rsync-deployments/issues/44))
+
+This error occurs when the `DEPLOY_PATH` secret is not set or is empty.
+
+**Common Cause:** Secrets added as **Environment secrets** instead of **Repository secrets**!
+
+```bash
+# Verify all secrets are configured in GitHub
+# Go to: Repository Settings → Secrets and variables → Actions → Repository secrets tab
+
+# Required secrets:
+# ✅ DEPLOY_HOST - Server hostname/IP
+# ✅ DEPLOY_USER - SSH username
+# ✅ DEPLOY_PATH - Target path (must end with /)
+# ✅ DEPLOY_KEY  - Private SSH key
+# ⚠️ DEPLOY_PORT - SSH port (optional, defaults to 22)
+```
+
+The workflow now includes validation that will fail early with a clear error message if any required secret is missing:
+
+```
+❌ Error: DEPLOY_PATH secret is not set
+```
+
+**Solutions:**
+
+1. **Check secret location:** Ensure secrets are added as **Repository secrets**, NOT Environment secrets
+   - ✅ Correct: Settings → Secrets and variables → Actions → **Repository secrets** tab
+   - ❌ Wrong: Settings → Secrets and variables → Actions → **Environment secrets** tab
+
+2. **Verify secrets exist:** Go to Repository secrets and confirm all required secrets are listed
+
+3. **Check secret values:** Ensure `DEPLOY_PATH` ends with `/` (e.g., `/var/www/html/docs/`)
 
 ### SSH Connection Issues
 
