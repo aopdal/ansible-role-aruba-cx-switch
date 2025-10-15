@@ -81,16 +81,39 @@ collections:
 
 Install with:
 ```bash
-ansible-galaxy collection install arubanetworks.aoscx netbox.netbox
+ansible-galaxy collection install -r requirements.yml
 ```
 
 ### Python Libraries
 
+This role requires several Python libraries for the Aruba and NetBox collections to function. Install all dependencies with:
+
 ```bash
-pip install pynetbox
+pip install -r requirements.txt
 ```
 
+Required libraries:
+- **pyaoscx** >= 2.6.0 - Aruba AOS-CX Python SDK
+- **pynetbox** >= 6.0.0 - NetBox API client
+- **paramiko** >= 2.7.0 - SSH library for device connections
+- **ansible-pylibssh** >= 1.0.0 - Python SSH library wrapper
+- **requests** >= 2.25.0 - HTTP library
+- **packaging** >= 20.0 - Version parsing
+- **pytz** >= 2021.1 - Timezone support
+
 ## Installation
+
+### Quick Start
+
+Install all dependencies (role, collections, and Python libraries):
+
+```bash
+# Install Ansible role and collections
+ansible-galaxy install -r requirements.yml
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
 
 ### From GitHub (Private Repository)
 

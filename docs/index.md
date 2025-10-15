@@ -1,7 +1,7 @@
 # Ansible Role: Aruba AOS-CX Switch
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/your-namespace/aruba_cx_switch)
+[![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/aopdal/aruba_cx_switch)
 
 Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as the source of truth.
 
@@ -81,16 +81,39 @@ collections:
 
 Install with:
 ```bash
-ansible-galaxy collection install arubanetworks.aoscx netbox.netbox
+ansible-galaxy collection install -r requirements.yml
 ```
 
 ### Python Libraries
 
+This role requires several Python libraries for the Aruba and NetBox collections to function. Install all dependencies with:
+
 ```bash
-pip install pynetbox
+pip install -r requirements.txt
 ```
 
+Required libraries:
+- **pyaoscx** >= 2.6.0 - Aruba AOS-CX Python SDK
+- **pynetbox** >= 6.0.0 - NetBox API client
+- **paramiko** >= 2.7.0 - SSH library for device connections
+- **ansible-pylibssh** >= 1.0.0 - Python SSH library wrapper
+- **requests** >= 2.25.0 - HTTP library
+- **packaging** >= 20.0 - Version parsing
+- **pytz** >= 2021.1 - Timezone support
+
 ## Installation
+
+### Quick Start
+
+Install all dependencies (role, collections, and Python libraries):
+
+```bash
+# Install Ansible role and collections
+ansible-galaxy install -r requirements.yml
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
 
 ### From GitHub (Private Repository)
 
@@ -172,6 +195,41 @@ group_by:
   - device_roles
   - sites
   - platforms
+```
+
+## 📚 Documentation
+
+Comprehensive documentation is available in the `docs/` folder:
+
+### Essential Reading
+
+- **[docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md)** - **Essential** - Custom filters for NetBox data transformation
+  - 22 filters for VLAN, VRF, interface, and OSPF operations
+  - Real-world examples and workflows
+  - Critical for understanding how the role processes NetBox data
+
+- **[docs/QUICKSTART.md](QUICKSTART.md)** - Quick start guide
+- **[docs/QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Common tasks reference
+
+### Configuration Guides
+
+- **[docs/BASE_CONFIGURATION.md](BASE_CONFIGURATION.md)** - Base system (banner, NTP, DNS, timezone)
+- **[docs/BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)** - BGP/EVPN fabric configuration
+- **[docs/TAG_DEPENDENT_SUMMARY.md](TAG_DEPENDENT_SUMMARY.md)** - Tag-dependent tasks (BGP, OSPF, VSX)
+
+### Development & Testing
+
+- **[docs/DEVELOPMENT.md](DEVELOPMENT.md)** - Complete development guide
+- **[docs/TESTING_ENVIRONMENT.md](TESTING_ENVIRONMENT.md)** - Integration testing guide
+- **[docs/README.md](README.md)** - Complete documentation index
+
+### MkDocs Site
+
+View documentation with beautiful formatting:
+
+```bash
+pip install -r requirements-docs.txt
+make docs-serve  # Opens at http://127.0.0.1:8000
 ```
 
 ## Role Variables
@@ -511,7 +569,7 @@ Contributions are welcome! Please:
 
 ## Changelog
 
-### Version 1.0.0 (2024-10-05)
+### Version 1.0.0 (2025-10-14)
 - Initial release
 - VRF configuration support
 - VLAN management with idempotent mode
@@ -523,5 +581,5 @@ Contributions are welcome! Please:
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/your-org/ansible-role-aruba-cx-switch/issues
-- Documentation: https://github.com/your-org/ansible-role-aruba-cx-switch/wiki
+- GitHub Issues: https://github.com/aopdal/ansible-role-aruba-cx-switch/issues
+- Documentation: https://github.com/aopdal/ansible-role-aruba-cx-switch/wiki

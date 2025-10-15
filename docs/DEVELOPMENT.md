@@ -88,7 +88,8 @@ source .venv/bin/activate  # Linux/Mac
 pip install --upgrade pip
 
 # 4. Install Python dependencies
-pip install -r requirements-test.txt
+pip install -r requirements.txt        # Runtime dependencies (aoscx, netbox)
+pip install -r requirements-test.txt   # Testing dependencies (pytest, molecule, etc.)
 
 # 5. Install Ansible collections
 ansible-galaxy collection install -r requirements.yml

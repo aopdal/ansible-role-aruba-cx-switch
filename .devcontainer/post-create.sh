@@ -7,9 +7,17 @@ echo "🔧 Running post-create setup..."
 echo "📦 Upgrading pip..."
 pip install --upgrade pip
 
+# Install Python runtime requirements
+if [ -f "requirements.txt" ]; then
+    echo "📦 Installing runtime dependencies (aoscx, netbox)..."
+    pip install -r requirements.txt
+else
+    echo "⚠️  requirements.txt not found, skipping..."
+fi
+
 # Install Python testing requirements
 if [ -f "requirements-test.txt" ]; then
-    echo "📦 Installing Python testing requirements..."
+    echo "📦 Installing testing dependencies (pytest, molecule)..."
     pip install -r requirements-test.txt
 else
     echo "⚠️  requirements-test.txt not found, skipping..."

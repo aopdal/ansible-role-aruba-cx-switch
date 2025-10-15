@@ -22,7 +22,8 @@ A dev container is a Docker container configured with all the tools, libraries, 
 
 - **`post-create.sh`** - Post-creation setup script
   - Runs after the container is created
-  - Installs Python packages from `requirements-test.txt`
+  - Installs Python runtime packages from `requirements.txt` (aoscx, netbox)
+  - Installs Python testing packages from `requirements-test.txt` (pytest, molecule)
   - Installs Ansible collections from `requirements.yml`
   - Sets up pre-commit hooks
   - Displays helpful information

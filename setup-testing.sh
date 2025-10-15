@@ -67,9 +67,14 @@ echo ""
 echo "⬆️  Upgrading pip..."
 pip install --upgrade pip > /dev/null 2>&1
 
+# Install runtime dependencies
+echo ""
+echo "📦 Installing runtime dependencies (aoscx, netbox)..."
+pip install -r requirements.txt
+
 # Install test dependencies
 echo ""
-echo "📦 Installing test dependencies in virtual environment..."
+echo "📦 Installing test dependencies (pytest, molecule, etc.)..."
 pip install -r requirements-test.txt
 
 # Install Ansible collections

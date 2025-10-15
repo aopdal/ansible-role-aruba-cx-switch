@@ -66,6 +66,7 @@ nav:
   - Home: index.md
   - Getting Started:
       - Quick Start: QUICKSTART.md
+      - Requirements: REQUIREMENTS.md
       - Setup Guide: SETUP_COMPLETE.md
       - Development: DEVELOPMENT.md
   - NetBox Integration:
