@@ -71,6 +71,7 @@ nav:
       - Development: DEVELOPMENT.md
   - Architecture:
       - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
+      - Visual Reference: AUTOMATION_ECOSYSTEM_DIAGRAMS.md
   - NetBox Integration:
       - Integration Reference: NETBOX_INTEGRATION.md
       - Filter Plugins: FILTER_PLUGINS.md  # Essential for data transformation
@@ -90,6 +91,8 @@ nav:
           - NetBox BGP Plugin: NETBOX_BGP_PLUGIN.md
           - Migration Guide: BGP_MIGRATION_GUIDE.md
           - Summary: BGP_HYBRID_SUMMARY.md
+          - BGP Configuration: BGP_CONFIGURATION.md
+          - EVPN Fabric Example: BGP_EVPN_FABRIC_EXAMPLE.md
   - Testing:
       - Testing Guide: TESTING.md
       - Quick Start: TESTING_QUICK_START.md

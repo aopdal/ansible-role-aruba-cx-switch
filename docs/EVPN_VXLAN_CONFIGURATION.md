@@ -742,7 +742,7 @@ show vlan
 
 - [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP EVPN configuration
 - [BGP_EVPN_FABRIC_EXAMPLE.md](BGP_EVPN_FABRIC_EXAMPLE.md) - Complete fabric example
-- [VLAN_CONFIGURATION.md](VLAN_CONFIGURATION.md) - VLAN configuration
+- [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md) - Base system and VLAN configuration
 
 ## Integration with Other Tasks
 
