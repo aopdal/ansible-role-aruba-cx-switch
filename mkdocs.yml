@@ -69,6 +69,8 @@ nav:
       - Requirements: REQUIREMENTS.md
       - Setup Guide: SETUP_COMPLETE.md
       - Development: DEVELOPMENT.md
+  - Architecture:
+      - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
   - NetBox Integration:
       - Integration Reference: NETBOX_INTEGRATION.md
       - Filter Plugins: FILTER_PLUGINS.md  # Essential for data transformation
