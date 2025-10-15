@@ -5,7 +5,8 @@
 
 - name: Generate ZTP configurations for new switches
   hosts: aruba_switches
-  gather_facts: yes
+  gather_facts: no  # Switches don't exist yet during ZTP generation
+  connection: local   # Don't try to connect to non-existent switches
   vars:
     # Enable ZTP configuration generation
     aoscx_generate_ztp_config: true
@@ -38,7 +39,30 @@
     aoscx_configure_bgp: false
     aoscx_configure_vsx: false
 
+    # Disable NetBox fact gathering since we can't connect to switches
+    aoscx_gather_facts: false
+
   tasks:
+    - name: Set management interface data (when NetBox is not available)
+      ansible.builtin.set_fact:
+        mgmt_interfaces:
+          - name: mgmt
+            ip_addresses:
+              - address: "{{ ansible_host }}/24"  # Use inventory IP
+        config_context:
+          mgmt_defaultgateway: "{{ mgmt_gateway | default('192.168.1.1') }}"
+          mgmt_nameserver: "{{ mgmt_dns | default('8.8.8.8') }}"
+      when: mgmt_interfaces is not defined
+      tags:
+        - ztp
+        - config_generation
+    - name: Gather facts from localhost for timestamp
+      ansible.builtin.setup:
+      delegate_to: localhost
+      run_once: true
+      tags:
+        - ztp
+        - config_generation
     - name: Generate ZTP configurations
       ansible.builtin.include_role:
         name: aopdal.aruba_cx_switch
@@ -76,7 +100,7 @@
 # 1. Generate ZTP configs for all switches:
 #    ansible-playbook ztp-generation.yml
 #
-# 2. Generate configs with specific tags:
+# 2. Generate configs with specific tags (no device connection):
 #    ansible-playbook ztp-generation.yml --tags ztp
 #
 # 3. Generate configs for specific group:
@@ -87,3 +111,12 @@
 #
 # 5. Use different admin credentials:
 #    ansible-playbook ztp-generation.yml -e aoscx_ztp_admin_user="deploy" -e aoscx_ztp_admin_password="SecurePass123"
+#
+# 6. Override management network settings:
+#    ansible-playbook ztp-generation.yml -e mgmt_gateway="10.1.1.1" -e mgmt_dns="10.1.1.53"
+#
+# 7. Generate with custom management interface IP (overrides ansible_host):
+#    ansible-playbook ztp-generation.yml -e '{"sw01-lab": {"mgmt_ip": "192.168.100.10/24"}}'
+#
+# Note: This playbook uses connection: local and gather_facts: no because
+#       the target switches don't exist yet during ZTP configuration generation.

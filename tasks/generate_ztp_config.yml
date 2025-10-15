@@ -2,6 +2,19 @@
 # tasks/generate_ztp_config.yml
 # Generate ZTP base configuration for initial switch deployment
 
+- name: "Create ZTP output directory"
+  ansible.builtin.file:
+    path: "{{ aoscx_ztp_output_dir | default('./ztp_configs') }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  when:
+    - aoscx_generate_ztp_config | default(false) | bool
+  tags:
+    - aoscx_ztp
+    - aoscx_config_generation
+
 - name: "Generate ZTP base configuration"
   ansible.builtin.template:
     src: ztp_base_config.j2
@@ -36,7 +49,7 @@
       hostname: "{{ inventory_hostname }}"
       admin_user: "{{ aoscx_ztp_admin_user | default(ansible_user) | default('admin') }}"
       mgmt_interfaces: "{{ mgmt_interfaces | default([]) | map(attribute='name') | list }}"
-      generated_at: "{{ ansible_date_time.iso8601 }}"
+      generated_at: "{{ ansible_date_time.iso8601 | default(ansible_facts.date_time.iso8601) | default(lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
   when:
     - aoscx_generate_ztp_config | default(false) | bool
   tags:
