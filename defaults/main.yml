@@ -42,3 +42,10 @@ aoscx_connection_type: network_cli  # or httpapi
 
 # L3 interface settings
 aoscx_l3_counters_enable: true  # Enable l3-counters on L3 interfaces
+
+# ZTP (Zero Touch Provisioning) configuration generation
+aoscx_generate_ztp_config: false  # Generate ZTP base configuration file
+aoscx_ztp_output_dir: "./ztp_configs"  # Directory to store ZTP config files
+aoscx_ztp_backup_configs: true  # Backup existing config files
+aoscx_ztp_admin_user: "admin"  # Default admin username for ZTP
+# aoscx_ztp_admin_password: "admin"  # Admin password (define in vault or host vars)

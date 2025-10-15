@@ -76,6 +76,7 @@ nav:
       - Base System:
           - Overview: BASE_CONFIGURATION.md
           - DNS: DNS_CONFIGURATION.md
+      - ZTP (Zero Touch Provisioning): ZTP_CONFIGURATION.md
       - EVPN & VXLAN:
           - Overview: EVPN_VXLAN_CONFIGURATION.md
           - Configuration Modes: EVPN_VXLAN_MODES.md

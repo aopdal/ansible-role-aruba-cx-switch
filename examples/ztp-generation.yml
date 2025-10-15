@@ -1,0 +1,89 @@
+---
+# Example playbook for generating ZTP configurations
+# This playbook demonstrates how to use the role to generate
+# Zero Touch Provisioning configurations for initial switch deployment
+
+- name: Generate ZTP configurations for new switches
+  hosts: aruba_switches
+  gather_facts: yes
+  vars:
+    # Enable ZTP configuration generation
+    aoscx_generate_ztp_config: true
+
+    # ZTP configuration settings
+    aoscx_ztp_output_dir: "./ztp_configs"
+    aoscx_ztp_backup_configs: true
+    aoscx_ztp_admin_user: "netops"
+
+    # Use Ansible Vault for password security
+    # ansible-vault create group_vars/all/vault.yml
+    aoscx_ztp_admin_password: "{{ vault_ztp_admin_password }}"
+
+    # Disable actual device configuration for ZTP generation
+    aoscx_configure_banner: false
+    aoscx_configure_ntp: false
+    aoscx_configure_timezone: false
+    aoscx_configure_dns: false
+    aoscx_configure_vrfs: false
+    aoscx_configure_vlans: false
+    aoscx_configure_physical_interfaces: false
+    aoscx_configure_lag_interfaces: false
+    aoscx_configure_mclag_interfaces: false
+    aoscx_configure_l2_interfaces: false
+    aoscx_configure_l3_interfaces: false
+    aoscx_configure_loopback: false
+    aoscx_configure_evpn: false
+    aoscx_configure_vxlan: false
+    aoscx_configure_ospf: false
+    aoscx_configure_bgp: false
+    aoscx_configure_vsx: false
+
+  tasks:
+    - name: Generate ZTP configurations
+      ansible.builtin.include_role:
+        name: aopdal.aruba_cx_switch
+        tasks_from: generate_ztp_config
+      tags:
+        - ztp
+        - config_generation
+
+    - name: Display generated ZTP files
+      ansible.builtin.debug:
+        msg:
+          - "ZTP configuration generated for {{ inventory_hostname }}"
+          - "File: {{ ztp_config_summary.file_path }}"
+          - "Admin user: {{ ztp_config_summary.admin_user }}"
+          - "Management interfaces: {{ ztp_config_summary.mgmt_interfaces | join(', ') }}"
+      when: ztp_config_summary is defined
+      tags:
+        - ztp
+        - config_generation
+
+    - name: Summary of all generated configs
+      ansible.builtin.debug:
+        msg:
+          - "ZTP configuration generation complete!"
+          - "Generated configs in: {{ aoscx_ztp_output_dir }}"
+          - "Total switches: {{ ansible_play_hosts | length }}"
+      run_once: true
+      when: ztp_config_summary is defined
+      tags:
+        - ztp
+        - config_generation
+
+# Usage examples:
+#
+# 1. Generate ZTP configs for all switches:
+#    ansible-playbook ztp-generation.yml
+#
+# 2. Generate configs with specific tags:
+#    ansible-playbook ztp-generation.yml --tags ztp
+#
+# 3. Generate configs for specific group:
+#    ansible-playbook ztp-generation.yml --limit new_switches
+#
+# 4. Use custom output directory:
+#    ansible-playbook ztp-generation.yml -e aoscx_ztp_output_dir="/var/lib/ztp"
+#
+# 5. Use different admin credentials:
+#    ansible-playbook ztp-generation.yml -e aoscx_ztp_admin_user="deploy" -e aoscx_ztp_admin_password="SecurePass123"

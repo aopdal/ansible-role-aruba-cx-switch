@@ -1,0 +1,44 @@
+---
+# tasks/generate_ztp_config.yml
+# Generate ZTP base configuration for initial switch deployment
+
+- name: "Generate ZTP base configuration"
+  ansible.builtin.template:
+    src: ztp_base_config.j2
+    dest: "{{ aoscx_ztp_output_dir | default('./ztp_configs') }}/{{ inventory_hostname }}_ztp_base.cfg"
+    backup: "{{ aoscx_ztp_backup_configs | default(true) }}"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: false
+  tags:
+    - aoscx_ztp
+    - aoscx_config_generation
+  when:
+    - aoscx_generate_ztp_config | default(false) | bool
+
+- name: "Display ZTP configuration file location"
+  ansible.builtin.debug:
+    msg:
+      - "ZTP configuration generated:"
+      - "  File: {{ aoscx_ztp_output_dir | default('./ztp_configs') }}/{{ inventory_hostname }}_ztp_base.cfg"
+      - "  Host: {{ inventory_hostname }}"
+      - "  Management interfaces configured: {{ mgmt_interfaces | default([]) | length | default('unknown') }}"
+  when:
+    - aoscx_generate_ztp_config | default(false) | bool
+  tags:
+    - aoscx_ztp
+    - aoscx_config_generation
+
+- name: "Create ZTP configuration summary"
+  ansible.builtin.set_fact:
+    ztp_config_summary:
+      file_path: "{{ aoscx_ztp_output_dir | default('./ztp_configs') }}/{{ inventory_hostname }}_ztp_base.cfg"
+      hostname: "{{ inventory_hostname }}"
+      admin_user: "{{ aoscx_ztp_admin_user | default(ansible_user) | default('admin') }}"
+      mgmt_interfaces: "{{ mgmt_interfaces | default([]) | map(attribute='name') | list }}"
+      generated_at: "{{ ansible_date_time.iso8601 }}"
+  when:
+    - aoscx_generate_ztp_config | default(false) | bool
+  tags:
+    - aoscx_ztp
+    - aoscx_config_generation

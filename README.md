@@ -18,6 +18,7 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as 
 - ✅ **Virtual Chassis Support** - Works with VSX/stacked switches
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
+- ✅ **ZTP Configuration Generation** - Creates base configs for Zero Touch Provisioning
 
 ## Advanced L3 Interface Features
 
