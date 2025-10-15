@@ -1,7 +1,7 @@
 ---
 # See https://ansible.readthedocs.io/projects/lint/configuring/
 
-profile: production  # min, basic, moderate, safety, shared, production
+profile: production # min, basic, moderate, safety, shared, production
 
 # Exclude paths from linting
 exclude_paths:
@@ -11,6 +11,8 @@ exclude_paths:
   - tests/output/
   - .cache/
   - .molecule/
+  - mkdocs.yml # MkDocs config (not Ansible)
+  - docs/ # Documentation files
 
 # Enable specific rules
 enable_list:
@@ -21,12 +23,12 @@ enable_list:
 
 # Skip specific rules
 skip_list:
-  - galaxy[no-changelog]  # We'll add changelog later
-  - yaml[line-length]     # Network configs can be long
-  - name[casing]          # Network convention differs
-  - schema[meta]          # Galaxy meta might have custom fields
-  - role-name             # Role name format
-  - galaxy[version-incorrect]  # Version format in galaxy.yml
+  - galaxy[no-changelog] # We'll add changelog later
+  - yaml[line-length] # Network configs can be long
+  - name[casing] # Network convention differs
+  - schema[meta] # Galaxy meta might have custom fields
+  - role-name # Role name format
+  - galaxy[version-incorrect] # Version format in galaxy.yml
 
 # Ansible-lint configuration
 kinds:

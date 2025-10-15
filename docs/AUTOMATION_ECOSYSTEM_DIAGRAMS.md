@@ -4,284 +4,270 @@ This document provides simplified visual diagrams for the automation ecosystem.
 
 ## Quick Reference Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    NETWORK AUTOMATION FLOW                       │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A[PHASE 1: PLANNING<br/>NetBox] -->|Engineer documents network design<br/>Devices, IPs, VLANs, routing<br/>Config context, custom fields| B[PHASE 2: ZTP GENERATION<br/>Ansible]
+    B -->|ansible-playbook generate-ztp-configs.yml<br/>→ ztp_configs/sw01-lab_ztp_base.cfg| C[PHASE 3: ZTP INFRASTRUCTURE<br/>DHCP/TFTP Server]
+    C -->|Copy ZTP configs to server<br/>Out of scope for this role| D[PHASE 4: DEVICE BOOTSTRAP<br/>Switch ZTP]
+    D -->|1. DHCP → gets IP + ZTP URL<br/>2. Downloads ZTP script<br/>3. Downloads base config<br/>4. Applies config → mgmt ready| E[PHASE 5: FULL CONFIGURATION<br/>Ansible Deploy]
+    E -->|ansible-playbook site.yml<br/>→ Full config from NetBox<br/>SSH/HTTPS now available| F[PHASE 6: PRODUCTION<br/>Switch in Production]
+    F -->|Ongoing management| G[PHASE 7: CHANGE MANAGEMENT<br/>Update NetBox]
+    G -->|Run Ansible playbook| H[Switch Updated]
+    H -->|Verify change| F
 
-PHASE 1: PLANNING
-┌─────────────┐
-│   NetBox    │  Engineer documents network design
-│  (Plan)     │  • Devices, IPs, VLANs, routing
-└──────┬──────┘  • Config context, custom fields
-       │
-       │ Query API
-       ▼
-PHASE 2: ZTP GENERATION
-┌─────────────┐
-│   Ansible   │  ansible-playbook generate-ztp-configs.yml
-│  (Generate) │  → ztp_configs/sw01-lab_ztp_base.cfg
-└──────┬──────┘
-       │
-       │ Copy to server
-       ▼
-PHASE 3: ZTP INFRASTRUCTURE
-┌─────────────┐
-│ DHCP/TFTP   │  Hosts ZTP scripts and base configs
-│   Server    │  (Out of scope for this role)
-└──────┬──────┘
-       │
-       │ New switch boots
-       ▼
-PHASE 4: DEVICE BOOTSTRAP
-┌─────────────┐
-│   Switch    │  1. DHCP → gets IP + ZTP URL
-│    (ZTP)    │  2. Downloads ZTP script
-└──────┬──────┘  3. Downloads base config
-       │         4. Applies config → mgmt ready
-       │
-       │ SSH/HTTPS now available
-       ▼
-PHASE 5: FULL CONFIGURATION
-┌─────────────┐
-│   Ansible   │  ansible-playbook site.yml
-│  (Deploy)   │  → Full config from NetBox
-└──────┬──────┘
-       │
-       ▼
-PHASE 6: PRODUCTION
-┌─────────────┐
-│   Switch    │  Fully configured and operational
-│ (Production)│  All features active
-└──────┬──────┘
-       │
-       │ Ongoing management
-       ▼
-PHASE 7: CHANGE MANAGEMENT
-┌─────────────┐
-│   NetBox    │  Update NetBox
-│  (Change)   │  ↓
-└──────┬──────┘  Run Ansible
-       │         ↓
-┌─────────────┐  Switch updated
-│   Switch    │  ↓
-│  (Updated)  │  Verify change
-└─────────────┘
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1e1
+    style D fill:#e1ffe1
+    style E fill:#fff4e1
+    style F fill:#e1f5e1
+    style G fill:#e1f5ff
+    style H fill:#e1ffe1
 ```
 
 ## Component Responsibilities
 
-```
-╔═══════════════════════════════════════════════════════════════╗
-║                         NETBOX (SOUCE OF TRUTH)                ║
-╠═══════════════════════════════════════════════════════════════╣
-║ IN SCOPE FOR AUTOMATION:                                       ║
-║ • Device info (hostname, platform, mgmt IP)                   ║
-║ • Interfaces (physical, LAG, SVI, loopback)                   ║
-║ • VLANs and VRFs                                              ║
-║ • IP addresses                                                 ║
-║ • Routing (BGP, OSPF)                                         ║
-║ • EVPN/VXLAN config                                           ║
-║ • Config context (NTP, DNS, timezone)                         ║
-║ • Custom fields (feature flags)                               ║
-║ • Tags (automation control)                                    ║
-╠═══════════════════════════════════════════════════════════════╣
-║ OUT OF SCOPE (But important to document):                     ║
-║ • Physical: Cables, racks, power                             ║
-║ • Site: Location, contact info                               ║
-║ • Assets: Purchase orders, warranties                         ║
-║ • Circuits: WAN links, ISP details                           ║
-╚═══════════════════════════════════════════════════════════════╝
+### NetBox (Source of Truth)
 
-╔═══════════════════════════════════════════════════════════════╗
-║              ANSIBLE ROLE (aopdal.aruba_cx_switch)            ║
-╠═══════════════════════════════════════════════════════════════╣
-║ RESPONSIBILITIES:                                              ║
-║ • Query NetBox API                                            ║
-║ • Generate ZTP base configs                                   ║
-║ • Deploy full configurations                                  ║
-║ • Maintain idempotent state                                   ║
-║ • Handle: VLANs, L2/L3, EVPN, VXLAN, BGP, OSPF, VSX        ║
-╠═══════════════════════════════════════════════════════════════╣
-║ NOT RESPONSIBLE FOR:                                          ║
-║ • DHCP server configuration                                   ║
-║ • TFTP/HTTP server setup                                      ║
-║ • ZTP script deployment                                       ║
-║ • Firmware management                                         ║
-║ • Backup/restore (use separate roles)                        ║
-╚═══════════════════════════════════════════════════════════════╝
+```mermaid
+graph LR
+    subgraph "NetBox - IN SCOPE FOR AUTOMATION"
+        A1[Device Info<br/>hostname, platform, mgmt IP]
+        A2[Interfaces<br/>physical, LAG, SVI, loopback]
+        A3[VLANs and VRFs]
+        A4[IP Addresses]
+        A5[Routing<br/>BGP, OSPF]
+        A6[EVPN/VXLAN Config]
+        A7[Config Context<br/>NTP, DNS, timezone]
+        A8[Custom Fields<br/>feature flags]
+        A9[Tags<br/>automation control]
+    end
 
-╔═══════════════════════════════════════════════════════════════╗
-║               ZTP INFRASTRUCTURE (OUT OF SCOPE)                ║
-╠═══════════════════════════════════════════════════════════════╣
-║ DHCP SERVER:                                                   ║
-║ • Provide IP, gateway, DNS to new switches                    ║
-║ • Provide ZTP script URL (option 66/67)                       ║
-║                                                                ║
-║ TFTP/HTTP SERVER:                                             ║
-║ • Host ZTP scripts                                            ║
-║ • Host generated base configs (from Ansible)                  ║
-║ • (Optional) Host firmware images                             ║
-╚═══════════════════════════════════════════════════════════════╝
+    subgraph "NetBox - OUT OF SCOPE"
+        B1[Physical: Cables, racks, power]
+        B2[Site: Location, contact info]
+        B3[Assets: Purchase orders, warranties]
+        B4[Circuits: WAN links, ISP details]
+    end
+
+    style A1 fill:#e1f5ff
+    style A2 fill:#e1f5ff
+    style A3 fill:#e1f5ff
+    style A4 fill:#e1f5ff
+    style A5 fill:#e1f5ff
+    style A6 fill:#e1f5ff
+    style A7 fill:#e1f5ff
+    style A8 fill:#e1f5ff
+    style A9 fill:#e1f5ff
+    style B1 fill:#f0f0f0
+    style B2 fill:#f0f0f0
+    style B3 fill:#f0f0f0
+    style B4 fill:#f0f0f0
 ```
 
-## Data Flow: Initial Deployment
+### Ansible Role (aopdal.aruba_cx_switch)
 
-```
-NetBox                 Ansible              ZTP Server           Switch
-  │                       │                     │                  │
-  │                       │                     │                  │
-  │ 1. Engineer          │                     │                  │
-  │    documents         │                     │                  │
-  │    network           │                     │                  │
-  │◄───────────────────  │                     │                  │
-  │                       │                     │                  │
-  │                       │                     │                  │
-  │  2. Query NetBox API  │                     │                  │
-  ├──────────────────────►│                     │                  │
-  │      (Device info)    │                     │                  │
-  │                       │                     │                  │
-  │                       │ 3. Generate ZTP     │                  │
-  │                       │    base configs     │                  │
-  │                       │                     │                  │
-  │                       │ 4. Copy configs     │                  │
-  │                       ├────────────────────►│                  │
-  │                       │                     │                  │
-  │                       │                     │  5. Power on     │
-  │                       │                     │  6. DHCP request │
-  │                       │                     │◄─────────────────┤
-  │                       │                     │                  │
-  │                       │                     │  7. IP + ZTP URL │
-  │                       │                     ├─────────────────►│
-  │                       │                     │                  │
-  │                       │                     │  8. Download     │
-  │                       │                     │     ZTP script   │
-  │                       │                     │◄─────────────────┤
-  │                       │                     │                  │
-  │                       │                     │  9. Download     │
-  │                       │                     │     base config  │
-  │                       │                     │◄─────────────────┤
-  │                       │                     │                  │
-  │                       │                     │  10. Apply config│
-  │                       │                     │                  │
-  │                       │                     │  11. Reboot      │
-  │                       │                     │                  │
-  │                       │                     │                  │
-  │                       │ 12. SSH/HTTPS now available           │
-  │  13. Query NetBox API │                     │                  │
-  ├──────────────────────►│                     │                  │
-  │   (Full config data)  │                     │                  │
-  │                       │                     │                  │
-  │                       │ 14. Deploy full config                │
-  │                       ├───────────────────────────────────────►│
-  │                       │     (SSH/HTTPS)     │                  │
-  │                       │                     │                  │
-  │                       │ 15. ✅ Complete     │                  │
-  │                       │                     │                  │
+**RESPONSIBILITIES:**
+- Query NetBox API
+- Transform NetBox data into Aruba CX CLI
+- Generate Jinja2 templates
+- Execute arubanetworks.aoscx collection modules
+- Manage configuration lifecycle
+- Generate ZTP base configs (before devices exist)
+
+### ZTP Infrastructure (DHCP/TFTP Server)
+
+**OUT OF SCOPE** for this role, but critical for the ecosystem:
+- Host ZTP scripts and base configs
+- DHCP option configuration (ZTP URL)
+- TFTP/HTTP file serving
+
+### Aruba CX Switch
+
+**RESPONSIBILITIES:**
+- Execute ZTP process on first boot
+- Accept configuration via SSH/HTTPS
+- Report status and health
+
+---
+
+## Detailed Data Flow: ZTP to Production
+
+```mermaid
+sequenceDiagram
+    participant E as Engineer
+    participant N as NetBox
+    participant A as Ansible
+    participant Z as ZTP Server
+    participant S as Switch
+
+    Note over E,N: Phase 1: Planning
+    E->>N: 1. Document network design<br/>(devices, IPs, VLANs, routing)
+
+    Note over N,A: Phase 2: ZTP Generation
+    A->>N: 2. Query NetBox API<br/>(device info)
+    N-->>A: Device data
+    A->>A: 3. Generate ZTP base configs
+    A->>Z: 4. Copy configs to ZTP server
+
+    Note over Z,S: Phase 3: Device Bootstrap
+    S->>Z: 5. Power on<br/>6. DHCP request
+    Z->>S: 7. IP + ZTP URL
+    S->>Z: 8. Download ZTP script
+    S->>Z: 9. Download base config
+    S->>S: 10. Apply config<br/>11. Reboot
+
+    Note over N,S: Phase 4: Full Configuration
+    A->>N: 12. Query NetBox API<br/>(full config data)
+    N-->>A: Complete configuration
+    A->>S: 13. Deploy full config<br/>(SSH/HTTPS now available)
+    S-->>A: 14. ✅ Configuration applied
 ```
 
-## Data Flow: Ongoing Management
+---
 
+## Data Flow: Ongoing Change Management
+
+```mermaid
+graph LR
+    A[Change Request] --> B[Update NetBox]
+    B --> C[Run Ansible Playbook]
+    C --> D[Deploy to Switch]
+    D --> E[Verify Change]
+    E -->|Success| F[Complete]
+    E -->|Issue| B
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#fff4e1
+    style D fill:#e1ffe1
+    style E fill:#ffe1e1
+    style F fill:#e1f5e1
 ```
-Change Request → NetBox → Ansible → Switch → Verify
-      │             │         │         │        │
-      │             │         │         │        │
-      └─────────────┴─────────┴─────────┴────────┘
-              Continuous synchronization
-```
+
+---
 
 ## Network Topologies Supported
 
 ### Simple Access Network
-```
-┌───────────────┐
-│   Core        │
-│   Switch      │
-│   (BGP/OSPF)  │
-└───┬───┬───┬───┘
-    │   │   │
-┌───┴┐ ┌┴───┴──┐
-│Acc1│ │ Acc2  │  Access switches
-│    │ │       │  (L2 + VLANs)
-└────┘ └───────┘
+
+```mermaid
+graph TB
+    Core["Core Switch<br/>BGP/OSPF"]
+    Acc1["Access Switch 1<br/>L2 + VLANs"]
+    Acc2["Access Switch 2<br/>L2 + VLANs"]
+
+    Core --> Acc1
+    Core --> Acc2
+
+    style Core fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style Acc1 fill:#e1ffe1,stroke:#4caf50,stroke-width:2px
+    style Acc2 fill:#e1ffe1,stroke:#4caf50,stroke-width:2px
 ```
 
 ### EVPN/VXLAN Fabric
-```
-┌─────────┐         ┌─────────┐
-│ Spine 1 │◄───────►│ Spine 2 │
-│ (BGP)   │         │ (BGP)   │
-└───┬─────┘         └─────┬───┘
-    │  \             /  │
-    │   \           /   │
-    │    \         /    │
-    │     \       /     │
-┌───┴──┐  \     /  ┌───┴──┐
-│Leaf 1│   \   /   │Leaf 2│
-│(EVPN)│    \ /    │(EVPN)│
-│      │     X     │      │
-│      │    / \    │      │
-└──────┘   /   \   └──────┘
-          /     \
-    Servers     Servers
+
+```mermaid
+graph TB
+    S1["Spine 1<br/>BGP Route Reflector"]
+    S2["Spine 2<br/>BGP Route Reflector"]
+    L1["Leaf 1<br/>EVPN VTEP"]
+    L2["Leaf 2<br/>EVPN VTEP"]
+    Srv1["Servers<br/>Rack 1"]
+    Srv2["Servers<br/>Rack 2"]
+
+    S1 <--> L1
+    S1 <--> L2
+    S2 <--> L1
+    S2 <--> L2
+
+    L1 --> Srv1
+    L2 --> Srv2
+
+    style S1 fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style S2 fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style L1 fill:#e1ffe1,stroke:#4caf50,stroke-width:2px
+    style L2 fill:#e1ffe1,stroke:#4caf50,stroke-width:2px
+    style Srv1 fill:#f0f0f0,stroke:#9e9e9e,stroke-width:2px
+    style Srv2 fill:#f0f0f0,stroke:#9e9e9e,stroke-width:2px
 ```
 
 ### VSX Pair
+
+```mermaid
+graph TB
+    SW1["Switch 1<br/>VSX Primary"]
+    SW2["Switch 2<br/>VSX Secondary"]
+    SRV["Server<br/>Dual-homed LAG"]
+
+    SW1 <-->|ISL/VSL Keepalive| SW2
+    SW1 -->|LAG Member 1| SRV
+    SW2 -->|LAG Member 2| SRV
+
+    style SW1 fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style SW2 fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style SRV fill:#e1ffe1,stroke:#4caf50,stroke-width:2px
 ```
-┌──────────┐  ISL  ┌──────────┐
-│ Switch 1 │◄─────►│ Switch 2 │
-│  (VSX)   │  VSL  │  (VSX)   │
-└────┬─────┘       └─────┬────┘
-     │                   │
-     └──────┬───┬────────┘
-            │   │
-      Dual-homed LAG
-            │   │
-        ┌───┴───┴───┐
-        │  Server   │
-        └───────────┘
-```
+
+---
 
 ## Feature Interaction Matrix
 
-```
-┌──────────┬──────┬──────┬──────┬──────┬─────┬─────┐
-│ Feature  │ BGP  │ OSPF │ EVPN │VXLAN │ VSX │VRFs │
-├──────────┼──────┼──────┼──────┼──────┼─────┼─────┤
-│ BGP      │  ●   │  ○   │  ●   │  ○   │  ●  │  ●  │
-│ OSPF     │  ○   │  ●   │  ×   │  ×   │  ●  │  ●  │
-│ EVPN     │  ●   │  ×   │  ●   │  ●   │  ●  │  ○  │
-│ VXLAN    │  ○   │  ×   │  ●   │  ●   │  ●  │  ○  │
-│ VSX      │  ●   │  ●   │  ●   │  ●   │  ●  │  ●  │
-│ VRFs     │  ●   │  ●   │  ○   │  ○   │  ●  │  ●  │
-└──────────┴──────┴──────┴──────┴──────┴─────┴─────┘
+| Feature | BGP | OSPF | EVPN | VXLAN | VSX | VRFs |
+|---------|:---:|:----:|:----:|:-----:|:---:|:----:|
+| **BGP**    | ● | ○ | ● | ○ | ● | ● |
+| **OSPF**   | ○ | ● | × | × | ● | ● |
+| **EVPN**   | ● | × | ● | ● | ● | ○ |
+| **VXLAN**  | ○ | × | ● | ● | ● | ○ |
+| **VSX**    | ● | ● | ● | ● | ● | ● |
+| **VRFs**   | ● | ● | ○ | ○ | ● | ● |
 
-Legend:
-● = Required/Strongly recommended
-○ = Compatible/Optional
-× = Incompatible/Not supported together
-```
+**Legend:**
+- ● = Required/Strongly recommended
+- ○ = Compatible/Optional
+- × = Incompatible/Not supported together
+
+---
 
 ## Troubleshooting Decision Tree
 
-```
-Switch not responding?
-│
-├─ Can't reach mgmt IP?
-│  ├─ Check physical: Cable, port, power
-│  ├─ Check DHCP: IP assigned?
-│  └─ Check ZTP: Config applied?
-│
-├─ Can reach but Ansible fails?
-│  ├─ SSH enabled? → Check ZTP config
-│  ├─ Credentials? → Check vault
-│  └─ In NetBox? → Add device
-│
-└─ Config not as expected?
-   ├─ NetBox data correct? → Fix NetBox
-   ├─ Feature flags set? → Check custom fields
-   ├─ Idempotent mode? → Check if configs removed
-   └─ Run with -vvv → Review detailed output
+```mermaid
+graph TD
+    A[Switch not responding?] --> B{Can't reach mgmt IP?}
+    B -->|Yes| C[Check Physical]
+    B -->|No| D{Can reach but Ansible fails?}
+
+    C --> C1[Cable, port, power]
+    C --> C2[DHCP: IP assigned?]
+    C --> C3[ZTP: Config applied?]
+
+    D --> D1{SSH enabled?}
+    D1 -->|No| D1A[Check ZTP config]
+    D1 -->|Yes| D2{Credentials valid?}
+    D2 -->|No| D2A[Check vault]
+    D2 -->|Yes| D3{Device in NetBox?}
+    D3 -->|No| D3A[Add device to NetBox]
+
+    B -->|Config issues| E{Config not as expected?}
+    E --> E1{NetBox data correct?}
+    E1 -->|No| E1A[Fix NetBox data]
+    E1 -->|Yes| E2{Feature flags set?}
+    E2 -->|No| E2A[Check custom fields]
+    E2 -->|Yes| E3{Idempotent mode?}
+    E3 -->|Yes| E3A[Check if configs removed]
+    E3 -->|No| E4[Run with -vvv for details]
+
+    style A fill:#ffe1e1
+    style C1 fill:#fff4e1
+    style C2 fill:#fff4e1
+    style C3 fill:#fff4e1
+    style D1A fill:#fff4e1
+    style D2A fill:#fff4e1
+    style D3A fill:#fff4e1
+    style E1A fill:#e1f5ff
+    style E2A fill:#e1f5ff
+    style E3A fill:#fff4e1
+    style E4 fill:#e1ffe1
 ```
 
 ## Quick Command Reference

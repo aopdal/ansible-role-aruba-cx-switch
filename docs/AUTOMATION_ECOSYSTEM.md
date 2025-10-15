@@ -15,66 +15,49 @@ This document provides a comprehensive overview of the network automation ecosys
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          NETWORK AUTOMATION ECOSYSTEM                     │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph NetBox["🎯 NetBox - Source of Truth"]
+        direction LR
+        NB1["Physical Assets<br/>• Devices<br/>• Cables<br/>• Ports<br/>• Power"]
+        NB2["Logical Networks<br/>• Sites<br/>• Racks<br/>• VLANs<br/>• VRFs"]
+        NB3["IP Management<br/>• Prefixes<br/>• IPs<br/>• VRFs"]
+        NB4["Config Context<br/>• BGP AS<br/>• VLANs<br/>• NTP<br/>• DNS"]
+        NB5["Automation<br/>• Tags<br/>• Custom Fields<br/>• Feature Flags"]
+    end
 
-┌──────────────────────────────────────────────────────────────────────────┐
-│                      SOURCE OF TRUTH: NetBox                              │
-│  ┌────────────┬────────────┬──────────────┬────────────┬──────────────┐ │
-│  │  Physical  │  Logical   │  IP Address  │   Config   │  Automation  │ │
-│  │  Assets    │  Networks  │  Management  │  Context   │  Tags        │ │
-│  │            │            │              │            │              │ │
-│  │ • Devices  │ • Sites    │ • Prefixes   │ • BGP AS   │ • ZTP ready  │ │
-│  │ • Cables   │ • Racks    │ • IPs        │ • VLANs    │ • Production │ │
-│  │ • Ports    │ • VLANs    │ • VRFs       │ • NTP      │ • Staged     │ │
-│  │ • Power    │ • VRFs     │              │ • DNS      │              │ │
-│  └────────────┴────────────┴──────────────┴────────────┴──────────────┘ │
-└──────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                    AUTOMATION LAYER: Ansible                              │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │              aopdal.aruba_cx_switch Role                          │  │
-│  │                                                                    │  │
-│  │  Responsibilities:                                                │  │
-│  │  • Query NetBox for device configuration                         │  │
-│  │  • Generate ZTP base configurations                              │  │
-│  │  • Apply complete switch configurations                          │  │
-│  │  • Maintain idempotent state                                     │  │
-│  │  • Handle EVPN/VXLAN, BGP, OSPF, VSX                            │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────────────┘
-                                    │
-                    ┌───────────────┴───────────────┐
-                    ▼                               ▼
-┌──────────────────────────────┐    ┌──────────────────────────────┐
-│    INITIAL DEPLOYMENT        │    │   ONGOING MANAGEMENT         │
-│    (ZTP Infrastructure)      │    │   (Direct Connection)        │
-│                              │    │                              │
-│  ┌────────────────────────┐ │    │  ┌────────────────────────┐ │
-│  │   DHCP Server          │ │    │  │   SSH/HTTPS            │ │
-│  │   • IP Assignment      │ │    │  │   • Config push        │ │
-│  │   • Option 66/67       │ │    │  │   • Verification       │ │
-│  │   • ZTP script URL     │ │    │  │   • Monitoring         │ │
-│  └────────────────────────┘ │    │  └────────────────────────┘ │
-│                              │    │                              │
-│  ┌────────────────────────┐ │    └──────────────────────────────┘
-│  │   TFTP/HTTP Server     │ │
-│  │   • ZTP scripts        │ │
-│  │   • Base configs       │ │
-│  │   • Firmware (opt)     │ │
-│  └────────────────────────┘ │
-└──────────────────────────────┘
-                    │
-                    ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                     NETWORK DEVICES: Aruba CX Switches                    │
-│                                                                            │
-│  Phase 1: ZTP Boot → Phase 2: Base Config → Phase 3: Full Config        │
-└──────────────────────────────────────────────────────────────────────────┘
+    subgraph Ansible["⚙️ Automation Layer - Ansible"]
+        Role["aopdal.aruba_cx_switch Role<br/><br/>Responsibilities:<br/>• Query NetBox API<br/>• Generate ZTP configs<br/>• Apply full configurations<br/>• Maintain idempotent state<br/>• Handle EVPN/VXLAN, BGP, OSPF, VSX"]
+    end
+
+    subgraph Deploy["📦 Deployment Paths"]
+        direction LR
+        ZTP["Initial Deployment<br/>ZTP Infrastructure<br/><br/>• DHCP Server<br/>  - IP Assignment<br/>  - Option 66/67<br/>  - ZTP script URL<br/><br/>• TFTP/HTTP Server<br/>  - ZTP scripts<br/>  - Base configs<br/>  - Firmware (opt)"]
+        Direct["Ongoing Management<br/>Direct Connection<br/><br/>• SSH/HTTPS<br/>  - Config push<br/>  - Verification<br/>  - Monitoring"]
+    end
+
+    subgraph Switches["🔌 Network Devices"]
+        SW["Aruba CX Switches<br/><br/>Phase 1: ZTP Boot<br/>Phase 2: Base Config<br/>Phase 3: Full Config"]
+    end
+
+    NetBox --> Ansible
+    Ansible --> Deploy
+    ZTP --> SW
+    Direct --> SW
+
+    style NetBox fill:#e1f5ff,stroke:#3f51b5,stroke-width:3px
+    style Ansible fill:#fff4e1,stroke:#ff9800,stroke-width:3px
+    style Deploy fill:#e8f5e9,stroke:#4caf50,stroke-width:3px
+    style Switches fill:#f3e5f5,stroke:#9c27b0,stroke-width:3px
+    style NB1 fill:#e3f2fd,stroke:#2196f3,stroke-width:1px
+    style NB2 fill:#e3f2fd,stroke:#2196f3,stroke-width:1px
+    style NB3 fill:#e3f2fd,stroke:#2196f3,stroke-width:1px
+    style NB4 fill:#e3f2fd,stroke:#2196f3,stroke-width:1px
+    style NB5 fill:#e3f2fd,stroke:#2196f3,stroke-width:1px
+    style Role fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style ZTP fill:#f1f8e9,stroke:#8bc34a,stroke-width:2px
+    style Direct fill:#f1f8e9,stroke:#8bc34a,stroke-width:2px
+    style SW fill:#f3e5f5,stroke:#ab47bc,stroke-width:2px
 ```
 
 ---
@@ -415,89 +398,67 @@ ansible-playbook -i netbox_inventory.yml site.yml --tags vlans,bgp
 
 ### Initial Deployment Flow
 
-```
-┌──────────┐
-│ NetBox   │ 1. Engineer documents network design
-└────┬─────┘    (devices, IPs, VLANs, routing)
-     │
-     ▼
-┌──────────┐
-│ Ansible  │ 2. Generate ZTP base configurations
-│  Role    │    ansible-playbook generate-ztp-configs.yml
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│   ZTP    │ 3. Deploy configs to TFTP/HTTP server
-│  Server  │    scp configs/* ztp-server:/var/lib/ztp/
-└────┬─────┘
-     │
-     │         4. New switch powers on
-     │         5. DHCP provides IP + ZTP script URL
-     │         6. Switch downloads and runs ZTP script
-     │         7. ZTP script downloads base config
-     │         8. Base config applied
-     ▼
-┌──────────┐
-│ Switch   │ 9. Management connectivity established
-│ (Base    │    Hostname, IP, SSH, HTTPS configured
-│  Config) │
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│ Ansible  │ 10. Apply full configuration
-│  Role    │     ansible-playbook site.yml
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│ Switch   │ 11. Production ready
-│ (Full    │     All features configured
-│  Config) │
-└──────────┘
+```mermaid
+graph TB
+    Start([👤 Engineer]) --> NB1["1️⃣ NetBox<br/>Document network design<br/>(devices, IPs, VLANs, routing)"]
+
+    NB1 --> ANS1["2️⃣ Ansible Role<br/>Generate ZTP base configurations<br/><code>ansible-playbook generate-ztp-configs.yml</code>"]
+
+    ANS1 --> ZTP1["3️⃣ ZTP Server<br/>Deploy configs to TFTP/HTTP server<br/><code>scp configs/* ztp-server:/var/lib/ztp/</code>"]
+
+    ZTP1 --> SW1["4️⃣-8️⃣ Switch Boot Process<br/>• Power on<br/>• DHCP provides IP + ZTP script URL<br/>• Download and run ZTP script<br/>• Download base config<br/>• Apply base config"]
+
+    SW1 --> SW2["9️⃣ Switch (Base Config)<br/>Management connectivity established<br/>✅ Hostname, IP, SSH, HTTPS configured"]
+
+    SW2 --> ANS2["🔟 Ansible Role<br/>Apply full configuration<br/><code>ansible-playbook site.yml</code>"]
+
+    ANS2 --> SW3["1️⃣1️⃣ Switch (Full Config)<br/>✅ Production ready<br/>All features configured"]
+
+    style Start fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style NB1 fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style ANS1 fill:#fff4e1,stroke:#ff9800,stroke-width:2px
+    style ZTP1 fill:#ffe1e1,stroke:#f44336,stroke-width:2px
+    style SW1 fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    style SW2 fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+    style ANS2 fill:#fff4e1,stroke:#ff9800,stroke-width:2px
+    style SW3 fill:#c8e6c9,stroke:#4caf50,stroke-width:3px
 ```
 
 ### Ongoing Management Flow
 
-```
-┌──────────┐
-│ Change   │ 1. Change request approved
-│ Request  │
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│ NetBox   │ 2. Update NetBox
-└────┬─────┘    (add VLAN, change IP, etc.)
-     │
-     ▼
-┌──────────┐
-│ Ansible  │ 3. Run Ansible playbook
-│  Role    │    ansible-playbook site.yml
-└────┬─────┘
-     │
-     ├─→ Query NetBox for current state
-     ├─→ Compare with switch state
-     ├─→ Generate configuration changes
-     ├─→ Apply changes to switch
-     └─→ Verify changes
-     │
-     ▼
-┌──────────┐
-│ Switch   │ 4. Configuration updated
-└────┬─────┘
-     │
-     ▼
-┌──────────┐
-│ Verify   │ 5. Validate change
-└────┬─────┘    (network monitoring, testing)
-     │
-     ▼
-┌──────────┐
-│ Document │ 6. Update documentation
-│          │    (NetBox already updated)
-└──────────┘
+```mermaid
+graph TB
+    CR["📋 Change Request<br/>1. Change approved"] --> NB["🎯 NetBox<br/>2. Update NetBox<br/>(add VLAN, change IP, etc.)"]
+
+    NB --> ANS["⚙️ Ansible Role<br/>3. Run Ansible playbook<br/><code>ansible-playbook site.yml</code>"]
+
+    ANS --> Q1["Query NetBox for current state"]
+    ANS --> Q2["Compare with switch state"]
+    ANS --> Q3["Generate configuration changes"]
+    ANS --> Q4["Apply changes to switch"]
+    ANS --> Q5["Verify changes"]
+
+    Q1 & Q2 & Q3 & Q4 & Q5 --> SW["🔌 Switch<br/>4. Configuration updated"]
+
+    SW --> VER{"5. Validate change<br/>(monitoring, testing)"}
+
+    VER -->|✅ Success| DOC["📚 Document<br/>6. Update documentation<br/>(NetBox already updated)"]
+    VER -->|❌ Issue| NB
+
+    DOC --> END([✅ Complete])
+
+    style CR fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style NB fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
+    style ANS fill:#fff4e1,stroke:#ff9800,stroke-width:2px
+    style Q1 fill:#fff9c4,stroke:#fbc02d,stroke-width:1px
+    style Q2 fill:#fff9c4,stroke:#fbc02d,stroke-width:1px
+    style Q3 fill:#fff9c4,stroke:#fbc02d,stroke-width:1px
+    style Q4 fill:#fff9c4,stroke:#fbc02d,stroke-width:1px
+    style Q5 fill:#fff9c4,stroke:#fbc02d,stroke-width:1px
+    style SW fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    style VER fill:#ffe1e1,stroke:#f44336,stroke-width:2px
+    style DOC fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+    style END fill:#c8e6c9,stroke:#4caf50,stroke-width:3px
 ```
 
 ---
