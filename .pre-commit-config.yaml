@@ -21,6 +21,7 @@ repos:
       - id: check-merge-conflict
       - id: check-json
       - id: detect-private-key
+        exclude: ^docs/GITHUB_ACTIONS_DEPLOYMENT\.md$
       - id: mixed-line-ending
 
   - repo: https://github.com/adrienverge/yamllint
