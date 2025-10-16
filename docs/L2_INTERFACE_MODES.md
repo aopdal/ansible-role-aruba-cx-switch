@@ -75,37 +75,43 @@ aoscx_debug: true  # Recommended for visibility
 
 ### Workflow Diagram
 
-```
-┌─────────────────────────────────────────────────┐
-│  configure_l2_interfaces.yml (Unified)          │
-└─────────────────────────────────────────────────┘
-                      │
-                      ▼
-              [Check Mode Variable]
-                      │
-         ┌────────────┴────────────┐
-         ▼                         ▼
-   [Standard Mode]           [Idempotent Mode]
-         │                         │
-         │                         ├─► Analyze device state
-         │                         │   (get_interfaces_needing_changes)
-         │                         │
-         │                         ├─► Phase 1: Cleanup
-         │                         │   (cleanup_l2_vlans.yml)
-         │                         │
-         ├─────────────────────────┤
-         │   Common Configuration   │
-         ├─────────────────────────┤
-         │                         │
-         ├─► Categorize interfaces │
-         │   (categorize_l2_interfaces)
-         │                         │
-         ├─► Phase 2: Configure    │
-         │   - Physical interfaces │
-         │   - LAG interfaces      │
-         │   - MCLAG interfaces    │
-         │                         │
-         └─────────────────────────┘
+```mermaid
+flowchart TD
+    Start([configure_l2_interfaces.yml])
+    Start --> CheckMode{Check Mode Variable<br/>aoscx_idempotent_mode}
+
+    %% Standard Mode Path
+    CheckMode -->|false| StandardMode[Standard Mode<br/>Additive Only]
+    StandardMode --> StandardSet[Use ALL interfaces<br/>from NetBox]
+
+    %% Idempotent Mode Path
+    CheckMode -->|true| IdempotentMode[Idempotent Mode<br/>Full Sync]
+    IdempotentMode --> Analyze[Analyze device state<br/>get_interfaces_needing_changes]
+    Analyze --> Cleanup[Phase 1: Cleanup<br/>cleanup_l2_vlans.yml]
+    Cleanup --> IdempotentSet[Use FILTERED interfaces<br/>needing changes]
+
+    %% Convergence Point
+    StandardSet --> Categorize
+    IdempotentSet --> Categorize
+
+    %% Common Configuration Path
+    Categorize[Categorize Interfaces<br/>categorize_l2_interfaces]
+    Categorize --> Physical[Configure Physical<br/>configure_l2_physical.yml]
+    Physical --> LAG[Configure LAG<br/>configure_l2_lag.yml]
+    LAG --> MCLAG[Configure MCLAG<br/>configure_l2_mclag.yml]
+    MCLAG --> Summary[Configuration Summary]
+    Summary --> End([Complete])
+
+    %% Styling
+    classDef standardClass fill:#e1f5e1,stroke:#4caf50,stroke-width:2px
+    classDef idempotentClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
+    classDef commonClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    classDef decisionClass fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+
+    class StandardMode,StandardSet standardClass
+    class IdempotentMode,Analyze,Cleanup,IdempotentSet idempotentClass
+    class Categorize,Physical,LAG,MCLAG,Summary commonClass
+    class CheckMode decisionClass
 ```
 
 ### Key Functions
