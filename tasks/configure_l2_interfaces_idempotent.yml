@@ -1,53 +1,23 @@
 ---
-# Configure L2 interfaces with full idempotency (removes unwanted VLANs)
+# DEPRECATED: This file is now deprecated
+#
+# L2 interface configuration (both standard and idempotent modes) has been
+# unified into configure_l2_interfaces.yml for better maintainability.
+#
+# This file is kept for backwards compatibility but will be removed in a future version.
+# Please use configure_l2_interfaces.yml directly.
+#
+# Migration: Simply include configure_l2_interfaces.yml instead of this file.
+# The mode (standard vs idempotent) is automatically detected based on the
+# aoscx_idempotent_mode variable.
 
-- name: Analyze interfaces for L2 configuration changes
-  ansible.builtin.set_fact:
-    interfaces_needing_changes: "{{ interfaces | get_interfaces_needing_changes(ansible_facts | default({})) }}"
-  when: interfaces is defined
-
-- name: Debug - Show interfaces analysis
+- name: Deprecated file warning
   ansible.builtin.debug:
     msg:
-      - "Interfaces needing cleanup: {{ interfaces_needing_changes.cleanup | length }}"
-      - "Interfaces needing configuration: {{ interfaces_needing_changes.configure | length }}"
-      - "Total L2 interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
-      - >-
-        Interfaces already correct (skipped):
-        {{ (interfaces | selectattr('mode', 'defined') | list | length) - (interfaces_needing_changes.configure | length) }}
-  when:
-    - interfaces is defined
-    - aoscx_debug | bool or ansible_verbosity >= 1
+      - "⚠️  WARNING: configure_l2_interfaces_idempotent.yml is DEPRECATED"
+      - "This file will be removed in a future version."
+      - "Please update your playbooks to use configure_l2_interfaces.yml"
+      - "The task will continue normally by redirecting to the unified file."
 
-- name: Categorize interfaces that need configuration
-  ansible.builtin.set_fact:
-    l2_interfaces: "{{ interfaces_needing_changes.configure | categorize_l2_interfaces }}"
-
-- name: Debug - Show categorization
-  ansible.builtin.debug:
-    msg:
-      - "Physical access: {{ l2_interfaces.access | length }}"
-      - "Physical tagged with untagged: {{ l2_interfaces.tagged_with_untagged | length }}"
-      - "Physical tagged without untagged: {{ l2_interfaces.tagged_no_untagged | length }}"
-      - "LAG access: {{ l2_interfaces.lag_access | length }}"
-      - "LAG tagged with untagged: {{ l2_interfaces.lag_tagged_with_untagged | length }}"
-      - "LAG tagged without untagged: {{ l2_interfaces.lag_tagged_no_untagged | length }}"
-      - "MCLAG access: {{ l2_interfaces.mclag_access | length }}"
-      - "MCLAG tagged with untagged: {{ l2_interfaces.mclag_tagged_with_untagged | length }}"
-      - "MCLAG tagged without untagged: {{ l2_interfaces.mclag_tagged_no_untagged | length }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
-
-# Phase 1: Cleanup
-- name: Include VLAN cleanup tasks
-  ansible.builtin.include_tasks: cleanup_l2_vlans.yml
-  when: interfaces_needing_changes.cleanup | length > 0
-
-# Phase 2: Configuration
-- name: Include L2 physical interface configuration
-  ansible.builtin.include_tasks: configure_l2_physical.yml
-
-- name: Include L2 LAG interface configuration
-  ansible.builtin.include_tasks: configure_l2_lag.yml
-
-- name: Include L2 MCLAG interface configuration
-  ansible.builtin.include_tasks: configure_l2_mclag.yml
+- name: Redirect to unified L2 interface configuration
+  ansible.builtin.include_tasks: configure_l2_interfaces.yml

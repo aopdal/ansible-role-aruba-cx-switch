@@ -1,0 +1,122 @@
+---
+# Configure L2 interfaces (supports both standard and idempotent modes)
+#
+# This task file handles L2 interface configuration in two modes:
+#
+# 1. Standard mode (aoscx_idempotent_mode=false):
+#    - Only configures interfaces from NetBox
+#    - Does not remove any existing configurations
+#    - Faster, suitable for initial deployment
+#
+# 2. Idempotent mode (aoscx_idempotent_mode=true):
+#    - Analyzes current device state
+#    - Removes configurations not in NetBox
+#    - Ensures device matches NetBox exactly
+#    - Suitable for ongoing configuration management
+
+- name: Set mode description for logging
+  ansible.builtin.set_fact:
+    l2_config_mode: "{{ 'idempotent (full sync)' if (aoscx_idempotent_mode | bool) else 'standard (additive only)' }}"
+
+- name: Display L2 configuration mode
+  ansible.builtin.debug:
+    msg:
+      - "=== L2 Interface Configuration Mode: {{ l2_config_mode }} ==="
+      - "Device: {{ inventory_hostname }}"
+      - "Total interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+# ============================================================================
+# IDEMPOTENT MODE: Analyze differences and cleanup
+# ============================================================================
+- name: Idempotent mode - Analyze interfaces for configuration changes
+  block:
+    - name: Analyze interfaces for L2 configuration changes
+      ansible.builtin.set_fact:
+        interfaces_needing_changes: "{{ interfaces | get_interfaces_needing_changes(ansible_facts | default({})) }}"
+      when: interfaces is defined
+
+    - name: Debug - Show interfaces analysis
+      ansible.builtin.debug:
+        msg:
+          - "Interfaces needing cleanup: {{ interfaces_needing_changes.cleanup | length }}"
+          - "Interfaces needing configuration: {{ interfaces_needing_changes.configure | length }}"
+          - "Total L2 interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
+          - >-
+            Interfaces already correct (skipped):
+            {{ (interfaces | selectattr('mode', 'defined') | list | length) - (interfaces_needing_changes.configure | length) }}
+      when:
+        - interfaces is defined
+        - aoscx_debug | bool or ansible_verbosity >= 1
+
+    - name: Phase 1 - Cleanup unwanted VLAN configurations
+      ansible.builtin.include_tasks: cleanup_l2_vlans.yml
+      when: interfaces_needing_changes.cleanup | length > 0
+
+  when: aoscx_idempotent_mode | bool
+
+# ============================================================================
+# BOTH MODES: Categorize and configure interfaces
+# ============================================================================
+
+# In idempotent mode, use filtered list; in standard mode, use all interfaces
+- name: Set interfaces to configure based on mode
+  ansible.builtin.set_fact:
+    interfaces_to_configure: "{{ interfaces | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes) }}"
+
+- name: Categorize interfaces for L2 configuration
+  ansible.builtin.set_fact:
+    l2_interfaces: "{{ interfaces_to_configure | categorize_l2_interfaces }}"
+
+- name: Debug - Show L2 interface categorization
+  ansible.builtin.debug:
+    msg:
+      - "Physical access: {{ l2_interfaces.access | length }}"
+      - "Physical tagged with untagged: {{ l2_interfaces.tagged_with_untagged | length }}"
+      - "Physical tagged without untagged: {{ l2_interfaces.tagged_no_untagged | length }}"
+      - "LAG access: {{ l2_interfaces.lag_access | length }}"
+      - "LAG tagged with untagged: {{ l2_interfaces.lag_tagged_with_untagged | length }}"
+      - "LAG tagged without untagged: {{ l2_interfaces.lag_tagged_no_untagged | length }}"
+      - "MCLAG access: {{ l2_interfaces.mclag_access | length }}"
+      - "MCLAG tagged with untagged: {{ l2_interfaces.mclag_tagged_with_untagged | length }}"
+      - "MCLAG tagged without untagged: {{ l2_interfaces.mclag_tagged_no_untagged | length }}"
+      - "Total to configure: {{ interfaces_to_configure | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+# ============================================================================
+# Phase 2: Apply L2 configurations
+# ============================================================================
+
+- name: Phase 2 - Configure L2 physical interfaces
+  ansible.builtin.include_tasks: configure_l2_physical.yml
+  when: >-
+    (l2_interfaces.access | length > 0) or
+    (l2_interfaces.tagged_with_untagged | length > 0) or
+    (l2_interfaces.tagged_no_untagged | length > 0)
+
+- name: Phase 2 - Configure L2 LAG interfaces
+  ansible.builtin.include_tasks: configure_l2_lag.yml
+  when: >-
+    (l2_interfaces.lag_access | length > 0) or
+    (l2_interfaces.lag_tagged_with_untagged | length > 0) or
+    (l2_interfaces.lag_tagged_no_untagged | length > 0)
+
+- name: Phase 2 - Configure L2 MCLAG interfaces
+  ansible.builtin.include_tasks: configure_l2_mclag.yml
+  when: >-
+    (l2_interfaces.mclag_access | length > 0) or
+    (l2_interfaces.mclag_tagged_with_untagged | length > 0) or
+    (l2_interfaces.mclag_tagged_no_untagged | length > 0)
+
+# ============================================================================
+# Summary
+# ============================================================================
+
+- name: Configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "=== L2 Interface Configuration Complete ==="
+      - "Mode: {{ l2_config_mode }}"
+      - "Interfaces configured: {{ interfaces_to_configure | length }}"
+      - "{{ 'Interfaces cleaned up: ' + (interfaces_needing_changes.cleanup | length | string) if (aoscx_idempotent_mode | bool) else 'Cleanup skipped (standard mode)' }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1

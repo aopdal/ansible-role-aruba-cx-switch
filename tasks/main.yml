@@ -171,7 +171,7 @@
     - mclag_interfaces
     - lag_assignment
 
-# L2 interfaces (non-idempotent mode - for initial config)
+# L2 interfaces (unified task - supports both standard and idempotent modes)
 - name: Include L2 interface configuration tasks
   ansible.builtin.include_tasks:
     file: configure_l2_interfaces.yml
@@ -180,32 +180,11 @@
         - interfaces
         - l2_interfaces
         - layer2
-  when:
-    - aoscx_configure_l2_interfaces | bool
-    - not (aoscx_idempotent_mode | bool)
+  when: aoscx_configure_l2_interfaces | bool
   tags:
     - interfaces
     - l2_interfaces
     - layer2
-
-# L2 interfaces (idempotent mode - removes unwanted configs)
-- name: Include L2 interface configuration tasks (idempotent)
-  ansible.builtin.include_tasks:
-    file: configure_l2_interfaces_idempotent.yml
-    apply:
-      tags:
-        - interfaces
-        - l2_interfaces
-        - layer2
-        - idempotent
-  when:
-    - aoscx_configure_l2_interfaces | bool
-    - aoscx_idempotent_mode | bool
-  tags:
-    - interfaces
-    - l2_interfaces
-    - layer2
-    - idempotent
 
 - name: Include L3 interface configuration tasks
   ansible.builtin.include_tasks:

@@ -477,12 +477,41 @@ This role supports AOS-CX virtual chassis (VSX):
 
 ## Idempotent Mode
 
-When `aoscx_idempotent_mode: true`:
-- ✅ Removes VLANs not in NetBox (except VLAN 1)
-- ✅ Removes VLAN assignments from interfaces not in NetBox
-- ✅ Cleans up trunk allowed VLANs
+The role supports two configuration modes controlled by the `aoscx_idempotent_mode` variable:
 
-**Warning**: Use with caution in production - this removes configurations!
+### Standard Mode (Default: `aoscx_idempotent_mode: false`)
+- ✅ **Additive configuration** - Only adds/updates configurations from NetBox
+- ✅ **Faster execution** - Skips current state analysis
+- ✅ **Safer for initial deployment** - Won't remove existing configs
+- ✅ **Use case**: Initial device setup, adding new configurations
+
+### Idempotent Mode (`aoscx_idempotent_mode: true`)
+- ✅ **Full synchronization** - Device state matches NetBox exactly
+- ✅ **Removes configurations not in NetBox**:
+  - VLANs not in NetBox (except VLAN 1 - default VLAN)
+  - VLAN assignments from interfaces not in NetBox
+  - Trunk allowed VLANs not matching NetBox
+- ✅ **Intelligent cleanup** - Only removes configs not referenced in NetBox
+- ✅ **Use case**: Ongoing management, drift detection, compliance enforcement
+
+**⚠️ Important Notes:**
+- **Idempotent mode is more thorough** but takes longer as it analyzes current device state
+- **Use caution in production** - Always test idempotent mode in a dev environment first
+- **Unified task file** - Both modes use the same `configure_l2_interfaces.yml` task file
+- The role automatically detects the mode and adjusts behavior accordingly
+
+**Example Configuration:**
+```yaml
+# group_vars/switches.yml
+
+# For initial deployment or adding configs
+aoscx_idempotent_mode: false
+
+# For ongoing management and drift detection
+aoscx_idempotent_mode: true
+```
+
+**Migration Note:** The `configure_l2_interfaces_idempotent.yml` file has been deprecated in favor of a unified approach. Both modes now use `configure_l2_interfaces.yml` which intelligently handles both standard and idempotent operation.
 
 ## Testing
 

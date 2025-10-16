@@ -37,7 +37,7 @@
 - name: configure_banner | Remove banner if not configured
   arubanetworks.aoscx.aoscx_banner:
     banner_type: banner
-    state: absent
+    state: delete
   when:
     - config_context is defined
     - config_context.motd is not defined or config_context.motd | length == 0
