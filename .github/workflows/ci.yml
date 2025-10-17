@@ -101,6 +101,7 @@ jobs:
   molecule:
     name: Molecule
     runs-on: ubuntu-latest
+    needs: [lint, syntax, unit-tests]
     strategy:
       matrix:
         distro:

@@ -13,12 +13,23 @@
     device_id: 1
     ansible_network_os: "arubanetworks.aoscx.aoscx"
 
+    # Mock custom fields
+    custom_fields:
+      device_evpn: false
+      device_vxlan: false
+      device_ospf_1_routerid: "10.0.0.1"
+
     # Test VRFs
     netbox_vrfs:
       - name: "MGMT"
         rd: "65000:100"
         route_targets:
           - "65000:100"
+
+    # Mock VRFs list for filters
+    vrfs:
+      - name: "MGMT"
+        rd: "65000:100"
 
     # Test interfaces
     interfaces:
@@ -30,6 +41,7 @@
           vid: 100
         enabled: true
         ip_addresses: []
+        custom_fields: {}
       - name: "1/1/2"
         type:
           value: "1000base-t"
@@ -39,6 +51,7 @@
           - vid: 200
         enabled: true
         ip_addresses: []
+        custom_fields: {}
 
     # Test VLANs
     vlans:
@@ -48,6 +61,12 @@
       - id: 200
         vid: 200
         name: "VOICE"
+
+    # Mock IP addresses
+    ip_addresses: []
+
+    # Mock config context
+    config_context: {}
 
     # Enable features for testing - all disabled for Molecule testing
     aoscx_gather_facts: false  # Skip fact gathering in tests
