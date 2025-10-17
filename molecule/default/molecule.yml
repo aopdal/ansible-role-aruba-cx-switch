@@ -32,10 +32,6 @@ provisioner:
     host_vars:
       instance:
         ansible_user: root
-        # Mock NetBox data for testing
-        netbox_vrfs: []
-        netbox_vlans: []
-        netbox_interfaces: []
   playbooks:
     prepare: prepare.yml
     converge: converge.yml

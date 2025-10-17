@@ -2,7 +2,7 @@
 # Converge playbook for Molecule testing
 - name: Converge
   hosts: all
-  gather_facts: true
+  gather_facts: false  # Disabled to avoid network fact gathering issues
 
   vars:
     # Mock NetBox connection
@@ -11,7 +11,7 @@
 
     # Mock device data
     device_id: 1
-    ansible_network_os: "arubanetworks.aoscx.aoscx"
+    # ansible_network_os removed to avoid network fact gathering
 
     # Mock custom fields
     custom_fields:
