@@ -126,11 +126,12 @@ jobs:
           ansible-galaxy collection install -r requirements.yml
 
       - name: Run Molecule tests
-        run: molecule test
+        run: molecule test --debug
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'
           MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_VERBOSITY: '3'
 
   integration:
     name: Integration Tests

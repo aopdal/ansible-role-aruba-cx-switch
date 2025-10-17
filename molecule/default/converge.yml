@@ -70,13 +70,24 @@
 
     # Enable features for testing - all disabled for Molecule testing
     aoscx_gather_facts: false  # Skip fact gathering in tests
+    aoscx_generate_ztp_config: false  # No ZTP generation
+    aoscx_configure_banner: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_ntp: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_timezone: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_dns: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_vrfs: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_vlans: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_physical_interfaces: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_lag_interfaces: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_mclag_interfaces: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_l2_interfaces: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_l3_interfaces: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_loopback: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_evpn: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_vxlan: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_ospf: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_bgp: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_vsx: false  # Disabled - no AOS-CX modules in test env
     aoscx_save_config: false
     aoscx_debug: true
 
