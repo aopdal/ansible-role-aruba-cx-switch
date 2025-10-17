@@ -23,12 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful handling when VSX is not enabled
   - Tag-dependent execution (only runs with `--tags vsx`, `--tags ha`, or full run)
 - **Comprehensive unit test suite** - Complete test coverage for all filter plugins
-  - 22 filter functions tested across 6 modules with >90% code coverage
-  - 100+ individual test cases covering normal, edge, and error scenarios
+  - 87 tests passing with 81% code coverage across filter plugins
+  - 22 filter functions tested across 6 modules
   - pytest configuration with coverage reporting (HTML, XML, terminal)
   - Test fixtures for NetBox data (interfaces, VLANs, VRFs, IP addresses, OSPF config)
   - Makefile targets: `make test-unit` and `make test-unit-coverage`
   - Comprehensive test documentation in tests/unit/README.md
+- **CI/CD integration** - Unit tests integrated into GitHub Actions workflow
+  - Automated unit test execution on every push and pull request
+  - Coverage reporting with Codecov integration
+  - Fast feedback on filter plugin functionality
+  - Runs after lint and syntax checks, before integration tests
+  - Status badges in README for CI and code coverage
 - **Enhanced README documentation**:
   - Complete loopback configuration guide with NetBox setup examples
   - Comprehensive VSX configuration documentation with primary/secondary examples

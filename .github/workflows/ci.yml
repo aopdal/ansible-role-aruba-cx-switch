@@ -67,6 +67,37 @@ jobs:
         run: |
           ansible-playbook tests/test.yml -i tests/inventory --syntax-check
 
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [lint, syntax]
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Run unit tests
+        run: |
+          pytest tests/unit/ -v --cov=filter_plugins --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
   molecule:
     name: Molecule
     runs-on: ubuntu-latest
@@ -103,7 +134,7 @@ jobs:
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [lint, syntax]
+    needs: [lint, syntax, unit-tests]
     steps:
       - name: Check out the codebase
         uses: actions/checkout@v4
