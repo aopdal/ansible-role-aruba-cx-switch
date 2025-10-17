@@ -1,0 +1,43 @@
+---
+# Configure loopback interfaces
+#
+# This task file extracts loopback interfaces from the main interfaces list
+# and delegates to configure_l3_loopback.yml for IP address configuration.
+# Loopback interfaces are identified by name pattern (loopback*)
+
+- name: Extract loopback interfaces
+  ansible.builtin.set_fact:
+    loopback_interfaces: "{{ interfaces | selectattr('type.value', 'defined') | selectattr('type.value', 'equalto', 'virtual') | selectattr('name', 'match', '^loopback') | list }}"
+  when: interfaces is defined
+
+- name: Debug - Show loopback interfaces found
+  ansible.builtin.debug:
+    msg:
+      - "Total loopback interfaces found: {{ loopback_interfaces | length }}"
+      - "Loopback names: {{ loopback_interfaces | map(attribute='name') | list }}"
+  when:
+    - loopback_interfaces is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Create loopback interfaces
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: "{{ item.enabled | default(true) }}"
+    description: "{{ item.description | default(omit) }}"
+    state: create
+  loop: "{{ loopback_interfaces }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} Interface: {{ item.name }}"
+  when:
+    - loopback_interfaces is defined
+    - loopback_interfaces | length > 0
+
+- name: Configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "=== Loopback Interface Configuration Complete ==="
+      - "Device: {{ inventory_hostname }}"
+      - "Loopback interfaces created: {{ loopback_interfaces | length }}"
+  when:
+    - loopback_interfaces is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1

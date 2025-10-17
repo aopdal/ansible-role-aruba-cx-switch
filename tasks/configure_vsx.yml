@@ -1,0 +1,73 @@
+---
+# Configure VSX (Virtual Switching Extension)
+#
+# VSX configuration for Aruba AOS-CX switches enables active-active redundancy
+# Requirements:
+# - Device custom field: device_vsx_enabled (boolean)
+# - Config context VSX settings:
+#   - vsx_system_mac: VSX system MAC address
+#   - vsx_role: primary or secondary
+#   - vsx_isl_ports: List of ISL (Inter-Switch Link) ports
+#   - vsx_keepalive_peer: IP address of VSX peer keepalive
+#   - vsx_keepalive_src: Source IP for keepalive
+#   - vsx_keepalive_vrf: VRF for keepalive (default: mgmt)
+
+- name: Check if VSX is enabled for this device
+  ansible.builtin.set_fact:
+    vsx_enabled: "{{ custom_fields.device_vsx | default(false) | bool }}"
+
+- name: Display VSX configuration status
+  ansible.builtin.debug:
+    msg:
+      - "=== VSX Configuration ==="
+      - "Device: {{ inventory_hostname }}"
+      - "VSX Enabled: {{ vsx_enabled }}"
+      - "VSX Role: {{ config_context.vsx_role | default('not set') }}"
+      - "VSX System MAC: {{ config_context.vsx_system_mac | default('not set') }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Configure VSX
+  when:
+    - vsx_enabled | bool
+    - config_context.vsx_system_mac is defined
+    - config_context.vsx_role is defined
+  block:
+    - name: Configure VSX system MAC and role
+      arubanetworks.aoscx.aoscx_config:
+        lines:
+          - vsx-sync vsx-global
+        match: line
+      vars:
+        ansible_connection: "{{ aoscx_connection_type }}"
+
+    - name: Configure VSX parameters
+      arubanetworks.aoscx.aoscx_config:
+        lines:
+          - system-mac {{ config_context.vsx_system_mac }}
+          - inter-switch-link lag {{ config_context.vsx_isl_lag | default('isl') }}
+          - role {{ config_context.vsx_role }}
+          - "{% if config_context.vsx_keepalive_peer is defined %}keepalive peer {{ config_context.vsx_keepalive_peer }} source {{ config_context.vsx_keepalive_src | default('mgmt') }} vrf {{ config_context.vsx_keepalive_vrf | default('mgmt') }}{% endif %}"
+        parents: vsx
+        match: line
+      vars:
+        ansible_connection: "{{ aoscx_connection_type }}"
+
+    - name: Display VSX configuration summary
+      ansible.builtin.debug:
+        msg:
+          - "=== VSX Configuration Complete ==="
+          - "Device: {{ inventory_hostname }}"
+          - "System MAC: {{ config_context.vsx_system_mac }}"
+          - "Role: {{ config_context.vsx_role }}"
+          - "ISL LAG: {{ config_context.vsx_isl_lag | default('isl') }}"
+          - "Keepalive Peer: {{ config_context.vsx_keepalive_peer | default('not configured') }}"
+      when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Skip VSX configuration
+  ansible.builtin.debug:
+    msg:
+      - "VSX configuration skipped for {{ inventory_hostname }}"
+      - "Reason: {{ 'VSX not enabled' if not vsx_enabled else 'Missing required configuration' }}"
+  when:
+    - not vsx_enabled or config_context.vsx_system_mac is not defined or config_context.vsx_role is not defined
+    - aoscx_debug | bool or ansible_verbosity >= 1

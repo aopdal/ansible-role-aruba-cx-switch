@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Loopback interface configuration** - Complete implementation of `configure_loopback.yml` task file
+  - Automatic detection of loopback interfaces by type and name pattern
+  - IPv4 and IPv6 support with VRF attachment
+  - Dual-stack configuration support
+  - Proper interface creation before IP assignment
+  - Comprehensive debug output and logging
+- **VSX (Virtual Switching Extension) configuration** - Complete implementation of `configure_vsx.yml` task file
+  - System MAC and role configuration (primary/secondary)
+  - Inter-Switch Link (ISL) LAG setup
+  - Keepalive configuration with custom VRF support
+  - VSX-sync global configuration
+  - Validation of required parameters
+  - Graceful handling when VSX is not enabled
+  - Tag-dependent execution (only runs with `--tags vsx`, `--tags ha`, or full run)
+- **Comprehensive unit test suite** - Complete test coverage for all filter plugins
+  - 22 filter functions tested across 6 modules with >90% code coverage
+  - 100+ individual test cases covering normal, edge, and error scenarios
+  - pytest configuration with coverage reporting (HTML, XML, terminal)
+  - Test fixtures for NetBox data (interfaces, VLANs, VRFs, IP addresses, OSPF config)
+  - Makefile targets: `make test-unit` and `make test-unit-coverage`
+  - Comprehensive test documentation in tests/unit/README.md
+- **Enhanced README documentation**:
+  - Complete loopback configuration guide with NetBox setup examples
+  - Comprehensive VSX configuration documentation with primary/secondary examples
+  - NetBox config context requirements and complete configuration examples
+  - VSX deployment notes and best practices
+  - Unit testing section with examples and coverage details
+
 ### Changed
 - **Unified L2 interface configuration** - Merged `configure_l2_interfaces.yml` and `configure_l2_interfaces_idempotent.yml` into a single unified task file that handles both standard and idempotent modes automatically
 - `configure_l2_interfaces.yml` now intelligently detects `aoscx_idempotent_mode` and adjusts behavior accordingly
@@ -16,13 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 - `configure_l2_interfaces_idempotent.yml` - Now redirects to unified `configure_l2_interfaces.yml`. Will be removed in v2.0.0
 
-### Added
-- New documentation: `docs/L2_INTERFACE_MODES.md` - Comprehensive guide to L2 configuration modes
-- Mode detection and logging in L2 interface configuration
-- Debug output showing which mode is active (standard vs idempotent)
-- Configuration summary at end of L2 interface tasks
-
 ### Fixed
+- **Empty task files resolved** - Implemented missing functionality:
+  - `configure_loopback.yml` - Was empty, now fully functional
+  - `configure_vsx.yml` - Was empty, now fully functional
 - Banner configuration module parameters (use `banner_exec` instead of `exec`, `delete` instead of `absent`)
 - Line length violations in EVPN configuration tasks
 

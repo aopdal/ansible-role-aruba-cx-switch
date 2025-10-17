@@ -76,8 +76,8 @@ If you don't have Docker, you can use a traditional virtual environment setup. S
 
 ```yaml
 collections:
-  - arubanetworks.aoscx >= 4.0.0
-  - netbox.netbox >= 3.0.0
+  - arubanetworks.aoscx >= 4.4.0
+  - netbox.netbox >= 3.21.0
 ```
 
 Install with:
@@ -130,9 +130,9 @@ roles:
 
 collections:
   - name: arubanetworks.aoscx
-    version: ">=4.0.0"
+    version: ">=4.4.0"
   - name: netbox.netbox
-    version: ">=3.0.0"
+    version: ">=3.21.0"
 ```
 
 Install with:
@@ -436,21 +436,54 @@ ansible-playbook site.yml -e aoscx_save_config=false
 
 ## Tags
 
-- `always` - Always runs (fact gathering)
+### Always-Running Tags
+- `always` - Always runs (fact gathering, save config)
 - `facts`, `gather` - Fact gathering
-- `vrfs` - VRF configuration
-- `vlans` - VLAN configuration
-- `physical_interfaces` - Physical interface configuration (enable/disable)
-- `l2_interfaces` - L2 interface configuration
-- `l3_interfaces` - L3 interface configuration
-- `loopback` - Loopback interface configuration
+
+### Configuration Tags
+- `ztp`, `config_generation` - ZTP configuration generation
+- `banner`, `base_config`, `system` - Banner configuration
+- `timezone`, `base_config`, `system` - Timezone configuration
+- `ntp`, `base_config`, `system` - NTP configuration
+- `dns`, `base_config`, `system` - DNS configuration
+- `vrfs`, `layer3`, `routing` - VRF configuration
+- `vlans`, `layer2` - VLAN configuration
+- `interfaces`, `physical_interfaces`, `layer1` - Physical interface configuration
+- `interfaces`, `lag_interfaces`, `layer2` - LAG interface configuration
+- `interfaces`, `mclag_interfaces`, `vsx` - MCLAG interface configuration (VSX)
+- `interfaces`, `lag_interfaces`, `mclag_interfaces`, `lag_assignment` - LAG member assignment
+- `interfaces`, `l2_interfaces`, `layer2` - L2 interface configuration (access/trunk)
+- `interfaces`, `l3_interfaces`, `layer3` - L3 interface configuration (IP addresses)
+- `loopback`, `layer3` - Loopback interface configuration
+- `evpn`, `overlay` - EVPN configuration
+- `vxlan`, `overlay` - VXLAN configuration
+- `evpn`, `overlay`, `cleanup`, `idempotent` - EVPN cleanup (idempotent mode only)
+- `vxlan`, `overlay`, `cleanup`, `idempotent` - VXLAN cleanup (idempotent mode only)
+- `vlans`, `layer2`, `cleanup`, `idempotent` - VLAN cleanup (idempotent mode only)
+- `ospf`, `routing`, `layer3` - OSPF configuration (tag-dependent)
+- `bgp`, `routing`, `layer3` - BGP configuration (tag-dependent)
+- `vsx`, `ha` - VSX configuration (tag-dependent)
+- `save`, `config` - Save configuration
+
+### Aggregate Tags
+- `base_config` - All base system configuration (banner, timezone, NTP, DNS)
 - `layer1` - Physical interface configuration
-- `layer2` - All L2 configuration (VLANs + L2 interfaces)
-- `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks)
-- `ospf` - OSPF configuration
-- `routing` - Routing protocol configuration
-- `idempotent` - Cleanup tasks (requires `aoscx_idempotent_mode: true`)
-- `save` - Save configuration
+- `layer2` - All L2 configuration (VLANs + L2 interfaces + LAG)
+- `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks + routing)
+- `interfaces` - All interface configuration (physical, LAG, MCLAG, L2, L3)
+- `routing` - All routing protocol configuration (OSPF, BGP)
+- `overlay` - All overlay configuration (EVPN, VXLAN)
+- `cleanup` - All cleanup tasks (idempotent mode only)
+- `idempotent` - All idempotent cleanup tasks
+- `system` - All system configuration (banner, timezone, NTP, DNS)
+- `vsx` - VSX/MCLAG configuration
+- `ha` - High availability configuration (VSX)
+
+### Tag-Dependent Tasks
+Some tasks only run when explicitly requested with specific tags:
+- **OSPF** - Requires `--tags ospf`, `--tags routing`, or no tags (full run)
+- **BGP** - Requires `--tags bgp`, `--tags routing`, or no tags (full run)
+- **VSX** - Requires `--tags vsx`, `--tags ha`, or no tags (full run)
 
 ## VRF Handling
 
@@ -477,12 +510,45 @@ This role supports AOS-CX virtual chassis (VSX):
 
 ## Idempotent Mode
 
-When `aoscx_idempotent_mode: true`:
-- ✅ Removes VLANs not in NetBox (except VLAN 1)
-- ✅ Removes VLAN assignments from interfaces not in NetBox
-- ✅ Cleans up trunk allowed VLANs
+The role supports two configuration modes controlled by the `aoscx_idempotent_mode` variable:
 
-**Warning**: Use with caution in production - this removes configurations!
+### Standard Mode (Default: `aoscx_idempotent_mode: false`)
+- ✅ **Additive configuration** - Only adds/updates configurations from NetBox
+- ✅ **Faster execution** - Skips current state analysis
+- ✅ **Safer for initial deployment** - Won't remove existing configs
+- ✅ **Use case**: Initial device setup, adding new configurations
+
+### Idempotent Mode (`aoscx_idempotent_mode: true`)
+- ✅ **Full synchronization** - Device state matches NetBox exactly
+- ✅ **Removes configurations not in NetBox**:
+  - VLANs not in NetBox (except VLAN 1 - default VLAN)
+  - VLAN assignments from interfaces not in NetBox
+  - Trunk allowed VLANs not matching NetBox
+  - EVPN configuration for VLANs being removed
+  - VXLAN VNI and VLAN-to-VNI mappings for VLANs being removed
+- ✅ **Intelligent cleanup** - Only removes configs not referenced in NetBox
+- ✅ **Proper cleanup order** - EVPN → VXLAN → VLAN (prevents orphaned configurations)
+- ✅ **Use case**: Ongoing management, drift detection, compliance enforcement
+
+**⚠️ Important Notes:**
+- **Idempotent mode is more thorough** but takes longer as it analyzes current device state
+- **Use caution in production** - Always test idempotent mode in a dev environment first
+- **Unified task file** - Both modes use the same `configure_l2_interfaces.yml` task file
+- The role automatically detects the mode and adjusts behavior accordingly
+
+**Example Configuration:**
+```yaml
+# group_vars/switches.yml
+
+# For initial deployment or adding configs
+aoscx_idempotent_mode: false
+
+# For ongoing management and drift detection
+aoscx_idempotent_mode: true
+```
+
+**Migration Note:** The `configure_l2_interfaces_idempotent.yml` file has been deprecated in favor of a unified
+approach. Both modes now use `configure_l2_interfaces.yml` which intelligently handles both standard and idempotent operation.
 
 ## Testing
 

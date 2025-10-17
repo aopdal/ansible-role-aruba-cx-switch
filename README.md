@@ -13,9 +13,11 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as 
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support, ip mtu, and l3-counters
 - ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
-- ✅ **Loopback Interfaces** - With VRF support
+- ✅ **Loopback Interfaces** - Automatic detection, IPv4/IPv6, with VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
-- ✅ **Virtual Chassis Support** - Works with VSX/stacked switches
+- ✅ **VSX Configuration** - Active-active redundancy with system MAC, ISL, and keepalive
+- ✅ **BGP/EVPN Configuration** - Hybrid support for NetBox BGP plugin and config context
+- ✅ **VXLAN Configuration** - Overlay networks with VNI mapping and cleanup
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
 - ✅ **ZTP Configuration Generation** - Creates base configs for Zero Touch Provisioning
@@ -76,8 +78,8 @@ If you don't have Docker, you can use a traditional virtual environment setup. S
 
 ```yaml
 collections:
-  - arubanetworks.aoscx >= 4.0.0
-  - netbox.netbox >= 3.0.0
+  - arubanetworks.aoscx >= 4.4.0
+  - netbox.netbox >= 3.21.0
 ```
 
 Install with:
@@ -130,9 +132,9 @@ roles:
 
 collections:
   - name: arubanetworks.aoscx
-    version: ">=4.0.0"
+    version: ">=4.4.0"
   - name: netbox.netbox
-    version: ">=3.0.0"
+    version: ">=3.21.0"
 ```
 
 Install with:
@@ -363,6 +365,177 @@ if_ip_ospf_1_area: "0.0.0.0"
 if_ip_ospf_network: "point-to-point"
 ```
 
+### Loopback Configuration
+
+Loopback interfaces are automatically detected from NetBox and configured with IP addresses and VRF assignments.
+
+#### Requirements
+
+- Interface type: `virtual`
+- Interface name pattern: `loopback*` (e.g., `loopback0`, `loopback1`)
+- IP addresses assigned to the interface in NetBox
+- Optional: VRF assignment for custom routing tables
+
+#### NetBox Configuration
+
+**Interface Setup:**
+```yaml
+# Interface properties in NetBox
+name: loopback0
+type: virtual
+enabled: true
+description: "Router ID and BGP peering"
+```
+
+**IP Address Assignment:**
+```yaml
+# Assign IP addresses to loopback interface
+address: 10.255.255.1/32
+vrf: default  # or custom VRF name
+```
+
+#### Example Configuration
+
+**Single Loopback (Default VRF):**
+```yaml
+# In NetBox, create:
+# - Interface: loopback0, type=virtual, enabled=true
+# - IP Address: 10.255.255.1/32, assigned to loopback0
+```
+
+Generated configuration:
+```bash
+interface loopback0
+  ip address 10.255.255.1/32
+```
+
+**Multiple Loopbacks with Custom VRFs:**
+```yaml
+# Loopback 0 (default VRF) - Router ID
+# - Interface: loopback0
+# - IP: 10.255.255.1/32, vrf=default
+
+# Loopback 1 (custom VRF) - Customer A
+# - Interface: loopback1
+# - IP: 192.168.1.1/32, vrf=customer_a
+```
+
+Generated configuration:
+```bash
+interface loopback0
+  ip address 10.255.255.1/32
+
+interface loopback1
+  vrf attach customer_a
+  ip address 192.168.1.1/32
+```
+
+#### Features
+
+- ✅ Automatic detection of loopback interfaces by type and name
+- ✅ IPv4 and IPv6 support
+- ✅ VRF attachment for custom routing tables
+- ✅ Dual-stack configuration
+- ✅ Proper ordering (interface creation before IP assignment)
+
+### VSX Configuration
+
+VSX (Virtual Switching Extension) provides active-active redundancy for Aruba AOS-CX switches. This role configures VSX pairs with proper system MAC, role assignment, ISL, and keepalive settings.
+
+#### Requirements
+
+VSX configuration requires custom fields and config context in NetBox.
+
+#### Device Custom Field
+
+```yaml
+# Required custom field on devices
+device_vsx: true  # Enable VSX on this device
+```
+
+#### Device Config Context
+
+```yaml
+# VSX configuration parameters
+vsx_system_mac: "02:00:00:00:01:00"  # Shared system MAC for VSX pair
+vsx_role: "primary"                   # Role: primary or secondary
+vsx_isl_lag: "isl"                    # ISL LAG interface name
+vsx_keepalive_peer: "192.168.1.2"     # IP address of VSX peer
+vsx_keepalive_src: "192.168.1.1"      # Source IP for keepalive
+vsx_keepalive_vrf: "mgmt"             # VRF for keepalive (default: mgmt)
+```
+
+#### Complete Example
+
+**Primary Switch Configuration:**
+
+Device custom field:
+```yaml
+device_vsx: true
+```
+
+Device config context:
+```yaml
+vsx_system_mac: "02:00:00:00:01:00"
+vsx_role: "primary"
+vsx_isl_lag: "isl"
+vsx_keepalive_peer: "192.168.100.2"
+vsx_keepalive_src: "192.168.100.1"
+vsx_keepalive_vrf: "mgmt"
+```
+
+Generated configuration:
+```bash
+vsx-sync vsx-global
+vsx
+  system-mac 02:00:00:00:01:00
+  inter-switch-link lag isl
+  role primary
+  keepalive peer 192.168.100.2 source 192.168.100.1 vrf mgmt
+```
+
+**Secondary Switch Configuration:**
+
+Device custom field:
+```yaml
+device_vsx: true
+```
+
+Device config context:
+```yaml
+vsx_system_mac: "02:00:00:00:01:00"  # Same MAC as primary
+vsx_role: "secondary"                 # Different role
+vsx_isl_lag: "isl"
+vsx_keepalive_peer: "192.168.100.1"  # Peer is primary
+vsx_keepalive_src: "192.168.100.2"   # This switch's IP
+vsx_keepalive_vrf: "mgmt"
+```
+
+#### VSX Deployment Notes
+
+1. **System MAC**: Must be identical on both VSX peers
+2. **Roles**: One switch must be `primary`, the other `secondary`
+3. **Keepalive**: Peer IPs should be reachable (typically over management network)
+4. **ISL**: Configure ISL LAG interfaces separately with `mclag_interfaces` configuration
+5. **MCLAG**: Multi-Chassis LAG interfaces require VSX to be configured first
+
+#### Tag-Dependent Execution
+
+VSX configuration only runs when explicitly requested:
+- `ansible-playbook site.yml --tags vsx`
+- `ansible-playbook site.yml --tags ha`
+- `ansible-playbook site.yml` (full run without tags)
+
+#### Features
+
+- ✅ System MAC and role configuration
+- ✅ Inter-Switch Link (ISL) LAG setup
+- ✅ Keepalive configuration with custom VRF support
+- ✅ VSX-sync global configuration
+- ✅ Validation of required parameters
+- ✅ Comprehensive debug output
+- ✅ Graceful handling when VSX is not enabled
+
 ## Dependencies
 
 None.
@@ -436,21 +609,54 @@ ansible-playbook site.yml -e aoscx_save_config=false
 
 ## Tags
 
-- `always` - Always runs (fact gathering)
+### Always-Running Tags
+- `always` - Always runs (fact gathering, save config)
 - `facts`, `gather` - Fact gathering
-- `vrfs` - VRF configuration
-- `vlans` - VLAN configuration
-- `physical_interfaces` - Physical interface configuration (enable/disable)
-- `l2_interfaces` - L2 interface configuration
-- `l3_interfaces` - L3 interface configuration
-- `loopback` - Loopback interface configuration
+
+### Configuration Tags
+- `ztp`, `config_generation` - ZTP configuration generation
+- `banner`, `base_config`, `system` - Banner configuration
+- `timezone`, `base_config`, `system` - Timezone configuration
+- `ntp`, `base_config`, `system` - NTP configuration
+- `dns`, `base_config`, `system` - DNS configuration
+- `vrfs`, `layer3`, `routing` - VRF configuration
+- `vlans`, `layer2` - VLAN configuration
+- `interfaces`, `physical_interfaces`, `layer1` - Physical interface configuration
+- `interfaces`, `lag_interfaces`, `layer2` - LAG interface configuration
+- `interfaces`, `mclag_interfaces`, `vsx` - MCLAG interface configuration (VSX)
+- `interfaces`, `lag_interfaces`, `mclag_interfaces`, `lag_assignment` - LAG member assignment
+- `interfaces`, `l2_interfaces`, `layer2` - L2 interface configuration (access/trunk)
+- `interfaces`, `l3_interfaces`, `layer3` - L3 interface configuration (IP addresses)
+- `loopback`, `layer3` - Loopback interface configuration
+- `evpn`, `overlay` - EVPN configuration
+- `vxlan`, `overlay` - VXLAN configuration
+- `evpn`, `overlay`, `cleanup`, `idempotent` - EVPN cleanup (idempotent mode only)
+- `vxlan`, `overlay`, `cleanup`, `idempotent` - VXLAN cleanup (idempotent mode only)
+- `vlans`, `layer2`, `cleanup`, `idempotent` - VLAN cleanup (idempotent mode only)
+- `ospf`, `routing`, `layer3` - OSPF configuration (tag-dependent)
+- `bgp`, `routing`, `layer3` - BGP configuration (tag-dependent)
+- `vsx`, `ha` - VSX configuration (tag-dependent)
+- `save`, `config` - Save configuration
+
+### Aggregate Tags
+- `base_config` - All base system configuration (banner, timezone, NTP, DNS)
 - `layer1` - Physical interface configuration
-- `layer2` - All L2 configuration (VLANs + L2 interfaces)
-- `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks)
-- `ospf` - OSPF configuration
-- `routing` - Routing protocol configuration
-- `idempotent` - Cleanup tasks (requires `aoscx_idempotent_mode: true`)
-- `save` - Save configuration
+- `layer2` - All L2 configuration (VLANs + L2 interfaces + LAG)
+- `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks + routing)
+- `interfaces` - All interface configuration (physical, LAG, MCLAG, L2, L3)
+- `routing` - All routing protocol configuration (OSPF, BGP)
+- `overlay` - All overlay configuration (EVPN, VXLAN)
+- `cleanup` - All cleanup tasks (idempotent mode only)
+- `idempotent` - All idempotent cleanup tasks
+- `system` - All system configuration (banner, timezone, NTP, DNS)
+- `vsx` - VSX/MCLAG configuration
+- `ha` - High availability configuration (VSX)
+
+### Tag-Dependent Tasks
+Some tasks only run when explicitly requested with specific tags:
+- **OSPF** - Requires `--tags ospf`, `--tags routing`, or no tags (full run)
+- **BGP** - Requires `--tags bgp`, `--tags routing`, or no tags (full run)
+- **VSX** - Requires `--tags vsx`, `--tags ha`, or no tags (full run)
 
 ## VRF Handling
 
@@ -491,7 +697,10 @@ The role supports two configuration modes controlled by the `aoscx_idempotent_mo
   - VLANs not in NetBox (except VLAN 1 - default VLAN)
   - VLAN assignments from interfaces not in NetBox
   - Trunk allowed VLANs not matching NetBox
+  - EVPN configuration for VLANs being removed
+  - VXLAN VNI and VLAN-to-VNI mappings for VLANs being removed
 - ✅ **Intelligent cleanup** - Only removes configs not referenced in NetBox
+- ✅ **Proper cleanup order** - EVPN → VXLAN → VLAN (prevents orphaned configurations)
 - ✅ **Use case**: Ongoing management, drift detection, compliance enforcement
 
 **⚠️ Important Notes:**
@@ -511,13 +720,43 @@ aoscx_idempotent_mode: false
 aoscx_idempotent_mode: true
 ```
 
-**Migration Note:** The `configure_l2_interfaces_idempotent.yml` file has been deprecated in favor of a unified approach. Both modes now use `configure_l2_interfaces.yml` which intelligently handles both standard and idempotent operation.
+**Migration Note:** The `configure_l2_interfaces_idempotent.yml` file has been deprecated in favor of a unified
+approach. Both modes now use `configure_l2_interfaces.yml` which intelligently handles both standard and idempotent operation.
 
 ## Testing
 
+This role includes comprehensive testing at multiple levels: unit tests for filter plugins, integration tests with NetBox data, and molecule tests for role execution.
+
+### Unit Tests
+
+**22 filter functions** across **6 modules** are covered by comprehensive unit tests with **>90% code coverage**:
+
+```bash
+# Run all unit tests
+make test-unit
+
+# Run with coverage report
+make test-unit-coverage
+
+# Run specific test file
+pytest tests/unit/test_vlan_filters.py -v
+```
+
+**Test Coverage:**
+- ✅ **VLAN filters** (7 functions) - Extract, filter, and manage VLANs
+- ✅ **VRF filters** (4 functions) - Extract and filter VRFs
+- ✅ **Interface filters** (3 functions) - Categorize L2/L3 interfaces
+- ✅ **Comparison functions** (3 functions) - Compare and detect configuration changes
+- ✅ **OSPF filters** (4 functions) - OSPF configuration management
+- ✅ **Utility functions** (1 function) - VLAN range collapsing
+
+See **[tests/unit/README.md](tests/unit/README.md)** for detailed testing documentation.
+
+### Integration Tests
+
 This role includes comprehensive integration testing documentation and scripts for testing with real/virtual Aruba AOS-CX switches.
 
-### Testing Documentation
+#### Testing Documentation
 
 - **[Testing Environment](docs/TESTING_ENVIRONMENT.md)** - Complete testing setup guide
 - **[Quick Start](docs/TESTING_QUICK_START.md)** - 30-minute quick start to first test
