@@ -76,69 +76,74 @@ The EVPN and VXLAN configuration has two modes of operation controlled by `aoscx
 
 ## Configuration Flow (Both Modes)
 
-```
-┌─────────────────────────────────────────┐
-│ NetBox: VLANs with L2VPN Terminations   │
-└──────────────────┬──────────────────────┘
-                   ↓
-┌─────────────────────────────────────────┐
-│ Filter: VLANs in use on interfaces      │
-│ (via get_vlans_in_use filter plugin)   │
-└──────────────────┬──────────────────────┘
-                   ↓
-┌─────────────────────────────────────────┐
-│ configure_evpn.yml                      │
-│ - Configure EVPN for filtered VLANs    │
-│ - Auto RD and route-targets             │
-└──────────────────┬──────────────────────┘
-                   ↓
-┌─────────────────────────────────────────┐
-│ configure_vxlan.yml                     │
-│ - Create VNIs under interface vxlan 1   │
-│ - Map VLANs to VNIs                     │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    NetBox[NetBox: VLANs with L2VPN Terminations]
+    Filter[Filter: VLANs in use on interfaces<br/>via get_vlans_in_use filter plugin]
+    EVPN[configure_evpn.yml<br/>• Configure EVPN for filtered VLANs<br/>• Auto RD and route-targets]
+    VXLAN[configure_vxlan.yml<br/>• Create VNIs under interface vxlan 1<br/>• Map VLANs to VNIs]
+    Complete([Configuration Complete])
+
+    NetBox --> Filter
+    Filter --> EVPN
+    EVPN --> VXLAN
+    VXLAN --> Complete
+
+    %% Styling
+    classDef netboxClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
+    classDef filterClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    classDef configClass fill:#e1f5e1,stroke:#4caf50,stroke-width:2px
+
+    class NetBox netboxClass
+    class Filter filterClass
+    class EVPN,VXLAN configClass
 ```
 
 ## Cleanup Flow (Idempotent Mode Only)
 
-```
-┌─────────────────────────────────────────┐
-│ After interface cleanup:                │
-│ Recalculate VLANs in use                │
-└──────────────────┬──────────────────────┘
-                   ↓
-┌─────────────────────────────────────────┐
-│ Determine VLANs to delete               │
-│ (NetBox VLANs - VLANs in use)           │
-└──────────────────┬──────────────────────┘
-                   ↓
-         ┌─────────┴─────────┐
-         ↓                   ↓
-┌────────────────┐  ┌────────────────┐
-│ idempotent     │  │ NOT idempotent │
-│ mode: true     │  │ mode: false    │
-└────────┬───────┘  └────────┬───────┘
-         ↓                   ↓
-         ↓              ❌ SKIP ALL
-         ↓                 CLEANUP
-         ↓
-┌─────────────────────────────────────────┐
-│ cleanup_evpn.yml                        │
-│ - Remove EVPN config for deleted VLANs  │
-│ - Filter: vlans_to_delete with L2VPN    │
-└──────────────────┬──────────────────────┘
-                   ↓
-┌─────────────────────────────────────────┐
-│ cleanup_vxlan.yml                       │
-│ - Step 1: Remove VLAN from VNI         │
-│ - Step 2: Remove VNI from VXLAN iface  │
-│ - Filter: vlans_to_delete with L2VPN    │
-└──────────────────┬──────────────────────┘
-                   ↓
-┌─────────────────────────────────────────┐
-│ cleanup_vlans.yml                       │
-│ - Delete VLANs not in use               │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Start[After interface cleanup:<br/>Recalculate VLANs in use]
+    Determine[Determine VLANs to delete<br/>NetBox VLANs - VLANs in use]
+    CheckMode{Check Mode:<br/>aoscx_idempotent_mode}
+
+    %% Idempotent Mode Path
+    IdempotentTrue[Idempotent Mode: true]
+    CleanupEVPN[cleanup_evpn.yml<br/>• Remove EVPN config for deleted VLANs<br/>• Filter: vlans_to_delete with L2VPN]
+    CleanupVXLAN[cleanup_vxlan.yml<br/>• Step 1: Remove VLAN from VNI<br/>• Step 2: Remove VNI from VXLAN iface<br/>• Filter: vlans_to_delete with L2VPN]
+    CleanupVLANs[cleanup_vlans.yml<br/>• Delete VLANs not in use]
+
+    %% Non-Idempotent Mode Path
+    IdempotentFalse[Idempotent Mode: false]
+    SkipCleanup[❌ SKIP ALL CLEANUP]
+
+    %% Flow
+    Start --> Determine
+    Determine --> CheckMode
+
+    CheckMode -->|true| IdempotentTrue
+    IdempotentTrue --> CleanupEVPN
+    CleanupEVPN --> CleanupVXLAN
+    CleanupVXLAN --> CleanupVLANs
+    CleanupVLANs --> Complete([Cleanup Complete])
+
+    CheckMode -->|false| IdempotentFalse
+    IdempotentFalse --> SkipCleanup
+    SkipCleanup --> End([No Cleanup Performed])
+
+    %% Styling
+    classDef startClass fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    classDef cleanupClass fill:#ffebee,stroke:#f44336,stroke-width:2px
+    classDef skipClass fill:#fbe9e7,stroke:#ff5722,stroke-width:2px
+    classDef decisionClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
+    classDef activeClass fill:#e1f5e1,stroke:#4caf50,stroke-width:2px
+
+    class Start,Determine startClass
+    class CleanupEVPN,CleanupVXLAN,CleanupVLANs cleanupClass
+    class SkipCleanup skipClass
+    class CheckMode decisionClass
+    class IdempotentTrue activeClass
+    class IdempotentFalse skipClass
 ```
 
 ## Example Scenarios

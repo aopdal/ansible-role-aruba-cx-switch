@@ -94,36 +94,29 @@ Complete guide showing:
 
 ## Complete Cleanup Flow
 
-```
-┌──────────────────────────────────────┐
-│ Check: aoscx_idempotent_mode?        │
-└────────────┬─────────────────────────┘
-             │
-       ┌─────┴─────┐
-       ↓           ↓
-    false        true
-       ↓           ↓
-   ❌ SKIP    ✅ CONTINUE
-    cleanup      to cleanup
-       │           │
-       │           ↓
-       │      ┌─────────────────────────┐
-       │      │ cleanup_evpn.yml         │
-       │      │ Remove EVPN config       │
-       │      └────────┬─────────────────┘
-       │               ↓
-       │      ┌─────────────────────────┐
-       │      │ cleanup_vxlan.yml        │
-       │      │ Remove VNI and mappings  │
-       │      └────────┬─────────────────┘
-       │               ↓
-       │      ┌─────────────────────────┐
-       │      │ cleanup_vlans.yml        │
-       │      │ Delete VLANs             │
-       │      └─────────────────────────┘
-       │
-       └─────────────────────────────────→
-                  END
+```mermaid
+flowchart TD
+    Start([Check: aoscx_idempotent_mode?])
+    Start --> Decision{Mode?}
+
+    Decision -->|false| Skip[❌ SKIP cleanup]
+    Decision -->|true| Continue[✅ CONTINUE to cleanup]
+
+    Continue --> EVPN[cleanup_evpn.yml<br/>Remove EVPN config]
+    EVPN --> VXLAN[cleanup_vxlan.yml<br/>Remove VNI and mappings]
+    VXLAN --> VLAN[cleanup_vlans.yml<br/>Delete VLANs]
+
+    Skip --> End([END])
+    VLAN --> End
+
+    style Start fill:#f9f,stroke:#333,stroke-width:2px
+    style Decision fill:#bbf,stroke:#333,stroke-width:2px
+    style Skip fill:#faa,stroke:#333,stroke-width:2px
+    style Continue fill:#afa,stroke:#333,stroke-width:2px
+    style EVPN fill:#ffd,stroke:#333,stroke-width:2px
+    style VXLAN fill:#ffd,stroke:#333,stroke-width:2px
+    style VLAN fill:#ffd,stroke:#333,stroke-width:2px
+    style End fill:#ddd,stroke:#333,stroke-width:2px
 ```
 
 ## Example Playbook Usage

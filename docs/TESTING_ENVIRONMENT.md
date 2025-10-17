@@ -10,28 +10,48 @@ This document describes the comprehensive testing environment for the `ansible-r
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Test Controller                          │
-│  ┌────────────┐  ┌──────────────┐  ┌─────────────────────────┐ │
-│  │  Ansible   │  │   NetBox     │  │  Test Scripts          │ │
-│  │  Playbooks │──│   API        │──│  (validate configs)    │ │
-│  └────────────┘  └──────────────┘  └─────────────────────────┘ │
-│         │                                      │                 │
-└─────────┼──────────────────────────────────────┼─────────────────┘
-          │                                      │
-          │ SSH/HTTPS                            │ Validation
-          │                                      │
-┌─────────▼──────────────────────────────────────▼─────────────────┐
-│                         EVE-NG Lab                                │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │
-│  │ CX Switch│────│ CX Switch│────│ CX Switch│────│ CX Switch│  │
-│  │  Spine1  │    │  Spine2  │    │  Leaf1   │    │  Leaf2   │  │
-│  └──────────┘    └──────────┘    └──────────┘    └──────────┘  │
-│       │               │                │               │         │
-│       └───────────────┴────────────────┴───────────────┘         │
-│                    Management Network                             │
-└───────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Controller["Test Controller"]
+        Ansible["<b>Ansible</b><br/>Playbooks"]
+        NetBox["<b>NetBox</b><br/>API"]
+        Tests["<b>Test Scripts</b><br/>validate configs"]
+
+        Ansible -->|uses| NetBox
+        NetBox -->|provides data| Tests
+    end
+
+    subgraph Lab["EVE-NG Lab"]
+        Spine1["<b>CX Switch</b><br/>Spine1"]
+        Spine2["<b>CX Switch</b><br/>Spine2"]
+        Leaf1["<b>CX Switch</b><br/>Leaf1"]
+        Leaf2["<b>CX Switch</b><br/>Leaf2"]
+        MgmtNet["<b>Management Network</b>"]
+
+        Spine1 --- MgmtNet
+        Spine2 --- MgmtNet
+        Leaf1 --- MgmtNet
+        Leaf2 --- MgmtNet
+
+        Spine1 ---|data| Leaf1
+        Spine1 ---|data| Leaf2
+        Spine2 ---|data| Leaf1
+        Spine2 ---|data| Leaf2
+    end
+
+    Ansible -->|SSH/HTTPS| MgmtNet
+    Tests -->|Validation| MgmtNet
+
+    style Controller fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style Lab fill:#f3e5f5,stroke:#6a1b9a,stroke-width:3px
+    style Ansible fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style NetBox fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Tests fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    style Spine1 fill:#e1bee7,stroke:#6a1b9a,stroke-width:2px
+    style Spine2 fill:#e1bee7,stroke:#6a1b9a,stroke-width:2px
+    style Leaf1 fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style Leaf2 fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style MgmtNet fill:#fff3e0,stroke:#e65100,stroke-width:2px
 ```
 
 ## Components

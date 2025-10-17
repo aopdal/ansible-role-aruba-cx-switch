@@ -52,22 +52,28 @@ aoscx_no_log: false                 # Hide sensitive data in logs
 
 ### 1. Automatic Source Selection
 
-```
-Device Configuration Request
-         ↓
-   Query netbox-bgp plugin
-         ↓
-    ┌────┴────┐
-    │         │
- Plugin    No Plugin
-Available  Available
-    │         │
-    ↓         ↓
-Has Sessions? → config_context
-    │
-   Yes
-    ↓
-Use Plugin Data
+```mermaid
+flowchart TD
+    Start([Device Configuration Request])
+    Query[Query netbox-bgp plugin API]
+    CheckPlugin{Plugin<br/>Available?}
+    CheckSessions{Has<br/>Sessions?}
+    UsePlugin[✅ Use Plugin Data]
+    UseContext[📄 Use config_context]
+
+    Start --> Query
+    Query --> CheckPlugin
+    CheckPlugin -->|200 OK| CheckSessions
+    CheckPlugin -->|404 Not Found| UseContext
+    CheckSessions -->|Yes| UsePlugin
+    CheckSessions -->|No| UseContext
+
+    style Start fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Query fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style CheckPlugin fill:#bbdefb,stroke:#1976d2,stroke-width:2px
+    style CheckSessions fill:#bbdefb,stroke:#1976d2,stroke-width:2px
+    style UsePlugin fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style UseContext fill:#ffccbc,stroke:#d84315,stroke-width:2px
 ```
 
 ### 2. Side-by-Side Operation

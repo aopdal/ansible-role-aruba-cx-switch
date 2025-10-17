@@ -122,29 +122,35 @@ interface vxlan 1
 
 ## Cleanup Flow
 
-```
-┌─────────────────────────────────────────────────┐
-│  VLANs determined for deletion                  │
-│  (not in use on interfaces)                     │
-└────────────────┬────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────────────────┐
-│  EVPN Cleanup (cleanup_evpn.yml)                │
-│  - Filter VLANs with L2VPN terminations         │
-│  - Remove: no vlan X under evpn                 │
-└────────────────┬────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────────────────┐
-│  VXLAN Cleanup (cleanup_vxlan.yml)              │
-│  - Filter VLANs with L2VPN terminations         │
-│  - Step 1: no vlan X under vni Y                │
-│  - Step 2: no vni Y under interface vxlan 1     │
-└────────────────┬────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────────────────┐
-│  VLAN Cleanup (cleanup_vlans.yml)               │
-│  - Delete VLANs using aoscx_vlan state: delete  │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Start[VLANs determined for deletion<br/>not in use on interfaces]
+
+    EVPN[cleanup_evpn.yml<br/>• Filter VLANs with L2VPN terminations<br/>• Remove: no vlan X under evpn]
+
+    VXLAN[cleanup_vxlan.yml<br/>• Filter VLANs with L2VPN terminations<br/>• Step 1: no vlan X under vni Y<br/>• Step 2: no vni Y under interface vxlan 1]
+
+    VLAN[cleanup_vlans.yml<br/>• Delete VLANs using aoscx_vlan state: delete]
+
+    Complete([Cleanup Complete])
+
+    Start --> EVPN
+    EVPN --> VXLAN
+    VXLAN --> VLAN
+    VLAN --> Complete
+
+    %% Styling
+    classDef startClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    classDef evpnClass fill:#ffebee,stroke:#f44336,stroke-width:2px
+    classDef vxlanClass fill:#fce4ec,stroke:#e91e63,stroke-width:2px
+    classDef vlanClass fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    classDef completeClass fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+
+    class Start startClass
+    class EVPN evpnClass
+    class VXLAN vxlanClass
+    class VLAN vlanClass
+    class Complete completeClass
 ```
 
 ## Usage

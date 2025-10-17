@@ -250,26 +250,50 @@ ansible -i inventory/hosts.yml leaf1 -m arubanetworks.aoscx.aoscx_command \
 
 ## Recommended Topology
 
-```
-                    Management Network (192.168.1.0/24)
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-   ┌────▼────┐           ┌────▼────┐          ┌────▼────┐
-   │  Spine1 │───────────│  Spine2 │          │ NetBox  │
-   │  .11    │           │  .12    │          │  .10    │
-   └────┬────┘           └────┬────┘          └─────────┘
-        │                     │
-        ├──────────┬──────────┤
-        │          │          │
-   ┌────▼────┐    │     ┌────▼────┐
-   │  Leaf1  │────┴─────│  Leaf2  │
-   │  .21    │          │  .22    │
-   └─────────┘          └─────────┘
+```mermaid
+flowchart TB
+    %% Top layer - Management
+    MgmtNet["<b>Management Network</b><br/>192.168.1.0/24"]
+    NetBox["<b>NetBox Server</b><br/>192.168.1.10"]
 
-Links: 1/1/1-1/1/4 between devices
-Management: via mgmt interface
+    %% Middle layer - Spines
+    Spine1["<b>Spine1</b><br/>192.168.1.11"]
+    Spine2["<b>Spine2</b><br/>192.168.1.12"]
+
+    %% Bottom layer - Leafs
+    Leaf1["<b>Leaf1</b><br/>192.168.1.21"]
+    Leaf2["<b>Leaf2</b><br/>192.168.1.22"]
+
+    %% Management network to NetBox
+    MgmtNet ---|mgmt| NetBox
+
+    %% Management network to Spines
+    MgmtNet --> Spine1
+    MgmtNet --> Spine2
+
+    %% Management network to Leafs
+    MgmtNet --> Leaf1
+    MgmtNet --> Leaf2
+
+    %% Data plane: Spine to Leaf connections
+    Spine1 ---|1/1/3| Leaf1
+    Spine1 ---|1/1/4| Leaf2
+    Spine2 ---|1/1/3| Leaf1
+    Spine2 ---|1/1/4| Leaf2
+
+    style MgmtNet fill:#fff3e0,stroke:#e65100,stroke-width:3px
+    style NetBox fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style Spine1 fill:#e1bee7,stroke:#6a1b9a,stroke-width:3px
+    style Spine2 fill:#e1bee7,stroke:#6a1b9a,stroke-width:3px
+    style Leaf1 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style Leaf2 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
 ```
+
+**Data Plane Links:**
+- Spine1 ↔ Leaf1/Leaf2 (ports 1/1/3, 1/1/4)
+- Spine2 ↔ Leaf1/Leaf2 (ports 1/1/3, 1/1/4)
+
+**Management:** All devices connect via mgmt interface to 192.168.1.0/24
 
 ## Resources
 

@@ -317,25 +317,41 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
 
 ## Typical EVPN/VXLAN Fabric Architecture
 
-```
-                    ┌─────────────┐     ┌─────────────┐
-                    │   Spine 1   │─────│   Spine 2   │
-                    │   (RR)      │     │   (RR)      │
-                    │ 10.255.255.1│     │ 10.255.255.2│
-                    └──────┬──────┘     └──────┬──────┘
-                           │                   │
-              ┌────────────┴────────┬──────────┴─────────┐
-              │                     │                     │
-         ┌────┴─────┐         ┌────┴─────┐         ┌────┴─────┐
-         │  Leaf 1  │         │  Leaf 2  │         │  Leaf 3  │
-         │  (VTEP)  │         │  (VTEP)  │         │  (VTEP)  │
-         │10.255.255│         │10.255.255│         │10.255.255│
-         │    .11   │         │    .12   │         │    .13   │
-         └──────────┘         └──────────┘         └──────────┘
-              │                     │                     │
-         ┌────┴─────┐         ┌────┴─────┐         ┌────┴─────┐
-         │ Servers  │         │ Servers  │         │ Servers  │
-         └──────────┘         └──────────┘         └──────────┘
+```mermaid
+flowchart TB
+    Spine1["<b>Spine 1 (RR)</b><br/>10.255.255.1"]
+    Spine2["<b>Spine 2 (RR)</b><br/>10.255.255.2"]
+
+    Leaf1["<b>Leaf 1 (VTEP)</b><br/>10.255.255.11"]
+    Leaf2["<b>Leaf 2 (VTEP)</b><br/>10.255.255.12"]
+    Leaf3["<b>Leaf 3 (VTEP)</b><br/>10.255.255.13"]
+
+    Servers1["Servers"]
+    Servers2["Servers"]
+    Servers3["Servers"]
+
+    %% Spine to Leaf connections
+    Spine1 ---|BGP EVPN| Leaf1
+    Spine1 ---|BGP EVPN| Leaf2
+    Spine1 ---|BGP EVPN| Leaf3
+
+    Spine2 ---|BGP EVPN| Leaf1
+    Spine2 ---|BGP EVPN| Leaf2
+    Spine2 ---|BGP EVPN| Leaf3
+
+    %% Leaf to Server connections
+    Leaf1 --- Servers1
+    Leaf2 --- Servers2
+    Leaf3 --- Servers3
+
+    style Spine1 fill:#e1bee7,stroke:#6a1b9a,stroke-width:3px
+    style Spine2 fill:#e1bee7,stroke:#6a1b9a,stroke-width:3px
+    style Leaf1 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style Leaf2 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style Leaf3 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style Servers1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Servers2 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Servers3 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
 ```
 
 ### BGP Configuration Roles:

@@ -13,23 +13,37 @@ This hybrid approach allows smooth migration while supporting both methods side-
 
 ### Data Source Selection (Automatic)
 
-```
-┌─────────────────────────────────────────────────────┐
-│ Step 1: Query netbox-bgp plugin API                │
-│   GET /api/plugins/bgp/session/                    │
-└──────────────────┬──────────────────────────────────┘
-                   │
-                   ├─ 200 OK (plugin available)
-                   │    │
-                   │    ├─ Has sessions for device?
-                   │    │    │
-                   │    │    ├─ YES → Use plugin data ✓
-                   │    │    │
-                   │    │    └─ NO → Use config_context
-                   │
-                   └─ 404 Not Found (plugin not installed)
-                        │
-                        └─ Use config_context (fallback)
+```mermaid
+flowchart TD
+    Start([BGP Configuration Start])
+    Start --> Query[Query netbox-bgp Plugin API<br/>GET /api/plugins/bgp/session/]
+
+    Query --> CheckResponse{API Response?}
+
+    %% Plugin Available Path
+    CheckResponse -->|200 OK<br/>Plugin Available| CheckSessions{Has BGP Sessions<br/>for Device?}
+    CheckSessions -->|YES| UsePlugin[✅ Use Plugin Data<br/>netbox-bgp plugin]
+    CheckSessions -->|NO| UseContext1[Use config_context<br/>Fallback]
+
+    %% Plugin Not Available Path
+    CheckResponse -->|404 Not Found<br/>Plugin Not Installed| UseContext2[Use config_context<br/>Fallback]
+
+    %% End States
+    UsePlugin --> ConfigBGP[Configure BGP on Device]
+    UseContext1 --> ConfigBGP
+    UseContext2 --> ConfigBGP
+    ConfigBGP --> End([Complete])
+
+    %% Styling
+    classDef pluginClass fill:#e1f5e1,stroke:#4caf50,stroke-width:2px
+    classDef fallbackClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    classDef decisionClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
+    classDef configClass fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+
+    class UsePlugin pluginClass
+    class UseContext1,UseContext2 fallbackClass
+    class CheckResponse,CheckSessions decisionClass
+    class ConfigBGP configClass
 ```
 
 ### Configuration Priority

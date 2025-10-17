@@ -4,15 +4,34 @@
 
 ### Fabric Topology
 
-```
-        Spine-1            Spine-2
-     10.255.255.1      10.255.255.2
-          │  │              │  │
-     ┌────┘  └────┬────────┘  └─────┐
-     │            │                 │
-   Leaf-1      Leaf-2           Leaf-3      Leaf-4
-  10.255.      10.255.          10.255.     10.255.
-  255.11       255.12           255.13      255.14
+```mermaid
+flowchart TB
+    Spine1["<b>Spine-1</b><br/>10.255.255.1"]
+    Spine2["<b>Spine-2</b><br/>10.255.255.2"]
+
+    Leaf1["<b>Leaf-1</b><br/>10.255.255.11"]
+    Leaf2["<b>Leaf-2</b><br/>10.255.255.12"]
+    Leaf3["<b>Leaf-3</b><br/>10.255.255.13"]
+    Leaf4["<b>Leaf-4</b><br/>10.255.255.14"]
+
+    %% Spine-1 to all leafs
+    Spine1 ---|BGP EVPN| Leaf1
+    Spine1 ---|BGP EVPN| Leaf2
+    Spine1 ---|BGP EVPN| Leaf3
+    Spine1 ---|BGP EVPN| Leaf4
+
+    %% Spine-2 to all leafs
+    Spine2 ---|BGP EVPN| Leaf1
+    Spine2 ---|BGP EVPN| Leaf2
+    Spine2 ---|BGP EVPN| Leaf3
+    Spine2 ---|BGP EVPN| Leaf4
+
+    style Spine1 fill:#e1bee7,stroke:#6a1b9a,stroke-width:3px
+    style Spine2 fill:#e1bee7,stroke:#6a1b9a,stroke-width:3px
+    style Leaf1 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style Leaf2 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style Leaf3 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style Leaf4 fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
 ```
 
 ### IP Addressing Scheme

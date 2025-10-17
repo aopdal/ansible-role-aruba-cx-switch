@@ -269,27 +269,24 @@ aoscx_configure_vxlan: true
 
 ## Configuration Flow
 
-```
-┌─────────────────────────────────────────────────┐
-│ 1. Get VLANs from NetBox (configure_vlans.yml) │
-└──────────────────┬──────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────┐
-│ 2. Configure Interfaces (uses VLANs)           │
-└──────────────────┬──────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────┐
-│ 3. Determine VLANs in Use (from interfaces)    │
-└──────────────────┬──────────────────────────────┘
-                   │
-        ┌──────────┴──────────┐
-        │                     │
-┌───────▼────────┐   ┌────────▼───────┐
-│ 4a. EVPN       │   │ 4b. VXLAN      │
-│ Configure EVPN │   │ Create VNI     │
-│ for VLANs with │   │ Map VLAN to VNI│
-│ L2VPN          │   │                │
-└────────────────┘   └────────────────┘
+```mermaid
+flowchart TD
+    Step1[1. Get VLANs from NetBox<br/>configure_vlans.yml]
+    Step2[2. Configure Interfaces<br/>uses VLANs]
+    Step3[3. Determine VLANs in Use<br/>from interfaces]
+    Step4a[4a. EVPN<br/>• Configure EVPN<br/>• for VLANs with<br/>• L2VPN]
+    Step4b[4b. VXLAN<br/>• Create VNI<br/>• Map VLAN to VNI]
+
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Step4a
+    Step3 --> Step4b
+
+    style Step1 fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Step2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Step3 fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Step4a fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style Step4b fill:#fce4ec,stroke:#c2185b,stroke-width:2px
 ```
 
 ## Verification
