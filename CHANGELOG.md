@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Unit testing section with examples and coverage details
 
 ### Changed
+- **Updated Ansible version requirements** - Updated CI and requirements to match actual usage
+  - CI now tests with Ansible 2.16, 2.17, and 2.18 (previously 2.14, 2.15, 2.16)
+  - `requirements-test.txt` updated to `ansible-core>=2.16,<2.19`
+  - CI now uses Python 3.12 (previously 3.11) to match development environment
 - **Unified L2 interface configuration** - Merged `configure_l2_interfaces.yml` and `configure_l2_interfaces_idempotent.yml` into a single unified task file that handles both standard and idempotent modes automatically
 - `configure_l2_interfaces.yml` now intelligently detects `aoscx_idempotent_mode` and adjusts behavior accordingly
 - Simplified `tasks/main.yml` by removing duplicate L2 interface task includes
@@ -55,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Empty task files resolved** - Implemented missing functionality:
   - `configure_loopback.yml` - Was empty, now fully functional
   - `configure_vsx.yml` - Was empty, now fully functional
+- **pytest-ansible conflict** - Removed `pytest-ansible` from `requirements-test.txt` as it conflicts with pytest's argument parser and is not needed for filter plugin unit tests
 - Banner configuration module parameters (use `banner_exec` instead of `exec`, `delete` instead of `absent`)
 - Line length violations in EVPN configuration tasks
 
