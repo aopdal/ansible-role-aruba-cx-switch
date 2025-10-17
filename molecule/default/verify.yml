@@ -5,6 +5,28 @@
   gather_facts: true
 
   vars:
+    # Disable ALL configuration to only load filter plugins
+    aoscx_gather_facts: false
+    aoscx_generate_ztp_config: false
+    aoscx_configure_banner: false
+    aoscx_configure_ntp: false
+    aoscx_configure_timezone: false
+    aoscx_configure_dns: false
+    aoscx_configure_vrfs: false
+    aoscx_configure_vlans: false
+    aoscx_configure_physical_interfaces: false
+    aoscx_configure_lag_interfaces: false
+    aoscx_configure_mclag_interfaces: false
+    aoscx_configure_l2_interfaces: false
+    aoscx_configure_l3_interfaces: false
+    aoscx_configure_loopback: false
+    aoscx_configure_evpn: false
+    aoscx_configure_vxlan: false
+    aoscx_configure_ospf: false
+    aoscx_configure_bgp: false
+    aoscx_configure_vsx: false
+    aoscx_save_config: false
+
     # Test data for filter plugins
     test_interfaces:
       - name: "1/1/1"
@@ -44,12 +66,14 @@
         name: "VOICE"
 
     test_vrfs:
-      - name: "MGMT"
+      - name: "CUSTOMER_A"
         rd: "65000:100"
+      - name: "MGMT"
+        rd: "65000:200"
       - name: "default"
         rd: null
 
-  tasks:
+  pre_tasks:
     - name: "Verify instance is running"
       ansible.builtin.debug:
         msg: "Instance {{ ansible_hostname }} is running and responding"
@@ -63,24 +87,29 @@
       ansible.builtin.debug:
         msg: "Python version: {{ python_version.stdout }}"
 
-    # Test VLAN filters
+  roles:
+    # Include the role to make filter plugins available
+    # All configuration is disabled in converge.yml, so this won't actually configure anything
+    - role: aopdal.aruba_cx_switch
+
+  tasks:
     - name: "Test extract_vlan_ids filter"
       ansible.builtin.set_fact:
-        vlan_ids_result: "{{ test_interfaces | aopdal.aruba_cx_switch.extract_vlan_ids }}"
+        vlan_ids_result: "{{ test_interfaces | extract_vlan_ids }}"
 
     - name: "Verify extract_vlan_ids result"
       ansible.builtin.assert:
         that:
           - vlan_ids_result is defined
-          - vlan_ids_result.vids is defined
-          - 100 in vlan_ids_result.vids
-          - 200 in vlan_ids_result.vids
+          - vlan_ids_result is iterable
+          - 100 in vlan_ids_result
+          - 200 in vlan_ids_result
         success_msg: "✅ extract_vlan_ids filter works correctly"
         fail_msg: "❌ extract_vlan_ids filter failed"
 
     - name: "Test filter_vlans_in_use filter"
       ansible.builtin.set_fact:
-        vlans_in_use: "{{ test_vlans | aopdal.aruba_cx_switch.filter_vlans_in_use(test_interfaces) }}"
+        vlans_in_use: "{{ test_vlans | filter_vlans_in_use(test_interfaces) }}"
 
     - name: "Verify filter_vlans_in_use result"
       ansible.builtin.assert:
@@ -93,7 +122,7 @@
     # Test VRF filters
     - name: "Test extract_interface_vrfs filter"
       ansible.builtin.set_fact:
-        interface_vrfs: "{{ test_interfaces | aopdal.aruba_cx_switch.extract_interface_vrfs }}"
+        interface_vrfs: "{{ test_interfaces | extract_interface_vrfs }}"
 
     - name: "Verify extract_interface_vrfs result"
       ansible.builtin.assert:
@@ -105,35 +134,35 @@
 
     - name: "Test filter_configurable_vrfs filter"
       ansible.builtin.set_fact:
-        configurable_vrfs: "{{ test_vrfs | aopdal.aruba_cx_switch.filter_configurable_vrfs }}"
+        configurable_vrfs: "{{ test_vrfs | filter_configurable_vrfs }}"
 
     - name: "Verify filter_configurable_vrfs result"
       ansible.builtin.assert:
         that:
           - configurable_vrfs is defined
           - configurable_vrfs | length == 1
-          - configurable_vrfs[0].name == 'MGMT'
+          - configurable_vrfs[0].name == 'CUSTOMER_A'
         success_msg: "✅ filter_configurable_vrfs filter works correctly"
         fail_msg: "❌ filter_configurable_vrfs filter failed"
 
     # Test interface filters
     - name: "Test categorize_l2_interfaces filter"
       ansible.builtin.set_fact:
-        l2_categorized: "{{ test_interfaces | aopdal.aruba_cx_switch.categorize_l2_interfaces }}"
+        l2_categorized: "{{ test_interfaces | categorize_l2_interfaces }}"
 
     - name: "Verify categorize_l2_interfaces result"
       ansible.builtin.assert:
         that:
           - l2_categorized is defined
-          - l2_categorized.physical is defined
-          - l2_categorized.lag is defined
-          - l2_categorized.mclag is defined
+          - l2_categorized.access is defined
+          - l2_categorized.tagged_with_untagged is defined
+          - l2_categorized.tagged_no_untagged is defined
         success_msg: "✅ categorize_l2_interfaces filter works correctly"
         fail_msg: "❌ categorize_l2_interfaces filter failed"
 
     - name: "Test categorize_l3_interfaces filter"
       ansible.builtin.set_fact:
-        l3_categorized: "{{ test_interfaces | aopdal.aruba_cx_switch.categorize_l3_interfaces }}"
+        l3_categorized: "{{ test_interfaces | categorize_l3_interfaces }}"
 
     - name: "Verify categorize_l3_interfaces result"
       ansible.builtin.assert:
@@ -152,7 +181,7 @@
     - name: "Test collapse_vlan_list filter"
       ansible.builtin.set_fact:
         vlan_list_test: [1, 2, 3, 5, 7, 8, 9, 10, 15, 20, 21, 22]
-        collapsed_vlans: "{{ [1, 2, 3, 5, 7, 8, 9, 10, 15, 20, 21, 22] | aopdal.aruba_cx_switch.collapse_vlan_list }}"
+        collapsed_vlans: "{{ [1, 2, 3, 5, 7, 8, 9, 10, 15, 20, 21, 22] | collapse_vlan_list }}"
 
     - name: "Verify collapse_vlan_list result"
       ansible.builtin.assert:
