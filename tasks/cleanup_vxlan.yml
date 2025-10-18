@@ -61,8 +61,6 @@
       - "no vni {{ item.l2vpn_termination.l2vpn.identifier }}"
     parents:
       - "interface vxlan 1"
-    match: exact
-    save_when: changed
   loop: "{{ vlans_to_remove_from_vxlan }}"
   loop_control:
     label: "VNI {{ item.l2vpn_termination.l2vpn.identifier }}"
