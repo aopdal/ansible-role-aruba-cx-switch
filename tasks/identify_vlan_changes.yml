@@ -31,8 +31,8 @@
 - name: Debug - Show VLAN changes identified
   ansible.builtin.debug:
     msg:
-      - "VLANs to add: {{ vlan_changes.vlans_to_add }}"
-      - "VLANs to update: {{ vlan_changes.vlans_to_update }}"
+#      - "VLANs to add: {{ vlan_changes.vlans_to_add }}"
+#      - "VLANs to update: {{ vlan_changes.vlans_to_update }}"
       - "VLANs to delete: {{ vlan_changes.vlans_to_delete }}"
       - "VLANs in use (cannot delete): {{ vlans_in_use }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1

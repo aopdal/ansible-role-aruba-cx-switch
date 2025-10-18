@@ -37,14 +37,14 @@
       - "no vlan {{ item.vid }}"
     parents:
       - "evpn"
-    match: exact
-    save_when: changed
   loop: "{{ vlans_to_remove_from_evpn }}"
   loop_control:
     label: "VLAN {{ item.vid }}"
   when:
     - vlans_to_remove_from_evpn is defined
     - vlans_to_remove_from_evpn | length > 0
+  vars:
+    ansible_connection: network_cli
   register: evpn_cleanup_result
 
 - name: Display EVPN cleanup results

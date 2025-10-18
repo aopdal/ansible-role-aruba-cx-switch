@@ -1,6 +1,9 @@
 ---
 # Default variables for aruba_cx_switch role
 
+# REST API version to use
+ansible_aoscx_rest_version: 10.09
+
 # Enable/disable fact gathering
 aoscx_gather_facts: true
 
