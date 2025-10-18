@@ -3,21 +3,23 @@
 # ========================
 # Remove EVPN configuration for VLANs that are being deleted
 # This must happen BEFORE VLAN deletion to avoid orphaned EVPN configs
-# Order: cleanup_evpn.yml → cleanup_vxlan.yml → cleanup_vlans.yml
+# Order: identify_vlan_changes.yml → cleanup_evpn.yml → cleanup_vxlan.yml → cleanup_vlans.yml
+#
+# Uses the vlan_changes fact calculated in identify_vlan_changes.yml
 
 - name: Determine VLANs to remove from EVPN
   ansible.builtin.set_fact:
     vlans_to_remove_from_evpn: >-
       {{
         vlans | default([])
-        | selectattr('vid', 'in', vlan_changes_after.vlans_to_delete)
+        | selectattr('vid', 'in', vlan_changes.vlans_to_delete)
         | selectattr('l2vpn_termination.id', 'defined')
         | list
       }}
   when:
-    - vlan_changes_after is defined
-    - vlan_changes_after.vlans_to_delete is defined
-    - vlan_changes_after.vlans_to_delete | length > 0
+    - vlan_changes is defined
+    - vlan_changes.vlans_to_delete is defined
+    - vlan_changes.vlans_to_delete | length > 0
 
 - name: Display VLANs to remove from EVPN
   ansible.builtin.debug:

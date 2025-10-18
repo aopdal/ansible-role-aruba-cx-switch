@@ -1,42 +1,33 @@
 ---
-# Cleanup VLANs after interfaces have been cleaned up (DELETE only)
+# Cleanup VLANs (DELETE only)
 #
-# This task file runs AFTER all interface cleanup tasks to ensure:
-# 1. VLANs are removed from trunk interfaces
-# 2. Access ports using VLANs are reconfigured
-# 3. VLAN interfaces (SVIs) are removed
-# 4. EVPN/VXLAN configurations using VLANs are cleaned up
+# This task file runs AFTER:
+# 1. identify_vlan_changes.yml (to know what to delete)
+# 2. cleanup_evpn.yml (to remove EVPN configuration first)
+# 3. cleanup_vxlan.yml (to remove VXLAN/VNI mappings second)
+# 4. All interface cleanup tasks (to ensure VLANs aren't in use)
 #
 # Only then is it safe to delete the VLAN from the switch.
 # This includes orphaned VLANs that exist on the switch but not in NetBox.
-
-- name: Re-gather facts after interface cleanup
-  arubanetworks.aoscx.aoscx_facts:
-    gather_network_resources:
-      - vlans
-  register: device_facts_after_cleanup
-
-- name: Re-calculate VLANs in use
-  ansible.builtin.set_fact:
-    vlans_in_use_after: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
-
-- name: Re-determine VLAN changes needed
-  ansible.builtin.set_fact:
-    vlan_changes_after: "{{ vlans | get_vlans_needing_changes(vlans_in_use_after, ansible_facts | default({})) }}"
+#
+# Uses the vlan_changes fact calculated in identify_vlan_changes.yml
 
 - name: Debug - Show VLANs to delete
   ansible.builtin.debug:
     msg:
-      - "VLANs to delete after cleanup: {{ vlan_changes_after.vlans_to_delete }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
+      - "VLANs to delete: {{ vlan_changes.vlans_to_delete }}"
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 1
+    - vlan_changes is defined
 
-- name: Delete unused VLANs (after interface cleanup)
+- name: Delete unused VLANs
   arubanetworks.aoscx.aoscx_vlan:
     vlan_id: "{{ item }}"
     state: delete
-  loop: "{{ vlan_changes_after.vlans_to_delete }}"
+  loop: "{{ vlan_changes.vlans_to_delete }}"
   loop_control:
     label: "VLAN {{ item }}"
   when:
-    - vlan_changes_after.vlans_to_delete | length > 0
+    - vlan_changes is defined
+    - vlan_changes.vlans_to_delete | length > 0
     - item != 1  # Never delete VLAN 1

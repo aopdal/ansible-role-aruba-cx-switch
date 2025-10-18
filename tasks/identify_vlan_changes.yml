@@ -1,0 +1,38 @@
+---
+# Identify VLAN changes (additions and deletions)
+#
+# This task file determines which VLANs need to be added or removed based on:
+# - VLANs defined in NetBox (desired state)
+# - VLANs currently in use by interfaces (can't be deleted)
+# - VLANs currently on the device (actual state)
+#
+# CRITICAL: This must run BEFORE any cleanup operations (EVPN, VXLAN, VLAN)
+# to ensure we know what needs to be removed before we start removing it.
+#
+# The vlan_changes fact is used by:
+# - cleanup_evpn.yml - to remove EVPN configuration for deleted VLANs
+# - cleanup_vxlan.yml - to remove VXLAN/VNI mappings for deleted VLANs
+# - cleanup_vlans.yml - to delete the VLANs themselves
+
+- name: Gather VLAN facts for change identification
+  arubanetworks.aoscx.aoscx_facts:
+    gather_network_resources:
+      - vlans
+  register: device_facts_for_vlan_changes
+
+- name: Calculate VLANs currently in use by interfaces
+  ansible.builtin.set_fact:
+    vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
+
+- name: Determine VLAN changes needed
+  ansible.builtin.set_fact:
+    vlan_changes: "{{ vlans | get_vlans_needing_changes(vlans_in_use, ansible_facts | default({})) }}"
+
+- name: Debug - Show VLAN changes identified
+  ansible.builtin.debug:
+    msg:
+      - "VLANs to add: {{ vlan_changes.vlans_to_add }}"
+      - "VLANs to update: {{ vlan_changes.vlans_to_update }}"
+      - "VLANs to delete: {{ vlan_changes.vlans_to_delete }}"
+      - "VLANs in use (cannot delete): {{ vlans_in_use }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
