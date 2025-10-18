@@ -18,6 +18,8 @@ This project uses multiple requirements files for different purposes. This docum
 **Purpose:** Python libraries required for the role to function in production.
 
 **Contains:**
+
+- `ansible` >= 11.0.0, < 12.0.0 - Ansible automation platform (Ansible 11.x required; arubanetworks.aoscx collection is not compatible with Ansible 12)
 - `pyaoscx` - Aruba AOS-CX Python SDK (required by arubanetworks.aoscx collection)
 - `pynetbox` - NetBox API client (required by netbox.netbox collection)
 - `paramiko` - SSH library (required by arubanetworks.aoscx collection)
@@ -43,8 +45,9 @@ pip install -r requirements.txt
 **Purpose:** Ansible collections that this role depends on.
 
 **Contains:**
-- `arubanetworks.aoscx` >= 4.0.0 - Aruba AOS-CX modules
-- `netbox.netbox` >= 3.0.0 - NetBox inventory and modules
+
+- `arubanetworks.aoscx` >= 4.4.0 - Aruba AOS-CX modules
+- `netbox.netbox` >= 3.21.0 - NetBox inventory and modules
 
 **Install:**
 ```bash
@@ -63,6 +66,7 @@ ansible-galaxy collection install -r requirements.yml
 **Purpose:** Development, testing, and quality assurance tools.
 
 **Contains:**
+
 - `pytest` - Unit testing framework
 - `pytest-cov` - Test coverage reporting
 - `pytest-mock` - Mocking for tests
@@ -79,6 +83,7 @@ pip install -r requirements-test.txt
 ```
 
 **Required for:**
+
 - Role development
 - Running tests (pytest, molecule)
 - Code quality checks (ansible-lint, yamllint)
@@ -86,6 +91,7 @@ pip install -r requirements-test.txt
 - Pre-commit hooks
 
 **NOT required for:**
+
 - Using the role in production
 - Simple playbook execution
 
@@ -96,6 +102,7 @@ pip install -r requirements-test.txt
 **Purpose:** Documentation generation tools.
 
 **Contains:**
+
 - `mkdocs` - Static site generator
 - `mkdocs-material` - Material theme for MkDocs
 - `mkdocs-git-revision-date-localized-plugin` - Git-based date display
@@ -107,11 +114,13 @@ pip install -r requirements-docs.txt
 ```
 
 **Required for:**
+
 - Building documentation site (`mkdocs build`)
 - Serving documentation locally (`mkdocs serve`)
 - Documentation development
 
 **NOT required for:**
+
 - Using the role
 - Running tests
 - Reading documentation (Markdown files work without MkDocs)

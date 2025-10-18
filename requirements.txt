@@ -1,6 +1,10 @@
 # Python requirements for aopdal.aruba_cx_switch Ansible role
 # Install with: pip install -r requirements.txt
 
+# Ansible (required to run the role)
+# Using Ansible 11.x as arubanetworks.aoscx collection is not compatible with Ansible 12
+ansible>=11.0.0,<12.0.0
+
 # Required by arubanetworks.aoscx collection
 paramiko>=2.7.0
 requests>=2.25.0
