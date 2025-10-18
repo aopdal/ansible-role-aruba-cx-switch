@@ -16,7 +16,7 @@ if _filter_dir not in sys.path:
 # These imports must come after sys.path manipulation above
 # pylint: disable=wrong-import-position
 # flake8: noqa: E402
-from netbox_filters_lib.utils import collapse_vlan_list
+from netbox_filters_lib.utils import collapse_vlan_list, select_interfaces_to_configure
 from netbox_filters_lib.vlan_filters import (
     extract_vlan_ids,
     filter_vlans_in_use,
@@ -57,6 +57,7 @@ class FilterModule:
         """Return dict of all available filters"""
         return {
             "collapse_vlan_list": collapse_vlan_list,
+            "select_interfaces_to_configure": select_interfaces_to_configure,
             "extract_vlan_ids": extract_vlan_ids,
             "filter_vlans_in_use": filter_vlans_in_use,
             "extract_evpn_vlans": extract_evpn_vlans,

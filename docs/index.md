@@ -1,6 +1,8 @@
 # Ansible Role: Aruba AOS-CX Switch
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/aopdal/ansible-role-aruba-cx-switch/workflows/CI/badge.svg)](https://github.com/aopdal/ansible-role-aruba-cx-switch/actions)
+[![codecov](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch/branch/main/graph/badge.svg)](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch)
 [![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/aopdal/aruba_cx_switch)
 
 Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as the source of truth.
@@ -13,9 +15,11 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as 
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support, ip mtu, and l3-counters
 - ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
-- ✅ **Loopback Interfaces** - With VRF support
+- ✅ **Loopback Interfaces** - Automatic detection, IPv4/IPv6, with VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
-- ✅ **Virtual Chassis Support** - Works with VSX/stacked switches
+- ✅ **VSX Configuration** - Active-active redundancy with system MAC, ISL, and keepalive
+- ✅ **BGP/EVPN Configuration** - Hybrid support for NetBox BGP plugin and config context
+- ✅ **VXLAN Configuration** - Overlay networks with VNI mapping and cleanup
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
 - ✅ **ZTP Configuration Generation** - Creates base configs for Zero Touch Provisioning
@@ -94,6 +98,7 @@ pip install -r requirements.txt
 ```
 
 Required libraries:
+
 - **pyaoscx** >= 2.6.0 - Aruba AOS-CX Python SDK
 - **pynetbox** >= 6.0.0 - NetBox API client
 - **paramiko** >= 2.7.0 - SSH library for device connections
@@ -363,6 +368,177 @@ if_ip_ospf_1_area: "0.0.0.0"
 if_ip_ospf_network: "point-to-point"
 ```
 
+### Loopback Configuration
+
+Loopback interfaces are automatically detected from NetBox and configured with IP addresses and VRF assignments.
+
+#### Requirements
+
+- Interface type: `virtual`
+- Interface name pattern: `loopback*` (e.g., `loopback0`, `loopback1`)
+- IP addresses assigned to the interface in NetBox
+- Optional: VRF assignment for custom routing tables
+
+#### NetBox Configuration
+
+**Interface Setup:**
+```yaml
+# Interface properties in NetBox
+name: loopback0
+type: virtual
+enabled: true
+description: "Router ID and BGP peering"
+```
+
+**IP Address Assignment:**
+```yaml
+# Assign IP addresses to loopback interface
+address: 10.255.255.1/32
+vrf: default  # or custom VRF name
+```
+
+#### Example Configuration
+
+**Single Loopback (Default VRF):**
+```yaml
+# In NetBox, create:
+# - Interface: loopback0, type=virtual, enabled=true
+# - IP Address: 10.255.255.1/32, assigned to loopback0
+```
+
+Generated configuration:
+```bash
+interface loopback0
+  ip address 10.255.255.1/32
+```
+
+**Multiple Loopbacks with Custom VRFs:**
+```yaml
+# Loopback 0 (default VRF) - Router ID
+# - Interface: loopback0
+# - IP: 10.255.255.1/32, vrf=default
+
+# Loopback 1 (custom VRF) - Customer A
+# - Interface: loopback1
+# - IP: 192.168.1.1/32, vrf=customer_a
+```
+
+Generated configuration:
+```bash
+interface loopback0
+  ip address 10.255.255.1/32
+
+interface loopback1
+  vrf attach customer_a
+  ip address 192.168.1.1/32
+```
+
+#### Features
+
+- ✅ Automatic detection of loopback interfaces by type and name
+- ✅ IPv4 and IPv6 support
+- ✅ VRF attachment for custom routing tables
+- ✅ Dual-stack configuration
+- ✅ Proper ordering (interface creation before IP assignment)
+
+### VSX Configuration
+
+VSX (Virtual Switching Extension) provides active-active redundancy for Aruba AOS-CX switches. This role configures VSX pairs with proper system MAC, role assignment, ISL, and keepalive settings.
+
+#### Requirements
+
+VSX configuration requires custom fields and config context in NetBox.
+
+#### Device Custom Field
+
+```yaml
+# Required custom field on devices
+device_vsx: true  # Enable VSX on this device
+```
+
+#### Device Config Context
+
+```yaml
+# VSX configuration parameters
+vsx_system_mac: "02:00:00:00:01:00"  # Shared system MAC for VSX pair
+vsx_role: "primary"                   # Role: primary or secondary
+vsx_isl_lag: "isl"                    # ISL LAG interface name
+vsx_keepalive_peer: "192.168.1.2"     # IP address of VSX peer
+vsx_keepalive_src: "192.168.1.1"      # Source IP for keepalive
+vsx_keepalive_vrf: "mgmt"             # VRF for keepalive (default: mgmt)
+```
+
+#### Complete Example
+
+**Primary Switch Configuration:**
+
+Device custom field:
+```yaml
+device_vsx: true
+```
+
+Device config context:
+```yaml
+vsx_system_mac: "02:00:00:00:01:00"
+vsx_role: "primary"
+vsx_isl_lag: "isl"
+vsx_keepalive_peer: "192.168.100.2"
+vsx_keepalive_src: "192.168.100.1"
+vsx_keepalive_vrf: "mgmt"
+```
+
+Generated configuration:
+```bash
+vsx-sync vsx-global
+vsx
+  system-mac 02:00:00:00:01:00
+  inter-switch-link lag isl
+  role primary
+  keepalive peer 192.168.100.2 source 192.168.100.1 vrf mgmt
+```
+
+**Secondary Switch Configuration:**
+
+Device custom field:
+```yaml
+device_vsx: true
+```
+
+Device config context:
+```yaml
+vsx_system_mac: "02:00:00:00:01:00"  # Same MAC as primary
+vsx_role: "secondary"                 # Different role
+vsx_isl_lag: "isl"
+vsx_keepalive_peer: "192.168.100.1"  # Peer is primary
+vsx_keepalive_src: "192.168.100.2"   # This switch's IP
+vsx_keepalive_vrf: "mgmt"
+```
+
+#### VSX Deployment Notes
+
+1. **System MAC**: Must be identical on both VSX peers
+2. **Roles**: One switch must be `primary`, the other `secondary`
+3. **Keepalive**: Peer IPs should be reachable (typically over management network)
+4. **ISL**: Configure ISL LAG interfaces separately with `mclag_interfaces` configuration
+5. **MCLAG**: Multi-Chassis LAG interfaces require VSX to be configured first
+
+#### Tag-Dependent Execution
+
+VSX configuration only runs when explicitly requested:
+- `ansible-playbook site.yml --tags vsx`
+- `ansible-playbook site.yml --tags ha`
+- `ansible-playbook site.yml` (full run without tags)
+
+#### Features
+
+- ✅ System MAC and role configuration
+- ✅ Inter-Switch Link (ISL) LAG setup
+- ✅ Keepalive configuration with custom VRF support
+- ✅ VSX-sync global configuration
+- ✅ Validation of required parameters
+- ✅ Comprehensive debug output
+- ✅ Graceful handling when VSX is not enabled
+
 ## Dependencies
 
 None.
@@ -552,9 +728,38 @@ approach. Both modes now use `configure_l2_interfaces.yml` which intelligently h
 
 ## Testing
 
+This role includes comprehensive testing at multiple levels: unit tests for filter plugins, integration tests with NetBox data, and molecule tests for role execution.
+
+### Unit Tests
+
+**22 filter functions** across **6 modules** are covered by comprehensive unit tests with **>90% code coverage**:
+
+```bash
+# Run all unit tests
+make test-unit
+
+# Run with coverage report
+make test-unit-coverage
+
+# Run specific test file
+pytest tests/unit/test_vlan_filters.py -v
+```
+
+**Test Coverage:**
+- ✅ **VLAN filters** (7 functions) - Extract, filter, and manage VLANs
+- ✅ **VRF filters** (4 functions) - Extract and filter VRFs
+- ✅ **Interface filters** (3 functions) - Categorize L2/L3 interfaces
+- ✅ **Comparison functions** (3 functions) - Compare and detect configuration changes
+- ✅ **OSPF filters** (4 functions) - OSPF configuration management
+- ✅ **Utility functions** (1 function) - VLAN range collapsing
+
+See **[tests/unit/README.md](../tests/unit/README.md)** for detailed testing documentation.
+
+### Integration Tests
+
 This role includes comprehensive integration testing documentation and scripts for testing with real/virtual Aruba AOS-CX switches.
 
-### Testing Documentation
+#### Testing Documentation
 
 - **[Testing Environment](TESTING_ENVIRONMENT.md)** - Complete testing setup guide
 - **[Quick Start](TESTING_QUICK_START.md)** - 30-minute quick start to first test

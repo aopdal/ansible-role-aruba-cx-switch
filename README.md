@@ -98,6 +98,7 @@ pip install -r requirements.txt
 ```
 
 Required libraries:
+
 - **pyaoscx** >= 2.6.0 - Aruba AOS-CX Python SDK
 - **pynetbox** >= 6.0.0 - NetBox API client
 - **paramiko** >= 2.7.0 - SSH library for device connections
