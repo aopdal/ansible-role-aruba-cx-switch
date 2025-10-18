@@ -71,7 +71,6 @@ nav:
   - Getting Started:
       - Quick Start: QUICKSTART.md
       - Requirements: REQUIREMENTS.md
-      - Setup Guide: SETUP_COMPLETE.md
       - Development: DEVELOPMENT.md
   - Architecture:
       - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
@@ -97,18 +96,17 @@ nav:
           - Summary: BGP_HYBRID_SUMMARY.md
           - BGP Configuration: BGP_CONFIGURATION.md
           - EVPN Fabric Example: BGP_EVPN_FABRIC_EXAMPLE.md
-  - Testing:
+  - Testing & Development:
       - Testing Guide: TESTING.md
       - Quick Start: TESTING_QUICK_START.md
       - Environment: TESTING_ENVIRONMENT.md
+      - Contributing: CONTRIBUTING.md
   - Reference:
       - Quick Reference: QUICK_REFERENCE.md
       - Documentation Site: DOCUMENTATION_SITE.md  # How to use MkDocs
       - Workspace Setup: WORKSPACE.md
       - DevContainer Setup: DEVCONTAINER_SETUP.md
       - DevContainer Mounts: DEVCONTAINER_MOUNTS.md
-  - Contributing:
-      - Guide: CONTRIBUTING.md
       - Changelog: CHANGELOG.md
 
 extra:
