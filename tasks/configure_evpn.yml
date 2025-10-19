@@ -35,13 +35,57 @@
   changed_when: false
   failed_when: false
 
-- name: Parse existing EVPN VLANs from device
+- name: Debug - Raw EVPN output from device
+  ansible.builtin.debug:
+    msg:
+      - "=== Raw output from 'show evpn evi' ==="
+      - "Output type: {{ evpn_config_output.stdout | type_debug }}"
+      - "Output length: {{ evpn_config_output.stdout | length }}"
+      - "First 500 chars: {{ evpn_config_output.stdout[0][:500] if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0 else 'No output' }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
+    - evpn_config_output is defined
+
+- name: Parse existing EVPN VLANs from device (as strings)
   ansible.builtin.set_fact:
-    existing_evpn_vlans: "{{ evpn_config_output.stdout[0] | regex_findall('VLAN\\s+:\\s+(\\d+)') | map('int') | list if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0 else [] }}"
+    existing_evpn_vlans_raw: >-
+      {{
+        evpn_config_output.stdout[0] |
+        regex_findall('VLAN\\s+:\\s+(\\d+)')
+        if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0
+        else []
+      }}
   when:
     - custom_fields.device_evpn | default(false) | bool
     - evpn_config_output is defined
     - evpn_config_output.stdout is defined
+
+- name: Debug - Raw EVPN regex matches
+  ansible.builtin.debug:
+    msg:
+      - "Raw VLAN matches: {{ existing_evpn_vlans_raw }}"
+      - "Type: {{ existing_evpn_vlans_raw | type_debug }}"
+      - "Count: {{ existing_evpn_vlans_raw | length }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
+    - existing_evpn_vlans_raw is defined
+
+- name: Convert EVPN VLANs to integers
+  ansible.builtin.set_fact:
+    existing_evpn_vlans: "{{ existing_evpn_vlans_raw | map('int') | list }}"
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+    - existing_evpn_vlans_raw is defined
+    - existing_evpn_vlans_raw | length > 0
+
+- name: Initialize empty EVPN VLAN list if none found
+  ansible.builtin.set_fact:
+    existing_evpn_vlans: []
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+    - existing_evpn_vlans_raw is not defined or existing_evpn_vlans_raw | length == 0
 
 - name: Debug - VLANs in use for EVPN configuration
   ansible.builtin.debug:

@@ -236,7 +236,7 @@ The following files are in the repository root for standard compliance:
 - TESTING_QUICK_START.md
 - TESTING_PROPOSAL.md
 
-### 📋 Internal (8 docs)
+### 📋 Internal (9 docs)
 - REFACTORING_SUMMARY.md (historical)
 - REFACTOR_SUMMARY.md (VLAN refactoring)
 - COMPLETE_SUMMARY.md
@@ -245,5 +245,6 @@ The following files are in the repository root for standard compliance:
 - DOCS_SYNC_WORKFLOW.md
 - EVPN_VXLAN_DETECTION_FIX.md
 - ANSIBLE_REGEX_GOTCHA.md
+- EVPN_VXLAN_DEBUGGING.md
 
-**Total: 37 documentation files**
+**Total: 38 documentation files**
