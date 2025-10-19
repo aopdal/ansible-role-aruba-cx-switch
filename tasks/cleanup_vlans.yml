@@ -2,7 +2,7 @@
 # Cleanup VLANs (DELETE only)
 #
 # This task file runs AFTER:
-# 1. identify_vlan_changes.yml (to know what to delete)
+# 1. identify_vlan_changes.yml (re-run to know what to delete based on current state)
 # 2. cleanup_evpn.yml (to remove EVPN configuration first)
 # 3. cleanup_vxlan.yml (to remove VXLAN/VNI mappings second)
 # 4. All interface cleanup tasks (to ensure VLANs aren't in use)
@@ -10,7 +10,16 @@
 # Only then is it safe to delete the VLAN from the switch.
 # This includes orphaned VLANs that exist on the switch but not in NetBox.
 #
-# Uses the vlan_changes fact calculated in identify_vlan_changes.yml
+# Prerequisites: identify_vlan_changes.yml must run first to set:
+# - vlan_changes.vlans_to_delete: VLANs that should be removed
+
+- name: Verify VLAN analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - vlan_changes is defined
+      - vlan_changes.vlans_to_delete is defined
+    fail_msg: "ERROR: identify_vlan_changes.yml must run before cleanup_vlans.yml"
+    success_msg: "VLAN analysis completed - proceeding with VLAN cleanup"
 
 - name: Debug - Show VLANs to delete
   ansible.builtin.debug:

@@ -7,12 +7,25 @@
 # 3. Have L2VPN termination defined in NetBox
 # 4. Not already configured for VXLAN (idempotent check)
 #
+# Prerequisites: identify_vlan_changes.yml must run first to set:
+# - vlans: VLANs available from NetBox
+# - vlans_in_use: VLANs currently in use on interfaces
+#
 # Custom field required: device_vxlan (boolean)
 # VLAN field required: l2vpn_termination.l2vpn.identifier (VNI)
 #
 # Configuration order:
 # 1. Create VNI under interface vxlan 1
 # 2. Assign VLAN to VNI
+
+- name: Verify VLAN analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - vlans is defined
+      - vlans_in_use is defined
+    fail_msg: "ERROR: identify_vlan_changes.yml must run before configure_vxlan.yml"
+    success_msg: "VLAN analysis completed - proceeding with VXLAN configuration"
+  when: custom_fields.device_vxlan | default(false) | bool
 
 - name: Gather current VXLAN VNI configuration from device
   arubanetworks.aoscx.aoscx_command:
@@ -42,19 +55,13 @@
     - custom_fields.device_vxlan | default(false) | bool
     - existing_vxlan_mappings is defined
 
-- name: Get VLANs in use on device for VXLAN
-  ansible.builtin.set_fact:
-    vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
-  when:
-    - interfaces is defined
-    - vlans_in_use is not defined
-
 - name: Debug - VLANs in use for VXLAN configuration
   ansible.builtin.debug:
     msg:
+      - "=== VXLAN Configuration (configure_vxlan.yml) ==="
       - "Device: {{ inventory_hostname }}"
       - "VXLAN Enabled: {{ custom_fields.device_vxlan | default(false) }}"
-      - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }}"
+      - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }} - {{ vlans_in_use.vids | default([]) | sort }}"
       - "VLANs available: {{ vlans | default([]) | length }}"
   when: aoscx_debug_mode | default(false) | bool
 

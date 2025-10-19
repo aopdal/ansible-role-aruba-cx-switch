@@ -1,20 +1,44 @@
 ---
 # Identify VLAN changes (additions and deletions)
 #
-# This task file determines which VLANs need to be added or removed based on:
+# This task file is the SINGLE SOURCE OF TRUTH for VLAN change calculations.
+# It determines which VLANs need to be added or removed based on:
 # - VLANs defined in NetBox (desired state)
 # - VLANs currently in use by interfaces (can't be deleted)
 # - VLANs currently on the device (actual state)
 #
-# CRITICAL: This must run BEFORE any cleanup operations (EVPN, VXLAN, VLAN)
-# to ensure we know what needs to be removed before we start removing it.
+# This task MUST run:
+# 1. BEFORE configure_vlans.yml, configure_evpn.yml, configure_vxlan.yml
+# 2. BEFORE cleanup_evpn.yml, cleanup_vxlan.yml, cleanup_vlans.yml
 #
-# The vlan_changes fact is used by:
-# - cleanup_evpn.yml - to remove EVPN configuration for deleted VLANs
-# - cleanup_vxlan.yml - to remove VXLAN/VNI mappings for deleted VLANs
-# - cleanup_vlans.yml - to delete the VLANs themselves
+# The facts set by this task are used by:
+# - vlans_in_use: Used by configure_vlans.yml, configure_evpn.yml, configure_vxlan.yml
+# - vlan_changes: Used by configure_vlans.yml, cleanup_evpn.yml, cleanup_vxlan.yml, cleanup_vlans.yml
 
-- name: Gather VLAN facts for change identification
+- name: Get VLANs available on device from NetBox (if not provided)
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/ipam/vlans/?available_on_device={{ device_id }}&limit=0"
+    method: GET
+    return_content: true
+    validate_certs: false
+    headers:
+      accept: "application/json"
+      Authorization: "Token {{ netbox_token }}"
+  register: nb_vlans_response
+  vars:
+    ansible_connection: local
+  when: vlans is not defined or vlans | length == 0
+  delegate_to: localhost
+
+- name: Set vlans fact from API response
+  ansible.builtin.set_fact:
+    vlans: "{{ nb_vlans_response.json.results }}"
+  when:
+    - nb_vlans_response is defined
+    - nb_vlans_response.json is defined
+    - nb_vlans_response.json.results is defined
+
+- name: Gather VLAN facts from device for change identification
   arubanetworks.aoscx.aoscx_facts:
     gather_network_resources:
       - vlans
@@ -23,16 +47,19 @@
 - name: Calculate VLANs currently in use by interfaces
   ansible.builtin.set_fact:
     vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
+  when: interfaces is defined
 
 - name: Determine VLAN changes needed
   ansible.builtin.set_fact:
     vlan_changes: "{{ vlans | get_vlans_needing_changes(vlans_in_use, ansible_facts | default({})) }}"
 
-- name: Debug - Show VLAN changes identified
+- name: Debug - Show VLAN analysis results
   ansible.builtin.debug:
     msg:
-#      - "VLANs to add: {{ vlan_changes.vlans_to_add }}"
-#      - "VLANs to update: {{ vlan_changes.vlans_to_update }}"
-      - "VLANs to delete: {{ vlan_changes.vlans_to_delete }}"
-      - "VLANs in use (cannot delete): {{ vlans_in_use }}"
+      - "=== VLAN Analysis (identify_vlan_changes.yml) ==="
+      - "VLANs available from NetBox: {{ vlans | length }}"
+      - "VLANs in use on interfaces: {{ vlans_in_use.vids | length }} - {{ vlans_in_use.vids | sort }}"
+      - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{ vlan_changes.vlans_to_create | map(attribute='vid') | list | sort }}"
+      - "VLANs to delete: {{ vlan_changes.vlans_to_delete | length }} - {{ vlan_changes.vlans_to_delete | sort }}"
+      - "VLANs in use (protected from deletion): {{ vlan_changes.vlans_in_use | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1

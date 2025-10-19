@@ -94,7 +94,38 @@
     - layer3
     - routing
 
+# ============================================================================
+# VLAN Analysis (must run BEFORE VLAN/EVPN/VXLAN configuration)
+# ============================================================================
+# This identifies what VLANs need to be created/deleted based on NetBox
+# and current device state. Sets facts used by all VLAN-related tasks:
+# - vlans: VLANs available from NetBox
+# - vlans_in_use: VLANs currently in use on interfaces
+# - vlan_changes: VLANs to create/delete
+
+- name: Identify VLAN changes (before configuration)
+  ansible.builtin.include_tasks:
+    file: identify_vlan_changes.yml
+    apply:
+      tags:
+        - vlans
+        - evpn
+        - vxlan
+        - layer2
+        - overlay
+  when: aoscx_configure_vlans | bool
+  tags:
+    - vlans
+    - evpn
+    - vxlan
+    - layer2
+    - overlay
+
+# ============================================================================
+# VLAN/EVPN/VXLAN Configuration
+# ============================================================================
 # VLANs should be configured before interfaces
+
 - name: Include VLAN configuration tasks
   ansible.builtin.include_tasks:
     file: configure_vlans.yml
@@ -240,14 +271,17 @@
     - vxlan
     - overlay
 
-# EVPN/VXLAN/VLAN cleanup order is critical (only in idempotent mode):
-# 0. Identify VLAN changes (what needs to be deleted) FIRST
-# 1. Remove EVPN configuration (no vlan X under evpn)
-# 2. Remove VXLAN VNI and VLAN-to-VNI mappings
-# 3. Delete VLANs themselves
+# ============================================================================
+# VLAN/EVPN/VXLAN Cleanup (only in idempotent mode)
+# ============================================================================
+# Cleanup order is critical:
+# 1. Re-identify VLAN changes (what needs to be deleted) based on current state
+# 2. Remove EVPN configuration (no vlan X under evpn)
+# 3. Remove VXLAN VNI and VLAN-to-VNI mappings
+# 4. Delete VLANs themselves
 # This ensures proper cleanup without orphaned configurations
 
-- name: Identify VLAN changes before cleanup
+- name: Re-identify VLAN changes before cleanup
   ansible.builtin.include_tasks:
     file: identify_vlan_changes.yml
     apply:

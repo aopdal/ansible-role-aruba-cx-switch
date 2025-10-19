@@ -5,7 +5,18 @@
 # This must happen BEFORE VLAN deletion to avoid orphaned EVPN configs
 # Order: identify_vlan_changes.yml → cleanup_evpn.yml → cleanup_vxlan.yml → cleanup_vlans.yml
 #
-# Uses the vlan_changes fact calculated in identify_vlan_changes.yml
+# Prerequisites: identify_vlan_changes.yml must run first to set:
+# - vlan_changes.vlans_to_delete: VLANs that should be removed
+# - vlans: VLANs available from NetBox (to look up L2VPN termination info)
+
+- name: Verify VLAN analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - vlan_changes is defined
+      - vlan_changes.vlans_to_delete is defined
+      - vlans is defined
+    fail_msg: "ERROR: identify_vlan_changes.yml must run before cleanup_evpn.yml"
+    success_msg: "VLAN analysis completed - proceeding with EVPN cleanup"
 
 - name: Determine VLANs to remove from EVPN
   ansible.builtin.set_fact:

@@ -7,8 +7,21 @@
 # 3. Have L2VPN termination defined in NetBox
 # 4. Not already configured for EVPN (idempotent check)
 #
+# Prerequisites: identify_vlan_changes.yml must run first to set:
+# - vlans: VLANs available from NetBox
+# - vlans_in_use: VLANs currently in use on interfaces
+#
 # Custom field required: device_evpn (boolean)
 # VLAN field required: l2vpn_termination (NetBox IPAM L2VPN)
+
+- name: Verify VLAN analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - vlans is defined
+      - vlans_in_use is defined
+    fail_msg: "ERROR: identify_vlan_changes.yml must run before configure_evpn.yml"
+    success_msg: "VLAN analysis completed - proceeding with EVPN configuration"
+  when: custom_fields.device_evpn | default(false) | bool
 
 - name: Gather current EVPN configuration from device
   arubanetworks.aoscx.aoscx_command:
@@ -30,19 +43,13 @@
     - evpn_config_output is defined
     - evpn_config_output.stdout is defined
 
-- name: Get VLANs in use on device for EVPN
-  ansible.builtin.set_fact:
-    vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
-  when:
-    - interfaces is defined
-    - vlans_in_use is not defined
-
 - name: Debug - VLANs in use for EVPN configuration
   ansible.builtin.debug:
     msg:
+      - "=== EVPN Configuration (configure_evpn.yml) ==="
       - "Device: {{ inventory_hostname }}"
       - "EVPN Enabled: {{ custom_fields.device_evpn | default(false) }}"
-      - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }}"
+      - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }} - {{ vlans_in_use.vids | default([]) | sort }}"
       - "VLANs available: {{ vlans | default([]) | length }}"
   when: aoscx_debug_mode | default(false) | bool
 

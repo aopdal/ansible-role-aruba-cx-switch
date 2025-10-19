@@ -5,65 +5,28 @@
 # VLAN deletion happens in cleanup_vlans.yml AFTER interface cleanup
 # to ensure VLANs are not in use when deleted.
 #
-# Task order: configure_vlans.yml → interface cleanup → cleanup_vlans.yml
+# Prerequisites: identify_vlan_changes.yml must run first to set:
+# - vlans: VLANs available from NetBox
+# - vlans_in_use: VLANs currently in use on interfaces
+# - vlan_changes: VLANs to create/delete
+#
+# Task order: identify_vlan_changes.yml → configure_vlans.yml → interface cleanup → cleanup_vlans.yml
 
-- name: Get VLANs available on device from NetBox (if not provided)
-  ansible.builtin.uri:
-    url: "{{ netbox_url }}/api/ipam/vlans/?available_on_device={{ device_id }}&limit=0"
-    method: GET
-    return_content: true
-    validate_certs: false
-    headers:
-      accept: "application/json"
-      Authorization: "Token {{ netbox_token }}"
-  register: nb_vlans_response
-  vars:
-    ansible_connection: local
-  when: vlans is not defined or vlans | length == 0
-  delegate_to: localhost
+- name: Verify VLAN analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - vlans is defined
+      - vlans_in_use is defined
+      - vlan_changes is defined
+    fail_msg: "ERROR: identify_vlan_changes.yml must run before configure_vlans.yml"
+    success_msg: "VLAN analysis completed - proceeding with VLAN creation"
 
-- name: Set vlans fact from API response
-  ansible.builtin.set_fact:
-    vlans: "{{ nb_vlans_response.json.results }}"
-  when:
-    - nb_vlans_response is defined
-    - nb_vlans_response.json is defined
-    - nb_vlans_response.json.results is defined
-
-- name: Debug - Show VLANs available on device
+- name: Debug - Show VLAN creation plan
   ansible.builtin.debug:
     msg:
-      - "Device ID: {{ device_id }}"
-      - "VLANs available on device: {{ vlans | length }}"
-      - "VLAN IDs: {{ vlans | map(attribute='vid') | list | sort }}"
-  when:
-    - vlans is defined
-    - aoscx_debug | bool or ansible_verbosity >= 1
-
-- name: Get VLANs in use on device
-  ansible.builtin.set_fact:
-    vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
-  when: interfaces is defined
-
-- name: Debug - Show VLANs in use
-  ansible.builtin.debug:
-    msg:
-      - "VLANs in use (VIDs): {{ vlans_in_use.vids }}"
-      - "Total VLANs in use: {{ vlans_in_use.vids | length }}"
-  when:
-    - interfaces is defined
-    - aoscx_debug | bool or ansible_verbosity >= 1
-
-- name: Determine VLAN changes needed
-  ansible.builtin.set_fact:
-    vlan_changes: "{{ vlans | get_vlans_needing_changes(vlans_in_use, ansible_facts | default({})) }}"
-
-- name: Debug - Show VLAN changes needed
-  ansible.builtin.debug:
-    msg:
-      - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{ vlan_changes.vlans_to_create | map(attribute='vid') | list }}"
-      - "VLANs to delete: {{ vlan_changes.vlans_to_delete | length }} - {{ vlan_changes.vlans_to_delete }}"
-      - "VLANs in use: {{ vlan_changes.vlans_in_use | length }}"
+      - "=== VLAN Creation (configure_vlans.yml) ==="
+      - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{ vlan_changes.vlans_to_create | map(attribute='vid') | list | sort }}"
+      - "VLANs to delete (later): {{ vlan_changes.vlans_to_delete | length }} - {{ vlan_changes.vlans_to_delete | sort }}"
       - "Note: VLAN deletion happens in cleanup_vlans.yml after interface cleanup"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 

@@ -48,6 +48,24 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
   - Domain name, nameservers, and host mappings
   - Management vs. non-management VRF setup
 
+### VLAN Management
+
+- **[VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN change workflow
+  - Single source of truth for VLAN analysis
+  - Configuration and cleanup phases
+  - Integration with EVPN/VXLAN
+  - Benefits and safety features
+
+- **[VLAN_WORKFLOW_DIAGRAMS.md](VLAN_WORKFLOW_DIAGRAMS.md)** - Visual workflow diagrams
+  - Mermaid diagrams for configuration and cleanup phases
+  - Fact dependencies visualization
+  - Timeline comparison (before/after refactoring)
+
+- **[VLAN_DEVELOPER_GUIDE.md](VLAN_DEVELOPER_GUIDE.md)** - Developer quick reference
+  - Adding new VLAN-related tasks
+  - Common patterns and best practices
+  - Available facts and debugging
+
 ### Routing Protocols
 
 - **[BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)** - BGP/EVPN configuration guide
@@ -120,6 +138,36 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 ## Internal Documentation
 
+### VLAN Refactoring (October 2025)
+
+- **[REFACTOR_SUMMARY.md](REFACTOR_SUMMARY.md)** - VLAN change identification refactoring
+  - Executive summary of VLAN workflow changes
+  - Before/after comparison
+  - Testing checklist
+
+- **[COMPLETE_SUMMARY.md](COMPLETE_SUMMARY.md)** - Complete refactoring overview
+  - All changes made (code + docs)
+  - Documentation statistics
+  - File locations and structure
+  - Learning path and key concepts
+
+- **[DOCUMENTATION_INTEGRATION.md](DOCUMENTATION_INTEGRATION.md)** - Documentation integration details
+  - How new docs were integrated into MkDocs
+  - Navigation structure
+  - Build verification
+
+- **[VERIFICATION_CHECKLIST.md](VERIFICATION_CHECKLIST.md)** - Final verification checklist
+  - All changes verified
+  - Testing checklist
+  - Commit readiness
+
+- **[DOCS_SYNC_WORKFLOW.md](DOCS_SYNC_WORKFLOW.md)** - Documentation sync workflow
+  - How make docs-sync works
+  - When to use it
+  - Best practices
+
+### Historical Refactoring
+
 - **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - History of code refactoring and improvements
   - Filter plugin reorganization
   - Task splitting and optimization
@@ -150,9 +198,13 @@ The following files are in the repository root for standard compliance:
 ### 🔌 Filter Plugins (1 doc)
 - FILTER_PLUGINS.md - **Essential for understanding data transformation**
 
-### ⚙️ Configuration Guides (13 docs)
+### ⚙️ Configuration Guides (17 docs)
 - BASE_CONFIGURATION.md
 - DNS_CONFIGURATION.md
+- VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
+- VLAN_WORKFLOW_DIAGRAMS.md
+- VLAN_DEVELOPER_GUIDE.md
+- VLAN_DOCUMENTATION_ACCESS.md
 - BGP_CONFIGURATION.md
 - BGP_SUMMARY.md
 - BGP_MIGRATION_GUIDE.md
@@ -178,7 +230,12 @@ The following files are in the repository root for standard compliance:
 - TESTING_QUICK_START.md
 - TESTING_PROPOSAL.md
 
-### 📋 Internal (1 doc)
-- REFACTORING_SUMMARY.md
+### 📋 Internal (6 docs)
+- REFACTORING_SUMMARY.md (historical)
+- REFACTOR_SUMMARY.md (VLAN refactoring)
+- COMPLETE_SUMMARY.md
+- DOCUMENTATION_INTEGRATION.md
+- VERIFICATION_CHECKLIST.md
+- DOCS_SYNC_WORKFLOW.md
 
-**Total: 27 documentation files**
+**Total: 35 documentation files**
