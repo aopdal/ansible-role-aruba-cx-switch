@@ -63,10 +63,16 @@ regex_findall('VLAN\\s+:\\s+(\\d+)')  # Specific: matches "VLAN : 10"
 regex_findall('vni (\\d+)\\s+vlan (\\d+)')  # Wrong format
 ```
 
-**After:**
+**After (Initial - Had Error):**
 ```yaml
 regex_findall('L2VNI\\s+:\\s+(\\d+).*?VLAN\\s+:\\s+(\\d+)', multiline=True, dotall=True)
 ```
+
+**After (Fixed - Final):**
+```yaml
+regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True)
+```
+> **Note:** Ansible's `regex_findall` doesn't support `dotall` parameter. Use `[\\s\\S]` (matches any whitespace or non-whitespace character) instead of `.*?` to match across newlines.
 
 **Result:** Extracts VNI-to-VLAN mappings: `[[10100010, 10], [10100020, 20], ...]`
 

@@ -44,7 +44,7 @@
     existing_vxlan_mappings: >-
       {{
         vxlan_config_output.stdout[0] |
-        regex_findall('L2VNI\\s+:\\s+(\\d+).*?VLAN\\s+:\\s+(\\d+)', multiline=True, dotall=True) |
+        regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True) |
         map('map', 'int') |
         list
         if vxlan_config_output.stdout is defined and vxlan_config_output.stdout | length > 0

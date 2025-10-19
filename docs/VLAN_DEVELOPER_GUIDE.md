@@ -164,7 +164,8 @@ regex_findall('VLAN\\s+:\\s+(\\d+)')
 # Result: [10, 20, 30, ...]
 
 # VXLAN VNI-to-VLAN mappings (configure_vxlan.yml)
-regex_findall('L2VNI\\s+:\\s+(\\d+).*?VLAN\\s+:\\s+(\\d+)', multiline=True, dotall=True)
+# NOTE: Ansible doesn't support dotall parameter - use [\s\S] instead of .*?
+regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True)
 # Result: [[10100010, 10], [10100020, 20], ...]
 ```
 
@@ -183,9 +184,13 @@ L2VNI : 10100020
 vlans = re.findall(r'VLAN\s+:\s+(\d+)', output)
 print(f"VLANs: {vlans}")  # ['10', '20']
 
-# Test VXLAN regex
+# Test VXLAN regex (use re.DOTALL for Python, [\s\S] pattern for Ansible)
+# Python version:
 mappings = re.findall(r'L2VNI\s+:\s+(\d+).*?VLAN\s+:\s+(\d+)', output, re.DOTALL)
 print(f"Mappings: {mappings}")  # [('10100010', '10'), ('10100020', '20')]
+
+# Ansible equivalent pattern (no re.DOTALL flag support):
+# regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True)
 ```
 
 ## File Locations
