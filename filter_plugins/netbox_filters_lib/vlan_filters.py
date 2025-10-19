@@ -3,6 +3,8 @@
 VLAN-related filters for NetBox data transformation
 """
 
+import re
+
 from .utils import _debug
 
 
@@ -392,3 +394,61 @@ def get_vlan_interfaces(interfaces):
 
     _debug(f"Total VLAN interfaces found: {len(vlan_interfaces)}")
     return vlan_interfaces
+
+
+def parse_evpn_evi_output(output):
+    """
+    Parse 'show evpn evi' command output to extract EVPN and VXLAN configuration
+
+    Args:
+        output: String output from 'show evpn evi' command
+
+    Returns:
+        Dictionary with:
+        - evpn_vlans: List of VLAN IDs configured with EVPN (as integers)
+        - vxlan_mappings: List of [VNI, VLAN] mappings (as integers)
+        - vxlan_vnis: List of VNI values (as integers)
+        - vxlan_vlans: List of VLAN IDs configured with VXLAN (as integers)
+
+    Example output format:
+        L2VNI : 10100010
+            Route Distinguisher        : 172.20.1.33:10
+            VLAN                       : 10
+            Status                     : up
+            RT Import                  : 65005:10
+            RT Export                  : 65005:10
+        ...
+
+    Usage in Ansible:
+        {{ vxlan_config_output.stdout[0] | parse_evpn_evi_output }}
+    """
+    if not output or not isinstance(output, str):
+        return {
+            "evpn_vlans": [],
+            "vxlan_mappings": [],
+            "vxlan_vnis": [],
+            "vxlan_vlans": [],
+        }
+
+    # Parse L2VNI values (lines starting with "L2VNI")
+    vni_pattern = r"^L2VNI\s+:\s+(\d+)"
+    vnis = re.findall(vni_pattern, output, re.MULTILINE)
+    vnis_int = [int(vni) for vni in vnis]
+
+    # Parse VLAN values (lines starting with whitespace + "VLAN")
+    vlan_pattern = r"^\s+VLAN\s+:\s+(\d+)"
+    vlans = re.findall(vlan_pattern, output, re.MULTILINE)
+    vlans_int = [int(vlan) for vlan in vlans]
+
+    # Create VNI-to-VLAN mappings
+    mappings = [[vni, vlan] for vni, vlan in zip(vnis_int, vlans_int)]
+
+    result = {
+        "evpn_vlans": vlans_int,  # EVPN uses VLAN list
+        "vxlan_mappings": mappings,  # VXLAN uses VNI-to-VLAN mappings
+        "vxlan_vnis": vnis_int,  # Just the VNIs
+        "vxlan_vlans": vlans_int,  # Just the VLANs
+    }
+
+    _debug(f"Parsed EVPN EVI output: {len(vlans_int)} VLANs, {len(vnis_int)} VNIs")
+    return result

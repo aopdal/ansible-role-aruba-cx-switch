@@ -47,45 +47,35 @@
     - custom_fields.device_evpn | default(false) | bool
     - evpn_config_output is defined
 
-- name: Parse existing EVPN VLANs from device (as strings)
+- name: Parse EVPN configuration from device output using custom filter
   ansible.builtin.set_fact:
-    existing_evpn_vlans_raw: >-
+    evpn_parsed: >-
       {{
-        evpn_config_output.stdout[0] |
-        regex_findall('VLAN\\s+:\\s+(\\d+)')
+        evpn_config_output.stdout[0] | parse_evpn_evi_output
         if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0
-        else []
+        else {'evpn_vlans': []}
       }}
   when:
     - custom_fields.device_evpn | default(false) | bool
     - evpn_config_output is defined
     - evpn_config_output.stdout is defined
 
-- name: Debug - Raw EVPN regex matches
+- name: Debug - Parsed EVPN output
   ansible.builtin.debug:
     msg:
-      - "Raw VLAN matches: {{ existing_evpn_vlans_raw }}"
-      - "Type: {{ existing_evpn_vlans_raw | type_debug }}"
-      - "Count: {{ existing_evpn_vlans_raw | length }}"
+      - "Parsed EVPN VLANs: {{ evpn_parsed.evpn_vlans }}"
+      - "Count: {{ evpn_parsed.evpn_vlans | length }}"
   when:
     - aoscx_debug_mode | default(false) | bool
     - custom_fields.device_evpn | default(false) | bool
-    - existing_evpn_vlans_raw is defined
+    - evpn_parsed is defined
 
-- name: Convert EVPN VLANs to integers
+- name: Extract existing EVPN VLANs from parsed output
   ansible.builtin.set_fact:
-    existing_evpn_vlans: "{{ existing_evpn_vlans_raw | map('int') | list }}"
+    existing_evpn_vlans: "{{ evpn_parsed.evpn_vlans }}"
   when:
     - custom_fields.device_evpn | default(false) | bool
-    - existing_evpn_vlans_raw is defined
-    - existing_evpn_vlans_raw | length > 0
-
-- name: Initialize empty EVPN VLAN list if none found
-  ansible.builtin.set_fact:
-    existing_evpn_vlans: []
-  when:
-    - custom_fields.device_evpn | default(false) | bool
-    - existing_evpn_vlans_raw is not defined or existing_evpn_vlans_raw | length == 0
+    - evpn_parsed is defined
 
 - name: Debug - VLANs in use for EVPN configuration
   ansible.builtin.debug:

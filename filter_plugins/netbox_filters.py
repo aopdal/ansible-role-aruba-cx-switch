@@ -16,6 +16,7 @@ if _filter_dir not in sys.path:
 # These imports must come after sys.path manipulation above
 # pylint: disable=wrong-import-position
 # flake8: noqa: E402
+# fmt: off  # Tell Black to not reformat this section
 from netbox_filters_lib.utils import collapse_vlan_list, select_interfaces_to_configure
 from netbox_filters_lib.vlan_filters import (
     extract_vlan_ids,
@@ -25,6 +26,7 @@ from netbox_filters_lib.vlan_filters import (
     get_vlans_in_use,
     get_vlans_needing_changes,
     get_vlan_interfaces,
+    parse_evpn_evi_output,
 )
 from netbox_filters_lib.vrf_filters import (
     extract_interface_vrfs,
@@ -49,6 +51,8 @@ from netbox_filters_lib.ospf_filters import (
     validate_ospf_config,
 )
 
+# fmt: on
+
 
 class FilterModule:
     """Ansible filter plugin class"""
@@ -65,6 +69,7 @@ class FilterModule:
             "get_vlans_in_use": get_vlans_in_use,
             "get_vlans_needing_changes": get_vlans_needing_changes,
             "get_vlan_interfaces": get_vlan_interfaces,
+            "parse_evpn_evi_output": parse_evpn_evi_output,
             "extract_interface_vrfs": extract_interface_vrfs,
             "filter_vrfs_in_use": filter_vrfs_in_use,
             "get_vrfs_in_use": get_vrfs_in_use,

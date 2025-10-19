@@ -51,62 +51,39 @@
     - custom_fields.device_vxlan | default(false) | bool
     - vxlan_config_output is defined
 
-- name: Parse existing VXLAN VNI-to-VLAN mappings from device (as strings)
+- name: Parse VXLAN configuration from device output using custom filter
   ansible.builtin.set_fact:
-    existing_vxlan_mappings_raw: >-
+    vxlan_parsed: >-
       {{
-        vxlan_config_output.stdout[0] |
-        regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True)
+        vxlan_config_output.stdout[0] | parse_evpn_evi_output
         if vxlan_config_output.stdout is defined and vxlan_config_output.stdout | length > 0
-        else []
+        else {'vxlan_mappings': [], 'vxlan_vnis': [], 'vxlan_vlans': []}
       }}
   when:
     - custom_fields.device_vxlan | default(false) | bool
     - vxlan_config_output is defined
     - vxlan_config_output.stdout is defined
 
-- name: Debug - Raw regex matches
+- name: Debug - Parsed VXLAN output
   ansible.builtin.debug:
     msg:
-      - "Raw mappings: {{ existing_vxlan_mappings_raw }}"
-      - "Type: {{ existing_vxlan_mappings_raw | type_debug }}"
-      - "Count: {{ existing_vxlan_mappings_raw | length }}"
+      - "Parsed VNIs: {{ vxlan_parsed.vxlan_vnis }}"
+      - "Parsed VLANs: {{ vxlan_parsed.vxlan_vlans }}"
+      - "Parsed Mappings: {{ vxlan_parsed.vxlan_mappings }}"
+      - "Count: {{ vxlan_parsed.vxlan_vlans | length }}"
   when:
     - aoscx_debug_mode | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
-    - existing_vxlan_mappings_raw is defined
+    - vxlan_parsed is defined
 
-- name: Convert VXLAN mappings to integers
+- name: Extract existing VNIs and VLANs from parsed output
   ansible.builtin.set_fact:
-    existing_vxlan_mappings: "{{ existing_vxlan_mappings_raw | map('map', 'int') | list }}"
+    existing_vxlan_mappings: "{{ vxlan_parsed.vxlan_mappings }}"
+    existing_vxlan_vnis: "{{ vxlan_parsed.vxlan_vnis }}"
+    existing_vxlan_vlans: "{{ vxlan_parsed.vxlan_vlans }}"
   when:
     - custom_fields.device_vxlan | default(false) | bool
-    - existing_vxlan_mappings_raw is defined
-    - existing_vxlan_mappings_raw | length > 0
-
-- name: Initialize empty VXLAN mappings if none found
-  ansible.builtin.set_fact:
-    existing_vxlan_mappings: []
-  when:
-    - custom_fields.device_vxlan | default(false) | bool
-    - existing_vxlan_mappings_raw is not defined or existing_vxlan_mappings_raw | length == 0
-
-- name: Extract existing VNIs and VLANs
-  ansible.builtin.set_fact:
-    existing_vxlan_vnis: "{{ existing_vxlan_mappings | map(attribute='0') | list }}"
-    existing_vxlan_vlans: "{{ existing_vxlan_mappings | map(attribute='1') | list }}"
-  when:
-    - custom_fields.device_vxlan | default(false) | bool
-    - existing_vxlan_mappings is defined
-    - existing_vxlan_mappings | length > 0
-
-- name: Initialize empty VNI and VLAN lists if no mappings
-  ansible.builtin.set_fact:
-    existing_vxlan_vnis: []
-    existing_vxlan_vlans: []
-  when:
-    - custom_fields.device_vxlan | default(false) | bool
-    - existing_vxlan_mappings is not defined or existing_vxlan_mappings | length == 0
+    - vxlan_parsed is defined
 
 - name: Debug - VLANs in use for VXLAN configuration
   ansible.builtin.debug:
