@@ -96,6 +96,30 @@ The following duplicate logic was **removed** from downstream tasks:
 
 These tasks now simply **use** the facts set by `identify_vlan_changes.yml`.
 
+### Device Command Optimization
+
+Both EVPN and VXLAN configuration tasks use the same efficient command to check existing configuration:
+
+```yaml
+- name: Gather current EVPN/VXLAN configuration
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show evpn evi
+```
+
+The `show evpn evi` command provides both EVPN VLANs and VXLAN/VNI mappings in a single output, eliminating the need for multiple device queries. The output format is:
+
+```
+L2VNI : 10100010
+    VLAN                       : 10
+    Status                     : up
+    ...
+```
+
+**Regex patterns used:**
+- EVPN VLANs: `VLAN\s+:\s+(\d+)` - Extracts VLAN IDs
+- VXLAN VNI-to-VLAN mappings: `L2VNI\s+:\s+(\d+).*?VLAN\s+:\s+(\d+)` - Extracts both VNI and VLAN ID
+
 ## Benefits
 
 ✅ **Consistency**: All tasks work from the same VLAN analysis

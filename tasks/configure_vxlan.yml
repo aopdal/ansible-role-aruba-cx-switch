@@ -30,7 +30,7 @@
 - name: Gather current VXLAN VNI configuration from device
   arubanetworks.aoscx.aoscx_command:
     commands:
-      - show interface vxlan 1
+      - show evpn evi
   register: vxlan_config_output
   vars:
     ansible_connection: network_cli
@@ -41,7 +41,15 @@
 
 - name: Parse existing VXLAN VNI-to-VLAN mappings from device
   ansible.builtin.set_fact:
-    existing_vxlan_mappings: "{{ vxlan_config_output.stdout[0] | regex_findall('vni (\\d+)\\s+vlan (\\d+)') | map('map', 'int') | list if vxlan_config_output.stdout is defined and vxlan_config_output.stdout | length > 0 else [] }}"
+    existing_vxlan_mappings: >-
+      {{
+        vxlan_config_output.stdout[0] |
+        regex_findall('L2VNI\\s+:\\s+(\\d+).*?VLAN\\s+:\\s+(\\d+)', multiline=True, dotall=True) |
+        map('map', 'int') |
+        list
+        if vxlan_config_output.stdout is defined and vxlan_config_output.stdout | length > 0
+        else []
+      }}
   when:
     - custom_fields.device_vxlan | default(false) | bool
     - vxlan_config_output is defined

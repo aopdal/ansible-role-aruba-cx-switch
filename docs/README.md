@@ -166,6 +166,12 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
   - When to use it
   - Best practices
 
+- **[EVPN_VXLAN_DETECTION_FIX.md](EVPN_VXLAN_DETECTION_FIX.md)** - EVPN/VXLAN detection fix
+  - Issue with command and regex patterns
+  - Solution using `show evpn evi`
+  - Updated regex patterns for accurate detection
+  - Testing and verification
+
 ### Historical Refactoring
 
 - **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - History of code refactoring and improvements
@@ -230,12 +236,13 @@ The following files are in the repository root for standard compliance:
 - TESTING_QUICK_START.md
 - TESTING_PROPOSAL.md
 
-### 📋 Internal (6 docs)
+### 📋 Internal (7 docs)
 - REFACTORING_SUMMARY.md (historical)
 - REFACTOR_SUMMARY.md (VLAN refactoring)
 - COMPLETE_SUMMARY.md
 - DOCUMENTATION_INTEGRATION.md
 - VERIFICATION_CHECKLIST.md
 - DOCS_SYNC_WORKFLOW.md
+- EVPN_VXLAN_DETECTION_FIX.md
 
-**Total: 35 documentation files**
+**Total: 36 documentation files**

@@ -139,6 +139,54 @@ Debug output shows:
 2. **Test Idempotency**: Run twice, second run should make no changes
 3. **Test Cleanup**: Remove VLAN from NetBox, verify cleanup in idempotent mode
 4. **Test Assertions**: Comment out identify_vlan_changes.yml, verify assertion fails
+5. **Test Device Detection**: Verify EVPN/VXLAN detection works with `show evpn evi`
+
+### Testing EVPN/VXLAN Detection
+
+The role uses `show evpn evi` to detect existing EVPN and VXLAN configuration:
+
+```bash
+# On the switch, check the output format
+show evpn evi
+
+# Expected output format:
+L2VNI : 10100010
+    Route Distinguisher        : 172.20.1.33:10
+    VLAN                       : 10
+    Status                     : up
+    ...
+```
+
+**Regex patterns used:**
+```yaml
+# EVPN VLANs (configure_evpn.yml)
+regex_findall('VLAN\\s+:\\s+(\\d+)')
+# Result: [10, 20, 30, ...]
+
+# VXLAN VNI-to-VLAN mappings (configure_vxlan.yml)
+regex_findall('L2VNI\\s+:\\s+(\\d+).*?VLAN\\s+:\\s+(\\d+)', multiline=True, dotall=True)
+# Result: [[10100010, 10], [10100020, 20], ...]
+```
+
+**To test locally:**
+```python
+import re
+
+output = """
+L2VNI : 10100010
+    VLAN                       : 10
+L2VNI : 10100020
+    VLAN                       : 20
+"""
+
+# Test EVPN regex
+vlans = re.findall(r'VLAN\s+:\s+(\d+)', output)
+print(f"VLANs: {vlans}")  # ['10', '20']
+
+# Test VXLAN regex
+mappings = re.findall(r'L2VNI\s+:\s+(\d+).*?VLAN\s+:\s+(\d+)', output, re.DOTALL)
+print(f"Mappings: {mappings}")  # [('10100010', '10'), ('10100020', '20')]
+```
 
 ## File Locations
 

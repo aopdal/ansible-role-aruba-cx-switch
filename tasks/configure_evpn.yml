@@ -26,7 +26,7 @@
 - name: Gather current EVPN configuration from device
   arubanetworks.aoscx.aoscx_command:
     commands:
-      - show evpn vlan | include "VLAN ID"
+      - show evpn evi
   register: evpn_config_output
   vars:
     ansible_connection: network_cli
@@ -37,7 +37,7 @@
 
 - name: Parse existing EVPN VLANs from device
   ansible.builtin.set_fact:
-    existing_evpn_vlans: "{{ evpn_config_output.stdout[0] | regex_findall('(\\d+)') | map('int') | list if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0 else [] }}"
+    existing_evpn_vlans: "{{ evpn_config_output.stdout[0] | regex_findall('VLAN\\s+:\\s+(\\d+)') | map('int') | list if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0 else [] }}"
   when:
     - custom_fields.device_evpn | default(false) | bool
     - evpn_config_output is defined
