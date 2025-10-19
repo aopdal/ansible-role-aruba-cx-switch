@@ -370,3 +370,322 @@ def get_interface_ip_addresses(interfaces, ip_addresses):
 
     _debug(f"Total interface/IP matches: {len(result)}")
     return result
+
+
+def get_interfaces_needing_config_changes(interfaces, device_facts):
+    """
+    Compare NetBox interfaces with device facts to identify which interfaces need changes.
+    This is the idempotent check to avoid unnecessary API calls.
+
+    Args:
+        interfaces: List of interface objects from NetBox
+        device_facts: Device facts containing current interface state
+
+    Returns:
+        Dict with categorized interfaces:
+        - physical: Physical interfaces needing changes (enabled/disabled, description, MTU)
+        - lag: LAG interfaces needing changes
+        - mclag: MCLAG interfaces needing changes
+        - l2: L2 interfaces needing VLAN changes
+        - l3: L3 interfaces needing IP address changes
+        - lag_members: Physical interfaces needing LAG assignment changes
+        - no_changes: Interfaces that don't need any changes
+    """
+    result = {
+        "physical": [],
+        "lag": [],
+        "mclag": [],
+        "l2": [],
+        "l3": [],
+        "lag_members": [],
+        "no_changes": [],
+    }
+
+    if not interfaces:
+        _debug("No interfaces provided to get_interfaces_needing_config_changes")
+        return result
+
+    if not device_facts:
+        _debug("No device facts provided - assuming all interfaces need changes")
+        # Without facts, we can't compare, so assume all need changes
+        for intf in interfaces:
+            if not intf:
+                continue
+            _categorize_interface_for_changes(intf, result, needs_change=True)
+        return result
+
+    # Get device interface facts
+    facts_by_interface = {}
+    if "network_resources" in device_facts:
+        network_resources = device_facts.get("network_resources", {})
+        if network_resources and isinstance(network_resources, dict):
+            interfaces_dict = network_resources.get("interfaces", {})
+            if interfaces_dict and isinstance(interfaces_dict, dict):
+                facts_by_interface = interfaces_dict
+
+    if not facts_by_interface:
+        _debug("No interface facts found - assuming all interfaces need changes")
+        # Same as above - without facts, assume all need changes
+        for intf in interfaces:
+            if not intf:
+                continue
+            _categorize_interface_for_changes(intf, result, needs_change=True)
+        return result
+
+    _debug(f"Comparing {len(interfaces)} NetBox interfaces with device facts")
+
+    for nb_intf in interfaces:
+        if not nb_intf:
+            continue
+
+        intf_name = nb_intf.get("name")
+        if not intf_name:
+            continue
+
+        # Skip management interfaces
+        if nb_intf.get("mgmt_only"):
+            continue
+
+        # Get device facts for this interface
+        # AOS-CX uses format "1/1/1" which becomes key "1_1_1" in facts
+        device_intf_key = intf_name.replace("/", "_").replace(" ", "_")
+        device_intf = facts_by_interface.get(device_intf_key)
+
+        if not device_intf:
+            # Interface doesn't exist on device yet - needs to be created
+            _debug(f"Interface {intf_name} not found in device facts - needs creation")
+            _categorize_interface_for_changes(nb_intf, result, needs_change=True)
+            continue
+
+        # Check if interface needs changes
+        needs_change = False
+        change_reasons = []
+
+        # Get interface type
+        type_obj = nb_intf.get("type")
+        type_value = ""
+        if type_obj and isinstance(type_obj, dict):
+            type_value = type_obj.get("value")
+
+        # Check physical/LAG interface properties
+        if type_value not in ["virtual"]:
+            # Check enabled state
+            nb_enabled = nb_intf.get("enabled", True)
+            device_admin_state = device_intf.get("admin") or device_intf.get(
+                "admin_state"
+            )
+            device_enabled = device_admin_state == "up" if device_admin_state else True
+
+            if nb_enabled != device_enabled:
+                needs_change = True
+                change_reasons.append(
+                    f"enabled mismatch (NB: {nb_enabled}, device: {device_enabled})"
+                )
+
+            # Check description
+            nb_description = nb_intf.get("description", "")
+            device_description = device_intf.get("description", "")
+
+            # Special handling for AP_Aruba description
+            if nb_description == "AP_Aruba":
+                expected_description = f"{intf_name} {nb_description}"
+                if device_description != expected_description:
+                    needs_change = True
+                    change_reasons.append(
+                        f"description mismatch (NB: {expected_description}, "
+                        f"device: {device_description})"
+                    )
+            elif nb_description != device_description:
+                needs_change = True
+                change_reasons.append(
+                    f"description mismatch (NB: {nb_description}, "
+                    f"device: {device_description})"
+                )
+
+            # Check MTU (if specified in NetBox)
+            nb_mtu = nb_intf.get("mtu")
+            if nb_mtu and nb_mtu != "" and nb_mtu is not None:
+                device_mtu = device_intf.get("mtu")
+                if device_mtu and int(nb_mtu) != int(device_mtu):
+                    needs_change = True
+                    change_reasons.append(
+                        f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
+                    )
+
+        # Check LAG membership
+        nb_lag = nb_intf.get("lag")
+        if nb_lag and isinstance(nb_lag, dict):
+            nb_lag_name = nb_lag.get("name", "")
+            device_lag_id = device_intf.get("lag_id")
+
+            if device_lag_id:
+                # Parse device lag_id (e.g., "lag10" -> "lag10")
+                device_lag_name = (
+                    device_lag_id if isinstance(device_lag_id, str) else ""
+                )
+            else:
+                device_lag_name = ""
+
+            if nb_lag_name != device_lag_name:
+                needs_change = True
+                change_reasons.append(
+                    f"LAG membership mismatch (NB: {nb_lag_name}, "
+                    f"device: {device_lag_name})"
+                )
+                result["lag_members"].append(nb_intf)
+
+        # Check L2 configuration (VLANs)
+        mode_obj = nb_intf.get("mode")
+        if mode_obj and isinstance(mode_obj, dict):
+            # Has L2 mode - check VLAN configuration
+            nb_mode = mode_obj.get("value")
+            device_mode = device_intf.get("vlan_mode") or device_intf.get(
+                "applied_vlan_mode"
+            )
+
+            if nb_mode and device_mode:
+                # Mode mismatch check
+                if nb_mode == "access" and device_mode != "access":
+                    needs_change = True
+                    change_reasons.append(
+                        f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
+                    )
+                elif nb_mode in ["tagged", "tagged-all"] and device_mode not in [
+                    "native-tagged",
+                    "native-untagged",
+                ]:
+                    needs_change = True
+                    change_reasons.append(
+                        f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
+                    )
+
+                # VLAN membership check
+                nb_untagged = None
+                untagged_vlan = nb_intf.get("untagged_vlan")
+                if untagged_vlan and isinstance(untagged_vlan, dict):
+                    nb_untagged = untagged_vlan.get("vid")
+
+                nb_tagged = set()
+                tagged_vlans = nb_intf.get("tagged_vlans")
+                if tagged_vlans and isinstance(tagged_vlans, list):
+                    for v in tagged_vlans:
+                        if v and isinstance(v, dict):
+                            vid = v.get("vid")
+                            if vid is not None:
+                                nb_tagged.add(vid)
+
+                # Get device VLANs
+                device_native = None
+                vlan_tag = device_intf.get("vlan_tag") or device_intf.get(
+                    "applied_vlan_tag"
+                )
+                if vlan_tag and isinstance(vlan_tag, dict):
+                    for vlan_id_str in vlan_tag.keys():
+                        try:
+                            device_native = int(vlan_id_str)
+                            break
+                        except (ValueError, TypeError):
+                            pass
+
+                device_trunks = set()
+                vlan_trunks = device_intf.get("vlan_trunks") or device_intf.get(
+                    "applied_vlan_trunks"
+                )
+                if vlan_trunks and isinstance(vlan_trunks, dict):
+                    for vlan_id_str in vlan_trunks.keys():
+                        try:
+                            device_trunks.add(int(vlan_id_str))
+                        except (ValueError, TypeError):
+                            pass
+
+                # Check for VLAN mismatches
+                if nb_mode == "access":
+                    if nb_untagged and nb_untagged != device_native:
+                        needs_change = True
+                        change_reasons.append(
+                            f"access VLAN mismatch (NB: {nb_untagged}, "
+                            f"device: {device_native})"
+                        )
+                elif nb_mode == "tagged":
+                    nb_all_vlans = set(nb_tagged)
+                    if nb_untagged:
+                        nb_all_vlans.add(nb_untagged)
+
+                    if nb_untagged and nb_untagged != device_native:
+                        needs_change = True
+                        change_reasons.append(
+                            f"native VLAN mismatch (NB: {nb_untagged}, "
+                            f"device: {device_native})"
+                        )
+
+                    vlans_to_add = nb_all_vlans - device_trunks
+                    vlans_to_remove = device_trunks - nb_all_vlans
+
+                    if vlans_to_add or vlans_to_remove:
+                        needs_change = True
+                        if vlans_to_add:
+                            change_reasons.append(f"VLANs to add: {vlans_to_add}")
+                        if vlans_to_remove:
+                            change_reasons.append(f"VLANs to remove: {vlans_to_remove}")
+
+        if needs_change:
+            _debug(f"Interface {intf_name} needs changes: {', '.join(change_reasons)}")
+            _categorize_interface_for_changes(nb_intf, result, needs_change=True)
+        else:
+            _debug(f"Interface {intf_name} does not need changes")
+            result["no_changes"].append(nb_intf)
+
+    # Summary
+    _debug("Interface change analysis summary:")
+    _debug(f"  Physical interfaces needing changes: {len(result['physical'])}")
+    _debug(f"  LAG interfaces needing changes: {len(result['lag'])}")
+    _debug(f"  MCLAG interfaces needing changes: {len(result['mclag'])}")
+    _debug(f"  L2 interfaces needing changes: {len(result['l2'])}")
+    _debug(f"  L3 interfaces needing changes: {len(result['l3'])}")
+    _debug(f"  LAG member changes: {len(result['lag_members'])}")
+    _debug(f"  Interfaces not needing changes: {len(result['no_changes'])}")
+
+    return result
+
+
+def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
+    """
+    Helper function to categorize an interface into the appropriate change category
+
+    Args:
+        intf: Interface object from NetBox
+        result_dict: Dictionary to append the interface to
+        needs_change: Whether the interface needs changes
+    """
+    if not needs_change:
+        result_dict["no_changes"].append(intf)
+        return
+
+    type_obj = intf.get("type")
+    if not type_obj or not isinstance(type_obj, dict):
+        return
+
+    type_value = type_obj.get("value")
+
+    # Check if it's a LAG interface
+    if type_value == "lag":
+        is_mclag = intf.get("custom_fields", {}).get("if_mclag", False)
+        if is_mclag:
+            result_dict["mclag"].append(intf)
+        else:
+            result_dict["lag"].append(intf)
+        return
+
+    # Check if it's a virtual interface
+    if type_value == "virtual":
+        # Check if it has L3 configuration
+        result_dict["l3"].append(intf)
+        return
+
+    # Check if it has L2 configuration (mode defined)
+    mode_obj = intf.get("mode")
+    if mode_obj and isinstance(mode_obj, dict):
+        result_dict["l2"].append(intf)
+    else:
+        # Physical interface without L2 mode - just basic config
+        result_dict["physical"].append(intf)

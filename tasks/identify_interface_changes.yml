@@ -1,0 +1,81 @@
+---
+# Identify which interfaces need configuration changes
+#
+# This task analyzes interfaces from NetBox and compares them with the current device state
+# to determine which interfaces actually need changes. This allows us to skip unnecessary
+# API calls for interfaces that are already correctly configured.
+#
+# Similar to identify_vlan_changes.yml, this creates facts that are used by:
+# - configure_physical_interfaces.yml
+# - configure_lag_interfaces.yml
+# - configure_mclag_interfaces.yml
+# - assign_interfaces_to_lag.yml
+# - configure_l2_interfaces.yml
+# - configure_l3_interfaces.yml
+#
+# Facts created:
+# - interface_changes: Dict with categorized interfaces
+#   - physical: Physical interfaces needing changes
+#   - lag: LAG interfaces needing changes
+#   - mclag: MCLAG interfaces needing changes
+#   - l2: L2 interfaces needing VLAN changes
+#   - l3: L3 interfaces needing IP address changes
+#   - lag_members: Physical interfaces needing LAG assignment changes
+#   - no_changes: Interfaces that don't need any changes
+
+- name: Identify interfaces needing configuration changes
+  ansible.builtin.set_fact:
+    interface_changes: >-
+      {{
+        interfaces | get_interfaces_needing_config_changes(ansible_facts)
+        if ansible_facts is defined
+        else interfaces | get_interfaces_needing_config_changes({})
+      }}
+  tags:
+    - always
+
+- name: Debug - Interface change analysis summary
+  ansible.builtin.debug:
+    msg:
+      - "=== Interface Change Analysis ==="
+      - "Device: {{ inventory_hostname }}"
+      - "Total interfaces from NetBox: {{ interfaces | default([]) | length }}"
+      - "Physical interfaces needing changes: {{ interface_changes.physical | default([]) | length }}"
+      - >-
+        Physical interface names:
+        {{ interface_changes.physical | default([]) | map(attribute='name') | list }}
+      - "LAG interfaces needing changes: {{ interface_changes.lag | default([]) | length }}"
+      - >-
+        LAG interface names:
+        {{ interface_changes.lag | default([]) | map(attribute='name') | list }}
+      - "MCLAG interfaces needing changes: {{ interface_changes.mclag | default([]) | length }}"
+      - >-
+        MCLAG interface names:
+        {{ interface_changes.mclag | default([]) | map(attribute='name') | list }}
+      - "L2 interfaces needing changes: {{ interface_changes.l2 | default([]) | length }}"
+      - >-
+        L2 interface names (first 10):
+        {{ interface_changes.l2 | default([]) | map(attribute='name') | list | first(10) }}
+      - "L3 interfaces needing changes: {{ interface_changes.l3 | default([]) | length }}"
+      - "LAG member changes: {{ interface_changes.lag_members | default([]) | length }}"
+      - "Interfaces not needing changes: {{ interface_changes.no_changes | default([]) | length }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - interface_changes is defined
+  tags:
+    - always
+
+- name: Verify interface analysis was performed
+  ansible.builtin.assert:
+    that:
+      - interface_changes is defined
+      - interface_changes.physical is defined
+      - interface_changes.lag is defined
+      - interface_changes.mclag is defined
+      - interface_changes.l2 is defined
+      - interface_changes.l3 is defined
+      - interface_changes.no_changes is defined
+    fail_msg: "ERROR: Interface change analysis failed - interface_changes fact not properly set"
+    success_msg: "Interface change analysis completed successfully"
+  tags:
+    - always

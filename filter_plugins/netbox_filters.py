@@ -38,6 +38,7 @@ from netbox_filters_lib.interface_filters import (
     categorize_l2_interfaces,
     categorize_l3_interfaces,
     get_interface_ip_addresses,
+    get_interfaces_needing_config_changes,
 )
 from netbox_filters_lib.comparison import (
     compare_interface_vlans,
@@ -77,6 +78,7 @@ class FilterModule:
             "categorize_l2_interfaces": categorize_l2_interfaces,
             "categorize_l3_interfaces": categorize_l3_interfaces,
             "get_interface_ip_addresses": get_interface_ip_addresses,
+            "get_interfaces_needing_config_changes": get_interfaces_needing_config_changes,
             "compare_interface_vlans": compare_interface_vlans,
             "get_interfaces_needing_vlan_cleanup": get_interfaces_needing_vlan_cleanup,
             "get_interfaces_needing_changes": get_interfaces_needing_changes,

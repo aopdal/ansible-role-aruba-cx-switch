@@ -138,6 +138,47 @@
     - vlans
     - layer2
 
+# ============================================================================
+# Interface Analysis (must run BEFORE interface configuration)
+# ============================================================================
+# This identifies which interfaces need changes by comparing NetBox with device facts
+# Sets facts used by all interface-related tasks:
+# - interface_changes: Categorized interfaces (physical, lag, mclag, l2, l3, no_changes)
+
+- name: Identify interface changes (before configuration)
+  ansible.builtin.include_tasks:
+    file: identify_interface_changes.yml
+    apply:
+      tags:
+        - interfaces
+        - physical_interfaces
+        - lag_interfaces
+        - mclag_interfaces
+        - l2_interfaces
+        - l3_interfaces
+        - layer1
+        - layer2
+        - layer3
+  when:
+    - aoscx_configure_physical_interfaces | bool or
+      aoscx_configure_lag_interfaces | bool or
+      aoscx_configure_mclag_interfaces | bool or
+      aoscx_configure_l2_interfaces | bool or
+      aoscx_configure_l3_interfaces | bool
+  tags:
+    - interfaces
+    - physical_interfaces
+    - lag_interfaces
+    - mclag_interfaces
+    - l2_interfaces
+    - l3_interfaces
+    - layer1
+    - layer2
+    - layer3
+
+# ============================================================================
+# Interface Configuration
+# ============================================================================
 # Physical interfaces should be configured before L2/L3 or LAG configuration
 - name: Include physical interface configuration tasks
   ansible.builtin.include_tasks:

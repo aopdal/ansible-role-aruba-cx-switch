@@ -2,26 +2,39 @@
 # Configure MCLAG (Multi-Chassis LAG) interfaces
 # These require special handling and use "multi-chassis" keyword
 
-- name: configure_mclag_interfaces | Debug MCLAG interfaces to configure
+# Verify that interface analysis has been performed
+- name: configure_mclag_interfaces | Verify interface analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - interface_changes is defined
+      - interface_changes.mclag is defined
+    fail_msg: "ERROR: identify_interface_changes.yml must run before configure_mclag_interfaces.yml"
+    success_msg: "Interface analysis completed - proceeding with MCLAG interface configuration"
+  tags:
+    - always
+
+- name: configure_mclag_interfaces | Debug MCLAG interfaces to configure (only those needing changes)
   ansible.builtin.debug:
     msg:
       - "Configuring MCLAG interfaces"
-      - "MCLAGs found: {{ interfaces | selectattr('custom_fields.if_mclag', 'defined') |
-          selectattr('custom_fields.if_mclag', 'equalto', true) | map(attribute='name') | list }}"
+      - "Total MCLAGs from NetBox: {{ interfaces | selectattr('custom_fields.if_mclag', 'defined') |
+          selectattr('custom_fields.if_mclag', 'equalto', true) | list | length }}"
+      - "MCLAGs needing changes: {{ interface_changes.mclag | default([]) | length }}"
+      - "MCLAGs needing changes: {{ interface_changes.mclag | default([]) | map(attribute='name') | list }}"
   when: aoscx_debug | bool
 
 # Note: MCLAG interfaces use "multi-chassis" keyword and are part of VSX configuration
 # This task provides basic interface configuration, but full MCLAG setup
 # requires additional VSX domain and peer configuration
 
-- name: configure_mclag_interfaces | Configure MCLAG interface description
+- name: configure_mclag_interfaces | Configure MCLAG interface description (only those needing changes)
   arubanetworks.aoscx.aoscx_config:
     parents:
       - interface {{ item.name | replace("lag", "lag ") }} multi-chassis
     lines:
       - description {{ item.description }}
     match: line
-  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop: "{{ interface_changes.mclag | default([]) }}"
   loop_control:
     label: "MCLAG Interface: {{ item.name }} - Description: {{ item.description | default('(none)') }}"
   when:
@@ -32,15 +45,15 @@
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
 
-# Enable MCLAG interfaces
-- name: configure_mclag_interfaces | Configure MCLAG interface enable (no shutdown)
+# Enable MCLAG interfaces (only those needing changes)
+- name: configure_mclag_interfaces | Configure MCLAG interface enable (no shutdown, only those needing changes)
   arubanetworks.aoscx.aoscx_config:
     parents:
       - interface {{ item.name | replace("lag", "lag ") }} multi-chassis
     lines:
       - no shutdown
     match: line
-  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop: "{{ interface_changes.mclag | default([]) }}"
   loop_control:
     label: "MCLAG Interface: {{ item.name }} - Enabled: {{ item.enabled | default(true) }}"
   when:
@@ -50,15 +63,15 @@
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
 
-# Disable MCLAG interfaces
-- name: configure_mclag_interfaces | Configure MCLAG interface disable (shutdown)
+# Disable MCLAG interfaces (only those needing changes)
+- name: configure_mclag_interfaces | Configure MCLAG interface disable (shutdown, only those needing changes)
   arubanetworks.aoscx.aoscx_config:
     parents:
       - interface {{ item.name | replace("lag", "lag ") }} multi-chassis
     lines:
       - shutdown
     match: line
-  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop: "{{ interface_changes.mclag | default([]) }}"
   loop_control:
     label: "MCLAG Interface: {{ item.name }} - Enabled: {{ item.enabled | default(true) }}"
   when:
@@ -68,15 +81,15 @@
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
 
-# Configure LACP mode active on MCLAG interfaces
-- name: configure_mclag_interfaces | Configure MCLAG LACP mode active
+# Configure LACP mode active on MCLAG interfaces (only those needing changes)
+- name: configure_mclag_interfaces | Configure MCLAG LACP mode active (only those needing changes)
   arubanetworks.aoscx.aoscx_config:
     parents:
       - interface {{ item.name | replace("lag", "lag ") }} multi-chassis
     lines:
       - lacp mode active
     match: line
-  loop: "{{ interfaces | selectattr('type', 'defined') | list }}"
+  loop: "{{ interface_changes.mclag | default([]) }}"
   loop_control:
     label: "MCLAG Interface: {{ item.name }} - LACP: {{ item.custom_fields.if_lacp | default(true) }}"
   when:

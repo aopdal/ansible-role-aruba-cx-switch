@@ -1,18 +1,29 @@
 ---
 # Configure L3 interfaces with IP addresses
 
-- name: Extract interfaces for L3 configuration
-  ansible.builtin.set_fact:
-    interfaces_with_ips: "{{ interfaces | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list }}"
-  when: interfaces is defined
+# Verify that interface analysis has been performed
+- name: configure_l3_interfaces | Verify interface analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - interface_changes is defined
+      - interface_changes.l3 is defined
+    fail_msg: "ERROR: identify_interface_changes.yml must run before configure_l3_interfaces.yml"
+    success_msg: "Interface analysis completed - proceeding with L3 interface configuration"
+  tags:
+    - always
 
-- name: Debug - Show interfaces with IPs
+- name: Extract interfaces for L3 configuration (only those needing changes)
+  ansible.builtin.set_fact:
+    interfaces_with_ips: "{{ interface_changes.l3 | default([]) | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list }}"
+
+- name: Debug - Show interfaces with IPs (only those needing changes)
   ansible.builtin.debug:
     msg:
-      - "Interfaces with IP addresses: {{ interfaces_with_ips | length }}"
-      - "Sample: {{ interfaces_with_ips[:3] | map(attribute='name') | list }}"
+      - "Total L3 interfaces from NetBox: {{ interfaces | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list | length }}"
+      - "L3 interfaces needing configuration changes: {{ interfaces_with_ips | length }}"
+      - "L3 interfaces NOT needing changes (skipped): {{ (interfaces | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list | length) - (interfaces_with_ips | length) }}"
+      - "Sample interfaces with changes: {{ interfaces_with_ips[:3] | map(attribute='name') | list }}"
   when:
-    - interfaces is defined
     - aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Flatten interface/IP combinations

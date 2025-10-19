@@ -2,13 +2,24 @@
 # Configure basic physical interface settings (enable/disable, description)
 # This must be done before L2/L3 configuration or LAG membership
 
-- name: Enable or disable physical interfaces
+# Verify that interface analysis has been performed
+- name: configure_physical_interfaces | Verify interface analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - interface_changes is defined
+      - interface_changes.physical is defined
+    fail_msg: "ERROR: identify_interface_changes.yml must run before configure_physical_interfaces.yml"
+    success_msg: "Interface analysis completed - proceeding with physical interface configuration"
+  tags:
+    - always
+
+- name: Enable or disable physical interfaces (only those needing changes)
   arubanetworks.aoscx.aoscx_interface:
     name: "{{ item.name }}"
     enabled: "{{ item.enabled | default(true) }}"
     description: "{{ item.description | default('') }}"
     mtu: "{{ item.mtu if (item.mtu is defined and item.mtu is not none) else omit }}"
-  loop: "{{ interfaces }}"
+  loop: "{{ interface_changes.physical | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
   when:
@@ -18,13 +29,13 @@
       (item.type.value is not defined and item.type not in ["virtual", "lag"])
     - item.description is not defined or item.description != "AP_Aruba"
 
-- name: Enable or disable physical interfaces AP_Aruba (special case for Aruba Central)
+- name: Enable or disable physical interfaces AP_Aruba (special case for Aruba Central, only those needing changes)
   arubanetworks.aoscx.aoscx_interface:
     name: "{{ item.name }}"
     enabled: "{{ item.enabled | default(true) }}"
     description: "{{ item.name }} {{ item.description }}"
     mtu: "{{ item.mtu if (item.mtu is defined and item.mtu is not none) else omit }}"
-  loop: "{{ interfaces }}"
+  loop: "{{ interface_changes.physical | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
   when:
@@ -37,19 +48,18 @@
 - name: Debug - Physical interface configuration summary
   ansible.builtin.debug:
     msg:
-      - "Physical interfaces configured: {{ interfaces | selectattr('type', 'defined') | rejectattr('type', 'in', ['virtual', 'lag']) | list | length }}"
-      - "AP_Aruba interfaces: {{ interfaces | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
+      - "=== Physical Interface Configuration Summary ==="
+      - "Device: {{ inventory_hostname }}"
+      - "Total physical interfaces from NetBox: {{ interfaces | selectattr('type', 'defined') | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length }}"
+      - "Physical interfaces NEEDING changes: {{ interface_changes.physical | default([]) | length }}"
+      - "Physical interfaces NOT needing changes: {{ (interfaces | selectattr('type', 'defined') | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length) - (interface_changes.physical | default([]) | length) }}"
+      - "AP_Aruba interfaces changed: {{ interface_changes.physical | default([]) | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
       - >-
-        Interfaces with custom MTU:
-        {{ interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}
+        Interfaces with custom MTU changed:
+        {{ interface_changes.physical | default([]) | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}
       - >-
-        MTU values:
-        {{
-          interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) |
-          selectattr('mtu', '!=', '') | map(attribute='name') | list |
-          zip(interfaces | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) |
-          selectattr('mtu', '!=', '') | map(attribute='mtu') | list) | list
-        }}
+        Changed interfaces:
+        {{ interface_changes.physical | default([]) | map(attribute='name') | list }}
   when:
-    - interfaces is defined
+    - interface_changes is defined
     - aoscx_debug | bool or ansible_verbosity >= 1

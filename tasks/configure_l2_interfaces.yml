@@ -4,7 +4,7 @@
 # This task file handles L2 interface configuration in two modes:
 #
 # 1. Standard mode (aoscx_idempotent_mode=false):
-#    - Only configures interfaces from NetBox
+#    - Only configures interfaces from NetBox that need changes
 #    - Does not remove any existing configurations
 #    - Faster, suitable for initial deployment
 #
@@ -13,6 +13,17 @@
 #    - Removes configurations not in NetBox
 #    - Ensures device matches NetBox exactly
 #    - Suitable for ongoing configuration management
+
+# Verify that interface analysis has been performed
+- name: configure_l2_interfaces | Verify interface analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - interface_changes is defined
+      - interface_changes.l2 is defined
+    fail_msg: "ERROR: identify_interface_changes.yml must run before configure_l2_interfaces.yml"
+    success_msg: "Interface analysis completed - proceeding with L2 interface configuration"
+  tags:
+    - always
 
 - name: Set mode description for logging
   ansible.builtin.set_fact:
@@ -23,7 +34,9 @@
     msg:
       - "=== L2 Interface Configuration Mode: {{ l2_config_mode }} ==="
       - "Device: {{ inventory_hostname }}"
-      - "Total interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
+      - "Total L2 interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
+      - "L2 interfaces needing configuration changes: {{ interface_changes.l2 | default([]) | length }}"
+      - "L2 interfaces NOT needing changes (skipped): {{ (interfaces | selectattr('mode', 'defined') | list | length) - (interface_changes.l2 | default([]) | length) }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # ============================================================================
@@ -59,10 +72,15 @@
 # BOTH MODES: Categorize and configure interfaces
 # ============================================================================
 
-# In idempotent mode, use filtered list; in standard mode, use all interfaces
+# In idempotent mode, use filtered list; in standard mode, use only interfaces needing changes
 - name: Set interfaces to configure based on mode
   ansible.builtin.set_fact:
-    interfaces_to_configure: "{{ interfaces | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes) }}"
+    interfaces_to_configure: >-
+      {{
+        (interfaces | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes))
+        if (aoscx_idempotent_mode | bool)
+        else (interface_changes.l2 | default([]))
+      }}
 
 - name: Categorize interfaces for L2 configuration
   ansible.builtin.set_fact:

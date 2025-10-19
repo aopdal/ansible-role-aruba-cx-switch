@@ -2,22 +2,34 @@
 # Assign physical interfaces to LAG interfaces
 # This must run AFTER LAG and MCLAG interfaces have been created
 
-- name: assign_interfaces_to_lag | Debug physical interfaces to assign to LAGs
+# Verify that interface analysis has been performed
+- name: assign_interfaces_to_lag | Verify interface analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - interface_changes is defined
+      - interface_changes.lag_members is defined
+    fail_msg: "ERROR: identify_interface_changes.yml must run before assign_interfaces_to_lag.yml"
+    success_msg: "Interface analysis completed - proceeding with LAG member assignment"
+  tags:
+    - always
+
+- name: assign_interfaces_to_lag | Debug physical interfaces to assign to LAGs (only those needing changes)
   ansible.builtin.debug:
     msg:
-      - "Assigning {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }} physical interfaces to LAGs"
-      - "Assignments: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | map(attribute='name') | list | join(', ') }}"
+      - "Total physical interfaces with LAG membership from NetBox: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
+      - "Physical interfaces needing LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
+      - "Assignments: {{ interface_changes.lag_members | default([]) | map(attribute='name') | list | join(', ') }}"
   when: aoscx_debug | bool
 
-# Assign physical interfaces to LAG (regular LAGs)
-- name: assign_interfaces_to_lag | Assign physical interfaces to LAG
+# Assign physical interfaces to LAG (only those needing changes)
+- name: assign_interfaces_to_lag | Assign physical interfaces to LAG (only those needing changes)
   arubanetworks.aoscx.aoscx_config:
     parents:
       - interface {{ item.name }}
     lines:
       - "{{ item.lag.name | replace('lag', 'lag ') }}"
     match: line
-  loop: "{{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list }}"
+  loop: "{{ interface_changes.lag_members | default([]) }}"
   loop_control:
     label: "Interface: {{ item.name }} -> LAG: {{ item.lag.name }}"
   vars:
@@ -27,5 +39,6 @@
   ansible.builtin.debug:
     msg:
       - "Physical Interface LAG Assignment Summary:"
-      - "Total physical interfaces assigned to LAGs: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
+      - "Total physical interfaces with LAG membership from NetBox: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
+      - "Physical interfaces that received LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
   when: aoscx_debug | bool
