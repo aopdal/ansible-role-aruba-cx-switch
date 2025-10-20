@@ -68,18 +68,18 @@
       - "Interface 1/1/5 data: {{ interface_ips | selectattr('interface_name', 'equalto', '1/1/5') | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
-- name: Get VLAN interfaces
+- name: Get VLAN interfaces (from interfaces needing changes only)
   ansible.builtin.set_fact:
-    vlan_interfaces: "{{ interfaces | get_vlan_interfaces }}"
+    vlan_interfaces: "{{ interfaces_with_ips | get_vlan_interfaces }}"
 
 - name: Debug - Show VLAN interfaces
   ansible.builtin.debug:
     msg:
-      - "VLAN interfaces found: {{ vlan_interfaces | length }}"
+      - "VLAN interfaces needing configuration: {{ vlan_interfaces | length }}"
       - "VLAN interface names: {{ vlan_interfaces | map(attribute='name') | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
-- name: Create VLAN interfaces (SVIs)
+- name: Create VLAN interfaces (SVIs) that need configuration
   arubanetworks.aoscx.aoscx_interface:
     name: "{{ item.name }}"
     enabled: "{{ item.enabled }}"
