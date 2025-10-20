@@ -587,8 +587,17 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                 )
 
         # Check L2 configuration (VLANs)
+        # Skip L2 VLAN checks for VLAN interfaces (SVIs) - these are L3 interfaces
+        # that provide routing for a VLAN, and don't have vlan_mode/vlan_tag properties.
+        # NetBox uses the mode/VLAN fields just to identify which VLAN the SVI represents.
+        is_vlan_interface = intf_name.startswith("vlan") and (
+            nb_intf.get("type", {}).get("value") == "virtual"
+            if isinstance(nb_intf.get("type"), dict)
+            else False
+        )
+
         mode_obj = nb_intf.get("mode")
-        if mode_obj and isinstance(mode_obj, dict):
+        if mode_obj and isinstance(mode_obj, dict) and not is_vlan_interface:
             # Has L2 mode - check VLAN configuration
             nb_mode = mode_obj.get("value")
             device_mode = device_intf.get("vlan_mode") or device_intf.get(
