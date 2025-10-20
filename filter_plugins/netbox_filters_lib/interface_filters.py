@@ -440,6 +440,24 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
             _categorize_interface_for_changes(intf, result, needs_change=True)
         return result
 
+    # Build reverse mapping: physical_interface_name -> lag_name
+    # This is needed because AOS-CX stores LAG membership on the LAG interface, not on members
+    intf_to_lag_map = {}
+    for intf_key, intf_data in facts_by_interface.items():
+        if not isinstance(intf_data, dict):
+            continue
+        # Check if this is a LAG interface
+        if intf_data.get("type") == "lag":
+            # Get member interfaces from the "interfaces" dict
+            lag_members = intf_data.get("interfaces", {})
+            if isinstance(lag_members, dict):
+                lag_name = intf_data.get("name") or intf_key
+                for member_name in lag_members.keys():
+                    intf_to_lag_map[member_name] = lag_name
+                _debug(f"LAG {lag_name} has members: {list(lag_members.keys())}")
+
+    _debug(f"Built LAG membership map with {len(intf_to_lag_map)} member interfaces")
+
     _debug(f"Comparing {len(interfaces)} NetBox interfaces with device facts")
 
     for nb_intf in interfaces:
@@ -547,23 +565,13 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                     )
 
         # Check LAG membership
+        # AOS-CX stores LAG membership in the LAG interface's "interfaces" dict,
+        # not on the physical interface itself. Use the reverse mapping we built earlier.
         nb_lag = nb_intf.get("lag")
         if nb_lag and isinstance(nb_lag, dict):
             nb_lag_name = nb_lag.get("name", "")
-            device_lag_id = device_intf.get("lag_id")
-
-            if device_lag_id:
-                # Parse device lag_id (e.g., "lag10" -> "lag10" or just "10" -> "lag10")
-                device_lag_name = (
-                    device_lag_id
-                    if isinstance(device_lag_id, str)
-                    else str(device_lag_id)
-                )
-                # Ensure it has "lag" prefix
-                if not device_lag_name.startswith("lag"):
-                    device_lag_name = f"lag{device_lag_name}"
-            else:
-                device_lag_name = ""
+            # Look up current LAG membership from our reverse mapping
+            device_lag_name = intf_to_lag_map.get(intf_name, "")
 
             if nb_lag_name and nb_lag_name != device_lag_name:
                 needs_change = True
@@ -571,14 +579,12 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                     f"LAG membership mismatch (NB: {nb_lag_name}, "
                     f"device: {device_lag_name})"
                 )
-                result["lag_members"].append(nb_intf)
             elif not nb_lag_name and device_lag_name:
                 # Interface should not be in LAG but is
                 needs_change = True
                 change_reasons.append(
                     f"Interface should not be in LAG (device has: {device_lag_name})"
                 )
-                result["lag_members"].append(nb_intf)
 
         # Check L2 configuration (VLANs)
         mode_obj = nb_intf.get("mode")
