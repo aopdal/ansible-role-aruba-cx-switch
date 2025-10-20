@@ -444,6 +444,13 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
 
         # Skip management interfaces
         if nb_intf.get("mgmt_only"):
+            _debug(f"Skipping management interface: {intf_name}")
+            continue
+
+        # Skip interface if it's named "mgmt" (case insensitive)
+        if intf_name.lower() == "mgmt":
+            _debug(f"Skipping mgmt interface by name: {intf_name}")
+            result["no_changes"].append(nb_intf)
             continue
 
         # Get device facts for this interface
@@ -453,9 +460,16 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
 
         if not device_intf:
             # Interface doesn't exist on device yet - needs to be created
-            _debug(f"Interface {intf_name} not found in device facts - needs creation")
+            _debug(
+                f"Interface {intf_name} (key: {device_intf_key}) "
+                "not found in device facts - needs creation"
+            )
+            available_keys = list(facts_by_interface.keys())[:5]
+            _debug(f"Available interface keys: {available_keys}")
             _categorize_interface_for_changes(nb_intf, result, needs_change=True)
             continue
+
+        _debug(f"Found device facts for {intf_name}: {device_intf}")
 
         # Check if interface needs changes
         needs_change = False
@@ -474,33 +488,42 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
             device_admin_state = device_intf.get("admin") or device_intf.get(
                 "admin_state"
             )
-            device_enabled = device_admin_state == "up" if device_admin_state else True
+            device_enabled = device_admin_state == "up" if device_admin_state else None
 
-            if nb_enabled != device_enabled:
+            # Only compare if we have device state information
+            if device_enabled is not None and nb_enabled != device_enabled:
                 needs_change = True
                 change_reasons.append(
                     f"enabled mismatch (NB: {nb_enabled}, device: {device_enabled})"
                 )
 
-            # Check description
+            _debug(
+                f"Interface {intf_name}: NB enabled={nb_enabled}, "
+                f"device admin_state={device_admin_state}, "
+                f"device_enabled={device_enabled}"
+            )
+
+            # Check description (only if NetBox has a description)
             nb_description = nb_intf.get("description", "")
             device_description = device_intf.get("description", "")
 
-            # Special handling for AP_Aruba description
-            if nb_description == "AP_Aruba":
-                expected_description = f"{intf_name} {nb_description}"
-                if device_description != expected_description:
+            # Only check if NetBox has a description set
+            if nb_description:
+                # Special handling for AP_Aruba description
+                if nb_description == "AP_Aruba":
+                    expected_description = f"{intf_name} {nb_description}"
+                    if device_description != expected_description:
+                        needs_change = True
+                        change_reasons.append(
+                            f"description mismatch (NB: {expected_description}, "
+                            f"device: {device_description})"
+                        )
+                elif nb_description != device_description:
                     needs_change = True
                     change_reasons.append(
-                        f"description mismatch (NB: {expected_description}, "
+                        f"description mismatch (NB: {nb_description}, "
                         f"device: {device_description})"
                     )
-            elif nb_description != device_description:
-                needs_change = True
-                change_reasons.append(
-                    f"description mismatch (NB: {nb_description}, "
-                    f"device: {device_description})"
-                )
 
             # Check MTU (if specified in NetBox)
             nb_mtu = nb_intf.get("mtu")
@@ -519,18 +542,30 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
             device_lag_id = device_intf.get("lag_id")
 
             if device_lag_id:
-                # Parse device lag_id (e.g., "lag10" -> "lag10")
+                # Parse device lag_id (e.g., "lag10" -> "lag10" or just "10" -> "lag10")
                 device_lag_name = (
-                    device_lag_id if isinstance(device_lag_id, str) else ""
+                    device_lag_id
+                    if isinstance(device_lag_id, str)
+                    else str(device_lag_id)
                 )
+                # Ensure it has "lag" prefix
+                if not device_lag_name.startswith("lag"):
+                    device_lag_name = f"lag{device_lag_name}"
             else:
                 device_lag_name = ""
 
-            if nb_lag_name != device_lag_name:
+            if nb_lag_name and nb_lag_name != device_lag_name:
                 needs_change = True
                 change_reasons.append(
                     f"LAG membership mismatch (NB: {nb_lag_name}, "
                     f"device: {device_lag_name})"
+                )
+                result["lag_members"].append(nb_intf)
+            elif not nb_lag_name and device_lag_name:
+                # Interface should not be in LAG but is
+                needs_change = True
+                change_reasons.append(
+                    f"Interface should not be in LAG (device has: {device_lag_name})"
                 )
                 result["lag_members"].append(nb_intf)
 
@@ -543,90 +578,112 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                 "applied_vlan_mode"
             )
 
-            if nb_mode and device_mode:
-                # Mode mismatch check
-                if nb_mode == "access" and device_mode != "access":
-                    needs_change = True
-                    change_reasons.append(
-                        f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
-                    )
-                elif nb_mode in ["tagged", "tagged-all"] and device_mode not in [
-                    "native-tagged",
-                    "native-untagged",
-                ]:
-                    needs_change = True
-                    change_reasons.append(
-                        f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
-                    )
+            # Only check if NetBox has a mode configured
+            if nb_mode:
+                # Get VLAN configuration from NetBox to determine if we need to check
+                nb_untagged_vlan = nb_intf.get("untagged_vlan")
+                nb_tagged_vlans = nb_intf.get("tagged_vlans")
 
-                # VLAN membership check
-                nb_untagged = None
-                untagged_vlan = nb_intf.get("untagged_vlan")
-                if untagged_vlan and isinstance(untagged_vlan, dict):
-                    nb_untagged = untagged_vlan.get("vid")
-
-                nb_tagged = set()
-                tagged_vlans = nb_intf.get("tagged_vlans")
-                if tagged_vlans and isinstance(tagged_vlans, list):
-                    for v in tagged_vlans:
-                        if v and isinstance(v, dict):
-                            vid = v.get("vid")
-                            if vid is not None:
-                                nb_tagged.add(vid)
-
-                # Get device VLANs
-                device_native = None
-                vlan_tag = device_intf.get("vlan_tag") or device_intf.get(
-                    "applied_vlan_tag"
+                # Only compare mode if NetBox has actual VLAN assignments
+                has_vlan_config = (nb_untagged_vlan is not None) or (
+                    nb_tagged_vlans and len(nb_tagged_vlans) > 0
                 )
-                if vlan_tag and isinstance(vlan_tag, dict):
-                    for vlan_id_str in vlan_tag.keys():
-                        try:
-                            device_native = int(vlan_id_str)
-                            break
-                        except (ValueError, TypeError):
-                            pass
 
-                device_trunks = set()
-                vlan_trunks = device_intf.get("vlan_trunks") or device_intf.get(
-                    "applied_vlan_trunks"
-                )
-                if vlan_trunks and isinstance(vlan_trunks, dict):
-                    for vlan_id_str in vlan_trunks.keys():
-                        try:
-                            device_trunks.add(int(vlan_id_str))
-                        except (ValueError, TypeError):
-                            pass
-
-                # Check for VLAN mismatches
-                if nb_mode == "access":
-                    if nb_untagged and nb_untagged != device_native:
+                if has_vlan_config and device_mode:
+                    # Mode mismatch check
+                    if nb_mode == "access" and device_mode != "access":
                         needs_change = True
                         change_reasons.append(
-                            f"access VLAN mismatch (NB: {nb_untagged}, "
-                            f"device: {device_native})"
+                            f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
                         )
-                elif nb_mode == "tagged":
-                    nb_all_vlans = set(nb_tagged)
-                    if nb_untagged:
-                        nb_all_vlans.add(nb_untagged)
-
-                    if nb_untagged and nb_untagged != device_native:
+                    elif nb_mode in ["tagged", "tagged-all"] and device_mode not in [
+                        "native-tagged",
+                        "native-untagged",
+                        "trunk",  # Some AOS-CX versions use "trunk"
+                    ]:
                         needs_change = True
                         change_reasons.append(
-                            f"native VLAN mismatch (NB: {nb_untagged}, "
-                            f"device: {device_native})"
+                            f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
                         )
+                elif has_vlan_config and not device_mode:
+                    # NetBox has VLAN config but device doesn't
+                    needs_change = True
+                    change_reasons.append(
+                        "VLANs configured in NetBox but not on device"
+                    )
 
-                    vlans_to_add = nb_all_vlans - device_trunks
-                    vlans_to_remove = device_trunks - nb_all_vlans
+                # Only check VLAN membership if we have VLAN configuration
+                if has_vlan_config:
+                    # VLAN membership check
+                    nb_untagged = None
+                    untagged_vlan = nb_intf.get("untagged_vlan")
+                    if untagged_vlan and isinstance(untagged_vlan, dict):
+                        nb_untagged = untagged_vlan.get("vid")
 
-                    if vlans_to_add or vlans_to_remove:
-                        needs_change = True
-                        if vlans_to_add:
-                            change_reasons.append(f"VLANs to add: {vlans_to_add}")
-                        if vlans_to_remove:
-                            change_reasons.append(f"VLANs to remove: {vlans_to_remove}")
+                    nb_tagged = set()
+                    tagged_vlans = nb_intf.get("tagged_vlans")
+                    if tagged_vlans and isinstance(tagged_vlans, list):
+                        for v in tagged_vlans:
+                            if v and isinstance(v, dict):
+                                vid = v.get("vid")
+                                if vid is not None:
+                                    nb_tagged.add(vid)
+
+                    # Get device VLANs
+                    device_native = None
+                    vlan_tag = device_intf.get("vlan_tag") or device_intf.get(
+                        "applied_vlan_tag"
+                    )
+                    if vlan_tag and isinstance(vlan_tag, dict):
+                        for vlan_id_str in vlan_tag.keys():
+                            try:
+                                device_native = int(vlan_id_str)
+                                break
+                            except (ValueError, TypeError):
+                                pass
+
+                    device_trunks = set()
+                    vlan_trunks = device_intf.get("vlan_trunks") or device_intf.get(
+                        "applied_vlan_trunks"
+                    )
+                    if vlan_trunks and isinstance(vlan_trunks, dict):
+                        for vlan_id_str in vlan_trunks.keys():
+                            try:
+                                device_trunks.add(int(vlan_id_str))
+                            except (ValueError, TypeError):
+                                pass
+
+                    # Check for VLAN mismatches
+                    if nb_mode == "access":
+                        if nb_untagged and nb_untagged != device_native:
+                            needs_change = True
+                            change_reasons.append(
+                                f"access VLAN mismatch (NB: {nb_untagged}, "
+                                f"device: {device_native})"
+                            )
+                    elif nb_mode == "tagged":
+                        nb_all_vlans = set(nb_tagged)
+                        if nb_untagged:
+                            nb_all_vlans.add(nb_untagged)
+
+                        if nb_untagged and nb_untagged != device_native:
+                            needs_change = True
+                            change_reasons.append(
+                                f"native VLAN mismatch (NB: {nb_untagged}, "
+                                f"device: {device_native})"
+                            )
+
+                        vlans_to_add = nb_all_vlans - device_trunks
+                        vlans_to_remove = device_trunks - nb_all_vlans
+
+                        if vlans_to_add or vlans_to_remove:
+                            needs_change = True
+                            if vlans_to_add:
+                                change_reasons.append(f"VLANs to add: {vlans_to_add}")
+                            if vlans_to_remove:
+                                change_reasons.append(
+                                    f"VLANs to remove: {vlans_to_remove}"
+                                )
 
         if needs_change:
             _debug(f"Interface {intf_name} needs changes: {', '.join(change_reasons)}")
