@@ -55,7 +55,7 @@
       - "L2 interfaces needing changes: {{ interface_changes.l2 | default([]) | length }}"
       - >-
         L2 interface names (first 10):
-        {{ interface_changes.l2 | default([]) | map(attribute='name') | list | first(10) }}
+        {{ (interface_changes.l2 | default([]) | map(attribute='name') | list)[:10] }}
       - "L3 interfaces needing changes: {{ interface_changes.l3 | default([]) | length }}"
       - "LAG member changes: {{ interface_changes.lag_members | default([]) | length }}"
       - "Interfaces not needing changes: {{ interface_changes.no_changes | default([]) | length }}"
