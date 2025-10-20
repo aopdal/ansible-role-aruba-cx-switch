@@ -488,6 +488,25 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
         device_intf = facts_by_interface.get(device_intf_key)
 
         if not device_intf:
+            # Check if this is a VLAN interface (SVI)
+            # VLAN interfaces should not be created/configured via the interface module
+            # since they are L3 interfaces tied to VLANs
+            type_obj = nb_intf.get("type")
+            is_vlan_interface = intf_name.startswith("vlan") and (
+                type_obj.get("value") == "virtual"
+                if isinstance(type_obj, dict)
+                else False
+            )
+
+            if is_vlan_interface:
+                # VLAN interface doesn't exist on device - skip it, don't try to create
+                _debug(
+                    f"VLAN interface {intf_name} not found on device - "
+                    "skipping (VLAN interfaces are not created via interface config)"
+                )
+                result["no_changes"].append(nb_intf)
+                continue
+
             # Interface doesn't exist on device yet - needs to be created
             _debug(
                 f"Interface {intf_name} (key: {device_intf_key}) "
