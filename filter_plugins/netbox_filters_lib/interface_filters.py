@@ -465,8 +465,8 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
             continue
 
         # Get device facts for this interface
-        # AOS-CX uses format "1/1/1" which becomes key "1_1_1" in facts
-        device_intf_key = intf_name.replace("/", "_").replace(" ", "_")
+        # AOS-CX keeps the original format "1/1/1" as the key in facts
+        device_intf_key = intf_name
         device_intf = facts_by_interface.get(device_intf_key)
 
         if not device_intf:
