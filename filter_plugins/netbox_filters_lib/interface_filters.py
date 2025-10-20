@@ -735,6 +735,14 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
 
     type_value = type_obj.get("value")
 
+    # Check if it's a LAG member (physical interface with LAG assignment)
+    # LAG members need special handling
+    lag_obj = intf.get("lag")
+    if lag_obj and isinstance(lag_obj, dict) and lag_obj.get("name"):
+        # This is a LAG member interface
+        result_dict["lag_members"].append(intf)
+        return
+
     # Check if it's a LAG interface
     if type_value == "lag":
         is_mclag = intf.get("custom_fields", {}).get("if_mclag", False)
