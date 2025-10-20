@@ -422,6 +422,14 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
             interfaces_dict = network_resources.get("interfaces", {})
             if interfaces_dict and isinstance(interfaces_dict, dict):
                 facts_by_interface = interfaces_dict
+                _debug(f"Loaded {len(facts_by_interface)} interfaces from device facts")
+                _debug(f"Sample interface keys: {list(facts_by_interface.keys())[:10]}")
+                # Show structure of first interface
+                if facts_by_interface:
+                    first_key = list(facts_by_interface.keys())[0]
+                    _debug(
+                        f"Sample interface structure ({first_key}): {facts_by_interface[first_key]}"
+                    )
 
     if not facts_by_interface:
         _debug("No interface facts found - assuming all interfaces need changes")
@@ -442,9 +450,12 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
         if not intf_name:
             continue
 
+        _debug(f"Processing interface: {intf_name} (type: {nb_intf.get('type')})")
+
         # Skip management interfaces
         if nb_intf.get("mgmt_only"):
             _debug(f"Skipping management interface: {intf_name}")
+            result["no_changes"].append(nb_intf)
             continue
 
         # Skip interface if it's named "mgmt" (case insensitive)

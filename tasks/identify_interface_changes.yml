@@ -23,6 +23,19 @@
 #   - lag_members: Physical interfaces needing LAG assignment changes
 #   - no_changes: Interfaces that don't need any changes
 
+- name: Debug - Show sample device interface facts
+  ansible.builtin.debug:
+    msg:
+      - "Sample interface from device facts:"
+      - "{{ ansible_facts.network_resources.interfaces | dict2items | first }}"
+  when:
+    - aoscx_debug_mode | default(false) | bool
+    - ansible_facts is defined
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+  tags:
+    - always
+
 - name: Identify interfaces needing configuration changes
   ansible.builtin.set_fact:
     interface_changes: >-
