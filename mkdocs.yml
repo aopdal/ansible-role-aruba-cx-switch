@@ -115,12 +115,17 @@ nav:
       - Contributing: CONTRIBUTING.md
   - Reference:
       - Quick Reference: QUICK_REFERENCE.md
+      - Release Process:
+          - Full Guide: RELEASE_PROCESS.md
+          - Quick Reference: RELEASE_QUICK_REFERENCE.md
+          - System Integration: RELEASE_INTEGRATION.md
+          - Role vs Collection: RELEASE_ROLE_VS_COLLECTION.md
+          - Changelog: CHANGELOG.md
       - Documentation Site: DOCUMENTATION_SITE.md  # How to use MkDocs
       - Documentation Sync: DOCS_SYNC_WORKFLOW.md  # How README.md syncs to docs/
       - Workspace Setup: WORKSPACE.md
       - DevContainer Setup: DEVCONTAINER_SETUP.md
       - DevContainer Mounts: DEVCONTAINER_MOUNTS.md
-      - Changelog: CHANGELOG.md
   - Internal:
       - VLAN Refactoring:
           - Summary: REFACTOR_SUMMARY.md

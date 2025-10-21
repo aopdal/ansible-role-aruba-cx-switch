@@ -1,0 +1,190 @@
+---
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0) - leave empty for auto-increment'
+        required: false
+        type: string
+      release_type:
+        description: 'Release type (major, minor, patch)'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    # Only run on push to main (automatic) or manual workflow dispatch
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml semver
+
+      - name: Determine version
+        id: version
+        run: |
+          python3 << 'EOF'
+          import os
+          from pathlib import Path
+
+          # Get manual version if provided
+          manual_version = "${{ github.event.inputs.version }}"
+          release_type = "${{ github.event.inputs.release_type }}" or "patch"
+
+          # Read current version from VERSION file
+          version_file = Path("VERSION")
+          if version_file.exists():
+              current_version = version_file.read_text().strip()
+          else:
+              current_version = "0.0.0"
+
+          print(f"Current version: {current_version}")
+
+          if manual_version:
+              new_version = manual_version
+              print(f"Using manual version: {new_version}")
+          else:
+              # Auto-increment based on release type
+              parts = current_version.split(".")
+              major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+
+              if release_type == "major":
+                  major += 1
+                  minor = 0
+                  patch = 0
+              elif release_type == "minor":
+                  minor += 1
+                  patch = 0
+              else:  # patch
+                  patch += 1
+
+              new_version = f"{major}.{minor}.{patch}"
+              print(f"Auto-incremented to: {new_version}")
+
+          # Write to GitHub output
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"version={new_version}\n")
+              f.write(f"current_version={current_version}\n")
+          EOF
+
+      - name: Update VERSION file
+        run: |
+          echo "${{ steps.version.outputs.version }}" > VERSION
+          echo "Updated VERSION file to ${{ steps.version.outputs.version }}"
+
+      - name: Update CHANGELOG.md
+        id: changelog
+        run: |
+          python3 << 'EOF'
+          import os
+          import re
+          from datetime import datetime
+          from pathlib import Path
+
+          new_version = "${{ steps.version.outputs.version }}"
+          today = datetime.now().strftime("%Y-%m-%d")
+
+          changelog_file = Path("CHANGELOG.md")
+
+          if changelog_file.exists():
+              content = changelog_file.read_text()
+
+              # Replace [Unreleased] with version and date
+              # Keep the Unreleased section header
+              unreleased_pattern = r"## \[Unreleased\]"
+
+              # Add new version section after Unreleased
+              replacement = f"## [Unreleased]\n\n## [{new_version}] - {today}"
+
+              content = re.sub(unreleased_pattern, replacement, content, count=1)
+
+              changelog_file.write_text(content)
+              print(f"Updated CHANGELOG.md with version {new_version}")
+
+              # Extract release notes for this version
+              # Find content between the new version header and the next version header
+              version_pattern = rf"## \[{re.escape(new_version)}\] - {today}\n\n(.*?)(?=\n## \[|$)"
+              match = re.search(version_pattern, content, re.DOTALL)
+
+              if match:
+                  release_notes = match.group(1).strip()
+                  # Write release notes to file for GitHub release
+                  with open("RELEASE_NOTES.md", "w") as f:
+                      f.write(f"# Release {new_version}\n\n")
+                      f.write(release_notes)
+
+                  # Also output for GitHub
+                  with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                      # Escape multiline content
+                      notes = release_notes.replace("%", "%25").replace("\n", "%0A").replace("\r", "%0D")
+                      f.write(f"notes={notes}\n")
+
+                  print("Extracted release notes")
+              else:
+                  print("No release notes found")
+                  with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                      f.write(f"notes=Release {new_version}\n")
+          EOF
+
+      - name: Commit version changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION CHANGELOG.md
+          git commit -m "chore: release version ${{ steps.version.outputs.version }}"
+          git push
+
+      - name: Create Git tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release version ${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Version:** ${{ steps.version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
+          cat RELEASE_NOTES.md >> $GITHUB_STEP_SUMMARY
