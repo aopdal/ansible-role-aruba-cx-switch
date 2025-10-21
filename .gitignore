@@ -55,9 +55,9 @@ _build/
 *.swp
 *~.nib
 
-# Ansible local development
-.ansible/roles/
-.ansible/.lock
+# Ansible local development and caching
+# Created by ansible-lint, ansible-galaxy, and other Ansible tools
+.ansible/
 
 # Molecule test symlinks
 molecule/*/roles/
