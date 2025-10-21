@@ -77,7 +77,7 @@ existing_vxlan_mappings: >-
       - "Output type: {{ vxlan_config_output.stdout | type_debug }}"
       - "Output length: {{ vxlan_config_output.stdout | length }}"
       - "First 500 chars: {{ vxlan_config_output.stdout[0][:500] if ... }}"
-  when: aoscx_debug_mode | default(false) | bool
+  when: aoscx_debug | default(false) | bool
 ```
 
 **Regex match results:**
@@ -88,7 +88,7 @@ existing_vxlan_mappings: >-
       - "Raw mappings: {{ existing_vxlan_mappings_raw }}"
       - "Type: {{ existing_vxlan_mappings_raw | type_debug }}"
       - "Count: {{ existing_vxlan_mappings_raw | length }}"
-  when: aoscx_debug_mode | default(false) | bool
+  when: aoscx_debug | default(false) | bool
 ```
 
 #### 3. Explicit Error Handling
@@ -106,7 +106,7 @@ Each step now has explicit `when` conditions and default values.
 ### Enable Debug Mode
 ```yaml
 # In your playbook or inventory
-aoscx_debug_mode: true
+aoscx_debug: true
 ```
 
 ### What to Look For
@@ -183,7 +183,7 @@ print(f"As integers: {int_matches}")
 
 ## Testing Checklist
 
-- [ ] Enable `aoscx_debug_mode: true`
+- [ ] Enable `aoscx_debug: true`
 - [ ] Run playbook and check "Raw output" debug messages
 - [ ] Verify "Raw mappings" shows correct matches
 - [ ] Confirm "VLANs already configured" shows correct count

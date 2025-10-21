@@ -72,7 +72,7 @@ curl -X POST "$NETBOX_API/api/plugins/bgp/session/" \
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml \
   -l leaf-1 \
   -t bgp \
-  -e aoscx_debug_mode=true \
+  -e aoscx_debug=true \
   --check
 
 # Expected output:
@@ -181,7 +181,7 @@ for device in "${DEVICES[@]}"; do
   ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml \
     -l "$device" \
     -t bgp \
-    -e aoscx_debug_mode=true \
+    -e aoscx_debug=true \
     --check 2>&1 | grep "Plugin Sessions"
 
   # If plugin sessions found, deploy
@@ -211,7 +211,7 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 # 2. Test Ansible query
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml \
   -t bgp \
-  -e aoscx_debug_mode=true \
+  -e aoscx_debug=true \
   --check | grep "Configuration Source"
 
 # 3. Verify on device
@@ -355,7 +355,7 @@ curl -X POST "$NETBOX_API/api/plugins/bgp/asn/" -d '{"asn": 65000}'
 curl "$NETBOX_API/api/plugins/bgp/session/" | jq '.results[] | .name'
 
 # Test device
-ansible-playbook configure_aoscx.yml -l DEVICE -t bgp --check -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l DEVICE -t bgp --check -e aoscx_debug=true
 
 # Deploy device
 ansible-playbook configure_aoscx.yml -l DEVICE -t bgp

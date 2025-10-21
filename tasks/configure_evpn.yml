@@ -43,7 +43,7 @@
       - "Output length: {{ evpn_config_output.stdout | length }}"
       - "First 500 chars: {{ evpn_config_output.stdout[0][:500] if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0 else 'No output' }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - custom_fields.device_evpn | default(false) | bool
     - evpn_config_output is defined
 
@@ -66,7 +66,7 @@
       - "Parsed EVPN VLANs: {{ evpn_parsed.evpn_vlans }}"
       - "Count: {{ evpn_parsed.evpn_vlans | length }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - custom_fields.device_evpn | default(false) | bool
     - evpn_parsed is defined
 
@@ -85,7 +85,7 @@
       - "EVPN Enabled: {{ custom_fields.device_evpn | default(false) }}"
       - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }} - {{ vlans_in_use.vids | default([]) | sort }}"
       - "VLANs available: {{ vlans | default([]) | length }}"
-  when: aoscx_debug_mode | default(false) | bool
+  when: aoscx_debug | default(false) | bool
 
 - name: Filter VLANs that need EVPN configuration
   ansible.builtin.set_fact:
@@ -107,7 +107,7 @@
       - "VLANs needing EVPN config: {{ vlans_for_evpn | default([]) | length }}"
       - "VLAN IDs to configure: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - vlans_for_evpn is defined
 
 - name: Configure EVPN for VLANs in use (only new ones)
@@ -140,6 +140,6 @@
       - "EVPN VLANs newly configured: {{ vlans_for_evpn | default([]) | length }}"
       - "Newly configured VLAN IDs: {{ vlans_for_evpn | default([]) | map(attribute='vid') | list | sort }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - custom_fields.device_evpn | default(false) | bool
     - vlans_for_evpn is defined

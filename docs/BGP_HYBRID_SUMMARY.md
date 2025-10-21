@@ -152,7 +152,7 @@ ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp
 
 ```bash
 ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp \
-  -e aoscx_debug_mode=true \
+  -e aoscx_debug=true \
   --check
 
 # Output shows:
@@ -284,7 +284,7 @@ config_context.bgp_peers[0].peer
 ```bash
 # 1. Check plugin availability
 ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp \
-  -e aoscx_debug_mode=true --check
+  -e aoscx_debug=true --check
 
 # 2. Test with plugin
 ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp
@@ -295,7 +295,7 @@ ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp \
 
 # 4. Test mixed fabric
 ansible-playbook configure_aoscx.yml -t bgp \
-  -e aoscx_debug_mode=true --check
+  -e aoscx_debug=true --check
 ```
 
 ## Future Enhancements
@@ -353,7 +353,7 @@ ansible-playbook configure_aoscx.yml -t bgp \
 
 ```bash
 # Check which source will be used
-ansible-playbook configure_aoscx.yml -l DEVICE -t bgp -e aoscx_debug_mode=true --check
+ansible-playbook configure_aoscx.yml -l DEVICE -t bgp -e aoscx_debug=true --check
 
 # Deploy with plugin (if available)
 ansible-playbook configure_aoscx.yml -l DEVICE -t bgp
@@ -366,7 +366,7 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
   "$NETBOX_API/api/plugins/bgp/session/?device=DEVICE"
 
 # Test entire fabric
-ansible-playbook configure_aoscx.yml -t bgp --check -e aoscx_debug_mode=true | grep "Configuration Source"
+ansible-playbook configure_aoscx.yml -t bgp --check -e aoscx_debug=true | grep "Configuration Source"
 ```
 
 ## Success Indicators

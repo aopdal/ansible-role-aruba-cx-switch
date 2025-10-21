@@ -34,7 +34,7 @@
     - name: Debug BGP plugin status
       ansible.builtin.debug:
         msg: "NetBox BGP plugin: {{ 'Available ✓' if netbox_bgp_plugin_available else 'Not available, using config_context fallback' }}"
-      when: aoscx_debug_mode | default(false) | bool
+      when: aoscx_debug | default(false) | bool
 
 - name: Filter BGP sessions for this device from plugin
   ansible.builtin.set_fact:
@@ -56,7 +56,7 @@
       - "Config Context Peers: {{ config_context.bgp_peers | default([]) | length }}"
       - "Custom Field BGP Enabled: {{ custom_fields.device_bgp | default(false) }}"
       - "Custom Field Router ID: {{ custom_fields.device_bgp_routerid | default('not set') }}"
-  when: aoscx_debug_mode | default(false) | bool
+  when: aoscx_debug | default(false) | bool
 
 # ============================================================================
 # BGP Router Process Configuration
@@ -239,7 +239,7 @@
       - "Active Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'active') | list | length }}"
       - "Planned Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'planned') | list | length }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
@@ -256,6 +256,6 @@
       - "VRF Instances: {{ config_context.bgp_vrfs | default([]) | length }}"
       - "Route Reflector Clients: {{ config_context.bgp_rr_clients | default([]) | length }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)
     - custom_fields.device_bgp | default(false) | bool

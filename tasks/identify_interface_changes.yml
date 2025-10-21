@@ -29,7 +29,7 @@
       - "Sample interface from device facts:"
       - "{{ ansible_facts.network_resources.interfaces | dict2items | first }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - ansible_facts is defined
     - ansible_facts.network_resources is defined
     - ansible_facts.network_resources.interfaces is defined
@@ -73,7 +73,7 @@
       - "LAG member changes: {{ interface_changes.lag_members | default([]) | length }}"
       - "Interfaces not needing changes: {{ interface_changes.no_changes | default([]) | length }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - interface_changes is defined
   tags:
     - always

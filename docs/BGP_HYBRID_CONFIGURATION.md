@@ -75,7 +75,7 @@ aoscx_use_netbox_bgp_plugin: true
 aoscx_use_netbox_bgp_plugin: false
 
 # Debug mode shows which source is used
-aoscx_debug_mode: true
+aoscx_debug: true
 ```
 
 ## Migration Strategies
@@ -100,7 +100,7 @@ aoscx_debug_mode: true
 
 ```bash
 # Phase 1: Test with one device using plugin
-ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp -e aoscx_debug=true
 
 # Phase 2: Migrate device by device
 ansible-playbook configure_aoscx.yml -l leaf-2,leaf-3 -t bgp
@@ -215,7 +215,7 @@ custom_fields.device_bgp_routerid
 ```bash
 # Enable debug to see which source is used
 ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp \
-  -e aoscx_debug_mode=true \
+  -e aoscx_debug=true \
   -e aoscx_use_netbox_bgp_plugin=true
 
 # Expected output:
@@ -229,7 +229,7 @@ ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp \
 ```bash
 # Disable plugin to test config_context
 ansible-playbook configure_aoscx.yml -l leaf-2 -t bgp \
-  -e aoscx_debug_mode=true \
+  -e aoscx_debug=true \
   -e aoscx_use_netbox_bgp_plugin=false
 
 # Expected output:
@@ -243,7 +243,7 @@ ansible-playbook configure_aoscx.yml -l leaf-2 -t bgp \
 ```bash
 # Device with no plugin sessions falls back to config_context
 ansible-playbook configure_aoscx.yml -l leaf-3 -t bgp \
-  -e aoscx_debug_mode=true
+  -e aoscx_debug=true
 
 # Expected output if device has no sessions:
 # "NetBox BGP plugin: Available ✓"
@@ -324,7 +324,7 @@ device_bgp_routerid: "10.255.255.11"
 }
 
 # Test:
-ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l leaf-1 -t bgp -e aoscx_debug=true
 # Should use netbox-bgp plugin
 ```
 
@@ -440,7 +440,7 @@ systemctl restart netbox
 **Check which source each device uses:**
 ```bash
 ansible-playbook configure_aoscx.yml -t bgp \
-  -e aoscx_debug_mode=true \
+  -e aoscx_debug=true \
   --check | grep "Configuration Source"
 ```
 

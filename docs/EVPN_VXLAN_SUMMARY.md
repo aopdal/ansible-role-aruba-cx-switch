@@ -244,7 +244,7 @@ ansible-playbook configure_aoscx.yml -l leaf-switches -t vxlan
 ansible-playbook configure_aoscx.yml -l leaf-switches -t overlay
 
 # Debug mode to see filtering
-ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn,vxlan -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn,vxlan -e aoscx_debug=true
 ```
 
 ### Enable/Disable Per Device
@@ -330,7 +330,7 @@ aoscx_configure_evpn: true
 device_evpn: true
 
 # 3. VLANs in use
-ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn -e aoscx_debug=true
 # Look for: "VLANs in use: X"
 
 # 4. L2VPN terminations
@@ -345,7 +345,7 @@ curl "$NETBOX_API/api/ipam/vlans/?available_on_device=DEVICE_ID" | jq '.results[
 curl "$NETBOX_API/api/ipam/l2vpns/ID/" | jq '.identifier'
 
 # 2. Task runs with debug
-ansible-playbook configure_aoscx.yml -l leaf-1 -t vxlan -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l leaf-1 -t vxlan -e aoscx_debug=true
 # Look for: "VLANs with VXLAN config needed: X"
 ```
 
@@ -382,7 +382,7 @@ ansible-playbook configure_aoscx.yml -l leaf-1 -t vxlan -e aoscx_debug_mode=true
 
 ```bash
 # Test EVPN/VXLAN configuration
-ansible-playbook configure_aoscx.yml -l leaf-1 -t overlay --check -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l leaf-1 -t overlay --check -e aoscx_debug=true
 
 # Deploy EVPN/VXLAN
 ansible-playbook configure_aoscx.yml -l leaf-switches -t overlay

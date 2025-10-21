@@ -203,7 +203,7 @@ print("✅ All tests passed!")
   hosts: switches
   gather_facts: false
   vars:
-    aoscx_debug_mode: true
+    aoscx_debug: true
   tasks:
     - name: Gather EVPN EVI output
       arubanetworks.aoscx.aoscx_command:
@@ -277,7 +277,7 @@ parse_evpn_evi_output("Invalid data")
 Enable debug mode to see parsed output:
 
 ```yaml
-aoscx_debug_mode: true
+aoscx_debug: true
 ```
 
 Output:

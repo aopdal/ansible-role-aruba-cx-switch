@@ -442,7 +442,7 @@ curl "$NETBOX_API/api/ipam/vlans/100/" | jq '.l2vpn_termination'
 
 # 4. VLANs are in use on device
 # Run with debug mode
-ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn -e aoscx_debug_mode=true
+ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn -e aoscx_debug=true
 ```
 
 ### VXLAN VNI Not Created

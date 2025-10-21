@@ -47,7 +47,7 @@
       - "Output length: {{ vxlan_config_output.stdout | length }}"
       - "First 500 chars: {{ vxlan_config_output.stdout[0][:500] if vxlan_config_output.stdout is defined and vxlan_config_output.stdout | length > 0 else 'No output' }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
     - vxlan_config_output is defined
 
@@ -72,7 +72,7 @@
       - "Parsed Mappings: {{ vxlan_parsed.vxlan_mappings }}"
       - "Count: {{ vxlan_parsed.vxlan_vlans | length }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
     - vxlan_parsed is defined
 
@@ -93,7 +93,7 @@
       - "VXLAN Enabled: {{ custom_fields.device_vxlan | default(false) }}"
       - "VLANs in use: {{ vlans_in_use.vids | default([]) | length }} - {{ vlans_in_use.vids | default([]) | sort }}"
       - "VLANs available: {{ vlans | default([]) | length }}"
-  when: aoscx_debug_mode | default(false) | bool
+  when: aoscx_debug | default(false) | bool
 
 - name: Filter VLANs that need VXLAN configuration
   ansible.builtin.set_fact:
@@ -117,7 +117,7 @@
       - "VLAN IDs to configure: {{ vlans_for_vxlan | default([]) | map(attribute='vid') | list | sort }}"
       - "VNIs to configure: {{ vlans_for_vxlan | default([]) | map(attribute='l2vpn_termination.l2vpn.identifier') | list | sort }}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - vlans_for_vxlan is defined
 
 # ============================================================================
@@ -173,6 +173,6 @@
       - "Newly configured VLAN-to-VNI mappings:"
       - "{% for vlan in vlans_for_vxlan | default([]) %}  VLAN {{ vlan.vid }} → VNI {{ vlan.l2vpn_termination.l2vpn.identifier }}{% endfor %}"
   when:
-    - aoscx_debug_mode | default(false) | bool
+    - aoscx_debug | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
     - vlans_for_vxlan is defined
