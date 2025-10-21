@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-10-21
+
 ### Added
 - **Loopback interface configuration** - Complete implementation of `configure_loopback.yml` task file
   - Automatic detection of loopback interfaces by type and name pattern
