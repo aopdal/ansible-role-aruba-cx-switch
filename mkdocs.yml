@@ -77,7 +77,15 @@ nav:
       - Visual Reference: AUTOMATION_ECOSYSTEM_DIAGRAMS.md
   - NetBox Integration:
       - Integration Reference: NETBOX_INTEGRATION.md
-      - Filter Plugins: FILTER_PLUGINS.md  # Essential for data transformation
+      - Filter Plugins:
+          - Overview: FILTER_PLUGINS.md
+          - Detailed Reference: filter_plugins/index.md
+          - Utils Module: filter_plugins/utils.md
+          - VLAN Filters: filter_plugins/vlan_filters.md
+          - VRF Filters: filter_plugins/vrf_filters.md
+          - Interface Filters: filter_plugins/interface_filters.md
+          - Comparison Module: filter_plugins/comparison.md
+          - OSPF Filters: filter_plugins/ospf_filters.md
   - Configuration:
       - Base System:
           - Overview: BASE_CONFIGURATION.md
