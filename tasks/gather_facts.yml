@@ -1,5 +1,14 @@
 ---
 # Gather facts from AOS-CX switches
+#
+# IMPORTANT: This task gathers ALL network resources needed by the role.
+# When gathering facts elsewhere in the role, ALWAYS include ALL resources
+# listed below, not just a subset. The aoscx_facts module OVERWRITES the
+# network_resources dict, so gathering only 'vlans' will DELETE 'interfaces'.
+#
+# If you need to re-gather facts during the playbook run, either:
+# 1. Use include_tasks: gather_facts.yml (recommended)
+# 2. Or gather ALL resources: gather_network_resources: [interfaces, vlans]
 
 - name: Gather device facts
   arubanetworks.aoscx.aoscx_facts:

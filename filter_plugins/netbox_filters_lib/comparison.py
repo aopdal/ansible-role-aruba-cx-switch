@@ -161,13 +161,24 @@ def get_interfaces_needing_changes(interfaces, device_facts):
         return {"cleanup": cleanup_list, "configure": configure_list}
 
     # Convert device facts to a dict keyed by interface name
-    # AOS-CX can store facts in two locations:
-    # 1. network_resources.interfaces (newer resource modules format)
-    # 2. ansible_net_interfaces (legacy format from aoscx_facts module)
+    # AOS-CX can store facts in multiple paths depending on the Ansible version
+    # and which fact-gathering module was used
     facts_by_interface = {}
 
-    # Try network_resources first (newer format)
-    if "network_resources" in device_facts:
+    # Try ansible_network_resources first (most common path for aoscx_facts)
+    if "ansible_network_resources" in device_facts:
+        network_resources = device_facts.get("ansible_network_resources", {})
+        if network_resources and isinstance(network_resources, dict):
+            interfaces_dict = network_resources.get("interfaces", {})
+            if interfaces_dict and isinstance(interfaces_dict, dict):
+                facts_by_interface = interfaces_dict
+                _debug(
+                    f"Found {len(facts_by_interface)} interfaces in "
+                    f"ansible_network_resources.interfaces"
+                )
+
+    # Try network_resources (alternative path)
+    if not facts_by_interface and "network_resources" in device_facts:
         network_resources = device_facts.get("network_resources", {})
         if network_resources and isinstance(network_resources, dict):
             interfaces_dict = network_resources.get("interfaces", {})
@@ -178,7 +189,7 @@ def get_interfaces_needing_changes(interfaces, device_facts):
                     f"network_resources.interfaces"
                 )
 
-    # Try ansible_net_interfaces (Aruba aoscx_facts format)
+    # Try ansible_net_interfaces (Aruba aoscx_facts format - raw facts)
     if not facts_by_interface and "ansible_net_interfaces" in device_facts:
         ansible_net_interfaces = device_facts.get("ansible_net_interfaces", {})
         if ansible_net_interfaces and isinstance(ansible_net_interfaces, dict):

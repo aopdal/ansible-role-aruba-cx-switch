@@ -44,6 +44,18 @@
 # ============================================================================
 - name: Idempotent mode - Analyze interfaces for configuration changes
   block:
+    - name: Debug - Show ansible_facts structure for L2 comparison
+      ansible.builtin.debug:
+        msg:
+          - "ansible_facts keys (first 20): {{ ansible_facts.keys() | list | sort | batch(20) | first }}"
+          - "Has ansible_network_resources: {{ 'ansible_network_resources' in ansible_facts }}"
+          - "Has net_interfaces: {{ 'net_interfaces' in ansible_facts }}"
+          - "ansible_network_resources keys: {{ ansible_facts.ansible_network_resources.keys() | list if 'ansible_network_resources' in ansible_facts else 'N/A' }}"
+          - "net_interfaces type: {{ ansible_facts.net_interfaces | type_debug if 'net_interfaces' in ansible_facts else 'N/A' }}"
+      when:
+        - interface_changes.l2 is defined
+        - aoscx_debug | bool
+
     - name: Analyze interfaces for L2 configuration changes
       ansible.builtin.set_fact:
         interfaces_needing_changes: "{{ interface_changes.l2 | default([]) | get_interfaces_needing_changes(ansible_facts | default({})) }}"
