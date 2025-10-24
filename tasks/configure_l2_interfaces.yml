@@ -46,20 +46,20 @@
   block:
     - name: Analyze interfaces for L2 configuration changes
       ansible.builtin.set_fact:
-        interfaces_needing_changes: "{{ interfaces | get_interfaces_needing_changes(ansible_facts | default({})) }}"
-      when: interfaces is defined
+        interfaces_needing_changes: "{{ interface_changes.l2 | default([]) | get_interfaces_needing_changes(ansible_facts | default({})) }}"
+      when: interface_changes.l2 is defined
 
     - name: Debug - Show interfaces analysis
       ansible.builtin.debug:
         msg:
           - "Interfaces needing cleanup: {{ interfaces_needing_changes.cleanup | length }}"
           - "Interfaces needing configuration: {{ interfaces_needing_changes.configure | length }}"
-          - "Total L2 interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
+          - "Total L2 interfaces in NetBox: {{ interface_changes.l2 | default([]) | length }}"
           - >-
             Interfaces already correct (skipped):
-            {{ (interfaces | selectattr('mode', 'defined') | list | length) - (interfaces_needing_changes.configure | length) }}
+            {{ (interface_changes.l2 | default([]) | length) - (interfaces_needing_changes.configure | length) }}
       when:
-        - interfaces is defined
+        - interface_changes.l2 is defined
         - aoscx_debug | bool or ansible_verbosity >= 1
 
     - name: Phase 1 - Cleanup unwanted VLAN configurations
@@ -77,7 +77,7 @@
   ansible.builtin.set_fact:
     interfaces_to_configure: >-
       {{
-        (interfaces | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes))
+        (interface_changes.l2 | default([]) | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes))
         if (aoscx_idempotent_mode | bool)
         else (interface_changes.l2 | default([]))
       }}
