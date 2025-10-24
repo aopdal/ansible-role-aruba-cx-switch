@@ -754,6 +754,12 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
     """
     Helper function to categorize an interface into the appropriate change category
 
+    Interfaces can appear in MULTIPLE categories because:
+    - Interface type (physical/lag/mclag) is independent of routing mode (L2/L3)
+    - A LAG can be L2 or L3
+    - An MCLAG can be L2 or L3
+    - A physical interface can be L2 or L3
+
     Args:
         intf: Interface object from NetBox
         result_dict: Dictionary to append the interface to
@@ -770,32 +776,39 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
     type_value = type_obj.get("value")
 
     # Check if it's a LAG member (physical interface with LAG assignment)
-    # LAG members need special handling
+    # LAG members need special handling - they only get lag_members category
     lag_obj = intf.get("lag")
     if lag_obj and isinstance(lag_obj, dict) and lag_obj.get("name"):
         # This is a LAG member interface
         result_dict["lag_members"].append(intf)
         return
 
-    # Check if it's a LAG interface
+    # Categorize by interface type (LAG, MCLAG, physical)
     if type_value == "lag":
         is_mclag = intf.get("custom_fields", {}).get("if_mclag", False)
         if is_mclag:
             result_dict["mclag"].append(intf)
         else:
             result_dict["lag"].append(intf)
-        return
+        # Don't return - continue to categorize by L2/L3
 
-    # Check if it's a virtual interface
-    if type_value == "virtual":
-        # Check if it has L3 configuration
+    # Categorize by interface type (virtual = L3 only)
+    elif type_value == "virtual":
+        # Virtual interfaces are always L3
         result_dict["l3"].append(intf)
         return
 
+    # Categorize by interface type (physical without LAG membership)
+    elif type_value not in ["lag", "virtual"]:
+        # This is a physical interface (not a LAG member)
+        result_dict["physical"].append(intf)
+        # Don't return - continue to categorize by L2/L3
+
+    # Now categorize by L2/L3 configuration
     # Check if it has L2 configuration (mode defined)
     mode_obj = intf.get("mode")
     if mode_obj and isinstance(mode_obj, dict):
         result_dict["l2"].append(intf)
-    else:
-        # Physical interface without L2 mode - just basic config
-        result_dict["physical"].append(intf)
+    # Check if it has L3 configuration (IP addresses)
+    elif intf.get("ip_addresses"):
+        result_dict["l3"].append(intf)
