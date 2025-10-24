@@ -161,9 +161,12 @@ def get_interfaces_needing_changes(interfaces, device_facts):
         return {"cleanup": cleanup_list, "configure": configure_list}
 
     # Convert device facts to a dict keyed by interface name
-    # AOS-CX uses network_resources.interfaces as a dict
+    # AOS-CX can store facts in two locations:
+    # 1. network_resources.interfaces (newer resource modules format)
+    # 2. ansible_net_interfaces (legacy format from aoscx_facts module)
     facts_by_interface = {}
 
+    # Try network_resources first (newer format)
     if "network_resources" in device_facts:
         network_resources = device_facts.get("network_resources", {})
         if network_resources and isinstance(network_resources, dict):
@@ -174,6 +177,20 @@ def get_interfaces_needing_changes(interfaces, device_facts):
                     f"Found {len(facts_by_interface)} interfaces in "
                     f"network_resources.interfaces"
                 )
+
+    # Try ansible_net_interfaces (Aruba aoscx_facts format)
+    if not facts_by_interface and "ansible_net_interfaces" in device_facts:
+        ansible_net_interfaces = device_facts.get("ansible_net_interfaces", {})
+        if ansible_net_interfaces and isinstance(ansible_net_interfaces, dict):
+            # Aruba stores interfaces in line cards: {"line_card,1/1": {...}}
+            for card_key, card_data in ansible_net_interfaces.items():
+                if isinstance(card_data, dict) and "line_card" in card_key:
+                    # Each line card has interfaces like {"1/1/1": {...}, "lag3": {...}}
+                    facts_by_interface.update(card_data)
+            _debug(
+                f"Found {len(facts_by_interface)} interfaces in "
+                f"ansible_net_interfaces"
+            )
 
     if not facts_by_interface:
         _debug(f"Device facts structure: {list(device_facts.keys())}")
