@@ -533,10 +533,33 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
         if type_value not in ["virtual"]:
             # Check enabled state
             nb_enabled = nb_intf.get("enabled", True)
+
+            # Try multiple fields to determine actual admin state
+            # admin_state can be unreliable for LAG members - it may show "up"
+            # even when the interface is administratively down (no explicit shutdown in config)
+            # The forwarding_state.enablement field is more reliable
             device_admin_state = device_intf.get("admin") or device_intf.get(
                 "admin_state"
             )
-            device_enabled = device_admin_state == "up" if device_admin_state else None
+
+            # Check forwarding_state.enablement for more accurate admin state
+            # This is especially important for LAG member interfaces
+            forwarding_state = device_intf.get("forwarding_state", {})
+            if isinstance(forwarding_state, dict):
+                enablement = forwarding_state.get("enablement")
+                if enablement is not None:
+                    # Use enablement field as the source of truth
+                    device_enabled = enablement
+                    device_admin_state = "up" if enablement else "down"
+                else:
+                    # Fall back to admin_state
+                    device_enabled = (
+                        device_admin_state == "up" if device_admin_state else None
+                    )
+            else:
+                device_enabled = (
+                    device_admin_state == "up" if device_admin_state else None
+                )
 
             # Only compare if we have device state information
             if device_enabled is not None and nb_enabled != device_enabled:
@@ -545,10 +568,17 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                     f"enabled mismatch (NB: {nb_enabled}, device: {device_enabled})"
                 )
 
+            # Get enablement value for debug output
+            fs_enablement = (
+                forwarding_state.get("enablement")
+                if isinstance(forwarding_state, dict)
+                else "N/A"
+            )
             _debug(
                 f"Interface {intf_name}: NB enabled={nb_enabled}, "
                 f"device admin_state={device_admin_state}, "
-                f"device_enabled={device_enabled}"
+                f"device_enabled={device_enabled}, "
+                f"forwarding_state.enablement={fs_enablement}"
             )
 
             # Check description (only if NetBox has a description)
@@ -759,6 +789,15 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
     - A LAG can be L2 or L3
     - An MCLAG can be L2 or L3
     - A physical interface can be L2 or L3
+    - A LAG member is BOTH lag_members (for LAG assignment) AND physical (for MTU, admin state)
+
+    Categories:
+    - lag_members: Physical interfaces that are members of a LAG (for LAG assignment)
+    - physical: Physical interfaces including LAG members (for MTU, speed, admin state)
+    - lag: LAG interfaces (for LAG creation and basic config)
+    - mclag: MCLAG interfaces (for MCLAG-specific config)
+    - l2: Interfaces with L2/VLAN configuration (excludes LAG members)
+    - l3: Interfaces with L3/IP configuration (excludes LAG members)
 
     Args:
         intf: Interface object from NetBox
@@ -776,12 +815,15 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
     type_value = type_obj.get("value")
 
     # Check if it's a LAG member (physical interface with LAG assignment)
-    # LAG members need special handling - they only get lag_members category
+    # LAG members get BOTH lag_members (for LAG assignment) AND physical (for basic config)
+    # because they need physical properties configured (MTU, admin state, description, etc.)
+    is_lag_member = False
     lag_obj = intf.get("lag")
     if lag_obj and isinstance(lag_obj, dict) and lag_obj.get("name"):
         # This is a LAG member interface
         result_dict["lag_members"].append(intf)
-        return
+        is_lag_member = True
+        # Don't return - continue to add to physical category too
 
     # Categorize by interface type (LAG, MCLAG, physical)
     if type_value == "lag":
@@ -798,17 +840,19 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
         result_dict["l3"].append(intf)
         return
 
-    # Categorize by interface type (physical without LAG membership)
+    # Categorize by interface type (physical interfaces, including LAG members)
     elif type_value not in ["lag", "virtual"]:
-        # This is a physical interface (not a LAG member)
+        # This is a physical interface (may or may not be a LAG member)
         result_dict["physical"].append(intf)
         # Don't return - continue to categorize by L2/L3
 
     # Now categorize by L2/L3 configuration
-    # Check if it has L2 configuration (mode defined)
-    mode_obj = intf.get("mode")
-    if mode_obj and isinstance(mode_obj, dict):
-        result_dict["l2"].append(intf)
-    # Check if it has L3 configuration (IP addresses)
-    elif intf.get("ip_addresses"):
-        result_dict["l3"].append(intf)
+    # LAG members should NOT have L2/L3 config (the LAG itself has that)
+    if not is_lag_member:
+        # Check if it has L2 configuration (mode defined)
+        mode_obj = intf.get("mode")
+        if mode_obj and isinstance(mode_obj, dict):
+            result_dict["l2"].append(intf)
+        # Check if it has L3 configuration (IP addresses)
+        elif intf.get("ip_addresses"):
+            result_dict["l3"].append(intf)
