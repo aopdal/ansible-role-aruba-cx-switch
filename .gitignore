@@ -59,5 +59,8 @@ _build/
 # Created by ansible-lint, ansible-galaxy, and other Ansible tools
 .ansible/
 
+# Settings for claude
+.claude/
+
 # Molecule test symlinks
 molecule/*/roles/
