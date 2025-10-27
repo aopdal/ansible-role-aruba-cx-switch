@@ -32,25 +32,19 @@
     - config_context.vsx_system_mac is defined
     - config_context.vsx_role is defined
   block:
-    - name: Configure VSX system MAC and role
-      arubanetworks.aoscx.aoscx_config:
-        lines:
-          - vsx-sync vsx-global
-        match: line
-      vars:
-        ansible_connection: "{{ aoscx_connection_type }}"
-
-    - name: Configure VSX parameters
-      arubanetworks.aoscx.aoscx_config:
-        lines:
-          - system-mac {{ config_context.vsx_system_mac }}
-          - inter-switch-link lag {{ config_context.vsx_isl_lag | default('isl') }}
-          - role {{ config_context.vsx_role }}
-          - "{% if config_context.vsx_keepalive_peer is defined %}keepalive peer {{ config_context.vsx_keepalive_peer }} source {{ config_context.vsx_keepalive_src | default('mgmt') }} vrf {{ config_context.vsx_keepalive_vrf | default('mgmt') }}{% endif %}"
-        parents: vsx
-        match: line
-      vars:
-        ansible_connection: "{{ aoscx_connection_type }}"
+    - name: Configure VSX
+      arubanetworks.aoscx.aoscx_vsx:
+        system_mac: "{{ config_context.vsx_system_mac }}"
+        keepalive_vrf: "{{ config_context.vsx_keepalive_vrf | default('mgmt') }}"
+        keepalive_src_ip: "{{ config_context.vsx_keepalive_src | default('mgmt') }}"
+        keepalive_peer_ip: "{{ config_context.vsx_keepalive_peer | default('not set') }}"
+        device_role: "{{ config_context.vsx_role | default('not set') }}"
+        split_recovery_disable: true
+        isl_port: "{{ config_context.vsx_isl_port | default('lag256') }}"
+        config_sync_disable: false
+        config_sync_features:
+          - vsx-global
+          - mclag-interfaces
 
     - name: Display VSX configuration summary
       ansible.builtin.debug:
@@ -59,7 +53,7 @@
           - "Device: {{ inventory_hostname }}"
           - "System MAC: {{ config_context.vsx_system_mac }}"
           - "Role: {{ config_context.vsx_role }}"
-          - "ISL LAG: {{ config_context.vsx_isl_lag | default('isl') }}"
+          - "ISL LAG: {{ config_context.vsx_isl_lag | default('lag256') }}"
           - "Keepalive Peer: {{ config_context.vsx_keepalive_peer | default('not configured') }}"
       when: aoscx_debug | bool or ansible_verbosity >= 1
 
