@@ -3,11 +3,11 @@
 #
 # VSX configuration for Aruba AOS-CX switches enables active-active redundancy
 # Requirements:
-# - Device custom field: device_vsx_enabled (boolean)
+# - Device custom field: device_vsx (boolean)
 # - Config context VSX settings:
 #   - vsx_system_mac: VSX system MAC address
 #   - vsx_role: primary or secondary
-#   - vsx_isl_ports: List of ISL (Inter-Switch Link) ports
+#   - vsx_isl_ports: ISL (Inter-Switch Link) port
 #   - vsx_keepalive_peer: IP address of VSX peer keepalive
 #   - vsx_keepalive_src: Source IP for keepalive
 #   - vsx_keepalive_vrf: VRF for keepalive (default: mgmt)

@@ -25,6 +25,7 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | `device_bgp_routerid` | Text | Device | Yes (for BGP) | BGP Router ID (typically loopback IP) | `configure_bgp.yml` (config_context mode) |
 | `device_evpn` | Boolean | Device | Yes (for EVPN) | Enable/disable EVPN configuration and cleanup | `configure_evpn.yml`, `cleanup_evpn.yml` |
 | `device_vxlan` | Boolean | Device | Yes (for VXLAN) | Enable/disable VXLAN configuration and cleanup | `configure_vxlan.yml`, `cleanup_vxlan.yml` |
+| `device_vsx` | Boolean | Device | Yes (for VSX) | Enable/disable VSX configuration | `configure_vsx.yml` |
 
 ### Creating Custom Fields in NetBox
 
@@ -98,6 +99,28 @@ Default: false
 Required: No
 ```
 
+#### 5. device_vsx_enabled (Boolean)
+
+```
+Name: device_vsx_enabled
+Type: Boolean
+Object Type: dcim > device
+Label: Enable VSX
+Description: Enable VSX (Virtual Switching Extension) configuration on this device
+Default: false
+Required: No
+```
+
+**NetBox UI:**
+```
+Customization → Custom Fields → Add
+├─ Name: device_vsx_enabled
+├─ Type: Boolean
+├─ Content Types: dcim | device
+├─ Label: Enable VSX
+└─ Default: ☐ (unchecked)
+```
+
 ### Custom Field Usage Patterns
 
 #### Per-Device Control
@@ -167,6 +190,12 @@ Config context provides **configuration data** for features. This is JSON data a
 | | `config_context.ntp.servers` | List | NTP server IPs | ✅ Active |
 | | `config_context.dns.domain` | String | DNS domain name | ✅ Active |
 | | `config_context.dns.servers` | List | DNS server IPs | ✅ Active |
+| **VSX** | `config_context.vsx_system_mac` | String | VSX system MAC address | ✅ Active |
+| | `config_context.vsx_role` | String | VSX role (primary or secondary) | ✅ Active |
+| | `config_context.vsx_isl_ports` | List | Inter-Switch Link ports | ✅ Active |
+| | `config_context.vsx_keepalive_peer` | String | VSX peer keepalive IP address | ✅ Active |
+| | `config_context.vsx_keepalive_src` | String | Source IP for keepalive | ✅ Active |
+| | `config_context.vsx_keepalive_vrf` | String | VRF for keepalive (default: mgmt) | ✅ Active |
 | **BGP (Fallback)** | `config_context.bgp_as` | Integer | BGP AS Number | ⚠️ Hybrid (fallback) |
 | | `config_context.bgp_peers` | List | BGP EVPN neighbors | ⚠️ Hybrid (fallback) |
 | | `config_context.bgp_ipv4_peers` | List | BGP IPv4 unicast peers | ⚠️ Hybrid (fallback) |
@@ -721,7 +750,7 @@ curl -H "Authorization: Token $TOKEN" \
 
 ## Summary
 
-### Custom Fields (4 total)
+### Custom Fields (5 total)
 
 | Field | Type | Purpose |
 |-------|------|---------|
@@ -729,11 +758,15 @@ curl -H "Authorization: Token $TOKEN" \
 | `device_bgp_routerid` | Text | BGP Router ID (config_context mode) |
 | `device_evpn` | Boolean | Enable EVPN |
 | `device_vxlan` | Boolean | Enable VXLAN |
+| `device_vsx_enabled` | Boolean | Enable VSX |
 
 ### Config Context Keys
 
 **Base System (Stable):**
 - `motd`, `timezone`, `ntp.servers`, `dns.domain`, `dns.servers`
+
+**VSX (Stable):**
+- `vsx_system_mac`, `vsx_role`, `vsx_isl_ports`, `vsx_keepalive_peer`, `vsx_keepalive_src`, `vsx_keepalive_vrf`
 
 **BGP (Hybrid/Fallback):**
 - `bgp_as`, `bgp_peers`, `bgp_ipv4_peers`, `bgp_vrfs`, `bgp_rr_clients`

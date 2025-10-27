@@ -15,8 +15,9 @@
 # VLAN field required: l2vpn_termination.l2vpn.identifier (VNI)
 #
 # Configuration order:
-# 1. Create VNI under interface vxlan 1
-# 2. Assign VLAN to VNI
+# 1. Configure VXLAN source IP (loopback 0 or loopback 1 based on VSX)
+# 2. Create VNI under interface vxlan 1
+# 3. Assign VLAN to VNI
 
 - name: Verify VLAN analysis has been performed
   ansible.builtin.assert:
@@ -121,7 +122,55 @@
     - vlans_for_vxlan is defined
 
 # ============================================================================
-# Step 1: Create VNI under interface vxlan 1 (only new ones)
+# Step 1: Configure VXLAN source IP address (once per device)
+# ============================================================================
+
+- name: Get VXLAN source IP from loopback interface (based on VSX configuration)
+  ansible.builtin.set_fact:
+    vxlan_source_loopback: "{{ 'loopback1' if custom_fields.device_vsx | default(false) | bool else 'loopback0' }}"
+    vxlan_source_ip: >-
+      {{
+        (interfaces |
+        selectattr('name', 'equalto', 'loopback1' if custom_fields.device_vsx | default(false) | bool else 'loopback0') |
+        map(attribute='ip_addresses') |
+        flatten |
+        selectattr('family.value', 'equalto', 4) |
+        map(attribute='address') |
+        first |
+        default('') |
+        ansible.utils.ipaddr('address'))
+      }}
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+
+- name: Debug - VXLAN source IP configuration
+  ansible.builtin.debug:
+    msg:
+      - "=== VXLAN Source IP Configuration ==="
+      - "Device: {{ inventory_hostname }}"
+      - "VSX Enabled: {{ custom_fields.device_vsx | default(false) }}"
+      - "Source Loopback: {{ vxlan_source_loopback | default('not set') }}"
+      - "Source IP: {{ vxlan_source_ip | default('not set') }}"
+  when:
+    - aoscx_debug | default(false) | bool
+    - custom_fields.device_vxlan | default(false) | bool
+
+- name: Configure VXLAN source IP address
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface vxlan 1
+    lines:
+      - source ip {{ vxlan_source_ip }}
+    match: line
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vxlan_source_ip is defined
+    - vxlan_source_ip | length > 0
+  vars:
+    ansible_connection: network_cli
+
+# ============================================================================
+# Step 2: Create VNI under interface vxlan 1 (only new ones)
 # ============================================================================
 
 - name: Create VNI on VXLAN interface
@@ -142,7 +191,7 @@
     ansible_connection: network_cli
 
 # ============================================================================
-# Step 2: Assign VLAN to VNI (VLAN-to-VNI mapping) (only new ones)
+# Step 3: Assign VLAN to VNI (VLAN-to-VNI mapping) (only new ones)
 # ============================================================================
 
 - name: Assign VLAN to VNI on VXLAN interface
