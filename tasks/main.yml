@@ -217,12 +217,10 @@
       tags:
         - interfaces
         - mclag_interfaces
-        - vsx
   when: aoscx_configure_mclag_interfaces | bool
   tags:
     - interfaces
     - mclag_interfaces
-    - vsx
 
 # Assign physical interfaces to LAG (after LAG/MCLAG creation)
 - name: Assign physical interfaces to LAG
