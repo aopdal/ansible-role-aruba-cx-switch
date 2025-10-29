@@ -9,6 +9,7 @@ This project now has a complete development container setup that provides a cons
 ### Dev Container Configuration (`.devcontainer/`)
 
 1. **`devcontainer.json`** - Main configuration
+
    - Python 3.12 base image
    - Docker-in-Docker support for Molecule tests
    - 11 pre-configured VS Code extensions
@@ -16,6 +17,7 @@ This project now has a complete development container setup that provides a cons
    - Custom VS Code settings for Ansible development
 
 2. **`Dockerfile`** - Custom container image
+
    - System dependencies (Docker, Git, network tools)
    - Pre-commit installation
    - Bash completion for Ansible
@@ -23,12 +25,14 @@ This project now has a complete development container setup that provides a cons
    - Welcome message
 
 3. **`post-create.sh`** - Initialization script
+
    - Installs Python packages from `requirements-test.txt`
    - Installs Ansible collections from `requirements.yml`
    - Sets up pre-commit hooks
    - Shows quick start commands
 
 4. **`README.md`** - Dev container documentation
+
    - Explains what's included
    - Troubleshooting guide
    - Customization instructions
@@ -36,16 +40,19 @@ This project now has a complete development container setup that provides a cons
 ### Updated Documentation
 
 5. **`README.md`** (root)
+
    - Added "Getting Started" section
    - Dev container as recommended approach
    - Links to detailed guides
 
 6. **`TESTING.md`**
+
    - Added dev container testing instructions
    - Kept traditional venv as Option 2
    - Clear comparison of both approaches
 
 7. **`DEVELOPMENT.md`** (new)
+
    - Comprehensive development guide
    - Covers both dev container and venv setup
    - Project structure explanation
@@ -92,6 +99,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed instructions.
 - ✅ Network tools (ping, netcat, curl)
 
 ### VS Code Extensions
+
 - ✅ Ansible (redhat.ansible)
 - ✅ YAML (redhat.vscode-yaml)
 - ✅ Python (ms-python.python)
@@ -105,6 +113,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed instructions.
 - ✅ Indent Rainbow
 
 ### Pre-configured Settings
+
 - Python default interpreter
 - Ansible validation enabled
 - YAML schemas for Ansible files
@@ -205,16 +214,19 @@ ansible-role-aruba-cx-switch/
 ## 🎓 Next Steps
 
 1. **Try the dev container**
+
    - Open in VS Code
    - Click "Reopen in Container"
    - Experience the automatic setup
 
 2. **Read the guides**
+
    - [DEVELOPMENT.md](DEVELOPMENT.md) - Full development guide
    - [TESTING.md](TESTING.md) - Testing instructions
    - [DevContainer Details](../.devcontainer/README.md) - Container configuration details
 
 3. **Start developing**
+
    - Make changes to tasks
    - Run `make test-quick` for fast feedback
    - Commit with pre-commit hooks
@@ -239,10 +251,12 @@ docker ps
 ```
 
 ### Need more resources
+
 - Increase Docker memory/CPU in Docker Desktop settings
 - Close other containers
 
 ### Port conflicts
+
 - Check `.devcontainer/devcontainer.json` `forwardPorts`
 - Change to unused ports if needed
 
@@ -251,6 +265,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md#troubleshooting) for more troubleshooting he
 ## ✨ Summary
 
 Your Ansible role now has:
+
 - ✅ Professional dev container setup
 - ✅ Comprehensive documentation
 - ✅ Both container and traditional workflows supported

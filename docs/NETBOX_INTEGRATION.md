@@ -7,8 +7,11 @@ This role relies heavily on **NetBox** as the source of truth for network config
 ## Critical Integration Points
 
 ### 1. Custom Fields (Per-Device Control)
+
 ### 2. Config Context (Configuration Data)
+
 ### 3. NetBox Standard Objects (VLANs, Interfaces, L2VPNs)
+
 ### 4. NetBox Plugins (Optional: BGP Plugin)
 
 ---
@@ -42,6 +45,7 @@ Required: No
 ```
 
 **NetBox UI:**
+
 ```
 Customization → Custom Fields → Add
 ├─ Name: device_bgp
@@ -64,6 +68,7 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$ (optional)
 ```
 
 **NetBox UI:**
+
 ```
 Customization → Custom Fields → Add
 ├─ Name: device_bgp_routerid
@@ -112,6 +117,7 @@ Required: No
 ```
 
 **NetBox UI:**
+
 ```
 Customization → Custom Fields → Add
 ├─ Name: device_vsx_enabled
@@ -266,6 +272,7 @@ Ansible access:
 ### BGP Config Context (Fallback Mode)
 
 **Important:** BGP configuration supports **two modes**:
+
 1. **netbox-bgp plugin** (preferred) - Structured data via plugin API
 2. **config_context** (fallback) - JSON data for migration period
 
@@ -382,6 +389,7 @@ Device Config Context (highest priority)
 #### Example Hierarchy
 
 **Site Level (site: datacenter1):**
+
 ```json
 {
   "ntp": {
@@ -395,6 +403,7 @@ Device Config Context (highest priority)
 ```
 
 **Device Level (leaf1):**
+
 ```json
 {
   "bgp_as": 65000,
@@ -405,6 +414,7 @@ Device Config Context (highest priority)
 ```
 
 **Merged Result (what Ansible sees):**
+
 ```json
 {
   "ntp": {"servers": ["10.0.0.1", "10.0.0.2"]},
@@ -432,11 +442,13 @@ The role uses standard NetBox objects for configuration.
 **Used by:** `configure_vlans.yml`, `cleanup_vlans.yml`
 
 **Required fields:**
+
 - `vid` - VLAN ID (1-4094)
 - `name` - VLAN name
 - `site` - Site assignment
 
 **Optional fields:**
+
 - `description` - VLAN description
 - `l2vpn_termination` - Link to L2VPN (for EVPN/VXLAN)
 
@@ -447,19 +459,23 @@ The role uses standard NetBox objects for configuration.
 **Used by:** All interface configuration tasks
 
 **Required fields:**
+
 - `name` - Interface name
 - `type` - Interface type
 - `enabled` - Admin state
 
 **Key fields for L2:**
+
 - `mode` - Access or Tagged
 - `untagged_vlan` - Access VLAN
 - `tagged_vlans` - Trunk VLANs
 
 **Key fields for L3:**
+
 - `ip_addresses` - Assigned IP addresses
 
 **Key fields for LAG:**
+
 - `lag` - Parent LAG interface
 
 ### L2VPNs and L2VPN Terminations
@@ -487,6 +503,7 @@ Assigned Object: VLAN 100 (site: datacenter1)
 ```
 
 **Ansible access:**
+
 ```yaml
 vlan.l2vpn_termination.l2vpn.identifier  # VNI (10100)
 vlan.l2vpn_termination.id  # Termination exists check
@@ -562,12 +579,14 @@ GET /api/plugins/bgp/session/?device_id=123&status=active
 **UI:** Device → Custom Fields tab
 
 **API:**
+
 ```bash
 curl -H "Authorization: Token $NETBOX_TOKEN" \
   "$NETBOX_API/api/dcim/devices/123/" | jq '.custom_fields'
 ```
 
 **Expected output:**
+
 ```json
 {
   "device_bgp": true,
@@ -582,12 +601,14 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 **UI:** Device → Config Context tab
 
 **API:**
+
 ```bash
 curl -H "Authorization: Token $NETBOX_TOKEN" \
   "$NETBOX_API/api/dcim/devices/123/?include=config_context" | jq '.config_context'
 ```
 
 **Expected output:**
+
 ```json
 {
   "motd": "Production device",
@@ -700,6 +721,7 @@ custom_fields:
 **Symptom:** Task skipped even though custom field is set
 
 **Check:**
+
 ```bash
 # Verify custom field exists
 ansible-inventory -i netbox_inventory.yml --host DEVICE --yaml | grep device_bgp
@@ -709,6 +731,7 @@ ansible-playbook playbook.yml --check -vvv | grep "Conditional result"
 ```
 
 **Common causes:**
+
 - Custom field not created in NetBox
 - Custom field value is null/undefined
 - Role variable disabled (`aoscx_configure_bgp: false`)
@@ -718,6 +741,7 @@ ansible-playbook playbook.yml --check -vvv | grep "Conditional result"
 **Symptom:** Configuration not applied, config_context empty
 
 **Check:**
+
 ```bash
 # View merged config_context
 curl -H "Authorization: Token $TOKEN" \
@@ -725,6 +749,7 @@ curl -H "Authorization: Token $TOKEN" \
 ```
 
 **Common causes:**
+
 - No config_context defined at any level
 - JSON syntax error in config_context
 - Config context not assigned to correct object type
@@ -734,6 +759,7 @@ curl -H "Authorization: Token $TOKEN" \
 **Symptom:** Falls back to config_context when it shouldn't
 
 **Check:**
+
 ```bash
 # Test plugin API endpoint
 curl -H "Authorization: Token $TOKEN" \
@@ -741,6 +767,7 @@ curl -H "Authorization: Token $TOKEN" \
 ```
 
 **Common causes:**
+
 - Plugin not installed
 - No BGP sessions created
 - BGP sessions not in "active" or "planned" status
@@ -763,12 +790,15 @@ curl -H "Authorization: Token $TOKEN" \
 ### Config Context Keys
 
 **Base System (Stable):**
+
 - `motd`, `timezone`, `ntp.servers`, `dns.domain`, `dns.servers`
 
 **VSX (Stable):**
+
 - `vsx_system_mac`, `vsx_role`, `vsx_isl_ports`, `vsx_keepalive_peer`, `vsx_keepalive_src`, `vsx_keepalive_vrf`
 
 **BGP (Hybrid/Fallback):**
+
 - `bgp_as`, `bgp_peers`, `bgp_ipv4_peers`, `bgp_vrfs`, `bgp_rr_clients`
 
 ### NetBox Objects
@@ -780,13 +810,13 @@ curl -H "Authorization: Token $TOKEN" \
 
 ### Best Practices
 
-✅ **Use custom fields** for per-device enable/disable control
-✅ **Use config_context** for configuration data
-✅ **Use site/region level** config_context for common settings
-✅ **Use device level** config_context for device-specific overrides
-✅ **Use netbox-bgp plugin** for BGP when possible
-✅ **Keep config_context** for base system configuration
-✅ **Use L2VPN objects** for EVPN/VXLAN VNI mapping
+- ✅ **Use custom fields** for per-device enable/disable control
+- ✅ **Use config_context** for configuration data
+- ✅ **Use site/region level** config_context for common settings
+- ✅ **Use device level** config_context for device-specific overrides
+- ✅ **Use netbox-bgp plugin** for BGP when possible
+- ✅ **Keep config_context** for base system configuration
+- ✅ **Use L2VPN objects** for EVPN/VXLAN VNI mapping
 
 ---
 

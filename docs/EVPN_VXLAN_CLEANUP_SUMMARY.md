@@ -11,11 +11,13 @@ EVPN Cleanup → VXLAN Cleanup → VLAN Deletion
 ```
 
 **Why this matters:**
+
 - Deleting a VLAN with active EVPN/VXLAN config leaves orphaned configurations
 - VXLAN VNI must be removed before the VLAN
 - EVPN control plane config must be removed before VXLAN to avoid issues
 
 **Important:** Cleanup only runs when `aoscx_idempotent_mode: true`
+
 - This connects configuration and cleanup together
 - Initial deployments (`aoscx_idempotent_mode: false`) only create configs, no cleanup
 - Ongoing management (`aoscx_idempotent_mode: true`) creates new configs AND removes old ones
@@ -27,6 +29,7 @@ EVPN Cleanup → VXLAN Cleanup → VLAN Deletion
 **Purpose:** Remove EVPN configuration for VLANs being deleted
 
 **What it does:**
+
 - Filters VLANs to cleanup: in `vlans_to_delete` AND have L2VPN terminations
 - Removes EVPN config: `no vlan X` under `evpn` context
 - Only runs when `device_evpn` custom field is `true`
@@ -43,10 +46,11 @@ evpn
 **Purpose:** Remove VXLAN VNI and VLAN-to-VNI mappings for VLANs being deleted
 
 **What it does:**
+
 - Filters VLANs to cleanup: in `vlans_to_delete` AND have L2VPN terminations
 - **Two-step removal process** (reverse of configuration):
-  - Step 1: Remove VLAN from VNI (`no vlan X` under `vni Y`)
-  - Step 2: Remove VNI from VXLAN interface (`no vni Y`)
+    - Step 1: Remove VLAN from VNI (`no vlan X` under `vni Y`)
+    - Step 2: Remove VNI from VXLAN interface (`no vni Y`)
 - Only runs when `device_vxlan` custom field is `true`
 
 **Example cleanup:**
@@ -62,6 +66,7 @@ interface vxlan 1
 ### `tasks/main.yml`
 
 **Changes:**
+
 - Added EVPN cleanup include before VLAN cleanup
 - Added VXLAN cleanup include before VLAN cleanup
 - Updated comments to explain critical ordering
@@ -100,6 +105,7 @@ interface vxlan 1
 ### `docs/EVPN_VXLAN_CONFIGURATION.md`
 
 **Added section:** "Cleanup Process" with:
+
 - Overview of cleanup ordering and why it matters
 - Detailed explanation of each cleanup task
 - Examples of configurations before/after cleanup
@@ -111,14 +117,14 @@ interface vxlan 1
 
 ## Key Features
 
-✅ **Intelligent filtering** - Only removes EVPN/VXLAN for VLANs being deleted
-✅ **L2VPN termination check** - Only cleanups VLANs with VNI mappings
-✅ **Custom field control** - Respects per-device enable/disable
-✅ **Proper ordering** - Critical cleanup sequence enforced
-✅ **Two-step VXLAN removal** - VLAN from VNI, then VNI itself
-✅ **Safe execution** - Only runs when needed (when conditions)
-✅ **Idempotent** - Safe to run multiple times
-✅ **Debug output** - Shows what was cleaned up
+- ✅ **Intelligent filtering** - Only removes EVPN/VXLAN for VLANs being deleted
+- ✅ **L2VPN termination check** - Only cleanups VLANs with VNI mappings
+- ✅ **Custom field control** - Respects per-device enable/disable
+- ✅ **Proper ordering** - Critical cleanup sequence enforced
+- ✅ **Two-step VXLAN removal** - VLAN from VNI, then VNI itself
+- ✅ **Safe execution** - Only runs when needed (when conditions)
+- ✅ **Idempotent** - Safe to run multiple times
+- ✅ **Debug output** - Shows what was cleaned up
 
 ## Cleanup Flow
 
@@ -170,6 +176,7 @@ The cleanup tasks run **automatically** as part of the role execution when:
 | **Ongoing Management** | `true` | ✅ Creates configs | ✅ Removes old configs |
 
 **Why this matters:**
+
 - **Initial deployment**: You want to create configurations without removing anything
 - **Ongoing management**: You want to add new configs AND remove old ones to match NetBox
 
@@ -230,22 +237,23 @@ This matches best practices and ensures clean removal without orphaned configura
 ## Documentation
 
 Complete documentation in:
+
 - `docs/EVPN_VXLAN_CONFIGURATION.md` - Includes new "Cleanup Process" section
-  - Cleanup overview and ordering
-  - Each cleanup task explained
-  - Examples and verification
-  - Troubleshooting
+    - Cleanup overview and ordering
+    - Each cleanup task explained
+    - Examples and verification
+    - Troubleshooting
 
 ## Next Steps
 
 The EVPN/VXLAN implementation is now complete with:
 
-✅ Configuration tasks (configure_evpn.yml, configure_vxlan.yml)
-✅ Cleanup tasks (cleanup_evpn.yml, cleanup_vxlan.yml)
-✅ Proper ordering enforced in main.yml
-✅ Comprehensive documentation
-✅ Custom field control
-✅ Intelligent VLAN filtering
-✅ NetBox L2VPN integration
+- ✅ Configuration tasks (configure_evpn.yml, configure_vxlan.yml)
+- ✅ Cleanup tasks (cleanup_evpn.yml, cleanup_vxlan.yml)
+- ✅ Proper ordering enforced in main.yml
+- ✅ Comprehensive documentation
+- ✅ Custom field control
+- ✅ Intelligent VLAN filtering
+- ✅ NetBox L2VPN integration
 
 The role can now fully manage EVPN/VXLAN lifecycle from creation to cleanup!

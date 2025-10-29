@@ -28,44 +28,44 @@ This role includes comprehensive CI/CD testing infrastructure with **7 layers of
 
 ### Key Benefits
 
-✅ **Isolated Environment** - No conflicts with system packages
-✅ **Multi-version Testing** - Tests across Ansible 2.14, 2.15, 2.16
-✅ **Automated CI/CD** - Runs on every push/PR
-✅ **Pre-commit Hooks** - Catch issues before commit
-✅ **Easy Commands** - Simple Makefile interface
-✅ **Comprehensive Docs** - Multiple detailed guides
-✅ **Industry Best Practices** - Virtual envs, linting, testing
-✅ **Auto Galaxy Release** - Publish automatically on main branch
+- ✅ **Isolated Environment** - No conflicts with system packages
+- ✅ **Multi-version Testing** - Tests across Ansible 2.14, 2.15, 2.16
+- ✅ **Automated CI/CD** - Runs on every push/PR
+- ✅ **Pre-commit Hooks** - Catch issues before commit
+- ✅ **Easy Commands** - Simple Makefile interface
+- ✅ **Comprehensive Docs** - Multiple detailed guides
+- ✅ **Industry Best Practices** - Virtual envs, linting, testing
+- ✅ **Auto Galaxy Release** - Publish automatically on main branch
 
 ## Testing Infrastructure
 
 ### Core Components (21 files)
 
 1. **GitHub Actions CI/CD**
-   - `.github/workflows/ci.yml` - Multi-stage pipeline (lint, syntax, molecule, integration, release)
-   - `.github/ISSUE_TEMPLATE/bug_report.md` - Bug report template
-   - `.github/ISSUE_TEMPLATE/feature_request.md` - Feature request template
+    - `.github/workflows/ci.yml` - Multi-stage pipeline (lint, syntax, molecule, integration, release)
+    - `.github/ISSUE_TEMPLATE/bug_report.md` - Bug report template
+    - `.github/ISSUE_TEMPLATE/feature_request.md` - Feature request template
 
 2. **Testing Configuration**
-   - `.ansible-lint` - Ansible best practices linting (production profile)
-   - `.yamllint` - YAML syntax validation rules
-   - `requirements-test.txt` - Python testing dependencies
-   - `.pre-commit-config.yaml` - Pre-commit hook configuration
+    - `.ansible-lint` - Ansible best practices linting (production profile)
+    - `.yamllint` - YAML syntax validation rules
+    - `requirements-test.txt` - Python testing dependencies
+    - `.pre-commit-config.yaml` - Pre-commit hook configuration
 
 3. **Molecule Testing Framework**
-   - `molecule/default/molecule.yml` - Test configuration
-   - `molecule/default/converge.yml` - Role application test
-   - `molecule/default/verify.yml` - Verification tests
+    - `molecule/default/molecule.yml` - Test configuration
+    - `molecule/default/converge.yml` - Role application test
+    - `molecule/default/verify.yml` - Verification tests
 
 4. **Test Playbooks**
-   - `tests/test.yml` - Main test playbook with comprehensive mock data
-   - `tests/integration.yml` - Integration test scenarios
-   - `tests/inventory` - Test inventory file
+    - `tests/test.yml` - Main test playbook with comprehensive mock data
+    - `tests/integration.yml` - Integration test scenarios
+    - `tests/inventory` - Test inventory file
 
 5. **Developer Tools**
-   - `Makefile` - 20+ convenient commands with venv integration
-   - `setup-testing.sh` - Automated setup script (creates venv)
-   - `.gitignore` - Enhanced for testing artifacts and venv
+    - `Makefile` - 20+ convenient commands with venv integration
+    - `setup-testing.sh` - Automated setup script (creates venv)
+    - `.gitignore` - Enhanced for testing artifacts and venv
 
 ### File Structure
 
@@ -167,6 +167,7 @@ The **easiest way** to run tests is using the VS Code Dev Container, which provi
 4. All dependencies are automatically installed! 🎉
 
 **Benefits:**
+
 - ✅ No manual setup required
 - ✅ Consistent environment for all developers
 - ✅ All tools pre-configured (Python, Ansible, Docker, linters)
@@ -174,6 +175,7 @@ The **easiest way** to run tests is using the VS Code Dev Container, which provi
 - ✅ Works on Windows, Mac, and Linux
 
 **To run tests in dev container:**
+
 ```bash
 # All commands work out of the box
 make test-quick
@@ -212,6 +214,7 @@ pre-commit install
 ```
 
 **Note:** Always activate the virtual environment before running tests:
+
 ```bash
 source .venv/bin/activate
 ```
@@ -347,6 +350,7 @@ The role uses GitHub Actions for continuous integration.
 ### Workflow: `.github/workflows/ci.yml`
 
 The CI pipeline runs automatically on:
+
 - Push to `main` or `develop` branches
 - Pull requests to `main` or `develop`
 - Manual workflow dispatch
@@ -362,6 +366,7 @@ The CI pipeline runs automatically on:
 ### Viewing CI Results
 
 Check the Actions tab in GitHub:
+
 ```
 https://github.com/your-org/ansible-role-aruba-cx-switch/actions
 ```
@@ -373,6 +378,7 @@ https://github.com/your-org/ansible-role-aruba-cx-switch/actions
 Located in: `molecule/default/`
 
 Tests individual role functionality in isolation:
+
 - Role structure validation
 - Task file existence
 - Variable handling
@@ -383,11 +389,13 @@ Tests individual role functionality in isolation:
 Located in: `tests/`
 
 Tests role behavior with mock data:
+
 - `tests/test.yml` - Main test playbook with comprehensive scenarios
 - `tests/integration.yml` - Specific feature integration tests
 - `tests/inventory` - Test inventory file
 
 Run integration tests:
+
 ```bash
 cd tests
 ansible-playbook test.yml -i inventory -v
@@ -560,6 +568,7 @@ Current test coverage:
 ### Initial Setup
 
 1. **Review the setup**
+
    ```bash
    cat docs/TESTING.md
    cat docs/QUICK_REFERENCE.md
@@ -567,6 +576,7 @@ Current test coverage:
    ```
 
 2. **Run initial setup**
+
    ```bash
    ./setup-testing.sh
    # OR
@@ -574,11 +584,13 @@ Current test coverage:
    ```
 
 3. **Test it works**
+
    ```bash
    make test-quick
    ```
 
 4. **Setup pre-commit hooks**
+
    ```bash
    pre-commit install
    # OR
@@ -586,6 +598,7 @@ Current test coverage:
    ```
 
 5. **Commit and push to GitHub**
+
    ```bash
    git add .
    git commit -m "feat: add comprehensive CI/CD testing infrastructure"
@@ -593,8 +606,9 @@ Current test coverage:
    ```
 
 6. **Configure GitHub Secrets** (for automatic releases)
-   - Go to repository Settings → Secrets and variables → Actions
-   - Add `GALAXY_API_KEY` with your Ansible Galaxy API token
+
+    - Go to repository Settings → Secrets and variables → Actions
+    - Add `GALAXY_API_KEY` with your Ansible Galaxy API token
 
 ### Daily Development Workflow
 

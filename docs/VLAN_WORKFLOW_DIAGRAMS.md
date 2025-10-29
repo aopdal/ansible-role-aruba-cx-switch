@@ -105,56 +105,43 @@ graph LR
 ## Timeline Comparison
 
 ### Before Refactoring (Inconsistent)
-```
-Time →
-┌─────────────────────────────────────────────────────────────┐
-│ configure_vlans.yml                                         │
-│   └─ Fetch VLANs, calc vlans_in_use, determine changes ❶  │
-├─────────────────────────────────────────────────────────────┤
-│ configure_evpn.yml                                          │
-│   └─ Re-calc vlans_in_use (if not set) ❷                  │
-├─────────────────────────────────────────────────────────────┤
-│ configure_vxlan.yml                                         │
-│   └─ Re-calc vlans_in_use (if not set) ❸                  │
-├─────────────────────────────────────────────────────────────┤
-│ ... interface configuration ...                            │
-├─────────────────────────────────────────────────────────────┤
-│ identify_vlan_changes.yml                                   │
-│   └─ Re-calc everything again ❹                            │
-├─────────────────────────────────────────────────────────────┤
-│ cleanup_* tasks                                             │
-└─────────────────────────────────────────────────────────────┘
 
-❌ Problem: Multiple calculations with potentially different results
+```mermaid
+gantt
+    title Before Refactoring - Inconsistent VLAN Analysis
+    dateFormat X
+    axisFormat %s
+
+    section Tasks
+    configure_vlans.yml<br/>Fetch VLANs, calc vlans_in_use ❶     :crit, task1, 0, 1
+    configure_evpn.yml<br/>Re-calc vlans_in_use ❷                :crit, task2, 1, 1
+    configure_vxlan.yml<br/>Re-calc vlans_in_use ❸               :crit, task3, 2, 1
+    interface configuration                                       :task4, 3, 1
+    identify_vlan_changes.yml<br/>Re-calc everything ❹           :crit, task5, 4, 1
+    cleanup_* tasks                                               :task6, 5, 1
 ```
+
+**❌ Problem:** Multiple calculations with potentially different results
 
 ### After Refactoring (Consistent)
-```
-Time →
-┌─────────────────────────────────────────────────────────────┐
-│ identify_vlan_changes.yml ✓ SINGLE SOURCE OF TRUTH         │
-│   └─ Fetch VLANs, calc vlans_in_use, determine changes    │
-├─────────────────────────────────────────────────────────────┤
-│ configure_vlans.yml                                         │
-│   └─ Assert + use facts from above ✓                      │
-├─────────────────────────────────────────────────────────────┤
-│ configure_evpn.yml                                          │
-│   └─ Assert + use facts from above ✓                      │
-├─────────────────────────────────────────────────────────────┤
-│ configure_vxlan.yml                                         │
-│   └─ Assert + use facts from above ✓                      │
-├─────────────────────────────────────────────────────────────┤
-│ ... interface configuration ...                            │
-├─────────────────────────────────────────────────────────────┤
-│ identify_vlan_changes.yml ✓ RE-ANALYZE FOR CLEANUP        │
-│   └─ Re-calc with updated interface state                 │
-├─────────────────────────────────────────────────────────────┤
-│ cleanup_* tasks                                             │
-│   └─ Assert + use facts from above ✓                      │
-└─────────────────────────────────────────────────────────────┘
 
-✅ Solution: Consistent analysis, clear dependencies, safe execution
+```mermaid
+gantt
+    title After Refactoring - Consistent VLAN Analysis
+    dateFormat X
+    axisFormat %s
+
+    section Tasks
+    identify_vlan_changes.yml ✓<br/>SINGLE SOURCE OF TRUTH      :done, task1, 0, 1
+    configure_vlans.yml<br/>Assert + use facts ✓                :active, task2, 1, 1
+    configure_evpn.yml<br/>Assert + use facts ✓                 :active, task3, 2, 1
+    configure_vxlan.yml<br/>Assert + use facts ✓                :active, task4, 3, 1
+    interface configuration                                       :task5, 4, 1
+    identify_vlan_changes.yml ✓<br/>RE-ANALYZE FOR CLEANUP      :done, task6, 5, 1
+    cleanup_* tasks<br/>Assert + use facts ✓                    :active, task7, 6, 1
 ```
+
+**✅ Solution:** Consistent analysis, clear dependencies, safe execution
 
 ## Facts Reference Table
 

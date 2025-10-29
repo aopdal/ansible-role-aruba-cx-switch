@@ -50,6 +50,7 @@ flowchart TD
 
 1. **netbox-bgp plugin** is tried first (if `aoscx_use_netbox_bgp_plugin: true`)
 2. **config_context** is used if:
+
    - Plugin not installed (404 response)
    - Plugin installed but device has no sessions
    - Plugin explicitly disabled via variable
@@ -83,17 +84,20 @@ aoscx_debug: true
 ### Strategy 1: Gradual Migration (Recommended)
 
 **Phase 1: Parallel Operation**
+
 - Keep config_context data
 - Install netbox-bgp plugin
 - Create sessions for test devices
 - Both sources work simultaneously
 
 **Phase 2: Progressive Migration**
+
 - Migrate one device at a time
 - Verify each device works with plugin
 - Remove config_context BGP data after verification
 
 **Phase 3: Complete Migration**
+
 - All devices using netbox-bgp plugin
 - Remove config_context BGP data
 - Keep role supporting both for flexibility
@@ -112,21 +116,25 @@ ansible-playbook configure_aoscx.yml -l fabric -t bgp
 ### Strategy 2: Per-Site Migration
 
 **Site A: netbox-bgp plugin**
+
 - All devices have BGP sessions in plugin
 - config_context has no BGP data
 
 **Site B: config_context**
+
 - Devices use config_context
 - Will migrate later
 
 ### Strategy 3: Role-Based Migration
 
 **Spines: netbox-bgp plugin first**
+
 - Critical infrastructure
 - More complex BGP configuration
 - Better tracking with plugin
 
 **Leafs: config_context initially**
+
 - Simpler configuration
 - Migrate after spines are stable
 
@@ -271,16 +279,19 @@ ansible-playbook configure_aoscx.yml -l leaf-3 -t bgp \
 ### Current Implementation
 
 **Implemented (Both Sources):**
+
 - ✅ BGP router process (AS, Router ID)
 - ✅ EVPN neighbors (L2VPN EVPN address family)
 
 **Implemented (config_context Only):**
+
 - ✅ IPv4 unicast neighbors
 - ✅ VRF instances
 - ✅ Route reflector clients
 - ✅ Additional BGP settings
 
 **Future Enhancements (netbox-bgp Plugin):**
+
 - ⏳ Query peer groups for templating
 - ⏳ Apply routing policies from plugin
 - ⏳ Configure communities from plugin
@@ -431,6 +442,7 @@ systemctl restart netbox
 ### Mixed Configuration Sources
 
 **Symptom:**
+
 - Some devices use plugin
 - Some devices use config_context
 - Inconsistent behavior
@@ -449,12 +461,14 @@ ansible-playbook configure_aoscx.yml -t bgp \
 ### 1. Migration Planning
 
 ✅ **DO:**
+
 - Migrate in phases (test devices first)
 - Keep config_context as backup during migration
 - Use debug mode to verify data source
 - Test with `--check` before applying
 
 ❌ **DON'T:**
+
 - Migrate all devices at once
 - Delete config_context data before verifying plugin works
 - Mix data sources on same device (one source per device)
@@ -462,22 +476,26 @@ ansible-playbook configure_aoscx.yml -t bgp \
 ### 2. Data Management
 
 ✅ **DO:**
+
 - Use Status field (Planned → Active) for gradual rollout
 - Document which devices use which source
 - Keep custom fields (device_bgp) for enable/disable
 
 ❌ **DON'T:**
+
 - Have BGP data in both sources for same device
 - Forget to set Status to Active in plugin
 
 ### 3. Operations
 
 ✅ **DO:**
+
 - Use netbox-bgp plugin for new devices
 - Query plugin API for BGP session lists
 - Leverage peer groups for consistency
 
 ❌ **DON'T:**
+
 - Disable plugin support after migration (keep flexibility)
 - Assume all devices have sessions in plugin
 
@@ -486,26 +504,31 @@ ansible-playbook configure_aoscx.yml -t bgp \
 ### Planned Features (netbox-bgp Plugin)
 
 1. **Peer Group Templates**
+
    - Query peer group settings
    - Apply to all group members
    - Reduce duplication
 
 2. **Routing Policies**
+
    - Query import/export policies from plugin
    - Apply to sessions automatically
    - Policy-based configuration
 
 3. **BGP Communities**
+
    - Query community definitions
    - Apply to sessions
    - Community-based routing
 
 4. **IPv4 Unicast**
+
    - Support IPv4 neighbors from plugin
    - Distinguish EVPN vs IPv4 sessions
    - Address family per session
 
 5. **VRF Integration**
+
    - Link BGP sessions to VRF instances
    - Automatic VRF configuration
    - Per-VRF neighbors
@@ -527,6 +550,7 @@ The hybrid BGP configuration provides:
 ✅ **Production-ready** - Battle-tested with both methods
 
 **Migration Timeline:**
+
 - Today: Use config_context
 - Migration: Both sources side-by-side
 - Future: Full netbox-bgp plugin (recommended)

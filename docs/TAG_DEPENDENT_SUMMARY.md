@@ -11,19 +11,23 @@ Three high-impact configuration tasks are now **tag-dependent**, meaning they on
 ## Why This Matters
 
 ### Before
+
 ```bash
 # Running VLAN changes would also evaluate BGP/OSPF/VSX
 ansible-playbook configure_aoscx.yml -t vlans
 ```
+
 - All routing protocol tasks were included
 - Risk of accidental routing changes
 - Slower execution due to unnecessary evaluations
 
 ### After
+
 ```bash
 # Running VLAN changes ONLY touches VLANs
 ansible-playbook configure_aoscx.yml -t vlans
 ```
+
 - Routing protocols completely skipped
 - Safer day-to-day operations
 - Faster execution
@@ -53,11 +57,13 @@ when:
 ## Design Decisions
 
 ### ✅ Tag-Dependent (Requires Explicit Request)
+
 - **BGP**: High-impact routing protocol
 - **OSPF**: High-impact routing protocol
 - **VSX**: High-availability configuration
 
 ### ❌ NOT Tag-Dependent (Runs When Tagged)
+
 - **Cleanup**: Protected by `aoscx_idempotent_mode` flag
 - **EVPN/VXLAN**: Needs to run with VLAN changes
 - **VLANs**: Common operational changes
@@ -82,6 +88,7 @@ ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 --list-tas
 ## Real-World Impact
 
 ### Day-to-Day Operations (Safer)
+
 ```bash
 # Add VLANs without routing risk
 ansible-playbook configure_aoscx.yml -t vlans
@@ -94,6 +101,7 @@ ansible-playbook configure_aoscx.yml -t base_config
 ```
 
 ### Intentional Changes (Explicit)
+
 ```bash
 # Update BGP configuration
 ansible-playbook configure_aoscx.yml -t bgp

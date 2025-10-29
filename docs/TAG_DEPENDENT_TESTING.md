@@ -3,27 +3,35 @@
 ## Quick Verification Commands
 
 ### Test 1: VLAN Changes (Should NOT include routing)
+
 ```bash
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t vlans --list-tasks | grep -E "(OSPF|BGP|VSX)"
 ```
+
 **Expected**: No output (routing tasks not included)
 
 ### Test 2: Explicit Routing (Should include BGP and OSPF)
+
 ```bash
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t routing --list-tasks | grep -E "(OSPF|BGP)"
 ```
+
 **Expected**: Shows "Include OSPF configuration tasks" and "Include BGP configuration tasks"
 
 ### Test 3: Explicit BGP Only
+
 ```bash
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t bgp --list-tasks
 ```
+
 **Expected**: Shows only BGP tasks, not OSPF or VSX
 
 ### Test 4: Full Run (Should include everything)
+
 ```bash
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 --list-tasks | grep -E "(OSPF|BGP|VSX)"
 ```
+
 **Expected**: Shows all three task includes
 
 ## Detailed Test Matrix
@@ -42,24 +50,28 @@ ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 --list-tas
 ## Real-World Scenarios
 
 ### Scenario 1: Adding VLANs to Production
+
 ```bash
 # Safe - won't touch routing protocols
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l production-switches -t vlans
 ```
 
 ### Scenario 2: Updating BGP Neighbors
+
 ```bash
 # Explicit - only BGP changes
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l border-routers -t bgp
 ```
 
 ### Scenario 3: Initial Switch Deployment
+
 ```bash
 # Full run - everything including routing
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l new-switch
 ```
 
 ### Scenario 4: Emergency Interface Fix
+
 ```bash
 # Quick - no routing protocol risk
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l problematic-switch -t interfaces
@@ -106,6 +118,7 @@ echo "=== Test Complete ==="
 ```
 
 Make it executable:
+
 ```bash
 chmod +x test-tag-dependencies.sh
 ./test-tag-dependencies.sh

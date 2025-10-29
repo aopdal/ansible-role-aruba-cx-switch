@@ -6,11 +6,11 @@ The EVPN and VXLAN tasks configure overlay networking for EVPN/VXLAN fabrics on 
 
 ## Key Features
 
-✅ **Intelligent VLAN filtering** - Only configures VLANs in use on interfaces
-✅ **NetBox L2VPN integration** - Uses NetBox L2VPN terminations for VNI mapping
-✅ **Per-device control** - Custom fields enable/disable EVPN and VXLAN
-✅ **Proper ordering** - EVPN before VXLAN, VNI before VLAN-to-VNI mapping
-✅ **Idempotent** - Safe to run multiple times
+- ✅ **Intelligent VLAN filtering** - Only configures VLANs in use on interfaces
+- ✅ **NetBox L2VPN integration** - Uses NetBox L2VPN terminations for VNI mapping
+- ✅ **Per-device control** - Custom fields enable/disable EVPN and VXLAN
+- ✅ **Proper ordering** - EVPN before VXLAN, VNI before VLAN-to-VNI mapping
+- ✅ **Idempotent** - Safe to run multiple times
 
 ## Configuration Order
 
@@ -81,6 +81,7 @@ vlans_for_evpn: "{{ vlans |
 ### VLANs In Use Detection
 
 A VLAN is considered "in use" if it appears on:
+
 - Physical interface in access mode
 - Physical interface in tagged mode (trunk)
 - LAG interface in access mode
@@ -136,6 +137,7 @@ evpn
 ### Task: configure_vxlan.yml
 
 Configures VXLAN in two steps:
+
 1. Create VNI under interface vxlan 1
 2. Map VLAN to VNI
 
@@ -159,6 +161,7 @@ Same as EVPN - L2VPN termination with VNI identifier.
 **VLANs in use:** 100, 200, 300
 **VLANs with L2VPN:** 100, 200
 **VNI mappings:**
+
 - VLAN 100 → VNI 10100
 - VLAN 200 → VNI 10200
 
@@ -219,10 +222,12 @@ device_vxlan: false
 ### Example 2: Multi-Tenant Fabric
 
 **Tenants:**
+
 - TENANT-A: VLANs 100-199
 - TENANT-B: VLANs 200-299
 
 **VNI Scheme:**
+
 - TENANT-A: VNI 11000-11099
 - TENANT-B: VNI 12000-12099
 
@@ -430,6 +435,7 @@ show mac-address-table vxlan
 **Symptom:** `show evpn` returns empty
 
 **Check:**
+
 ```bash
 # 1. Role variable enabled
 aoscx_configure_evpn: true
@@ -450,6 +456,7 @@ ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn -e aoscx_debug=true
 **Symptom:** `show vxlan vni` returns empty
 
 **Check:**
+
 ```bash
 # 1. Role variable enabled
 aoscx_configure_vxlan: true
@@ -469,6 +476,7 @@ show interface vxlan 1
 **Symptom:** VNI exists but no VLAN mapped
 
 **Check:**
+
 ```yaml
 # Task order - VXLAN task runs in 2 steps:
 # 1. Create VNI
@@ -484,6 +492,7 @@ show interface vxlan 1
 **Possible Causes:**
 
 1. **VLAN not in use on interfaces**
+
    ```bash
    # Check if VLAN appears on any interface
    show vlan 100
@@ -491,12 +500,14 @@ show interface vxlan 1
    ```
 
 2. **No L2VPN termination in NetBox**
+
    ```bash
    curl "$NETBOX_API/api/ipam/l2vpn-terminations/?assigned_object_type=ipam.vlan&assigned_object_id=VLAN_ID"
    # Should return termination
    ```
 
 3. **VNI identifier missing**
+
    ```bash
    # Check L2VPN has identifier
    curl "$NETBOX_API/api/ipam/l2vpns/ID/" | jq '.identifier'
@@ -508,11 +519,13 @@ show interface vxlan 1
 ### 1. VNI Numbering
 
 ✅ **Recommended schemes:**
+
 - Simple: VNI = 10000 + VLAN ID (VLAN 100 → VNI 10100)
 - Multi-tenant: VNI = tenant_base + VLAN (TENANT-A base 11000, VLAN 100 → VNI 11100)
 - Datacenter: VNI = DC_ID + VLAN (DC1 10000, DC2 20000)
 
 ❌ **Avoid:**
+
 - Random VNI numbers
 - Overlapping VNI ranges
 - Using VLAN ID as VNI directly
@@ -520,11 +533,13 @@ show interface vxlan 1
 ### 2. L2VPN Organization
 
 ✅ **DO:**
+
 - Consistent naming: `VLAN-{VID}-L2VPN` or `{TENANT}-VLAN-{VID}`
 - Document VNI scheme in NetBox
 - Use L2VPN descriptions
 
 ❌ **DON'T:**
+
 - Create L2VPNs without terminations
 - Reuse VNIs across L2VPNs
 - Mix VNI schemes within same fabric
@@ -532,12 +547,14 @@ show interface vxlan 1
 ### 3. Custom Fields
 
 ✅ **DO:**
+
 - Set `device_evpn` and `device_vxlan` per device
 - Enable on leaf switches (VTEPs)
 - Disable on spines (no VTEP needed)
 - Disable on access switches
 
 ❌ **DON'T:**
+
 - Enable EVPN without VXLAN (both needed for overlay)
 - Enable on devices without loopback interfaces
 - Enable before underlay routing is configured
@@ -545,12 +562,14 @@ show interface vxlan 1
 ### 4. Operations
 
 ✅ **DO:**
+
 - Configure in order: VLANs → Interfaces → Loopback → Routing → EVPN → VXLAN
 - Test with one VLAN first
 - Use debug mode to verify filtering
 - Check `show evpn` and `show vxlan` after configuration
 
 ❌ **DON'T:**
+
 - Configure EVPN/VXLAN before underlay routing
 - Configure on spines (unless spine is also acting as VTEP)
 - Create L2VPN terminations for VLANs not in use
@@ -566,11 +585,13 @@ EVPN Cleanup → VXLAN Cleanup → VLAN Deletion
 ```
 
 **Important:** Cleanup only runs when `aoscx_idempotent_mode` is `true`. This ensures:
+
 - Configuration and cleanup are connected together
 - Initial deployments don't trigger cleanup
 - Only ongoing management performs cleanup operations
 
 **Why order matters:**
+
 - Removing a VLAN that still has EVPN/VXLAN config can leave orphaned configurations
 - VXLAN VNI must be removed before the VLAN itself
 - EVPN config must be removed before VXLAN to avoid control plane issues
@@ -582,6 +603,7 @@ The role automatically runs these cleanup tasks when VLANs are being deleted:
 #### 1. EVPN Cleanup (`cleanup_evpn.yml`)
 
 **What it does:**
+
 - Identifies VLANs being deleted that have EVPN config (have L2VPN terminations)
 - Removes EVPN configuration: `no vlan X` under `evpn` context
 - Only runs when `device_evpn` custom field is enabled
@@ -596,10 +618,11 @@ evpn
 #### 2. VXLAN Cleanup (`cleanup_vxlan.yml`)
 
 **What it does:**
+
 - Identifies VLANs being deleted that have VXLAN mappings (have L2VPN terminations)
 - **Two-step removal** (reverse of configuration):
-  1. Remove VLAN from VNI: `no vlan X` under `vni Y`
-  2. Remove VNI from VXLAN interface: `no vni Y`
+    1. Remove VLAN from VNI: `no vlan X` under `vni Y`
+    2. Remove VNI from VXLAN interface: `no vni Y`
 - Only runs when `device_vxlan` custom field is enabled
 
 **Example cleanup:**
@@ -613,6 +636,7 @@ interface vxlan 1
 #### 3. VLAN Deletion (`cleanup_vlans.yml`)
 
 **What it does:**
+
 - Deletes VLANs that are no longer in use on any interface
 - Runs **after** EVPN and VXLAN cleanup complete
 
@@ -649,12 +673,14 @@ interface vxlan 1
 ```
 
 **Key point:** All three cleanup tasks require `aoscx_idempotent_mode: true`. This connects configuration and cleanup together:
+
 - **Initial deployment** (`aoscx_idempotent_mode: false`): Only creates configurations, no cleanup
 - **Ongoing management** (`aoscx_idempotent_mode: true`): Creates new configs AND removes old ones
 
 ### Cleanup Logic
 
 **VLAN identification:**
+
 ```yaml
 vlans_to_remove_from_evpn: >-
   {{
@@ -666,6 +692,7 @@ vlans_to_remove_from_evpn: >-
 ```
 
 **Only VLANs with:**
+
 - VID in `vlans_to_delete` list (not in use on interfaces)
 - L2VPN termination defined (have VNI mapping)
 
@@ -674,6 +701,7 @@ vlans_to_remove_from_evpn: >-
 **Scenario:** Remove VLAN 100 (VNI 10100) from a leaf switch
 
 **Before cleanup:**
+
 ```
 vlan 100
   name "Production"
@@ -690,6 +718,7 @@ evpn
 ```
 
 **After cleanup:**
+
 ```
 # All EVPN, VXLAN, and VLAN config removed cleanly
 ```
@@ -697,18 +726,21 @@ evpn
 ### Verification
 
 **Check EVPN cleanup:**
+
 ```bash
 show evpn vlan
 # VLAN should not appear in output
 ```
 
 **Check VXLAN cleanup:**
+
 ```bash
 show interface vxlan 1
 # VNI should not appear in output
 ```
 
 **Check VLAN deletion:**
+
 ```bash
 show vlan
 # VLAN should not exist
@@ -719,6 +751,7 @@ show vlan
 **Issue:** EVPN config not removed
 
 **Solution:**
+
 - Verify `device_evpn` custom field is `true` in NetBox
 - Check `aoscx_configure_evpn` is enabled (default: `false`)
 - Verify VLAN has L2VPN termination
@@ -726,6 +759,7 @@ show vlan
 **Issue:** VXLAN mapping not removed
 
 **Solution:**
+
 - Verify `device_vxlan` custom field is `true` in NetBox
 - Check `aoscx_configure_vxlan` is enabled (default: `false`)
 - Verify VLAN has L2VPN termination with identifier (VNI)
@@ -733,6 +767,7 @@ show vlan
 **Issue:** "VLAN in use" error during cleanup
 
 **Solution:**
+
 - Cleanup runs after interface cleanup, so VLANs should not be in use
 - Check that interface cleanup completed successfully
 - Verify EVPN cleanup ran before VXLAN cleanup
@@ -749,6 +784,7 @@ show vlan
 ### Prerequisites
 
 **Must run before EVPN/VXLAN configuration:**
+
 1. VLANs created (`configure_vlans.yml`)
 2. Interfaces configured (`configure_*_interfaces.yml`)
 3. Loopback configured (`configure_loopback.yml`)
@@ -756,6 +792,7 @@ show vlan
 5. BGP EVPN (`configure_bgp.yml`)
 
 **Must run before VLAN deletion (cleanup order):**
+
 1. EVPN cleanup (`cleanup_evpn.yml`)
 2. VXLAN cleanup (`cleanup_vxlan.yml`)
 3. VLAN cleanup (`cleanup_vlans.yml`)
@@ -763,34 +800,61 @@ show vlan
 ### Task Dependencies
 
 **Configuration Flow:**
-```
-VLANs → Interfaces → Loopback
-                        ↓
-                  Underlay (OSPF)
-                        ↓
-                  Overlay Control (BGP EVPN)
-                        ↓
-                ┌───────┴───────┐
-             EVPN            VXLAN
-                └───────┬───────┘
-                        ↓
-                  Fabric Ready
+
+```mermaid
+flowchart TD
+    VLANs[VLANs]
+    Interfaces[Interfaces]
+    Loopback[Loopback]
+    Underlay[Underlay - OSPF]
+    Overlay[Overlay Control - BGP EVPN]
+    EVPN[EVPN]
+    VXLAN[VXLAN]
+    Ready[Fabric Ready]
+
+    VLANs --> Interfaces
+    Interfaces --> Loopback
+    Loopback --> Underlay
+    Underlay --> Overlay
+    Overlay --> EVPN
+    Overlay --> VXLAN
+    EVPN --> Ready
+    VXLAN --> Ready
+
+    style VLANs fill:#e3f2fd
+    style Interfaces fill:#e8f5e9
+    style Loopback fill:#fff3e0
+    style Underlay fill:#f3e5f5
+    style Overlay fill:#fce4ec
+    style EVPN fill:#e0f2f1
+    style VXLAN fill:#f1f8e9
+    style Ready fill:#c8e6c9
 ```
 
 **Cleanup Flow (Reverse Order):**
-```
-EVPN Cleanup → VXLAN Cleanup → VLAN Deletion
+```mermaid
+flowchart LR
+    EVPN[EVPN Cleanup]
+    VXLAN[VXLAN Cleanup]
+    VLAN[VLAN Deletion]
+
+    EVPN --> VXLAN
+    VXLAN --> VLAN
+
+    style EVPN fill:#e0f2f1
+    style VXLAN fill:#f1f8e9
+    style VLAN fill:#ffebee
 ```
 
 ## Summary
 
-✅ **EVPN task** - Configures EVPN for VLANs in use with auto RD/RT
-✅ **VXLAN task** - Creates VNIs and maps to VLANs
-✅ **EVPN cleanup** - Removes EVPN config before VLAN deletion
-✅ **VXLAN cleanup** - Two-step removal (VLAN from VNI, then VNI itself)
-✅ **Intelligent filtering** - Only VLANs in use get configured
-✅ **NetBox integration** - Uses L2VPN terminations for VNI mapping
-✅ **Custom field control** - Per-device enable/disable
-✅ **Proper ordering** - Configuration and cleanup follow correct sequence
+- ✅ **EVPN task** - Configures EVPN for VLANs in use with auto RD/RT
+- ✅ **VXLAN task** - Creates VNIs and maps to VLANs
+- ✅ **EVPN cleanup** - Removes EVPN config before VLAN deletion
+- ✅ **VXLAN cleanup** - Two-step removal (VLAN from VNI, then VNI itself)
+- ✅ **Intelligent filtering** - Only VLANs in use get configured
+- ✅ **NetBox integration** - Uses L2VPN terminations for VNI mapping
+- ✅ **Custom field control** - Per-device enable/disable
+- ✅ **Proper ordering** - Configuration and cleanup follow correct sequence
 
 The implementation matches your production configuration exactly while integrating properly with the role's structure and NetBox inventory!

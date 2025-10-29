@@ -5,6 +5,7 @@
 ### Option 1: MkDocs Site (Recommended) 🌐
 
 **Start the documentation server:**
+
 ```bash
 cd /workspaces/ansible-role-aruba-cx-switch
 make docs-serve
@@ -12,6 +13,7 @@ make docs-serve
 ```
 
 **Navigate in the site:**
+
 ```
 http://127.0.0.1:8000
   └─ Top Navigation: "Configuration" tab
@@ -24,6 +26,7 @@ http://127.0.0.1:8000
 ### Option 2: Direct File Access 📁
 
 **From the repository root:**
+
 ```bash
 # Main overview
 cat docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
@@ -38,6 +41,7 @@ cat docs/VLAN_DEVELOPER_GUIDE.md
 ### Option 3: GitHub (when pushed) 🐙
 
 **Navigate to:**
+
 ```
 https://github.com/aopdal/ansible-role-aruba-cx-switch
   └─ docs/
@@ -87,11 +91,13 @@ https://github.com/aopdal/ansible-role-aruba-cx-switch
 ## What Each Document Covers
 
 ### 📋 Workflow Overview
+
 **File:** `VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md`
 
 **Audience:** DevOps Engineers, Network Automation Engineers
 
 **Content:**
+
 - Problem statement and solution
 - Single source of truth architecture
 - Task execution order (configuration + cleanup)
@@ -104,11 +110,13 @@ https://github.com/aopdal/ansible-role-aruba-cx-switch
 ---
 
 ### 📊 Visual Diagrams
+
 **File:** `VLAN_WORKFLOW_DIAGRAMS.md`
 
 **Audience:** Visual learners, Architects, Team leads
 
 **Content:**
+
 - Mermaid flowcharts for configuration phase
 - Mermaid flowcharts for cleanup phase
 - Fact dependencies graph
@@ -120,11 +128,13 @@ https://github.com/aopdal/ansible-role-aruba-cx-switch
 ---
 
 ### 👨‍💻 Developer Guide
+
 **File:** `VLAN_DEVELOPER_GUIDE.md`
 
 **Audience:** Developers contributing to the role
 
 **Content:**
+
 - Quick reference patterns
 - How to add new VLAN-related tasks
 - Available facts and their structure
@@ -139,6 +149,7 @@ https://github.com/aopdal/ansible-role-aruba-cx-switch
 ## Search Functionality
 
 Use the search bar in the MkDocs site to find:
+
 - **"vlan changes"** → All VLAN workflow docs
 - **"identify_vlan_changes"** → Task file references
 - **"vlans_in_use"** → Fact usage examples

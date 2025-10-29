@@ -456,15 +456,18 @@ ansible spine*,leaf* -m shell -a "show bgp l2vpn evpn summary"
 ## NetBox Config Context Assignment Strategy
 
 ### Option 1: Device-Specific
+
 - Assign unique config context to each device
 - Most flexible but more work
 
 ### Option 2: Role-Based
+
 - Create "Spines" and "Leafs" config contexts
 - Assign based on device role
 - Easier to manage
 
 ### Option 3: Site-Based
+
 - Create per-site config contexts
 - Good for multi-datacenter deployments
 

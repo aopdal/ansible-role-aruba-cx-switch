@@ -7,6 +7,7 @@ The VLAN change identification workflow has been refactored to provide **consist
 ## Problem Statement
 
 Previously, VLAN change identification logic was duplicated across multiple task files:
+
 - `configure_vlans.yml` - Calculated `vlans_in_use` and `vlan_changes`
 - `configure_evpn.yml` - Recalculated `vlans_in_use` if not defined
 - `configure_vxlan.yml` - Recalculated `vlans_in_use` if not defined
@@ -38,6 +39,7 @@ This task sets the following facts used by all downstream tasks:
 ### Task Execution Order
 
 #### Configuration Phase (Create/Update)
+
 ```
 1. identify_vlan_changes.yml  ← Analyze VLANs ONCE
    ↓
@@ -49,6 +51,7 @@ This task sets the following facts used by all downstream tasks:
 ```
 
 #### Cleanup Phase (Delete) - Only in Idempotent Mode
+
 ```
 1. identify_vlan_changes.yml  ← RE-analyze VLANs based on current state
    ↓
@@ -90,6 +93,7 @@ This prevents tasks from running with stale or missing data.
 ### Removed Duplicate Logic
 
 The following duplicate logic was **removed** from downstream tasks:
+
 - ❌ Fetching VLANs from NetBox API
 - ❌ Calculating VLANs in use
 - ❌ Determining VLAN changes
@@ -117,29 +121,33 @@ L2VNI : 10100010
 ```
 
 **Regex patterns used:**
+
 - EVPN VLANs: `VLAN\s+:\s+(\d+)` - Extracts VLAN IDs
 - VXLAN VNI-to-VLAN mappings: `L2VNI\s+:\s+(\d+).*?VLAN\s+:\s+(\d+)` - Extracts both VNI and VLAN ID
 
 ## Benefits
 
-✅ **Consistency**: All tasks work from the same VLAN analysis
-✅ **Maintainability**: VLAN logic centralized in one place
-✅ **Safety**: Assertions prevent tasks running with stale data
-✅ **Clarity**: Clear execution order documented
-✅ **Idempotency**: Proper re-analysis before cleanup ensures safe deletions
+- ✅ **Consistency**: All tasks work from the same VLAN analysis
+- ✅ **Maintainability**: VLAN logic centralized in one place
+- ✅ **Safety**: Assertions prevent tasks running with stale data
+- ✅ **Clarity**: Clear execution order documented
+- ✅ **Idempotency**: Proper re-analysis before cleanup ensures safe deletions
 
 ## Files Modified
 
 ### Primary Task Files
+
 - `tasks/identify_vlan_changes.yml` - Enhanced as single source of truth
 - `tasks/main.yml` - Added identify_vlan_changes.yml before configuration tasks
 
 ### Configuration Tasks (Simplified)
+
 - `tasks/configure_vlans.yml` - Removed duplicate logic, added assertion
 - `tasks/configure_evpn.yml` - Removed duplicate logic, added assertion
 - `tasks/configure_vxlan.yml` - Removed duplicate logic, added assertion
 
 ### Cleanup Tasks (Verified)
+
 - `tasks/cleanup_vlans.yml` - Added assertion
 - `tasks/cleanup_evpn.yml` - Added assertion
 - `tasks/cleanup_vxlan.yml` - Added assertion
@@ -165,6 +173,7 @@ ansible-playbook -vv playbook.yml
 ```
 
 Debug output includes:
+
 - VLANs available from NetBox
 - VLANs in use on interfaces
 - VLANs to create

@@ -29,6 +29,7 @@ This project uses multiple requirements files for different purposes. This docum
 - `pytz` - Timezone support (required by netbox.netbox collection)
 
 **Install:**
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -205,16 +206,19 @@ make docs-serve                        # Start documentation server
 ### Updating Dependencies
 
 Check for outdated packages:
+
 ```bash
 pip list --outdated
 ```
 
 Update specific package:
+
 ```bash
 pip install --upgrade pyaoscx
 ```
 
 Update collections:
+
 ```bash
 ansible-galaxy collection install arubanetworks.aoscx --force
 ```
@@ -228,6 +232,7 @@ ansible-galaxy collection install arubanetworks.aoscx --force
 ### Testing New Versions
 
 Always test in a virtual environment:
+
 ```bash
 python -m venv test-env
 source test-env/bin/activate  # Linux/Mac
@@ -245,6 +250,7 @@ make test-quick
 ### "Module not found" errors
 
 Usually means runtime dependencies not installed:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -252,6 +258,7 @@ pip install -r requirements.txt
 ### "Collection not found" errors
 
 Collections not installed:
+
 ```bash
 ansible-galaxy collection install -r requirements.yml
 ```
@@ -259,6 +266,7 @@ ansible-galaxy collection install -r requirements.yml
 ### "Command not found" (ansible-lint, molecule, etc.)
 
 Testing dependencies not installed:
+
 ```bash
 pip install -r requirements-test.txt
 ```
@@ -266,6 +274,7 @@ pip install -r requirements-test.txt
 ### Version conflicts
 
 Use a fresh virtual environment:
+
 ```bash
 deactivate  # If in a venv
 rm -rf .venv

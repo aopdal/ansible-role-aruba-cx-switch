@@ -21,6 +21,7 @@ If you're adding a new task that needs to work with VLANs, follow this pattern:
 ### 2. Use the Facts (Don't Recalculate)
 
 **DON'T DO THIS:**
+
 ```yaml
 # ❌ BAD: Recalculating vlans_in_use
 - name: Get VLANs in use
@@ -29,6 +30,7 @@ If you're adding a new task that needs to work with VLANs, follow this pattern:
 ```
 
 **DO THIS:**
+
 ```yaml
 # ✅ GOOD: Use existing fact
 - name: Filter VLANs for my task
@@ -56,6 +58,7 @@ If you're adding a new task that needs to work with VLANs, follow this pattern:
 ## Available Facts
 
 ### `vlans` - VLANs from NetBox
+
 ```yaml
 vlans:
   - vid: 10
@@ -68,12 +71,14 @@ vlans:
 ```
 
 ### `vlans_in_use` - VLANs on Interfaces
+
 ```yaml
 vlans_in_use:
   vids: [1, 10, 20, 30]  # List of VLAN IDs
 ```
 
 ### `vlan_changes` - What Needs to Change
+
 ```yaml
 vlan_changes:
   vlans_to_create:
@@ -86,6 +91,7 @@ vlan_changes:
 ## Common Patterns
 
 ### Pattern 1: Configure Feature for VLANs with L2VPN
+
 ```yaml
 - name: Filter VLANs with L2VPN termination
   ansible.builtin.set_fact:
@@ -97,6 +103,7 @@ vlan_changes:
 ```
 
 ### Pattern 2: Cleanup Feature for Deleted VLANs
+
 ```yaml
 - name: Filter VLANs to clean up
   ansible.builtin.set_fact:
@@ -107,6 +114,7 @@ vlan_changes:
 ```
 
 ### Pattern 3: Check if VLAN is in Use
+
 ```yaml
 - name: Only process unused VLANs
   some_module:
@@ -118,16 +126,19 @@ vlan_changes:
 ## Debugging
 
 Enable debug output to see VLAN analysis:
+
 ```bash
 ansible-playbook -vv playbook.yml
 ```
 
 Or set in group_vars:
+
 ```yaml
 aoscx_debug: true
 ```
 
 Debug output shows:
+
 - VLANs from NetBox count
 - VLANs in use (with IDs)
 - VLANs to create (with IDs)
@@ -158,6 +169,7 @@ L2VNI : 10100010
 ```
 
 **Regex patterns used:**
+
 ```yaml
 # EVPN VLANs (configure_evpn.yml)
 regex_findall('VLAN\\s+:\\s+(\\d+)')
@@ -170,6 +182,7 @@ regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=Tru
 ```
 
 **To test locally:**
+
 ```python
 import re
 

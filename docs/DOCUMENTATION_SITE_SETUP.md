@@ -18,6 +18,7 @@ Instead of `antsibull-docs` (designed for collections with modules/plugins), I'v
 ## What Was Set Up
 
 ### 1. `mkdocs.yml` - Site Configuration
+
 - Material theme with dark/light mode
 - Navigation structure organized by topic
 - Code highlighting for YAML/Jinja2
@@ -25,6 +26,7 @@ Instead of `antsibull-docs` (designed for collections with modules/plugins), I'v
 - Git revision dates
 
 ### 2. `requirements-docs.txt` - Dependencies
+
 ```
 mkdocs>=1.5.0
 mkdocs-material>=9.0.0
@@ -33,11 +35,13 @@ pymdown-extensions>=10.0
 ```
 
 ### 3. `.github/workflows/docs.yml` - Auto Deployment
+
 - Triggers on docs changes
 - Builds and deploys to GitHub Pages
 - Published at: `https://aopdal.github.io/ansible-role-aruba-cx-switch`
 
 ### 4. `Makefile` - Quick Commands
+
 ```bash
 make docs-install  # Install dependencies
 make docs-serve    # Live preview at localhost:8000
@@ -46,6 +50,7 @@ make docs          # Alias for docs-serve
 ```
 
 ### 5. `docs/DOCUMENTATION_SITE.md` - Usage Guide
+
 Complete guide for maintaining and extending the docs.
 
 ## Your Documentation Structure
@@ -98,6 +103,7 @@ mkdocs serve
 ```
 
 **Alternative:** Use Makefile commands:
+
 ```bash
 make docs-install  # Install dependencies
 make docs-serve    # Live preview
@@ -112,13 +118,14 @@ make docs-build    # Build static site
 
 1. **Uncomment** `.github/workflows/docs.yml` workflow
 2. **Enable GitHub Pages** in repo Settings → Pages:
-   - Source: Deploy from a branch
-   - Branch: `gh-pages` / (root)
-   - Save
+    - Source: Deploy from a branch
+    - Branch: `gh-pages` / (root)
+    - Save
 3. **Push changes** to trigger automatic deployment
 4. Site will be live at: `https://aopdal.github.io/ansible-role-aruba-cx-switch`
 
 **Current alternative for private repos:**
+
 ```bash
 # Build static site locally
 make docs-build
@@ -129,21 +136,22 @@ make docs-build
 
 ## Features You Get
 
-✅ **Beautiful design** - Same Material theme as ansible.com
-✅ **Dark/light mode** - Automatic switching
-✅ **Full-text search** - Find anything instantly
-✅ **Code highlighting** - YAML, Jinja2, Bash, Python
-✅ **Mobile responsive** - Works great on any device
-✅ **Git integration** - Shows when pages were last updated
-✅ **Navigation tabs** - Clean top-level organization
-✅ **Copy button** - Click to copy code blocks
-✅ **Admonitions** - Notes, warnings, tips styled beautifully
-✅ **Tables** - Rendered beautifully
-✅ **Links** - Internal navigation just works
+- ✅ **Beautiful design** - Same Material theme as ansible.com
+- ✅ **Dark/light mode** - Automatic switching
+- ✅ **Full-text search** - Find anything instantly
+- ✅ **Code highlighting** - YAML, Jinja2, Bash, Python
+- ✅ **Mobile responsive** - Works great on any device
+- ✅ **Git integration** - Shows when pages were last updated
+- ✅ **Navigation tabs** - Clean top-level organization
+- ✅ **Copy button** - Click to copy code blocks
+- ✅ **Admonitions** - Notes, warnings, tips styled beautifully
+- ✅ **Tables** - Rendered beautifully
+- ✅ **Links** - Internal navigation just works
 
 ## Your Existing Docs Work Perfectly
 
 All your existing `.md` files work as-is:
+
 - `EVPN_VXLAN_CONFIGURATION.md` ✅
 - `BGP_HYBRID_CONFIGURATION.md` ✅
 - `BGP_MIGRATION_GUIDE.md` ✅
@@ -162,6 +170,7 @@ No conversion needed!
 ## Comparison with Your Needs
 
 Your role documentation needs:
+
 - ✅ **Narrative guides** - EVPN/VXLAN setup, BGP hybrid approach
 - ✅ **Step-by-step tutorials** - Migration from config_context to plugin
 - ✅ **Configuration examples** - Lots of YAML examples
@@ -172,6 +181,7 @@ Your role documentation needs:
 **MkDocs handles all of this beautifully!**
 
 antsibull-docs is great for:
+
 - ❌ Module documentation (you don't have modules)
 - ❌ Plugin API reference (you have one filter plugin)
 - ❌ Auto-generated parameter docs (roles have limited metadata)

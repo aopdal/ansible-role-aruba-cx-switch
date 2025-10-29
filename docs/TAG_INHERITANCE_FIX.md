@@ -1,15 +1,19 @@
 # Tag Inheritance Fix for Base Configuration Tasks
 
 ## Problem
+
 When running with `-t base_config`, the base configuration tasks were being included but not executed. The tasks inside the included files were being skipped silently.
 
 ## Root Cause
+
 Ansible's `include_tasks` does not automatically apply tags to tasks within the included file. The tags on the `include_tasks` statement only control whether the include itself happens, not the tasks within.
 
 ## Solution
+
 Use the `apply:` parameter with `include_tasks` to apply tags to all tasks within the included file.
 
 ### Before (Not Working)
+
 ```yaml
 - name: Include banner configuration tasks
   ansible.builtin.include_tasks: configure_banner.yml
@@ -21,6 +25,7 @@ Use the `apply:` parameter with `include_tasks` to apply tags to all tasks withi
 ```
 
 ### After (Working - Corrected)
+
 ```yaml
 - name: Include banner configuration tasks
   ansible.builtin.include_tasks:
@@ -46,17 +51,20 @@ Use the `apply:` parameter with `include_tasks` to apply tags to all tasks withi
 ## Why Tags Must Match
 
 **Problem with `tags: always`:**
+
 ```yaml
 tags:
   - always  # ❌ This causes the include to ALWAYS run, regardless of tag filters
 ```
 
 When using `tags: always`, the include is evaluated even when you run with specific tags like `-t vlans`. This causes:
+
 - Banner/NTP/DNS includes run even when you only want VLANs
 - Unnecessary task evaluations
 - Confusing output showing unrelated includes
 
 **Solution with matching tags:**
+
 ```yaml
 tags:
   - banner
@@ -65,6 +73,7 @@ tags:
 ```
 
 Now when you run:
+
 - `-t vlans` → Only VLAN includes run
 - `-t base_config` → Only base config includes run
 - `-t banner` → Only banner include runs
@@ -106,16 +115,19 @@ Fresh inventory generated with all base configuration:
 ## Testing
 
 ### Test with specific tag
+
 ```bash
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t banner
 ```
 
 ### Test with base_config tag
+
 ```bash
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t base_config
 ```
 
 ### Test without tags (all tasks)
+
 ```bash
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3
 ```
@@ -123,6 +135,7 @@ ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3
 ## Expected Behavior
 
 With `-t base_config`, you should now see:
+
 - ✅ Banner task executed (if motd defined)
 - ✅ Timezone task executed (if timezone defined)
 - ✅ NTP tasks executed (if ntp_servers defined)
@@ -131,8 +144,8 @@ With `-t base_config`, you should now see:
 ## Files Modified
 
 - `/workspaces/ansible-role-aruba-cx-switch/tasks/main.yml`
-  - Updated all base config includes (banner, timezone, NTP, DNS)
-  - Applied same pattern for consistency
+    - Updated all base config includes (banner, timezone, NTP, DNS)
+    - Applied same pattern for consistency
 
 ## References
 

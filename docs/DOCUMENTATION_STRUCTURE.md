@@ -26,6 +26,7 @@ ansible-role-aruba-cx-switch/
 ### ✅ Standard MkDocs Convention
 
 MkDocs expects all documentation in `docs/` folder:
+
 - Easier to configure
 - No path confusion
 - Clear separation of docs from code
@@ -33,6 +34,7 @@ MkDocs expects all documentation in `docs/` folder:
 ### ✅ Clean Repository Root
 
 Only essential files at root:
+
 - `README.md` - For GitHub/Ansible Galaxy
 - `mkdocs.yml` - MkDocs configuration
 - Role files (tasks/, defaults/, etc.)
@@ -40,6 +42,7 @@ Only essential files at root:
 ### ✅ Single Source for Documentation
 
 All docs in one place:
+
 - Easy to find
 - Easy to maintain
 - Easy to navigate
@@ -56,6 +59,7 @@ All docs in one place:
 | `docs/index.md` | MkDocs home page | Documentation website |
 
 **Why both?**
+
 - GitHub looks for `README.md` at root
 - MkDocs looks in `docs/` folder
 - They should contain the same content
@@ -72,11 +76,13 @@ make docs-sync
 ### CHANGELOG.md and CONTRIBUTING.md
 
 **Moved to docs/ folder:**
+
 - Previously at root (common for roles)
 - Now in `docs/` (MkDocs convention)
 - Still accessible via MkDocs navigation
 
 **Benefits:**
+
 - Consistent structure
 - No warnings from MkDocs
 - Easier to link between docs
@@ -171,6 +177,7 @@ ansible-role-aruba-cx-switch/
 ```
 
 **Issues:**
+
 - Mixed locations confusing
 - MkDocs warnings for root files
 - Harder to manage navigation
@@ -192,6 +199,7 @@ ansible-role-aruba-cx-switch/
 ```
 
 **Benefits:**
+
 - ✅ All docs in one place
 - ✅ No MkDocs warnings
 - ✅ Standard convention
@@ -240,20 +248,20 @@ make docs-serve
 
 ### Files Moved
 
-✅ `CHANGELOG.md` - Root → `docs/`
-✅ `CONTRIBUTING.md` - Root → `docs/`
-✅ `README.md` - Copied to `docs/index.md`
+- ✅ `CHANGELOG.md` - Root → `docs/`
+- ✅ `CONTRIBUTING.md` - Root → `docs/`
+- ✅ `README.md` - Copied to `docs/index.md`
 
 ### mkdocs.yml Updates
 
-✅ Added `docs_dir: docs`
-✅ Changed `Home: README.md` to `Home: index.md`
-✅ Updated all nav paths (removed `docs/` prefix)
-✅ Updated `CONTRIBUTING.md` and `CHANGELOG.md` paths
+- ✅ Added `docs_dir: docs`
+- ✅ Changed `Home: README.md` to `Home: index.md`
+- ✅ Updated all nav paths (removed `docs/` prefix)
+- ✅ Updated `CONTRIBUTING.md` and `CHANGELOG.md` paths
 
 ### Makefile Updates
 
-✅ Added `docs-sync` target for README synchronization
+- ✅ Added `docs-sync` target for README synchronization
 
 ## Best Practices
 

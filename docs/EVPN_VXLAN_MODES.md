@@ -16,11 +16,13 @@ The EVPN and VXLAN configuration has two modes of operation controlled by `aoscx
 ### Initial Deployment Mode (`aoscx_idempotent_mode: false`)
 
 **When to use:**
+
 - First-time fabric deployment
 - Adding new devices to existing fabric
 - When you only want to add configurations without removing anything
 
 **What happens:**
+
 ```yaml
 # EVPN Configuration
 - configure_evpn.yml ✅ RUNS
@@ -45,11 +47,13 @@ The EVPN and VXLAN configuration has two modes of operation controlled by `aoscx
 ### Ongoing Management Mode (`aoscx_idempotent_mode: true`)
 
 **When to use:**
+
 - Day-to-day network management
 - When you want device config to match NetBox exactly
 - Removing decommissioned VLANs/VNIs
 
 **What happens:**
+
 ```yaml
 # EVPN Configuration
 - configure_evpn.yml ✅ RUNS
@@ -161,6 +165,7 @@ flowchart TD
 ```
 
 **What happens:**
+
 1. ✅ Creates VLANs 100, 200, 300
 2. ✅ Creates EVPN config for VLANs 100, 200, 300
 3. ✅ Creates VNIs 10100, 10200, 10300
@@ -171,6 +176,7 @@ flowchart TD
 ### Scenario 2: Remove VLAN 300 from Production
 
 **NetBox changes:**
+
 - Remove VLAN 300 from all interface assignments
 - Keep VLAN 300 object (will be deleted by cleanup)
 
@@ -185,6 +191,7 @@ flowchart TD
 ```
 
 **What happens:**
+
 1. ✅ Interface cleanup removes VLAN 300 from interfaces
 2. ✅ EVPN cleanup removes `vlan 300` from EVPN
 3. ✅ VXLAN cleanup removes VLAN 300 from VNI 10300
@@ -196,6 +203,7 @@ flowchart TD
 ### Scenario 3: Add VLAN 400 to Production
 
 **NetBox changes:**
+
 - Create VLAN 400
 - Create L2VPN with identifier 10400
 - Create L2VPN Termination linking VLAN 400 to L2VPN
@@ -212,6 +220,7 @@ flowchart TD
 ```
 
 **What happens:**
+
 1. ✅ Creates VLAN 400
 2. ✅ Configures interfaces with VLAN 400
 3. ✅ Creates EVPN config for VLAN 400
@@ -259,29 +268,29 @@ custom_fields:
 
 ## Benefits of This Approach
 
-✅ **Safe initial deployment** - No risk of removing configs on first run
-✅ **Connected lifecycle** - Configuration and cleanup work together
-✅ **Explicit control** - Clear mode selection via variable
-✅ **Idempotent** - Safe to run multiple times in either mode
-✅ **Predictable** - Same behavior every time for given mode
-✅ **Production-ready** - Matches common Ansible patterns
+- ✅ **Safe initial deployment** - No risk of removing configs on first run
+- ✅ **Connected lifecycle** - Configuration and cleanup work together
+- ✅ **Explicit control** - Clear mode selection via variable
+- ✅ **Idempotent** - Safe to run multiple times in either mode
+- ✅ **Predictable** - Same behavior every time for given mode
+- ✅ **Production-ready** - Matches common Ansible patterns
 
 ## Best Practices
 
 1. **Initial Deployment:**
-   - Use `aoscx_idempotent_mode: false`
-   - Verify configs manually
-   - Switch to `true` after validation
+    - Use `aoscx_idempotent_mode: false`
+    - Verify configs manually
+    - Switch to `true` after validation
 
 2. **Day-to-Day Operations:**
-   - Use `aoscx_idempotent_mode: true`
-   - Let automation handle cleanup
-   - Trust the ordering
+    - Use `aoscx_idempotent_mode: true`
+    - Let automation handle cleanup
+    - Trust the ordering
 
 3. **Troubleshooting:**
-   - Use `aoscx_idempotent_mode: false` to only add configs
-   - Verify what would be cleaned up
-   - Switch to `true` when ready
+    - Use `aoscx_idempotent_mode: false` to only add configs
+    - Verify what would be cleaned up
+    - Switch to `true` when ready
 
 ## Summary
 

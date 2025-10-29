@@ -216,22 +216,26 @@ git push origin feature/your-feature-name
 ### Style Guidelines
 
 1. **YAML Formatting**
+
    - Use 2 spaces for indentation
    - Use `---` document start marker
    - Quote strings with special characters
    - Line length: max 160 characters
 
 2. **Naming Conventions**
+
    - Use snake_case for variables: `aoscx_vlan_id`
    - Use descriptive names: `configure_vlans.yml` not `vlans.yml`
    - Prefix role variables: `aoscx_*`
 
 3. **Task Structure**
+
    - Always include `name:` for tasks
    - Use FQCN for modules: `ansible.builtin.debug`
    - Group related tasks in separate files
 
 4. **Documentation**
+
    - Document all variables in `defaults/main.yml`
    - Include examples in README.md
    - Add comments for complex logic

@@ -18,11 +18,13 @@ EVPN and VXLAN configuration tasks based on your production `auto-netops-ansible
 ### 1. Intelligent VLAN Filtering
 
 **Only configures VLANs that are:**
+
 - ✅ Available on device (from NetBox)
 - ✅ In use on interfaces (access or tagged)
 - ✅ Have L2VPN termination defined
 
 **Example:**
+
 ```
 Device has VLANs: 100, 200, 300
 VLANs in use: 100, 200
@@ -41,12 +43,14 @@ when:
 ```
 
 **Enable on leafs (VTEPs):**
+
 ```yaml
 device_evpn: true
 device_vxlan: true
 ```
 
 **Disable on spines:**
+
 ```yaml
 device_evpn: false
 device_vxlan: false
@@ -71,6 +75,7 @@ Matches your production playbook exactly:
 **Task:** `configure_evpn.yml`
 
 **Configures:**
+
 ```
 evpn
   vlan 100
@@ -80,6 +85,7 @@ evpn
 ```
 
 **Filters VLANs:**
+
 ```yaml
 vlans_for_evpn: "{{ vlans |
   selectattr('vid', 'in', vlans_in_use.vids) |
@@ -95,6 +101,7 @@ vlans_for_evpn: "{{ vlans |
 **Two-step process:**
 
 **Step 1: Create VNI**
+
 ```
 interface vxlan 1
   vni 10100
@@ -102,6 +109,7 @@ interface vxlan 1
 ```
 
 **Step 2: Map VLAN to VNI**
+
 ```
 interface vxlan 1
   vni 10100
@@ -115,12 +123,14 @@ interface vxlan 1
 ### Required Setup
 
 **1. Custom Fields (Device)**
+
 ```
 device_evpn: Boolean
 device_vxlan: Boolean
 ```
 
 **2. L2VPN Objects**
+
 ```
 Name: VLAN-100-L2VPN
 Identifier: 10100  # This is the VNI
@@ -128,6 +138,7 @@ Type: VXLAN
 ```
 
 **3. L2VPN Terminations**
+
 ```
 L2VPN: VLAN-100-L2VPN
 Assigned Object: VLAN 100
@@ -166,6 +177,7 @@ Assigned Object: VLAN 100
 ### From `create_evpn_used_on_device.yml`
 
 **Your code:**
+
 ```yaml
 when:
   - item.vid in allvids
@@ -173,6 +185,7 @@ when:
 ```
 
 **Role implementation:**
+
 ```yaml
 # Filters VLANs first
 vlans_for_evpn: "{{ vlans |
@@ -185,6 +198,7 @@ loop: "{{ vlans_for_evpn }}"
 ```
 
 **Advantages:**
+
 - ✅ Pre-filters VLANs (more efficient)
 - ✅ Shows VLAN count in debug output
 - ✅ Better error handling
@@ -193,6 +207,7 @@ loop: "{{ vlans_for_evpn }}"
 ### From `create_vni_used_on_device.yml` + `assign_vlan_used_on_device_vni.yml`
 
 **Your code:**
+
 ```yaml
 # Step 1: Create VNI
 parents:
@@ -209,6 +224,7 @@ lines:
 ```
 
 **Role implementation:**
+
 ```yaml
 # Step 1: Create VNI (same)
 parents:
@@ -250,6 +266,7 @@ ansible-playbook configure_aoscx.yml -l leaf-1 -t evpn,vxlan -e aoscx_debug=true
 ### Enable/Disable Per Device
 
 **In NetBox:**
+
 ```yaml
 # Leaf switches (VTEPs)
 device_evpn: true
@@ -261,6 +278,7 @@ device_vxlan: false
 ```
 
 **In Role:**
+
 ```yaml
 # defaults/main.yml or group_vars
 aoscx_configure_evpn: true
@@ -322,6 +340,7 @@ show interface vxlan 1
 ### EVPN Not Configured
 
 **Check:**
+
 ```bash
 # 1. Role variable
 aoscx_configure_evpn: true
@@ -340,6 +359,7 @@ curl "$NETBOX_API/api/ipam/vlans/?available_on_device=DEVICE_ID" | jq '.results[
 ### VXLAN VNI Missing
 
 **Check:**
+
 ```bash
 # 1. L2VPN has identifier
 curl "$NETBOX_API/api/ipam/l2vpns/ID/" | jq '.identifier'
@@ -364,12 +384,12 @@ ansible-playbook configure_aoscx.yml -l leaf-1 -t vxlan -e aoscx_debug=true
 
 ## Benefits
 
-✅ **Production-proven** - Based on your working code
-✅ **Intelligent** - Only configures VLANs in use
-✅ **Integrated** - Works with role's VLAN and interface tasks
-✅ **Controlled** - Custom fields enable/disable per device
-✅ **Ordered** - Follows your playbook sequence
-✅ **Documented** - Complete examples and troubleshooting
+- ✅ **Production-proven** - Based on your working code
+- ✅ **Intelligent** - Only configures VLANs in use
+- ✅ **Integrated** - Works with role's VLAN and interface tasks
+- ✅ **Controlled** - Custom fields enable/disable per device
+- ✅ **Ordered** - Follows your playbook sequence
+- ✅ **Documented** - Complete examples and troubleshooting
 
 ## Related Documentation
 

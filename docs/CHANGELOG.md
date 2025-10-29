@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Comprehensive CI/CD testing infrastructure
   - GitHub Actions workflow for automated testing
   - Molecule testing framework for role validation
@@ -20,15 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Setup script for quick testing environment setup
 
 ### Changed
+
 - Enhanced .gitignore for testing artifacts
 - Updated role structure for better maintainability
 
 ### Fixed
+
 - N/A
 
 ## [1.0.0] - YYYY-MM-DD
 
 ### Added
+
 - Initial release
 - VRF configuration support
 - VLAN management (create/cleanup)

@@ -23,6 +23,7 @@ You have two options for setting up your development environment:
 **Best for:** Most developers, especially those new to the project or working on multiple platforms.
 
 **Advantages:**
+
 - ✅ Zero configuration - everything just works
 - ✅ Consistent environment across all developers
 - ✅ No conflicts with system packages
@@ -31,11 +32,13 @@ You have two options for setting up your development environment:
 - ✅ Works on Windows, Mac, and Linux
 
 **Requirements:**
+
 - [VS Code](https://code.visualstudio.com/)
 - [Docker Desktop](https://www.docker.com/get-started)
 - [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 
 **Setup:**
+
 1. Install the prerequisites above
 2. Clone the repository
 3. Open the folder in VS Code
@@ -45,6 +48,7 @@ You have two options for setting up your development environment:
 6. You're ready to develop! All dependencies are installed automatically.
 
 **What's Included:**
+
 - Python 3.12 with all testing packages
 - Ansible and required collections
 - Docker-in-Docker for Molecule testing
@@ -57,6 +61,7 @@ You have two options for setting up your development environment:
 **Best for:** Developers who prefer local setup or don't have Docker available.
 
 **Requirements:**
+
 - Python 3.9 or higher
 - Python venv module
 - Git
@@ -117,6 +122,7 @@ The dev container includes:
 **Base Image:** Python 3.11 (Debian-based)
 
 **Installed Tools:**
+
 - Python 3.11 with pip
 - Ansible and ansible-lint
 - yamllint
@@ -128,6 +134,7 @@ The dev container includes:
 - Utilities (jq, bash-completion)
 
 **VS Code Extensions:**
+
 - Ansible (redhat.ansible) - Syntax highlighting and validation
 - YAML (redhat.vscode-yaml) - YAML language support
 - Python (ms-python.python) - Python development
@@ -393,6 +400,7 @@ Edit `molecule/default/verify.yml` to add verification:
    ```
 
 5. **Use Variables from `defaults/main.yml`**
+
    - All user-configurable options should be in `defaults/main.yml`
    - Use descriptive variable names with `aoscx_` prefix
    - Provide sensible defaults
@@ -448,6 +456,7 @@ def get_vlan_name(vlan_id: int, vlans: list) -> str:
 ### Documentation Standards
 
 1. **README.md** - User-facing documentation
+
    - Clear feature list
    - Installation instructions
    - Usage examples
@@ -595,15 +604,18 @@ pip install --upgrade ansible-lint
 ### Getting Help
 
 1. **Check existing documentation:**
+
    - [Main Documentation](index.md) - Role usage
    - [TESTING.md](TESTING.md) - Testing guide
    - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
 
 2. **Check issues:**
+
    - Search GitHub issues for similar problems
    - Create a new issue with detailed information
 
 3. **Debug output:**
+
    ```bash
    # Ansible verbose output
    ansible-playbook -vvv playbook.yml
@@ -620,6 +632,7 @@ pip install --upgrade ansible-lint
 ### Development Tips
 
 1. **Use the Makefile**
+
    ```bash
    make test-quick  # Fast feedback
    make test        # Full validation
@@ -627,11 +640,13 @@ pip install --upgrade ansible-lint
    ```
 
 2. **Test incrementally**
+
    - Test after each significant change
    - Don't wait until everything is done
    - Fix issues early
 
 3. **Use molecule converge for iteration**
+
    ```bash
    molecule create    # Create once
    molecule converge  # Test changes quickly
@@ -640,12 +655,14 @@ pip install --upgrade ansible-lint
    ```
 
 4. **Check syntax before running**
+
    ```bash
    ansible-playbook --syntax-check playbook.yml
    ansible-lint playbook.yml
    ```
 
 5. **Use VS Code features**
+
    - Hover over modules for documentation
    - Use IntelliSense for autocomplete
    - Use integrated terminal
@@ -654,6 +671,7 @@ pip install --upgrade ansible-lint
 ### Git Workflow Tips
 
 1. **Commit often with clear messages**
+
    ```bash
    git commit -m "feat: add VLAN cleanup task"
    git commit -m "fix: handle missing VRF gracefully"
@@ -661,6 +679,7 @@ pip install --upgrade ansible-lint
    ```
 
 2. **Use conventional commits**
+
    - `feat:` - New feature
    - `fix:` - Bug fix
    - `docs:` - Documentation only
@@ -669,6 +688,7 @@ pip install --upgrade ansible-lint
    - `chore:` - Maintenance tasks
 
 3. **Keep changes focused**
+
    - One feature per branch
    - One logical change per commit
    - Review your own PR before submitting
@@ -676,6 +696,7 @@ pip install --upgrade ansible-lint
 ### Performance Tips
 
 1. **Cache dependencies in CI**
+
    - Dev container caches layers
    - Molecule reuses containers
 
@@ -690,6 +711,7 @@ pip install --upgrade ansible-lint
    ```
 
 3. **Use parallel testing when possible**
+
    - Molecule can test multiple platforms
    - Pre-commit runs checks in parallel
 

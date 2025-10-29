@@ -6,11 +6,11 @@ This role uses **MkDocs with Material theme** to generate a beautiful documentat
 
 While `antsibull-docs` is excellent for Ansible Collections (modules, plugins), this role benefits more from MkDocs because:
 
-✅ **Rich narrative docs** - EVPN/VXLAN guides, BGP hybrid setup, migration guides
-✅ **Flexible organization** - Can structure docs to tell a story
-✅ **Beautiful presentation** - Material theme is stunning
-✅ **Easy maintenance** - All your existing `.md` files work directly
-✅ **Code examples** - Excellent syntax highlighting for YAML/Jinja2
+- ✅ **Rich narrative docs** - EVPN/VXLAN guides, BGP hybrid setup, migration guides0
+- ✅ **Flexible organization** - Can structure docs to tell a story
+- ✅ **Beautiful presentation** - Material theme is stunning
+- ✅ **Easy maintenance** - All your existing `.md` files work directly
+- ✅ **Code examples** - Excellent syntax highlighting for YAML/Jinja2
 
 ## Local Development
 
@@ -58,14 +58,15 @@ When the repo becomes public or you upgrade to a paid GitHub plan, documentation
 
 1. **Uncomment** the workflow in `.github/workflows/docs.yml`
 2. **Enable GitHub Pages** in repo settings:
-   - Go to Settings → Pages
-   - Source: Deploy from a branch
-   - Branch: `gh-pages` / (root)
-   - Save
+    - Go to Settings → Pages
+    - Source: Deploy from a branch
+    - Branch: `gh-pages` / (root)
+    - Save
 3. **Push changes** to trigger deployment
 4. Site will be at: `https://aopdal.github.io/ansible-role-aruba-cx-switch`
 
 The workflow will automatically deploy when you push changes to:
+
 - `docs/**`
 - `README.md`
 - `CONTRIBUTING.md`
@@ -180,6 +181,7 @@ Standard Markdown tables work great and look beautiful with Material theme.
 ## Example Output
 
 Your docs will look like:
+
 - **ansible.com documentation** (same Material theme!)
 - **Beautiful navigation** with collapsible sections
 - **Search** that actually works

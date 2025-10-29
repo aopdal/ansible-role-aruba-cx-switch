@@ -5,6 +5,7 @@
 ## Issues Found by Pylint
 
 ### Issue 1: Wrong Import Order (netbox_filters.py)
+
 ```
 C0411: standard import "import sys" should be placed before local imports (wrong-import-order)
 C0411: standard import "import os" should be placed before local imports (wrong-import-order)
@@ -13,11 +14,13 @@ C0411: standard import "import os" should be placed before local imports (wrong-
 **Problem:** Standard library imports (`sys`, `os`) were placed after local module imports.
 
 **PEP 8 Import Order:**
+
 1. Standard library imports
 2. Related third-party imports
 3. Local application/library-specific imports
 
 ### Issue 2: Import Outside Toplevel (vlan_filters.py)
+
 ```
 C0415: Import outside toplevel (re) (import-outside-toplevel)
 ```
@@ -31,6 +34,7 @@ C0415: Import outside toplevel (re) (import-outside-toplevel)
 ### Fix 1: Reorganize Import Order in netbox_filters.py
 
 **Before:**
+
 ```python
 #!/usr/bin/env python3
 """
@@ -47,6 +51,7 @@ _filter_dir = os.path.dirname(os.path.abspath(__file__))
 ```
 
 **After:**
+
 ```python
 #!/usr/bin/env python3
 """
@@ -73,6 +78,7 @@ from netbox_filters_lib.vlan_filters import (...)
 ### Fix 2: Move re Import to Module Level in vlan_filters.py
 
 **Before:**
+
 ```python
 #!/usr/bin/env python3
 """
@@ -91,6 +97,7 @@ def parse_evpn_evi_output(output):
 ```
 
 **After:**
+
 ```python
 #!/usr/bin/env python3
 """
@@ -113,12 +120,14 @@ def parse_evpn_evi_output(output):
 ## Why These Changes Matter
 
 ### Import Order
+
 - **Readability:** Consistent import ordering makes code easier to scan
 - **Standards:** Follows PEP 8 style guide
 - **Tool Compatibility:** Allows linters and formatters to work correctly
 - **Convention:** Matches Python community best practices
 
 ### Toplevel Imports
+
 - **Performance:** Module-level imports are executed once at import time, not on every function call
 - **Clarity:** Makes dependencies explicit at the top of the file
 - **Debugging:** Easier to see what modules are required
@@ -146,12 +155,14 @@ from netbox_filters_lib.vlan_filters import (...)
 ## Verification
 
 ### Test Import Order
+
 ```bash
 cd /workspaces/ansible-role-aruba-cx-switch
 python3 -c "import sys; sys.path.insert(0, 'filter_plugins'); from netbox_filters import FilterModule; print('✅ Imports work correctly')"
 ```
 
 ### Test Filter Functionality
+
 ```bash
 python3 -c "
 import sys
@@ -168,6 +179,7 @@ print('✅ Filter works after import fix')
 ```
 
 ### Run Pylint
+
 ```bash
 cd /workspaces/ansible-role-aruba-cx-switch
 pylint filter_plugins/netbox_filters.py filter_plugins/netbox_filters_lib/vlan_filters.py
@@ -178,12 +190,14 @@ pylint filter_plugins/netbox_filters.py filter_plugins/netbox_filters_lib/vlan_f
 ## Files Modified
 
 1. **filter_plugins/netbox_filters.py**
-   - Moved `import sys` and `import os` to top of file (before local imports)
-   - Kept local imports after sys.path manipulation with proper pylint directive
+
+    - Moved `import sys` and `import os` to top of file (before local imports)
+    - Kept local imports after sys.path manipulation with proper pylint directive
 
 2. **filter_plugins/netbox_filters_lib/vlan_filters.py**
-   - Moved `import re` from inside `parse_evpn_evi_output()` to module level
-   - Placed after standard docstring, before local imports
+
+    - Moved `import re` from inside `parse_evpn_evi_output()` to module level
+    - Placed after standard docstring, before local imports
 
 ## Checklist
 

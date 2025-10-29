@@ -31,11 +31,13 @@ Interface configuration now only updates interfaces that need changes, significa
 ## Files Modified
 
 ### New Files
+
 - `filter_plugins/netbox_filters_lib/interface_filters.py` - Added `get_interfaces_needing_config_changes()`
 - `tasks/identify_interface_changes.yml` - New analysis task
 - `docs/INTERFACE_IDEMPOTENT_IMPLEMENTATION.md` - Full documentation
 
 ### Updated Files
+
 - `tasks/main.yml` - Added interface analysis before configuration
 - `tasks/configure_physical_interfaces.yml` - Loop over `interface_changes.physical`
 - `tasks/configure_lag_interfaces.yml` - Loop over `interface_changes.lag`
@@ -89,6 +91,7 @@ ansible-playbook -i inventory playbook.yml --tags physical_interfaces -v
 ### 3. See Change Reasons
 
 Add to playbook:
+
 ```yaml
 aoscx_debug: true
 ```
@@ -100,6 +103,7 @@ aoscx_debug: true
 **Cause**: Device facts not available
 
 **Solution**: Verify fact gathering is enabled:
+
 ```yaml
 aoscx_gather_facts: true  # Should be enabled
 ```
@@ -109,6 +113,7 @@ aoscx_gather_facts: true  # Should be enabled
 **Cause**: NetBox and device state match
 
 **Solution**: Verify NetBox data:
+
 1. Check interface properties in NetBox
 2. Compare with device state: `show interface 1/1/1`
 3. Run with `-v` to see comparison results
@@ -155,6 +160,7 @@ aoscx_gather_facts: true  # Should be enabled
 ## Testing Commands
 
 ### Test All Interface Types
+
 ```bash
 ansible-playbook -i inventory playbook.yml \
   --tags interfaces \
@@ -162,6 +168,7 @@ ansible-playbook -i inventory playbook.yml \
 ```
 
 ### Test Specific Interface Type
+
 ```bash
 # Physical only
 ansible-playbook -i inventory playbook.yml --tags physical_interfaces -v
@@ -174,6 +181,7 @@ ansible-playbook -i inventory playbook.yml --tags l2_interfaces -v
 ```
 
 ### Check Mode (See Changes Without Applying)
+
 ```bash
 ansible-playbook -i inventory playbook.yml \
   --tags interfaces \
@@ -193,37 +201,68 @@ ansible-playbook -i inventory playbook.yml \
 ## Related Patterns
 
 This implementation follows the same pattern as:
+
 - **VLAN configuration**: `identify_vlan_changes.yml`
 - **EVPN configuration**: Custom parsing filter
 - **VXLAN configuration**: Similar comparison logic
 
 ## Quick Reference Card
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Interface Idempotent Configuration                      │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ 1. Fact Gathering                                       │
-│    ✓ Device state collected via API                    │
-│                                                         │
-│ 2. Analysis Phase                                       │
-│    ✓ Compare NetBox vs Device                          │
-│    ✓ Categorize by interface type                      │
-│    ✓ Set interface_changes fact                        │
-│                                                         │
-│ 3. Configuration Phase                                  │
-│    ✓ Configure physical (if needed)                    │
-│    ✓ Configure LAG/MCLAG (if needed)                   │
-│    ✓ Configure L2/L3 (if needed)                       │
-│    ✓ Assign LAG members (if needed)                    │
-│                                                         │
-│ 4. Results                                              │
-│    ✓ Only changed interfaces configured                │
-│    ✓ Reduced API calls (typically 70-100%)             │
-│    ✓ Faster execution                                  │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Title[Interface Idempotent Configuration]
+
+    Gather[1. Fact Gathering]
+    Gather_Detail["✓ Device state collected via API"]
+
+    Analysis[2. Analysis Phase]
+    Analysis_Detail1["✓ Compare NetBox vs Device"]
+    Analysis_Detail2["✓ Categorize by interface type"]
+    Analysis_Detail3["✓ Set interface_changes fact"]
+
+    Config[3. Configuration Phase]
+    Config_Detail1["✓ Configure physical (if needed)"]
+    Config_Detail2["✓ Configure LAG/MCLAG (if needed)"]
+    Config_Detail3["✓ Configure L2/L3 (if needed)"]
+    Config_Detail4["✓ Assign LAG members (if needed)"]
+
+    Results[4. Results]
+    Results_Detail1["✓ Only changed interfaces configured"]
+    Results_Detail2["✓ Reduced API calls (typically 70-100%)"]
+    Results_Detail3["✓ Faster execution"]
+
+    Title --> Gather
+    Gather --> Gather_Detail
+    Gather_Detail --> Analysis
+    Analysis --> Analysis_Detail1
+    Analysis_Detail1 --> Analysis_Detail2
+    Analysis_Detail2 --> Analysis_Detail3
+    Analysis_Detail3 --> Config
+    Config --> Config_Detail1
+    Config_Detail1 --> Config_Detail2
+    Config_Detail2 --> Config_Detail3
+    Config_Detail3 --> Config_Detail4
+    Config_Detail4 --> Results
+    Results --> Results_Detail1
+    Results_Detail1 --> Results_Detail2
+    Results_Detail2 --> Results_Detail3
+
+    style Title fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style Gather fill:#e8f5e9
+    style Gather_Detail fill:#f1f8e9
+    style Analysis fill:#fff3e0
+    style Analysis_Detail1 fill:#fff9c4
+    style Analysis_Detail2 fill:#fff9c4
+    style Analysis_Detail3 fill:#fff9c4
+    style Config fill:#f3e5f5
+    style Config_Detail1 fill:#f8bbd0
+    style Config_Detail2 fill:#f8bbd0
+    style Config_Detail3 fill:#f8bbd0
+    style Config_Detail4 fill:#f8bbd0
+    style Results fill:#e0f2f1
+    style Results_Detail1 fill:#b2dfdb
+    style Results_Detail2 fill:#b2dfdb
+    style Results_Detail3 fill:#b2dfdb
 ```
 
 ## Quick Tips
@@ -237,6 +276,7 @@ This implementation follows the same pattern as:
 ## Support
 
 For issues or questions:
+
 1. Check full documentation: `docs/INTERFACE_IDEMPOTENT_IMPLEMENTATION.md`
 2. Review debug output with `-v` flag
 3. Verify NetBox interface configuration

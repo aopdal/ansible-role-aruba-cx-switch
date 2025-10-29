@@ -6,13 +6,13 @@ The [netbox-bgp plugin](https://github.com/netbox-community/netbox-bgp) provides
 
 ### Why Use netbox-bgp Plugin?
 
-✅ **Structured data models** - Proper objects instead of free-form JSON
-✅ **Validation** - NetBox validates fields and relationships
-✅ **Relationships** - Links sessions to devices, peer groups, policies
-✅ **API access** - RESTful API for querying BGP data
-✅ **Inventory integration** - Can be used with NetBox inventory plugin
-✅ **Audit trail** - NetBox tracks all changes
-✅ **Search and filter** - Query BGP sessions, communities, etc.
+- ✅ **Structured data models** - Proper objects instead of free-form JSON
+- ✅ **Validation** - NetBox validates fields and relationships
+- ✅ **Relationships** - Links sessions to devices, peer groups, policies
+- ✅ **API access** - RESTful API for querying BGP data
+- ✅ **Inventory integration** - Can be used with NetBox inventory plugin
+- ✅ **Audit trail** - NetBox tracks all changes
+- ✅ **Search and filter** - Query BGP sessions, communities, etc.
 
 ### netbox-bgp Plugin Models
 
@@ -183,6 +183,7 @@ If NetBox inventory plugin includes BGP data:
 ```
 
 **Issues:**
+
 - ❌ No validation of AS numbers or IPs
 - ❌ No relationships to other objects
 - ❌ Hard to query across devices
@@ -192,6 +193,7 @@ If NetBox inventory plugin includes BGP data:
 ### netbox-bgp Plugin Approach (Better)
 
 **Benefits:**
+
 - ✅ AS numbers are validated objects
 - ✅ IP addresses linked to existing IPs
 - ✅ Can query all sessions for an AS
@@ -204,6 +206,7 @@ If NetBox inventory plugin includes BGP data:
 ## Migration Path
 
 ### Current State: config_context
+
 ```json
 {
   "bgp_as": 65000,
@@ -227,11 +230,13 @@ If NetBox inventory plugin includes BGP data:
 ### NetBox Setup
 
 **1. Create AS Objects**
+
 ```
 AS 65000 (Private)
 ```
 
 **2. Create Peer Group (Optional)**
+
 ```
 Name: EVPN-OVERLAY
 Description: EVPN overlay peers
@@ -240,6 +245,7 @@ Description: EVPN overlay peers
 **3. Create BGP Sessions**
 
 **Leaf-1 → Spine-1:**
+
 - Device: leaf-1
 - Name: leaf-1-to-spine-1
 - Local AS: 65000
@@ -250,6 +256,7 @@ Description: EVPN overlay peers
 - Status: Active
 
 **Leaf-1 → Spine-2:**
+
 - Device: leaf-1
 - Name: leaf-1-to-spine-2
 - Local AS: 65000
@@ -341,10 +348,13 @@ The role could support **both** approaches:
 ## Recommendation
 
 ### For New Deployments
+
 **Use netbox-bgp plugin** - Better structure, validation, and relationships
 
 ### For Existing Deployments
+
 **Migration plan:**
+
 1. Install netbox-bgp plugin
 2. Populate BGP sessions in plugin
 3. Test with one device using plugin data
@@ -353,14 +363,18 @@ The role could support **both** approaches:
 6. Remove config_context BGP data
 
 ### For Simple Deployments
+
 **config_context is fine** if:
+
 - Small number of devices
 - Simple BGP configuration
 - Don't need complex queries
 - Quick deployment needed
 
 ### For Complex Deployments
+
 **netbox-bgp plugin is better** for:
+
 - Large fabrics (dozens of devices)
 - Complex routing policies
 - Need to query BGP data

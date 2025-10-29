@@ -7,25 +7,30 @@ Updated documentation setup to reflect that GitHub Pages is **not available** fo
 ## Modified Files
 
 ### 1. `.github/workflows/docs.yml`
+
 - **Commented out** entire workflow
 - Added clear explanation at the top
 - Instructions for when to uncomment (when repo is public or on paid plan)
 
 ### 2. `mkdocs.yml`
+
 - **Commented out** `site_url` setting
 - Will be uncommented when GitHub Pages is enabled
 
 ### 3. `docs/DOCUMENTATION_SITE.md`
+
 - Updated "Publishing" section
 - Added "For Private Repositories" section with local usage
 - Added "For Public Repositories" section for future reference
 
 ### 4. `docs/DOCUMENTATION_SITE_SETUP.md`
+
 - Updated "Quick Start" section
 - Added warning about GitHub Pages requirements
 - Added instructions for local documentation building
 
 ### 5. `docs/README.md`
+
 - Added section at top explaining local documentation usage
 - Clear note that GitHub Pages is disabled
 - Link to DOCUMENTATION_SITE.md for details
@@ -68,12 +73,12 @@ When ready to enable GitHub Pages:
 
 Even without GitHub Pages, MkDocs provides:
 
-✅ **Beautiful local documentation** - Material theme looks great
-✅ **Live reload** - See changes instantly during development
-✅ **Organized navigation** - Easy to find what you need
-✅ **Full-text search** - Works locally too
-✅ **Syntax highlighting** - YAML/Jinja2 examples look great
-✅ **Future-ready** - Easy to enable GitHub Pages later
+- ✅ **Beautiful local documentation** - Material theme looks great
+- ✅ **Live reload** - See changes instantly during development
+- ✅ **Organized navigation** - Easy to find what you need
+- ✅ **Full-text search** - Works locally too
+- ✅ **Syntax highlighting** - YAML/Jinja2 examples look great
+- ✅ **Future-ready** - Easy to enable GitHub Pages later
 
 ## Alternatives for Private Repos
 
@@ -99,9 +104,9 @@ If you need to share docs with the team:
 
 ## Summary
 
-✅ **Workflow commented out** - Won't trigger on pushes
-✅ **Documentation updated** - Clear instructions for current setup
-✅ **Local usage documented** - `make docs-serve` for development
-✅ **Future-ready** - Easy to enable when repo becomes public
+- ✅ **Workflow commented out** - Won't trigger on pushes
+- ✅ **Documentation updated** - Clear instructions for current setup
+- ✅ **Local usage documented** - `make docs-serve` for development
+- ✅ **Future-ready** - Easy to enable when repo becomes public
 
 The MkDocs setup is still valuable for local documentation viewing and is ready to deploy to GitHub Pages when the time comes!

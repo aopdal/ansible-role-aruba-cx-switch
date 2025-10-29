@@ -161,6 +161,7 @@
       - interface vxlan 1
     lines:
       - source ip {{ vxlan_source_ip }}
+      - no shutdown
     match: line
   when:
     - custom_fields.device_vxlan | default(false) | bool

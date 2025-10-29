@@ -28,17 +28,17 @@ If you prefer to add folders manually:
 The workspace includes:
 
 - **🎭 Ansible Role - Aruba CX Switch** (`.`)
-  - The main role repository
-  - Read/Write access
+    - The main role repository
+    - Read/Write access
 
 - **🧪 Test Environment** (`/workspaces/aruba-role-testing`)
-  - Your testing environment with inventory and playbooks
-  - Read/Write access
-  - Location: `~/code/aruba-role-testing` on host
+    - Your testing environment with inventory and playbooks
+    - Read/Write access
+    - Location: `~/code/aruba-role-testing` on host
 
 - **📚 Auto NetOps** (`/workspaces/auto-netops-ansible`)
-  - Reference repository (read-only)
-  - Location: `~/code/auto-netops-ansible` on host
+    - Reference repository (read-only)
+    - Location: `~/code/auto-netops-ansible` on host
 
 ## Customization
 
@@ -99,6 +99,7 @@ Changes take effect after reloading: **F1** → **"Developer: Reload Window"**
 **Problem:** Mounted folder doesn't appear in Explorer
 
 **Solution:**
+
 1. Verify the mount exists: `ls /workspaces/`
 2. Add to workspace: File → Add Folder to Workspace
 3. Check `ansible-workspace.code-workspace` for correct path
@@ -108,7 +109,9 @@ Changes take effect after reloading: **F1** → **"Developer: Reload Window"**
 **Problem:** Can't edit files in mounted folder
 
 **Solution:**
+
 Check folder ownership on host:
+
 ```bash
 # On host machine
 ls -la ~/code/aruba-role-testing
@@ -122,6 +125,7 @@ Then rebuild: **F1** → **"Dev Containers: Rebuild Container"**
 **Problem:** Folder doesn't exist at `/workspaces/folder-name`
 
 **Solution:**
+
 1. Check host path exists: `ls ~/code/aruba-role-testing`
 2. Check `.devcontainer/devcontainer.json` mounts section
 3. Rebuild container

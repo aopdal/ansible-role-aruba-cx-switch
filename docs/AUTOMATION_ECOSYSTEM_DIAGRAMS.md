@@ -68,6 +68,7 @@ graph LR
 ### Ansible Role (aopdal.aruba_cx_switch)
 
 **RESPONSIBILITIES:**
+
 - Query NetBox API
 - Transform NetBox data into Aruba CX CLI
 - Generate Jinja2 templates
@@ -78,6 +79,7 @@ graph LR
 ### ZTP Infrastructure (DHCP/TFTP Server)
 
 **OUT OF SCOPE** for this role, but critical for the ecosystem:
+
 - Host ZTP scripts and base configs
 - DHCP option configuration (ZTP URL)
 - TFTP/HTTP file serving
@@ -85,6 +87,7 @@ graph LR
 ### Aruba CX Switch
 
 **RESPONSIBILITIES:**
+
 - Execute ZTP process on first boot
 - Accept configuration via SSH/HTTPS
 - Report status and health
@@ -223,6 +226,7 @@ graph TB
 | **VRFs**   | ● | ● | ○ | ○ | ● | ● |
 
 **Legend:**
+
 - ● = Required/Strongly recommended
 - ○ = Compatible/Optional
 - × = Incompatible/Not supported together

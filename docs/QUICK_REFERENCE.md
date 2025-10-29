@@ -55,6 +55,7 @@ pre-commit run --all-files
 ## Tag Usage (Production Playbooks)
 
 ### Safe Day-to-Day Operations (Won't Touch Routing)
+
 ```bash
 # Add VLANs (routing protocols skipped)
 ansible-playbook configure_aoscx.yml -l switch-name -t vlans
@@ -70,6 +71,7 @@ ansible-playbook configure_aoscx.yml -l switch-name -t lag
 ```
 
 ### High-Impact Changes (Require Explicit Tags)
+
 ```bash
 # BGP configuration (tag-dependent - safe from accidental runs)
 ansible-playbook configure_aoscx.yml -l switch-name -t bgp
@@ -85,6 +87,7 @@ ansible-playbook configure_aoscx.yml -l switch-name -t vsx
 ```
 
 ### Full Configuration
+
 ```bash
 # Everything (including routing protocols)
 ansible-playbook configure_aoscx.yml -l switch-name
@@ -97,6 +100,7 @@ ansible-playbook configure_aoscx.yml -l switch-name -t vlans --list-tasks
 ```
 
 ### Verify Tag Behavior
+
 ```bash
 # Verify VLANs won't include routing (should be empty)
 ansible-playbook configure_aoscx.yml -l switch-name -t vlans --list-tasks | grep -E "(BGP|OSPF|VSX)"
@@ -106,10 +110,11 @@ ansible-playbook configure_aoscx.yml -l switch-name -t routing --list-tasks | gr
 ```
 
 ### Important Notes
+
 - **Tag-Dependent**: BGP, OSPF, VSX only run when:
-  - Explicitly tagged (`-t bgp`, `-t routing`, `-t vsx`)
-  - No tags specified (full run)
-  - Never run with other tags like `-t vlans`
+    - Explicitly tagged (`-t bgp`, `-t routing`, `-t vsx`)
+    - No tags specified (full run)
+    - Never run with other tags like `-t vlans`
 - **Always Safe**: VLANs, interfaces, LAGs never trigger routing changes
 - **Cleanup**: Protected by `aoscx_idempotent_mode` variable
 

@@ -236,16 +236,19 @@ print("✅ All tests passed!")
 ## Code Reduction
 
 ### EVPN Tasks
+
 - **Before:** ~70 lines across 5 tasks
 - **After:** ~25 lines across 3 tasks
 - **Reduction:** 64% fewer lines
 
 ### VXLAN Tasks
+
 - **Before:** ~100 lines across 8 tasks
 - **After:** ~30 lines across 3 tasks
 - **Reduction:** 70% fewer lines
 
 ### Total
+
 - **Before:** 170 lines of playbook code
 - **After:** 55 lines of playbook code + 40 lines of filter code
 - **Net reduction:** 44% fewer total lines

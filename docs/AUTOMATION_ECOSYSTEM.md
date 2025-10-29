@@ -69,6 +69,7 @@ graph TB
 **Scope: Complete Network Inventory and Configuration Data**
 
 #### In Scope (Used by This Role)
+
 - ✅ **Device Information**: Hostname, platform, serial number, management IP
 - ✅ **Interfaces**: Physical ports, LAGs, SVIs, loopbacks
 - ✅ **L2 Configuration**: VLANs, trunk/access ports, allowed VLANs
@@ -81,6 +82,7 @@ graph TB
 - ✅ **Tags**: Automation control (ztp_ready, production, staging)
 
 #### Out of Scope (Not Used by This Role, but Important)
+
 - 📋 **Physical Documentation**: Cable management, rack elevations, power circuits
 - 📋 **Site Information**: Address, contact information, facility details
 - 📋 **Circuit Management**: WAN links, ISP information
@@ -89,6 +91,7 @@ graph TB
 
 **Why Document These?**
 While not used for configuration automation, these provide critical context for:
+
 - Troubleshooting physical layer issues
 - Planning upgrades and expansions
 - Capacity management
@@ -101,6 +104,7 @@ While not used for configuration automation, these provide critical context for:
 #### This Role (`aopdal.aruba_cx_switch`)
 
 **Responsibilities:**
+
 - ✅ Query NetBox API for device configuration
 - ✅ Generate ZTP base configurations for initial deployment
 - ✅ Deploy complete switch configurations via SSH/HTTPS
@@ -109,6 +113,7 @@ While not used for configuration automation, these provide critical context for:
 - ✅ Provide cleanup of removed configurations (idempotent mode)
 
 **Does NOT Handle:**
+
 - ❌ DHCP server configuration
 - ❌ TFTP/HTTP server configuration
 - ❌ ZTP script deployment to servers
@@ -122,6 +127,7 @@ While not used for configuration automation, these provide critical context for:
 #### DHCP Server (Out of Scope for This Role)
 
 **Responsibilities:**
+
 - Provide IP address to new switches
 - Provide default gateway
 - Provide DNS servers
@@ -149,6 +155,7 @@ subnet 192.168.1.0 netmask 255.255.255.0 {
 #### TFTP/HTTP Server (Out of Scope for This Role)
 
 **Responsibilities:**
+
 - Host ZTP Python scripts
 - Host generated base configurations
 - (Optional) Host firmware images
@@ -196,6 +203,7 @@ def main():
 ### 4. Network Devices (Aruba CX Switches)
 
 **Lifecycle Phases:**
+
 1. **Factory Default** → DHCP request
 2. **ZTP Phase** → Download and apply base config
 3. **Bootstrap Complete** → Management connectivity established
@@ -211,28 +219,33 @@ def main():
 
 **Activities:**
 1. **Site Planning**
+
    - Create sites in NetBox
    - Document racks and rack units
    - Plan power distribution
 
 2. **Device Documentation**
+
    - Add devices to NetBox (can be pre-populated before physical arrival)
    - Set device type, role, platform
    - Record serial numbers (when known)
    - Assign management IP addresses
 
 3. **Network Design**
+
    - Define VLANs and prefixes
    - Create VRFs for multi-tenancy
    - Plan IP addressing scheme
    - Design routing topology (BGP AS, OSPF areas)
 
 4. **Configuration Context**
+
    - Set system-wide settings (NTP, DNS, timezone)
    - Define site-specific or role-specific configurations
    - Configure BGP fallback parameters
 
 5. **Custom Fields**
+
    - Set feature flags (device_bgp, device_evpn, device_vxlan, device_vsx)
    - Tag devices for automation (ztp_ready, staging, production)
 
@@ -245,6 +258,7 @@ def main():
 **Objective:** Generate base configurations for initial device deployment.
 
 **Prerequisites:**
+
 - NetBox fully populated with device information
 - Management IP addresses assigned
 - Config context configured
@@ -259,6 +273,7 @@ ansible-playbook generate-ztp-configs.yml
 ```
 
 **Generated Configuration Includes:**
+
 - Hostname
 - Admin user credentials
 - Management interface IP configuration
@@ -273,6 +288,7 @@ scp ztp_configs/*.cfg ztp-server:/var/lib/ztp/configs/
 ```
 
 **Key Points:**
+
 - ✅ No device connection required (devices don't exist yet)
 - ✅ Uses NetBox as single source of truth
 - ✅ Minimal configuration for bootstrap only
@@ -286,12 +302,14 @@ scp ztp_configs/*.cfg ztp-server:/var/lib/ztp/configs/
 
 **Activities:**
 1. **Physical Installation** (Documented in NetBox)
+
    - Mount devices in racks
    - Connect power cables (document in NetBox)
    - Connect network cables (document in NetBox)
    - Connect management interface to ZTP network
 
 2. **Power On**
+
    - Device boots to factory default
    - DHCP request on management interface
    - Receives IP address and ZTP script URL
@@ -318,6 +336,7 @@ scp ztp_configs/*.cfg ztp-server:/var/lib/ztp/configs/
 **Objective:** Apply complete network configuration from NetBox.
 
 **Prerequisites:**
+
 - Device accessible via management IP
 - SSH/HTTPS enabled
 - Admin credentials configured
@@ -336,6 +355,7 @@ ansible-playbook -i netbox_inventory.yml site.yml --tags vlans,bgp
 ```
 
 **Configuration Applied:**
+
 - ✅ Base system (NTP, DNS, timezone, banner)
 - ✅ VRFs
 - ✅ VLANs
@@ -350,6 +370,7 @@ ansible-playbook -i netbox_inventory.yml site.yml --tags vlans,bgp
 - ✅ VSX virtual chassis (if enabled)
 
 **Key Features:**
+
 - **Idempotent:** Safe to run multiple times
 - **NetBox-driven:** All config from NetBox
 - **Feature flags:** Control what gets configured via custom fields
@@ -383,11 +404,13 @@ ansible-playbook -i netbox_inventory.yml site.yml --tags vlans,bgp
    ```
 
 4. **Change Validation**
+
    - Ansible reports changes made
    - Compare before/after state
    - Rollback if needed
 
 5. **Documentation Updates**
+
    - Update NetBox when changes occur
    - NetBox remains authoritative source
    - Audit trail of all changes
@@ -474,6 +497,7 @@ netbox_token: "{{ vault_netbox_token }}"
 ```
 
 **Queried Objects:**
+
 - Devices (filtered by tags, roles, sites)
 - Interfaces (physical, virtual, LAG)
 - IP addresses
@@ -493,10 +517,12 @@ ansible-playbook -i netbox_inventory.yml site.yml
 ### Collections Used
 
 **Required Collections:**
-- `arubanetworks.aoscx` >= 4.0.0 - Aruba CX modules
-- `netbox.netbox` >= 3.0.0 - NetBox inventory and modules
+
+- `arubanetworks.aoscx` >= 4.4.0 - Aruba CX modules
+- `netbox.netbox` >= 3.21.0 - NetBox inventory and modules
 
 **Python Libraries:**
+
 - `pyaoscx` - Aruba CX SDK
 - `pynetbox` - NetBox API client
 
@@ -505,20 +531,24 @@ ansible-playbook -i netbox_inventory.yml site.yml
 While not managed by this role, integration points exist for:
 
 - **Monitoring Systems** (Prometheus, SNMP)
+
   - Switch metrics and health
   - Interface statistics
   - BGP/OSPF status
 
 - **Logging Systems** (Syslog, ELK)
+
   - Configuration changes
   - System events
   - Security logs
 
 - **Backup Systems**
+
   - Configuration backups
   - Automated snapshots before changes
 
 - **CI/CD Pipelines**
+
   - Automated testing of configuration changes
   - Rollback procedures
   - Change approval workflows
@@ -530,6 +560,7 @@ While not managed by this role, integration points exist for:
 ### 1. NetBox as Single Source of Truth
 
 **Do:**
+
 - ✅ Always update NetBox first, then run Ansible
 - ✅ Use config context for site/role-specific settings
 - ✅ Tag devices appropriately (production, staging, ztp_ready)
@@ -537,6 +568,7 @@ While not managed by this role, integration points exist for:
 - ✅ Use custom fields for feature flags
 
 **Don't:**
+
 - ❌ Make manual changes to switches without updating NetBox
 - ❌ Store configuration in multiple places
 - ❌ Bypass NetBox for "quick fixes"
@@ -544,6 +576,7 @@ While not managed by this role, integration points exist for:
 ### 2. Idempotent Operations
 
 **Do:**
+
 - ✅ Run Ansible regularly (daily/weekly)
 - ✅ Enable idempotent mode in production
   ```yaml
@@ -553,12 +586,14 @@ While not managed by this role, integration points exist for:
 - ✅ Test changes in staging environment first
 
 **Don't:**
+
 - ❌ Fear running Ansible multiple times
 - ❌ Make manual changes that conflict with NetBox
 
 ### 3. ZTP Workflow
 
 **Do:**
+
 - ✅ Generate ZTP configs before equipment arrives
 - ✅ Test ZTP process in lab environment
 - ✅ Use Ansible Vault for passwords
@@ -566,6 +601,7 @@ While not managed by this role, integration points exist for:
 - ✅ Document serial numbers in NetBox for ZTP script matching
 
 **Don't:**
+
 - ❌ Use weak passwords in ZTP configs
 - ❌ Forget to deploy generated configs to ZTP server
 - ❌ Skip testing ZTP process
@@ -584,6 +620,7 @@ While not managed by this role, integration points exist for:
 ```
 
 **Do:**
+
 - ✅ Use version control for Ansible playbooks
 - ✅ Tag production-ready devices appropriately
 - ✅ Maintain separate staging environment
@@ -591,6 +628,7 @@ While not managed by this role, integration points exist for:
 - ✅ Review Ansible output for unexpected changes
 
 **Don't:**
+
 - ❌ Skip testing in staging
 - ❌ Run massive changes without review
 - ❌ Ignore Ansible warnings or errors
@@ -598,6 +636,7 @@ While not managed by this role, integration points exist for:
 ### 5. Security
 
 **Do:**
+
 - ✅ Use Ansible Vault for all credentials
   ```bash
   ansible-vault create group_vars/all/vault.yml
@@ -609,6 +648,7 @@ While not managed by this role, integration points exist for:
 - ✅ Use HTTPS for NetBox API
 
 **Don't:**
+
 - ❌ Store passwords in plain text
 - ❌ Use same password across all devices
 - ❌ Share Ansible Vault passwords insecurely
@@ -616,6 +656,7 @@ While not managed by this role, integration points exist for:
 ### 6. Documentation
 
 **NetBox Documentation:**
+
 - Device serial numbers
 - Cable connections (even if not used for config)
 - Rack locations
@@ -624,6 +665,7 @@ While not managed by this role, integration points exist for:
 - Contact information
 
 **Ansible Documentation:**
+
 - Playbook usage examples
 - Variable definitions
 - Custom filters and plugins
@@ -631,6 +673,7 @@ While not managed by this role, integration points exist for:
 
 **Why Document Physical Infrastructure?**
 Even though physical documentation isn't used for automation:
+
 - Essential for troubleshooting
 - Required for disaster recovery
 - Helps plan capacity
@@ -644,16 +687,19 @@ Even though physical documentation isn't used for automation:
 ### ZTP Issues
 
 **Problem:** Device doesn't get IP address
+
 - Check DHCP server logs
 - Verify DHCP pool availability
 - Confirm switch sends DHCP request on mgmt interface
 
 **Problem:** ZTP script not downloaded
+
 - Verify DHCP option 66/67 configuration
 - Check TFTP/HTTP server accessibility
 - Review switch boot logs
 
 **Problem:** Configuration not applied
+
 - Check ZTP script logs
 - Verify configuration file syntax
 - Ensure config file exists on server
@@ -661,18 +707,21 @@ Even though physical documentation isn't used for automation:
 ### Configuration Issues
 
 **Problem:** Ansible can't connect to device
+
 - Verify device is in NetBox
 - Check management IP reachability
 - Confirm SSH/HTTPS is enabled
 - Validate credentials
 
 **Problem:** Changes not applied
+
 - Check Ansible output for errors
 - Verify NetBox data is correct
 - Review custom fields and tags
 - Check idempotent mode setting
 
 **Problem:** Unexpected configuration removed
+
 - Check idempotent mode is desired
 - Verify all required config is in NetBox
 - Review Ansible diff output before applying

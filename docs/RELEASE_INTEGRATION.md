@@ -8,42 +8,29 @@ The release system consists of several interconnected components that automate v
 
 ## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Developer Workflow                           │
-├─────────────────────────────────────────────────────────────────┤
-│ 1. Create feature branch                                        │
-│ 2. Make changes                                                 │
-│ 3. Update CHANGELOG.md under [Unreleased]                       │
-│ 4. Create PR and merge to main                                  │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              GitHub Actions: Release Workflow                    │
-├─────────────────────────────────────────────────────────────────┤
-│ Trigger: Push to main or manual dispatch                        │
-│                                                                  │
-│ Steps:                                                           │
-│ 1. Checkout code (full history)                                 │
-│ 2. Determine version (auto-increment or manual)                 │
-│ 3. Update galaxy.yml with new version                           │
-│ 4. Update CHANGELOG.md ([Unreleased] → [Version])               │
-│ 5. Extract release notes from changelog                         │
-│ 6. Commit version changes                                       │
-│ 7. Create Git tag (v{version})                                  │
-│ 8. Create GitHub Release with notes                             │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Release Artifacts                             │
-├─────────────────────────────────────────────────────────────────┤
-│ • Git Tag: v{version}                                           │
-│ • GitHub Release: Release notes + source code                   │
-│ • Updated galaxy.yml: version field                             │
-│ • Updated CHANGELOG.md: versioned entry                         │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Dev[Developer Workflow]
+    Dev_Details["1. Create feature branch<br/>2. Make changes<br/>3. Update CHANGELOG.md under [Unreleased]<br/>4. Create PR and merge to main"]
+
+    Workflow[GitHub Actions: Release Workflow]
+    Workflow_Details["Trigger: Push to main or manual dispatch<br/><br/>Steps:<br/>1. Checkout code (full history)<br/>2. Determine version (auto-increment or manual)<br/>3. Update galaxy.yml with new version<br/>4. Update CHANGELOG.md ([Unreleased] → [Version])<br/>5. Extract release notes from changelog<br/>6. Commit version changes<br/>7. Create Git tag (v{version})<br/>8. Create GitHub Release with notes"]
+
+    Artifacts[Release Artifacts]
+    Artifacts_Details["• Git Tag: v{version}<br/>• GitHub Release: Release notes + source code<br/>• Updated galaxy.yml: version field<br/>• Updated CHANGELOG.md: versioned entry"]
+
+    Dev --> Dev_Details
+    Dev_Details --> Workflow
+    Workflow --> Workflow_Details
+    Workflow_Details --> Artifacts
+    Artifacts --> Artifacts_Details
+
+    style Dev fill:#e1f5ff
+    style Workflow fill:#fff3e0
+    style Artifacts fill:#e8f5e9
+    style Dev_Details fill:#f0f0f0
+    style Workflow_Details fill:#f0f0f0
+    style Artifacts_Details fill:#f0f0f0
 ```
 
 ---
@@ -70,12 +57,18 @@ The release system consists of several interconnected components that automate v
 **Why not galaxy.yml?**: This is an Ansible **Role** (not a Collection). Roles use `meta/main.yml` for Galaxy metadata, not `galaxy.yml`. We use a simple `VERSION` file for version tracking.
 
 **Example Flow**:
-```
-Initial: 0.1.0
-         ↓
-Workflow runs (patch release)
-         ↓
-Updated: 0.1.1
+```mermaid
+flowchart TD
+    Initial[Initial: 0.1.0]
+    Workflow[Workflow runs<br/>patch release]
+    Updated[Updated: 0.1.1]
+
+    Initial --> Workflow
+    Workflow --> Updated
+
+    style Initial fill:#e3f2fd
+    style Workflow fill:#fff3e0
+    style Updated fill:#e8f5e9
 ```
 
 ---
@@ -256,85 +249,132 @@ Assets:
 
 ### Scenario: Feature Development to Release
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Step 1: Developer Creates Feature                       │
-├─────────────────────────────────────────────────────────┤
-│ $ git checkout -b feature/ospf-support                  │
-│ $ # ... develop feature ...                             │
-│ $ vim CHANGELOG.md  # Add to [Unreleased]               │
-│ $ git commit -m "feat: add OSPF support"                │
-│ $ git push                                               │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│ Step 2: Create and Merge PR                             │
-├─────────────────────────────────────────────────────────┤
-│ $ gh pr create --fill                                   │
-│ # Review, approve, merge to main                        │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼ (Push to main triggers workflow)
-┌─────────────────────────────────────────────────────────┐
-│ Step 3: Release Workflow Executes                       │
-├─────────────────────────────────────────────────────────┤
-│ 1. Read current version from galaxy.yml: 0.1.0          │
-│ 2. Auto-increment (patch): 0.1.0 → 0.1.1                │
-│ 3. Update galaxy.yml: version: 0.1.1                    │
-│ 4. Update CHANGELOG.md:                                 │
-│    [Unreleased] → [0.1.1] - 2025-01-15                  │
-│ 5. Extract release notes from CHANGELOG                 │
-│ 6. Commit: "chore: release version 0.1.1"               │
-│ 7. Create tag: v0.1.1                                   │
-│ 8. Push commit and tag                                  │
-│ 9. Create GitHub Release                                │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│ Step 4: Release Available                               │
-├─────────────────────────────────────────────────────────┤
-│ • GitHub Release: v0.1.1                                │
-│ • Git Tag: v0.1.1                                       │
-│ • galaxy.yml: version: 0.1.1                            │
-│ • CHANGELOG.md: [0.1.1] entry added                     │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Step1[Step 1: Developer Creates Feature]
+    Step1_Details["$ git checkout -b feature/ospf-support<br/>$ # ... develop feature ...<br/>$ vim CHANGELOG.md  # Add to [Unreleased]<br/>$ git commit -m 'feat: add OSPF support'<br/>$ git push"]
+
+    Step2[Step 2: Create and Merge PR]
+    Step2_Details["$ gh pr create --fill<br/># Review, approve, merge to main"]
+
+    Trigger[Push to main triggers workflow]
+
+    Step3[Step 3: Release Workflow Executes]
+    Step3_Details["1. Read current version from galaxy.yml: 0.1.0<br/>2. Auto-increment (patch): 0.1.0 → 0.1.1<br/>3. Update galaxy.yml: version: 0.1.1<br/>4. Update CHANGELOG.md:<br/>   [Unreleased] → [0.1.1] - 2025-01-15<br/>5. Extract release notes from CHANGELOG<br/>6. Commit: 'chore: release version 0.1.1'<br/>7. Create tag: v0.1.1<br/>8. Push commit and tag<br/>9. Create GitHub Release"]
+
+    Step4[Step 4: Release Available]
+    Step4_Details["• GitHub Release: v0.1.1<br/>• Git Tag: v0.1.1<br/>• galaxy.yml: version: 0.1.1<br/>• CHANGELOG.md: [0.1.1] entry added"]
+
+    Step1 --> Step1_Details
+    Step1_Details --> Step2
+    Step2 --> Step2_Details
+    Step2_Details --> Trigger
+    Trigger --> Step3
+    Step3 --> Step3_Details
+    Step3_Details --> Step4
+    Step4 --> Step4_Details
+
+    style Step1 fill:#e3f2fd
+    style Step2 fill:#f3e5f5
+    style Trigger fill:#fff9c4
+    style Step3 fill:#fff3e0
+    style Step4 fill:#e8f5e9
+    style Step1_Details fill:#f5f5f5
+    style Step2_Details fill:#f5f5f5
+    style Step3_Details fill:#f5f5f5
+    style Step4_Details fill:#f5f5f5
 ```
 
 ---
 
 ## File Dependencies
 
+### VERSION File
+
+```mermaid
+graph TD
+    VERSION[VERSION]
+    VERSION --> |Updated by| RW1[Release workflow: version number]
+    VERSION --> |Read by| RW2[Release workflow: current version]
+    VERSION --> |Read by| Users1[Users: quick check]
+
+    style VERSION fill:#e3f2fd
+    style RW1 fill:#fff3e0
+    style RW2 fill:#fff3e0
+    style Users1 fill:#e8f5e9
 ```
-VERSION
-    ├── Updated by: Release workflow (version number)
-    ├── Read by: Release workflow (current version)
-    └── Read by: Users (quick check)
 
-CHANGELOG.md
-    ├── Updated by: Developer (adds to [Unreleased])
-    ├── Read by: Release workflow (extract notes)
-    └── Updated by: Release workflow (version section)
+### CHANGELOG.md
 
-meta/main.yml
-    ├── Updated by: Manual (Galaxy metadata)
-    └── Read by: Ansible Galaxy (when publishing)
+```mermaid
+graph TD
+    CHANGELOG[CHANGELOG.md]
+    CHANGELOG --> |Updated by| Dev1[Developer: adds to Unreleased]
+    CHANGELOG --> |Read by| RW3[Release workflow: extract notes]
+    CHANGELOG --> |Updated by| RW4[Release workflow: version section]
 
-.github/workflows/release.yml
-    ├── Triggered by: Git push to main
-    ├── Reads: VERSION, CHANGELOG.md
-    ├── Updates: VERSION, CHANGELOG.md
-    ├── Creates: Git tags, GitHub Releases
-    └── Requires: GITHUB_TOKEN (automatic)
+    style CHANGELOG fill:#f3e5f5
+    style Dev1 fill:#e3f2fd
+    style RW3 fill:#fff3e0
+    style RW4 fill:#fff3e0
+```
 
-Git Tags
-    ├── Created by: Release workflow
-    └── Used by: GitHub Releases, version control
+### meta/main.yml
 
-GitHub Releases
-    ├── Created by: Release workflow
-    └── Contains: Release notes, source code
+```mermaid
+graph TD
+    META[meta/main.yml]
+    META --> |Updated by| Manual1[Manual: Galaxy metadata]
+    META --> |Read by| Galaxy1[Ansible Galaxy: when publishing]
+
+    style META fill:#fff3e0
+    style Manual1 fill:#e3f2fd
+    style Galaxy1 fill:#e0f2f1
+```
+
+### Release Workflow
+
+```mermaid
+graph TD
+    WORKFLOW[.github/workflows/release.yml]
+    WORKFLOW --> |Triggered by| Push[Git push to main]
+    WORKFLOW --> |Reads| Read1[VERSION, CHANGELOG.md]
+    WORKFLOW --> |Updates| Update1[VERSION, CHANGELOG.md]
+    WORKFLOW --> |Creates| Create1[Git tags, GitHub Releases]
+    WORKFLOW --> |Requires| Token[GITHUB_TOKEN: automatic]
+
+    style WORKFLOW fill:#e8f5e9
+    style Push fill:#fff9c4
+    style Read1 fill:#e3f2fd
+    style Update1 fill:#f3e5f5
+    style Create1 fill:#fce4ec
+    style Token fill:#fff3e0
+```
+
+### Git Tags
+
+```mermaid
+graph TD
+    TAGS[Git Tags]
+    TAGS --> |Created by| RW5[Release workflow]
+    TAGS --> |Used by| Use1[GitHub Releases, version control]
+
+    style TAGS fill:#fce4ec
+    style RW5 fill:#e8f5e9
+    style Use1 fill:#f1f8e9
+```
+
+### GitHub Releases
+
+```mermaid
+graph TD
+    RELEASES[GitHub Releases]
+    RELEASES --> |Created by| RW6[Release workflow]
+    RELEASES --> |Contains| Content[Release notes, source code]
+
+    style RELEASES fill:#f1f8e9
+    style RW6 fill:#e8f5e9
+    style Content fill:#e0f2f1
 ```
 
 ---
@@ -446,22 +486,43 @@ Add `GALAXY_API_KEY` to repository secrets:
 
 ### Step 3: Workflow Integration
 
-```
-Release Workflow (creates tag)
-         ↓
-CI Workflow (on tag push)
-         ↓
-Galaxy Publishing Job
-         ↓
-Role Published to Galaxy
+```mermaid
+flowchart TD
+    RW[Release Workflow<br/>creates tag]
+    CI[CI Workflow<br/>on tag push]
+    PJ[Galaxy Publishing Job]
+    GP[Role Published to Galaxy]
+
+    RW --> CI
+    CI --> PJ
+    PJ --> GP
+
+    style RW fill:#e8f5e9
+    style CI fill:#fff3e0
+    style PJ fill:#f3e5f5
+    style GP fill:#e0f2f1
 ```
 
 ### Combined Flow
 
-```
-Developer → PR → Main → Release Workflow → Tag → CI → Galaxy
-                                              ↓
-                                        GitHub Release
+```mermaid
+flowchart LR
+    Developer --> PR[Pull Request]
+    PR --> Main[Main Branch]
+    Main --> ReleaseWF[Release Workflow]
+    ReleaseWF --> Tag[Git Tag]
+    Tag --> CI[CI Workflow]
+    CI --> Galaxy[Ansible Galaxy]
+    ReleaseWF --> GHRelease[GitHub Release]
+
+    style Developer fill:#e3f2fd
+    style PR fill:#f3e5f5
+    style Main fill:#fff3e0
+    style ReleaseWF fill:#e8f5e9
+    style Tag fill:#fce4ec
+    style CI fill:#f1f8e9
+    style Galaxy fill:#e0f2f1
+    style GHRelease fill:#fff9c4
 ```
 
 ---

@@ -19,10 +19,12 @@ A **hybrid BGP configuration** system supporting both netbox-bgp plugin and conf
 ```
 
 #### Dual Configuration Paths
+
 - **netbox-bgp plugin path**: Query API, filter by device, configure from structured data
 - **config_context path**: Use existing JSON structure, configure from custom fields
 
 #### Features Implemented
+
 ✅ BGP router process (both sources)
 ✅ EVPN neighbors (both sources)
 ✅ IPv4 unicast neighbors (config_context)
@@ -79,6 +81,7 @@ flowchart TD
 ### 2. Side-by-Side Operation
 
 **During Migration:**
+
 - Device A: Uses netbox-bgp plugin
 - Device B: Uses config_context
 - Device C: Uses config_context (no sessions in plugin yet)
@@ -241,6 +244,7 @@ config_context.bgp_peers[0].peer
 **Decision:** Use `ansible.builtin.uri` to query API
 
 **Reasons:**
+
 1. **No additional dependencies** - uri module is built-in
 2. **pynetbox in task context** - Would need to be available on control node
 3. **Simple GET request** - Don't need full pynetbox functionality
@@ -253,6 +257,7 @@ config_context.bgp_peers[0].peer
 **Decision:** Duplicate tasks for plugin vs config_context
 
 **Reasons:**
+
 1. **Clear separation** - Easy to see which source is used
 2. **Different data structures** - Plugin uses nested objects, config_context uses flat JSON
 3. **Easier debugging** - Can trace which path is taken
@@ -263,6 +268,7 @@ config_context.bgp_peers[0].peer
 **Decision:** Try plugin first, fall back to config_context
 
 **Reasons:**
+
 1. **Smooth migration** - No disruption to existing deployments
 2. **Flexibility** - Works with or without plugin
 3. **Future-proof** - Plugin is preferred long-term
@@ -315,6 +321,7 @@ ansible-playbook configure_aoscx.yml -t bgp \
 **Reason:** Flexibility for simple deployments
 
 **Use Cases:**
+
 - Small sites with simple BGP
 - Quick testing without plugin
 - Sites without plugin installed
@@ -323,18 +330,21 @@ ansible-playbook configure_aoscx.yml -t bgp \
 ## Best Practices
 
 ### 1. Migration
+
 ✅ Test with one device first
 ✅ Use Status "Planned" initially
 ✅ Keep config_context during migration
 ✅ Document which devices use which source
 
 ### 2. Operations
+
 ✅ Use plugin for new devices
 ✅ Leverage Status field (Active/Planned/Offline)
 ✅ Use debug mode when troubleshooting
 ✅ Keep role supporting both methods
 
 ### 3. Data Management
+
 ✅ Create all IP addresses in IPAM first
 ✅ Use consistent session naming
 ✅ Document in session descriptions

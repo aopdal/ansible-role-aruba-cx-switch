@@ -3,6 +3,7 @@
 ## Overview
 
 This document describes the comprehensive testing environment for the `ansible-role-aruba-cx-switch` role using:
+
 - **EVE-NG**: Virtual network lab for Aruba AOS-CX switches
 - **NetBox**: Source of truth for network configuration
 - **Ansible**: Automation engine running the role
@@ -61,16 +62,19 @@ flowchart TB
 #### Topology Options
 
 **Option A: Simple L2/L3 Testing (2 switches)**
+
 - 1x Spine switch
 - 1x Leaf switch
 - Test: VLANs, LAG, basic L3, OSPF
 
 **Option B: Full EVPN/VXLAN Fabric (4 switches)**
+
 - 2x Spine switches (EVPN Route Reflectors)
 - 2x Leaf switches (VTEP endpoints)
 - Test: Full EVPN/VXLAN, BGP, VSX, redundancy
 
 **Option C: VSX Pair Testing (4 switches)**
+
 - 2x Spine switches (VSX pair)
 - 2x Leaf switches (MCLAG clients)
 - Test: VSX, MCLAG, failover scenarios
@@ -104,6 +108,7 @@ netbox:     192.168.1.10:8000  # Can be on same host
 #### Installation Options
 
 **Option 1: Docker Compose (Recommended for testing)**
+
 ```bash
 # Quick setup using official NetBox Docker
 git clone https://github.com/netbox-community/netbox-docker.git
@@ -112,6 +117,7 @@ docker-compose up -d
 ```
 
 **Option 2: Dedicated VM**
+
 - Ubuntu 22.04 LTS
 - NetBox installed via official documentation
 - Persistent storage for test data
@@ -228,24 +234,28 @@ packages:
 ### Phase 1: Basic Connectivity & VLANs
 
 **Test Case 1.1: Bootstrap**
+
 - Bootstrap fresh switches with management config
 - Enable REST API
 - Verify SSH and HTTPS access
 - Expected: All switches reachable via API
 
 **Test Case 1.2: VLAN Creation**
+
 - Populate NetBox with VLANs 10, 20, 30
 - Run role to create VLANs
 - Verify VLANs exist on switches
 - Expected: All VLANs created with correct names
 
 **Test Case 1.3: VLAN Deletion (Idempotent)**
+
 - Remove VLAN 30 from NetBox
 - Run role in idempotent mode
 - Verify VLAN 30 deleted from switch
 - Expected: VLAN 30 removed, VLAN 10/20 remain
 
 **Test Case 1.4: Orphaned VLAN Cleanup**
+
 - Manually create VLAN 99 on switch (not in NetBox)
 - Run role in idempotent mode
 - Expected: VLAN 99 deleted automatically
@@ -253,24 +263,28 @@ packages:
 ### Phase 2: L2 Interfaces
 
 **Test Case 2.1: Access Ports**
+
 - Configure access ports in NetBox
 - Run role to apply configs
 - Verify access VLAN assignments
 - Expected: Ports have correct VLAN, mode access
 
 **Test Case 2.2: Trunk Ports**
+
 - Configure trunk ports with allowed VLANs
 - Run role to apply configs
 - Verify trunk mode and allowed VLANs
 - Expected: Ports in trunk mode with correct VLANs
 
 **Test Case 2.3: LAG Configuration**
+
 - Configure LAG in NetBox
 - Run role to create LAG
 - Verify LAG members and LACP
 - Expected: LAG active with all members
 
 **Test Case 2.4: MCLAG (VSX)**
+
 - Configure MCLAG between VSX pair
 - Run role to configure MCLAG
 - Verify MCLAG sync and status
@@ -279,29 +293,34 @@ packages:
 ### Phase 3: L3 & Routing
 
 **Test Case 3.1: VRF Creation**
+
 - Configure VRFs in NetBox
 - Run role to create VRFs
 - Verify VRF existence
 - Expected: VRFs created with correct RD
 
 **Test Case 3.2: VLAN Interfaces (SVIs)**
+
 - Configure SVIs in NetBox with IP addressing
 - Run role to create SVIs
 - Verify IPs and VLAN association
 - Expected: SVIs up with correct IPs
 
 **Test Case 3.3: Loopback Interfaces**
+
 - Configure loopback IPs in NetBox
 - Run role to create loopbacks
 - Expected: Loopbacks configured with IPs
 
 **Test Case 3.4: OSPF Configuration**
+
 - Configure OSPF areas and interfaces
 - Run role to configure OSPF
 - Verify OSPF neighbors and routes
 - Expected: OSPF adjacencies up, routes exchanged
 
 **Test Case 3.5: BGP/EVPN Configuration**
+
 - Configure BGP peers and EVPN address family
 - Run role to configure BGP
 - Verify BGP sessions and EVPN routes
@@ -310,24 +329,28 @@ packages:
 ### Phase 4: Overlay & Advanced
 
 **Test Case 4.1: VXLAN Tunnel Creation**
+
 - Configure VXLAN VNIs in NetBox
 - Run role to create VXLAN tunnels
 - Verify VNI-to-VLAN mappings
 - Expected: VXLAN tunnels operational
 
 **Test Case 4.2: EVPN L2 Extension**
+
 - Configure L2 EVPN services
 - Run role to configure EVPN
 - Verify MAC learning across fabric
 - Expected: L2 connectivity across VXLAN
 
 **Test Case 4.3: EVPN L3 (VRF) Services**
+
 - Configure L3 EVPN with VRFs
 - Run role to configure L3 EVPN
 - Verify inter-VRF routing
 - Expected: L3 connectivity with VRF isolation
 
 **Test Case 4.4: VSX Configuration**
+
 - Configure VSX pair parameters
 - Run role to configure VSX
 - Verify VSX sync and ISL
@@ -336,23 +359,27 @@ packages:
 ### Phase 5: Idempotent Operations
 
 **Test Case 5.1: No-Change Run**
+
 - Run role twice with same config
 - Verify no changes on second run
 - Expected: "changed=0" on second run
 
 **Test Case 5.2: Interface Cleanup**
+
 - Remove interface configs from NetBox
 - Run role in idempotent mode
 - Verify configs removed from switch
 - Expected: Interfaces reset to default
 
 **Test Case 5.3: VLAN Cleanup After Interface Changes**
+
 - Remove VLAN from all interfaces
 - Run role in idempotent mode
 - Verify VLAN deleted from switch
 - Expected: VLAN removed after interface cleanup
 
 **Test Case 5.4: VRF Deletion**
+
 - Remove VRF from NetBox
 - Run role in idempotent mode
 - Verify VRF removed (after interfaces removed)
@@ -610,26 +637,31 @@ done
 ## Benefits of This Approach
 
 ### 1. **Realistic Testing**
+
 - Real AOS-CX switches (virtual but authentic)
 - Actual NetBox integration
 - Production-like workflows
 
 ### 2. **Comprehensive Coverage**
+
 - L2, L3, overlay, routing protocols
 - Idempotent operations
 - Error handling and recovery
 
 ### 3. **Repeatable**
+
 - Automated test execution
 - Consistent environment
 - Version-controlled test cases
 
 ### 4. **Documentation**
+
 - Test scenarios = role documentation
 - Example playbooks for users
 - Troubleshooting guides
 
 ### 5. **Continuous Validation**
+
 - Catch regressions early
 - Validate new features
 - Ensure NetBox compatibility
@@ -637,6 +669,7 @@ done
 ## Cost & Resource Requirements
 
 ### Option 1: Single Server (Minimum)
+
 ```yaml
 Hardware:
   CPU: 8+ cores
@@ -652,6 +685,7 @@ Total Cost: ~$0 (using existing hardware)
 ```
 
 ### Option 2: Dedicated Lab (Recommended)
+
 ```yaml
 Hardware:
   CPU: 16+ cores
@@ -664,6 +698,7 @@ Total Cost: ~$1000-2000 one-time (if buying hardware)
 ```
 
 ### Option 3: Cloud-based (Flexible)
+
 ```yaml
 Provider: AWS/Azure/GCP
 Instance: t3.2xlarge or equivalent
@@ -673,24 +708,28 @@ Cost: ~$200-300/month (only when testing)
 ## Timeline
 
 ### Week 1: Infrastructure Setup
+
 - [ ] EVE-NG lab creation
 - [ ] NetBox deployment
 - [ ] Test controller setup
 - [ ] Network connectivity verification
 
 ### Week 2: Basic Tests
+
 - [ ] Bootstrap playbooks
 - [ ] VLAN tests
 - [ ] L2 interface tests
 - [ ] Initial validation scripts
 
 ### Week 3: Advanced Tests
+
 - [ ] L3/VRF tests
 - [ ] Routing protocol tests
 - [ ] EVPN/VXLAN tests (if applicable)
 - [ ] VSX tests (if applicable)
 
 ### Week 4: Automation & Documentation
+
 - [ ] Test automation scripts
 - [ ] CI/CD integration (optional)
 - [ ] Documentation
@@ -703,8 +742,9 @@ Cost: ~$200-300/month (only when testing)
 3. **Priority Testing**: Which features to test first?
 4. **Timeline**: When to start implementation?
 
-Would you like me to:
-1. Create detailed NetBox population scripts?
-2. Generate example test playbooks for specific scenarios?
-3. Create the test validation (pytest) framework?
-4. Design a specific topology based on your use case?
+To do for complete testing:
+
+1. Create detailed NetBox population scripts.
+2. Generate example test playbooks for specific scenarios.
+3. Create the test validation (pytest) framework.
+4. Design a specific topology based on your use case.

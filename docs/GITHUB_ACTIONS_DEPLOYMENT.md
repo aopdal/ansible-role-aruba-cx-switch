@@ -5,6 +5,7 @@ This guide explains how to automatically deploy your MkDocs documentation to you
 ## Overview
 
 The workflow automatically:
+
 - Builds the MkDocs static site
 - Deploys it to your server via rsync over SSH
 - Triggers on pushes to `main` branch when documentation files change
@@ -77,6 +78,7 @@ Add these secrets (**all are required** except DEPLOY_PORT):
 | `DEPLOY_KEY` | Private SSH key | Contents of `~/.ssh/github_deploy_key` | ✅ Yes |
 
 > **⚠️ Important Notes:**
+>
 > - `DEPLOY_PATH` **must not be empty** and should end with a trailing slash `/`
 > - All required secrets must be set before the workflow will run
 > - The workflow will fail with a clear error message if any required secret is missing
@@ -228,13 +230,14 @@ http://docs.example.com
 The workflow runs when:
 
 1. **Push to main branch** with changes to:
-   - `docs/**` (any documentation file)
-   - `README.md`
-   - `CONTRIBUTING.md`
-   - `CHANGELOG.md`
-   - `mkdocs.yml`
-   - `requirements-docs.txt`
-   - `.github/workflows/deploy-docs.yml`
+
+    - `docs/**` (any documentation file)
+    - `README.md`
+    - `CONTRIBUTING.md`
+    - `CHANGELOG.md`
+    - `mkdocs.yml`
+    - `requirements-docs.txt`
+    - `.github/workflows/deploy-docs.yml`
 
 2. **Manual trigger** via GitHub Actions UI
 
@@ -269,8 +272,9 @@ The workflow now includes validation that will fail early with a clear error mes
 **Solutions:**
 
 1. **Check secret location:** Ensure secrets are added as **Repository secrets**, NOT Environment secrets
-   - ✅ Correct: Settings → Secrets and variables → Actions → **Repository secrets** tab
-   - ❌ Wrong: Settings → Secrets and variables → Actions → **Environment secrets** tab
+
+    - ✅ Correct: Settings → Secrets and variables → Actions → **Repository secrets** tab
+    - ❌ Wrong: Settings → Secrets and variables → Actions → **Environment secrets** tab
 
 2. **Verify secrets exist:** Go to Repository secrets and confirm all required secrets are listed
 

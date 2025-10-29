@@ -24,112 +24,116 @@ filter_plugins/
 ## Modules
 
 ### `utils.py` - Helper Functions
+
 Core utilities used across all modules:
 
 - **`_debug(message)`**
-  Print debug messages when `DEBUG_ANSIBLE=true` environment variable is set
+    - Print debug messages when `DEBUG_ANSIBLE=true` environment variable is set
 
 - **`collapse_vlan_list(vlan_list)`**
-  Format VLAN IDs as compact ranges
-  Example: `[10, 11, 12, 20, 21]` → `"10-12,20-21"`
+    - Format VLAN IDs as compact ranges
+    - Example: `[10, 11, 12, 20, 21]` → `"10-12,20-21"`
 
 ### `vlan_filters.py` - VLAN Operations
+
 Complete VLAN lifecycle management (7 filters):
 
 - **`extract_vlan_ids(interfaces)`**
-  Extract all VLAN IDs in use from interfaces
-  Returns: Sorted list of unique VLAN IDs
+    - Extract all VLAN IDs in use from interfaces
+    - Returns: Sorted list of unique VLAN IDs
 
 - **`filter_vlans_in_use(vlans, interfaces)`**
-  Filter VLAN objects to only those actually in use on interfaces
-  Returns: List of VLAN objects
+    - Filter VLAN objects to only those actually in use on interfaces
+    - Returns: List of VLAN objects
 
 - **`extract_evpn_vlans(vlans, interfaces, check_noevpn=True)`**
-  Get VLANs that should be configured for EVPN
-  Checks `vlan_noevpn` custom field and L2VPN termination
-  Returns: List of EVPN-enabled VLAN objects
+    - Get VLANs that should be configured for EVPN
+    - Checks `vlan_noevpn` custom field and L2VPN termination
+    - Returns: List of EVPN-enabled VLAN objects
 
 - **`extract_vxlan_mappings(vlans, interfaces, use_l2vpn_id=True)`**
-  Extract VXLAN VNI to VLAN mappings for VXLAN configuration
-  Returns: List of dicts with `vni` and `vlan` keys
+    - Extract VXLAN VNI to VLAN mappings for VXLAN configuration
+    - Returns: List of dicts with `vni` and `vlan` keys
 
 - **`get_vlans_in_use(interfaces, vlan_interfaces=None)`**
-  Get comprehensive VLAN details with full metadata
-  Returns: Dict with `vlan_ids`, `vlans`, and detailed VLAN info
+    - Get comprehensive VLAN details with full metadata
+    - Returns: Dict with `vlan_ids`, `vlans`, and detailed VLAN info
 
 - **`get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None)`**
-  Determine which VLANs need to be added or removed
-  Compares NetBox with current device state
-  Returns: Dict with `vlans_to_create` and `vlans_to_delete` lists
+    - Determine which VLANs need to be added or removed
+    - Compares NetBox with current device state
+    - Returns: Dict with `vlans_to_create` and `vlans_to_delete` lists
 
 - **`get_vlan_interfaces(interfaces)`**
-  Extract VLAN/SVI interfaces (e.g., vlan100, vlan200)
-  Returns: List of VLAN interface objects
+    - Extract VLAN/SVI interfaces (e.g., vlan100, vlan200)
+    - Returns: List of VLAN interface objects
 
 ### `vrf_filters.py` - VRF Operations
+
 VRF extraction and filtering (4 filters):
 
 - **`extract_interface_vrfs(interfaces)`**
-  Extract unique VRF names from interfaces
-  Returns: Set of VRF names
+    - Extract unique VRF names from interfaces
+    - Returns: Set of VRF names
 
-- **`filter_vrfs_in_use(vrfs, interfaces, tenant=None)`**
-  Filter VRF objects to only those in use on interfaces
-  Excludes built-in VRFs (mgmt, Global)
-  Optional tenant filtering
-  Returns: List of VRF objects
+- **filter_vrfs_in_use(vrfs, interfaces, tenant=None)`**
+    - Filter VRF objects to only those in use on interfaces
+    - Excludes built-in VRFs (mgmt, Global)
+    - Optional tenant filtering
+    - Returns: List of VRF objects
 
 - **`get_vrfs_in_use(interfaces, ip_addresses=None)`**
-  Get comprehensive VRF details with full metadata
-  Excludes built-in/non-configurable VRFs
-  Returns: Dict with `vrf_names` list and `vrfs` dict
+    - Get comprehensive VRF details with full metadata
+    - Excludes built-in/non-configurable VRFs
+    - Returns: Dict with `vrf_names` list and `vrfs` dict
 
 - **`filter_configurable_vrfs(vrfs)`**
-  Remove built-in VRFs that should not be configured
-  Filters out: mgmt, MGMT, Global, global, default, Default
-  Returns: List of configurable VRF objects
+    - Remove built-in VRFs that should not be configured
+    - Filters out: mgmt, MGMT, Global, global, default, Default
+    - Returns: List of configurable VRF objects
 
 ### `interface_filters.py` - Interface Categorization
+
 Interface processing and categorization (3 filters):
 
 - **`categorize_l2_interfaces(interfaces)`**
-  Categorize L2 interfaces by VLAN mode and type
-  Returns dict with 15 categories:
-  - Regular interfaces: `access`, `tagged_with_untagged`, `tagged_no_untagged`, `tagged_all_with_untagged`, `tagged_all_no_untagged`
-  - LAG interfaces: `lag_access`, `lag_tagged_with_untagged`, `lag_tagged_no_untagged`, `lag_tagged_all_with_untagged`, `lag_tagged_all_no_untagged`
-  - MCLAG interfaces: `mclag_access`, `mclag_tagged_with_untagged`, `mclag_tagged_no_untagged`, `mclag_tagged_all_with_untagged`, `mclag_tagged_all_no_untagged`
+    - Categorize L2 interfaces by VLAN mode and type
+    - Returns dict with 15 categories:
+    - Regular interfaces: `access`, `tagged_with_untagged`, `tagged_no_untagged`,   `tagged_all_with_untagged`, `tagged_all_no_untagged`
+    - LAG interfaces: `lag_access`, `lag_tagged_with_untagged`, `lag_tagged_no_untagged`,   `lag_tagged_all_with_untagged`, `lag_tagged_all_no_untagged`
+    - MCLAG interfaces: `mclag_access`, `mclag_tagged_with_untagged`, `mclag_tagged_no_untagged`,   `mclag_tagged_all_with_untagged`, `mclag_tagged_all_no_untagged`
 
 - **`categorize_l3_interfaces(interfaces)`**
-  Categorize L3 interfaces by type and VRF
-  Returns dict with 7 categories:
-  - `physical_default_vrf`: Physical interfaces in default/Global/mgmt VRF
-  - `physical_custom_vrf`: Physical interfaces in custom VRFs
-  - `vlan_default_vrf`: VLAN/SVI interfaces in default VRF
-  - `vlan_custom_vrf`: VLAN/SVI interfaces in custom VRFs
-  - `lag_default_vrf`: LAG interfaces in default VRF
-  - `lag_custom_vrf`: LAG interfaces in custom VRFs
-  - `loopback`: Loopback interfaces
+    - Categorize L3 interfaces by type and VRF
+    - Returns dict with 7 categories:
+    - `physical_default_vrf`: Physical interfaces in default/Global/mgmt VRF
+    - `physical_custom_vrf`: Physical interfaces in custom VRFs
+    - `vlan_default_vrf`: VLAN/SVI interfaces in default VRF
+    - `vlan_custom_vrf`: VLAN/SVI interfaces in custom VRFs
+    - `lag_default_vrf`: LAG interfaces in default VRF
+    - `lag_custom_vrf`: LAG interfaces in custom VRFs
+    - `loopback`: Loopback interfaces
 
 - **`get_interface_ip_addresses(interfaces, ip_addresses)`**
-  Match IP addresses to their interfaces
-  Returns: Dict mapping interface names to IP address objects
+    - Match IP addresses to their interfaces
+    - Returns: Dict mapping interface names to IP address objects
 
 ### `comparison.py` - State Comparison
 NetBox vs device state comparison (3 filters):
 
 - **`compare_interface_vlans(netbox_interface, device_facts_interface)`**
-  Compare VLAN configuration between NetBox and device
-  Returns dict with:
-  - `vlans_to_add`: VLANs to add to interface
-  - `vlans_to_remove`: VLANs to remove from interface
-  - `needs_change`: Boolean if changes needed
-  - `mode_change`: Boolean if VLAN mode needs to change
+    - Compare VLAN configuration between NetBox and device
+    - Returns dict with:
+    - `vlans_to_add`: VLANs to add to interface
+    - `vlans_to_remove`: VLANs to remove from interface
+    - `needs_change`: Boolean if changes needed
+    - `mode_change`: Boolean if VLAN mode needs to change
 
 - **`get_interfaces_needing_changes(interfaces, device_facts)`**
-  Identify interfaces requiring configuration updates
-  Returns dict with:
-  - `cleanup`: Interfaces needing VLAN removal
-  - `configure`: Interfaces needing VLAN additions
+    - Identify interfaces requiring configuration updates
+    - Returns dict with:
+    - `cleanup`: Interfaces needing VLAN removal
+    - `configure`: Interfaces needing VLAN additions
 
 - **`get_interfaces_needing_vlan_cleanup(interfaces, device_facts)`**
   ⚠️ **DEPRECATED** - Use `get_interfaces_needing_changes()` instead
@@ -139,22 +143,22 @@ NetBox vs device state comparison (3 filters):
 OSPF interface selection and validation (4 filters):
 
 - **`select_ospf_interfaces(interfaces)`**
-  Filter interfaces that have OSPF configuration defined
-  Checks `if_ip_ospf_1_area` custom field
-  Returns: List of OSPF-enabled interfaces
+    - Filter interfaces that have OSPF configuration defined
+    - Checks `if_ip_ospf_1_area` custom field
+    - Returns: List of OSPF-enabled interfaces
 
 - **`extract_ospf_areas(interfaces)`**
-  Extract unique OSPF area IDs from interfaces
-  Returns: Sorted list of area IDs
+    - Extract unique OSPF area IDs from interfaces
+    - Returns: Sorted list of area IDs
 
 - **`get_ospf_interfaces_by_area(interfaces, area_id)`**
-  Get all interfaces belonging to a specific OSPF area
-  Returns: List of interfaces in the specified area
+    - Get all interfaces belonging to a specific OSPF area
+    - Returns: List of interfaces in the specified area
 
 - **`validate_ospf_config(device_config, interfaces)`**
-  Validate OSPF configuration consistency
-  Checks router ID and area definitions
-  Returns: Dict with `valid` boolean, `warnings`, and `errors` lists
+    - Validate OSPF configuration consistency
+    - Checks router ID and area definitions
+    - Returns: Dict with `valid` boolean, `warnings`, and `errors` lists
 
 ## Usage in Playbooks
 
@@ -404,12 +408,12 @@ All filters are available through standard Ansible filter syntax:
 ### Adding New Filters
 
 1. **Choose the appropriate module** or create a new one:
-   - VLAN operations → `vlan_filters.py`
-   - VRF operations → `vrf_filters.py`
-   - Interface processing → `interface_filters.py`
-   - State comparison → `comparison.py`
-   - OSPF operations → `ospf_filters.py`
-   - General utilities → `utils.py`
+    - VLAN operations → `vlan_filters.py`
+    - VRF operations → `vrf_filters.py`
+    - Interface processing → `interface_filters.py`
+    - State comparison → `comparison.py`
+    - OSPF operations → `ospf_filters.py`
+    - General utilities → `utils.py`
 
 2. **Write your function** with proper docstring:
    ```python
@@ -482,6 +486,7 @@ ansible-playbook your-playbook.yml
 ```
 
 Debug messages show:
+
 - VLAN IDs extracted from interfaces
 - VRF filtering decisions
 - Interface categorization results
@@ -545,6 +550,7 @@ If you were using an older version with a single `netbox_filters.py` file:
 **Good news**: No changes needed! The refactored version maintains 100% backward compatibility. All existing playbooks will continue to work without modification.
 
 The refactoring:
+
 - ✅ Preserves all filter names and signatures
 - ✅ Maintains identical return values
 - ✅ Keeps the same FilterModule interface
@@ -553,8 +559,8 @@ The refactoring:
 ### Deprecation Notices
 
 - `get_interfaces_needing_vlan_cleanup()` is deprecated
-  - Use `get_interfaces_needing_changes()` instead
-  - Returns both cleanup and configure lists in one call
+    - Use `get_interfaces_needing_changes()` instead
+    - Returns both cleanup and configure lists in one call
 
 ## Contributing
 
@@ -577,8 +583,8 @@ See repository root for license information.
 - **Repository**: https://github.com/aopdal/ansible-role-aruba-cx-switch
 - **Issues**: Use GitHub Issues for bug reports
 - **Documentation**: See `docs/` folder in repository root
-```
 
+```
 ## Development
 
 ### Adding New Filters

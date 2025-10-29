@@ -5,10 +5,12 @@
 ## Problem Evolution
 
 ### Issue 1: `dotall` Parameter Not Supported
+
 **Error:** `regex_findall() got an unexpected keyword argument 'dotall'`
 **Fix:** Changed from `.*?` with `dotall=True` to `[\s\S]*?` pattern
 
 ### Issue 2: Pattern Still Not Matching
+
 **Problem:** Even after fixing `dotall`, the regex returned 0 matches
 **Cause:** Ansible's `regex_findall` doesn't handle `[\s\S]*?` the same way Python does
 
@@ -37,10 +39,10 @@ Mappings: [('10100010', '10'), ('10100020', '20'), ...]
 
 ### Why This Works
 
-✅ **Simple patterns** - Each pattern matches a single line type
-✅ **Reliable** - No need for multiline matching across content
-✅ **Ansible-compatible** - Uses only basic regex features that work in Ansible
-✅ **Predictable** - Relies on the consistent format of `show evpn evi` output
+- ✅ **Simple patterns** - Each pattern matches a single line type
+- ✅ **Reliable** - No need for multiline matching across content
+- ✅ **Ansible-compatible** - Uses only basic regex features that work in Ansible
+- ✅ **Predictable** - Relies on the consistent format of `show evpn evi` output
 
 ## Implementation
 
@@ -143,9 +145,11 @@ L2VNI : 10100020
 ## Pattern Details
 
 ### Pattern 1: L2VNI (VXLAN only)
+
 ```regex
 ^L2VNI\s+:\s+(\d+)
 ```
+
 - `^` - Start of line (multiline mode)
 - `L2VNI` - Literal text
 - `\s+` - One or more whitespace
@@ -157,9 +161,11 @@ L2VNI : 10100020
 **Captures:** `10100010`
 
 ### Pattern 2: VLAN (Both EVPN and VXLAN)
+
 ```regex
 ^\s+VLAN\s+:\s+(\d+)
 ```
+
 - `^` - Start of line (multiline mode)
 - `\s+` - One or more whitespace (indentation)
 - `VLAN` - Literal text
@@ -174,6 +180,7 @@ L2VNI : 10100020
 ## Testing
 
 ### Python Verification
+
 ```python
 import re
 
@@ -193,6 +200,7 @@ print(f"Mappings: {mappings}")  # [('10100010', '10'), ('10100020', '20')]
 ```
 
 ### Expected Ansible Debug Output
+
 ```yaml
 "L2VNI matches: ['10100010', '10100020', '10100030', '10100040', '10100041']"
 "VLAN matches: ['10', '20', '30', '40', '41']"
@@ -233,10 +241,10 @@ print(f"Mappings: {mappings}")  # [('10100010', '10'), ('10100020', '20')]
 
 ## Result
 
-✅ **Idempotent** - Correctly detects existing configurations
-✅ **Reliable** - Simple patterns that work consistently
-✅ **Maintainable** - Easy to understand and debug
-✅ **Tested** - Verified with actual device output
+- ✅ **Idempotent** - Correctly detects existing configurations
+- ✅ **Reliable** - Simple patterns that work consistently
+- ✅ **Maintainable** - Easy to understand and debug
+- ✅ **Tested** - Verified with actual device output
 
 ---
 

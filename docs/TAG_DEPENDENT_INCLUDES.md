@@ -7,6 +7,7 @@ Some configuration tasks should **only run when explicitly requested** via tags,
 ## Use Cases
 
 Tasks that are:
+
 - **High-impact**: Changes that could disrupt service (VSX, BGP, OSPF)
 - **Infrequent**: Initial setup tasks rarely modified (VRFs, loopback)
 - **Risky**: Could cause network connectivity issues (routing, cleanup)
@@ -34,23 +35,29 @@ Tasks that are:
 ### How It Works
 
 1. **Normal run (no tags)**:
+
    ```bash
    ansible-playbook configure_aoscx.yml
    ```
+
    - `ansible_run_tags` = `['all']`
    - VSX tasks **DO run** (because of `'all' in ansible_run_tags`)
 
 2. **Specific tags (without vsx)**:
+
    ```bash
    ansible-playbook configure_aoscx.yml -t vlans
    ```
+
    - `ansible_run_tags` = `['vlans']`
    - VSX tasks **DO NOT run** (tag not in list)
 
 3. **Explicit VSX request**:
+
    ```bash
    ansible-playbook configure_aoscx.yml -t vsx
    ```
+
    - `ansible_run_tags` = `['vsx']`
    - VSX tasks **DO run** (tag explicitly requested)
 
@@ -76,43 +83,54 @@ Tasks that are:
 The following tasks **only run when explicitly requested** via tags:
 
 ### 1. VSX (Virtual Switching Extension)
+
 ```yaml
 when:
   - aoscx_configure_vsx | bool
   - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in ansible_run_tags"
 ```
+
 **Reason**: High-availability configuration that rarely changes and could disrupt service.
 
 ### 2. OSPF (Open Shortest Path First)
+
 ```yaml
 when:
   - aoscx_configure_ospf | bool
   - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
 ```
+
 **Reason**: Routing protocol changes are high-impact and could affect network connectivity.
 
 ### 3. BGP (Border Gateway Protocol)
+
 ```yaml
 when:
   - aoscx_configure_bgp | bool
   - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
 ```
+
 **Reason**: Routing protocol changes are high-impact and could affect network connectivity.
 
 ## Tasks That Are NOT Tag-Dependent
 
 ### Cleanup Tasks
+
 **Decision**: Protected by `aoscx_idempotent_mode` flag instead.
+
 - Cleanup only runs when explicitly enabled via variable
 - Idempotent mode prevents accidental deletions
 
 ### EVPN/VXLAN
+
 **Decision**: Must run as part of VLAN changes.
+
 - Overlay networking needs to be updated when VLANs change
 - Will be run frequently as part of normal operations
 - Not high-risk enough to require explicit tagging
 
 ### Regular Operations (Always Run When Tagged)
+
 - **VLANs**: Common day-to-day changes
 - **Interfaces**: Frequent configuration updates
 - **LAGs**: Regular operational changes
@@ -147,6 +165,7 @@ ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t vlans -
 ## Example Workflow
 
 ### Day-to-Day Operations (Safe - No Routing Changes)
+
 ```bash
 # Add new VLANs - no risk of changing VSX/BGP/OSPF
 ansible-playbook configure_aoscx.yml -t vlans
@@ -159,6 +178,7 @@ ansible-playbook configure_aoscx.yml -t base_config
 ```
 
 ### Intentional High-Impact Changes
+
 ```bash
 # Explicitly configure VSX
 ansible-playbook configure_aoscx.yml -t vsx

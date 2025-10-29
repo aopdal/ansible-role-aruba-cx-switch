@@ -10,6 +10,7 @@ The logic for detecting existing EVPN and VXLAN/VNI configurations was failing b
 ## Root Cause
 
 The commands were returning output that didn't match the regex patterns, causing:
+
 - Existing EVPN VLANs not being detected
 - Existing VXLAN/VNI mappings not being detected
 - Attempted re-configuration of already configured VLANs
@@ -45,11 +46,13 @@ L2VNI : 10100010
 #### EVPN Detection (`configure_evpn.yml`)
 
 **Before:**
+
 ```yaml
 regex_findall('(\\d+)')  # Too generic, matches any number
 ```
 
 **After:**
+
 ```yaml
 regex_findall('VLAN\\s+:\\s+(\\d+)')  # Specific: matches "VLAN : 10"
 ```
@@ -59,19 +62,23 @@ regex_findall('VLAN\\s+:\\s+(\\d+)')  # Specific: matches "VLAN : 10"
 #### VXLAN Detection (`configure_vxlan.yml`)
 
 **Before:**
+
 ```yaml
 regex_findall('vni (\\d+)\\s+vlan (\\d+)')  # Wrong format
 ```
 
 **After (Initial - Had Error):**
+
 ```yaml
 regex_findall('L2VNI\\s+:\\s+(\\d+).*?VLAN\\s+:\\s+(\\d+)', multiline=True, dotall=True)
 ```
 
 **After (Fixed - Final):**
+
 ```yaml
 regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True)
 ```
+
 > **Note:** Ansible's `regex_findall` doesn't support `dotall` parameter. Use `[\\s\\S]` (matches any whitespace or non-whitespace character) instead of `.*?` to match across newlines.
 
 **Result:** Extracts VNI-to-VLAN mappings: `[[10100010, 10], [10100020, 20], ...]`
@@ -79,27 +86,31 @@ regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=Tru
 ## Files Modified
 
 1. `tasks/configure_evpn.yml`
+
    - Changed command to `show evpn evi`
    - Updated regex pattern to `VLAN\\s+:\\s+(\\d+)`
 
 2. `tasks/configure_vxlan.yml`
+
    - Changed command to `show evpn evi`
    - Updated regex pattern to match L2VNI and VLAN in EVI output
 
 3. `docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md`
+
    - Added "Device Command Optimization" section
    - Documented the new command and regex patterns
 
 4. `docs/VLAN_DEVELOPER_GUIDE.md`
+
    - Added testing section for EVPN/VXLAN detection
    - Included Python test examples for regex patterns
 
 ## Benefits
 
-✅ **Accurate Detection**: Correctly identifies existing EVPN and VXLAN configurations
-✅ **Efficiency**: Single command provides both EVPN and VXLAN information
-✅ **Idempotency**: Prevents re-configuration of already configured VLANs
-✅ **Reliability**: Specific regex patterns avoid false matches
+- ✅ **Accurate Detection**: Correctly identifies existing EVPN and VXLAN - configurations
+- ✅ **Efficiency**: Single command provides both EVPN and VXLAN information
+- ✅ **Idempotency**: Prevents re-configuration of already configured VLANs
+- ✅ **Reliability**: Specific regex patterns avoid false matches
 
 ## Testing
 
@@ -153,6 +164,7 @@ print("✅ All regex tests passed")
 ## Verification
 
 ### Before Fix
+
 ```
 TASK [Configure EVPN] *****
 changed: [switch] => (item=VLAN 10)  ← Should be "ok" if already configured
@@ -160,6 +172,7 @@ changed: [switch] => (item=VLAN 20)  ← Should be "ok" if already configured
 ```
 
 ### After Fix
+
 ```
 TASK [Gather current EVPN configuration] *****
 ok: [switch]
@@ -175,6 +188,7 @@ skipping: [switch] => (item=VLAN 20)  ← Correctly skipped (already configured)
 ## Related Issues
 
 This fix ensures the refactored VLAN workflow works correctly by:
+
 - Detecting existing configurations accurately
 - Preventing duplicate configurations
 - Maintaining idempotency

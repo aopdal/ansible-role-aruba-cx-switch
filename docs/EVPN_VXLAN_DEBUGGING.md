@@ -6,6 +6,7 @@
 The EVPN/VXLAN detection logic was showing "VLANs already configured: 0" even when VLANs were configured on the device.
 
 ### Symptoms
+
 ```yaml
 "VLANs already configured with VXLAN: 0 - []"
 "VNIs already configured: 0 - []"
@@ -25,6 +26,7 @@ But the device actually had 5 VLANs configured with VXLAN/EVPN.
 #### 1. Split Parsing into Multiple Steps
 
 **Before (single complex step):**
+
 ```yaml
 existing_vxlan_mappings: >-
   {{
@@ -38,6 +40,7 @@ existing_vxlan_mappings: >-
 ```
 
 **After (multiple explicit steps with error handling):**
+
 ```yaml
 # Step 1: Parse raw strings from device output
 - name: Parse existing VXLAN VNI-to-VLAN mappings from device (as strings)
@@ -69,6 +72,7 @@ existing_vxlan_mappings: >-
 #### 2. Added Debug Output at Each Stage
 
 **Raw device output:**
+
 ```yaml
 - name: Debug - Raw VXLAN output from device
   ansible.builtin.debug:
@@ -81,6 +85,7 @@ existing_vxlan_mappings: >-
 ```
 
 **Regex match results:**
+
 ```yaml
 - name: Debug - Raw regex matches
   ansible.builtin.debug:
@@ -94,6 +99,7 @@ existing_vxlan_mappings: >-
 #### 3. Explicit Error Handling
 
 Added separate tasks for:
+
 - Empty output handling
 - Failed regex matches
 - Integer conversion
@@ -104,6 +110,7 @@ Each step now has explicit `when` conditions and default values.
 ## How to Debug
 
 ### Enable Debug Mode
+
 ```yaml
 # In your playbook or inventory
 aoscx_debug: true
@@ -112,6 +119,7 @@ aoscx_debug: true
 ### What to Look For
 
 1. **Check raw device output** - Is it actually being captured?
+
    ```
    "Output type: list"
    "Output length: 1"
@@ -119,12 +127,14 @@ aoscx_debug: true
    ```
 
 2. **Check regex matches** - Is the pattern matching?
+
    ```
    "Raw mappings: [['10100010', '10'], ['10100020', '20'], ...]"
    "Count: 5"
    ```
 
 3. **Check integer conversion** - Did the conversion work?
+
    ```
    "VLANs already configured with VXLAN: 5 - [10, 20, 30, 40, 41]"
    "VNIs already configured: 5 - [10100010, 10100020, ...]"
@@ -133,6 +143,7 @@ aoscx_debug: true
 ### Testing the Regex Pattern
 
 **Python test:**
+
 ```python
 import re
 
@@ -170,12 +181,14 @@ print(f"As integers: {int_matches}")
 ## Files Modified
 
 1. **tasks/configure_vxlan.yml**
+
    - Split parsing into 3 explicit steps
    - Added raw output debug task
    - Added regex match debug task
    - Added explicit empty list initialization
 
 2. **tasks/configure_evpn.yml**
+
    - Split parsing into 3 explicit steps
    - Added raw output debug task
    - Added regex match debug task
@@ -194,6 +207,7 @@ print(f"As integers: {int_matches}")
 ## Expected Behavior After Fix
 
 ### First Run (VLANs not configured)
+
 ```
 "VLANs already configured with VXLAN: 0 - []"
 "VLANs needing VXLAN config: 5"
@@ -202,19 +216,23 @@ print(f"As integers: {int_matches}")
 **Result:** 5 VLANs configured (changed)
 
 ### Second Run (VLANs already configured)
+
 ```
 "VLANs already configured with VXLAN: 5 - [10, 20, 30, 40, 41]"
 "VLANs needing VXLAN config: 0"
 "VLAN IDs to configure: []"
 ```
+
 **Result:** No changes (ok/skipped)
 
 ### Third Run (Add 1 new VLAN)
+
 ```
 "VLANs already configured with VXLAN: 5 - [10, 20, 30, 40, 41]"
 "VLANs needing VXLAN config: 1"
 "VLAN IDs to configure: [50]"
 ```
+
 **Result:** Only VLAN 50 configured (changed)
 
 ## Related Documentation
@@ -225,6 +243,7 @@ print(f"As integers: {int_matches}")
 - `VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md` - Overall workflow
 
 ## Date
+
 - Issue discovered: October 19, 2025
 - Initial fix: October 19, 2025 (regex pattern)
 - Enhanced fix: October 19, 2025 (added debugging and explicit error handling)

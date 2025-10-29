@@ -43,39 +43,47 @@ All three cleanup tasks now require `aoscx_idempotent_mode: true`:
 ### Benefits
 
 ✅ **Safe Initial Deployment**
+
 - First-time fabric deployment won't trigger cleanup
 - Only creates configurations, never removes
 
 ✅ **Connected Lifecycle**
+
 - Configuration and cleanup work together
 - VLANs, EVPN, and VXLAN all follow same pattern
 
 ✅ **Explicit Control**
+
 - Clear mode selection via single variable
 - Predictable behavior
 
 ✅ **Proper Ordering Enforced**
+
 ```
 EVPN Cleanup → VXLAN Cleanup → VLAN Deletion
 ```
 
 ✅ **Consistent with Role Pattern**
+
 - Matches existing L2 interface cleanup behavior
 - Follows established role conventions
 
 ## Files Modified
 
 ### `tasks/main.yml`
+
 - Added `aoscx_idempotent_mode | bool` to EVPN cleanup when condition
 - Added `aoscx_idempotent_mode | bool` to VXLAN cleanup when condition
 - Updated comments to reflect "only in idempotent mode"
 
 ### `docs/EVPN_VXLAN_CONFIGURATION.md`
+
 - Updated cleanup overview to explain idempotent mode requirement
 - Updated cleanup execution order showing idempotent mode checks
 - Added mode behavior explanation (initial vs ongoing)
 
 ### `docs/EVPN_VXLAN_CLEANUP_SUMMARY.md`
+
 - Updated critical ordering section with idempotent mode explanation
 - Updated main.yml structure showing CRITICAL comments
 - Updated usage section with mode behavior table
@@ -84,6 +92,7 @@ EVPN Cleanup → VXLAN Cleanup → VLAN Deletion
 
 ### `docs/EVPN_VXLAN_MODES.md`
 Complete guide showing:
+
 - Mode comparison (initial deployment vs ongoing management)
 - Behavior details for each mode
 - Configuration and cleanup flows
@@ -143,6 +152,7 @@ flowchart TD
 ```
 
 **Result:**
+
 - ✅ Creates VLANs
 - ✅ Configures EVPN for VLANs in use
 - ✅ Configures VXLAN VNIs and mappings
@@ -170,6 +180,7 @@ flowchart TD
 ```
 
 **Result:**
+
 - ✅ Creates new VLANs
 - ✅ Configures EVPN for VLANs in use
 - ✅ Configures VXLAN VNIs and mappings
@@ -200,6 +211,7 @@ flowchart TD
 ### Check During Playbook Run
 
 Look for these task names:
+
 ```
 TASK [aopdal.aruba_cx_switch : Include EVPN cleanup tasks]
 TASK [aopdal.aruba_cx_switch : Include VXLAN cleanup tasks]
@@ -213,14 +225,17 @@ If `aoscx_idempotent_mode: false`, these tasks will show as "skipped".
 All documentation now reflects the idempotent mode requirement:
 
 1. **EVPN_VXLAN_CONFIGURATION.md**
+
    - Cleanup Process section explains idempotent mode
    - Shows mode behavior in examples
 
 2. **EVPN_VXLAN_CLEANUP_SUMMARY.md**
+
    - Critical ordering includes idempotent mode
    - Usage section shows mode table
 
 3. **EVPN_VXLAN_MODES.md** (NEW)
+
    - Complete guide to both modes
    - Example scenarios
    - Best practices
@@ -268,13 +283,13 @@ ansible-playbook playbook.yml -e "aoscx_idempotent_mode=true"
 
 ## Summary
 
-✅ **EVPN cleanup** requires `aoscx_idempotent_mode: true`
-✅ **VXLAN cleanup** requires `aoscx_idempotent_mode: true`
-✅ **VLAN cleanup** requires `aoscx_idempotent_mode: true`
-✅ **All three connected** via same variable
-✅ **Proper ordering** enforced: EVPN → VXLAN → VLAN
-✅ **Safe initial deployment** with `false` mode
-✅ **Full lifecycle management** with `true` mode
-✅ **Documentation complete** for both modes
+- ✅ **EVPN cleanup** requires `aoscx_idempotent_mode: true`
+- ✅ **VXLAN cleanup** requires `aoscx_idempotent_mode: true`
+- ✅ **VLAN cleanup** requires `aoscx_idempotent_mode: true`
+- ✅ **All three connected** via same variable
+- ✅ **Proper ordering** enforced: EVPN → VXLAN → VLAN
+- ✅ **Safe initial deployment** with `false` mode
+- ✅ **Full lifecycle management** with `true` mode
+- ✅ **Documentation complete** for both modes
 
 The EVPN/VXLAN configuration and cleanup implementation is now complete and properly connected to the role's idempotent mode!

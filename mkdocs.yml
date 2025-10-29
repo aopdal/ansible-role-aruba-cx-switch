@@ -68,10 +68,6 @@ plugins:
 
 nav:
   - Home: index.md
-  - Getting Started:
-      - Quick Start: QUICKSTART.md
-      - Requirements: REQUIREMENTS.md
-      - Development: DEVELOPMENT.md
   - Architecture:
       - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
       - Visual Reference: AUTOMATION_ECOSYSTEM_DIAGRAMS.md
@@ -108,12 +104,16 @@ nav:
           - Summary: BGP_HYBRID_SUMMARY.md
           - BGP Configuration: BGP_CONFIGURATION.md
           - EVPN Fabric Example: BGP_EVPN_FABRIC_EXAMPLE.md
-  - Testing & Development:
+  - Development:
+      - Quick Start: QUICKSTART.md
+      - Requirements: REQUIREMENTS.md
+      - Development: DEVELOPMENT.md
+      - Contributing: CONTRIBUTING.md
+  - Testing:
       - Testing Guide: TESTING.md
       - Quick Start: TESTING_QUICK_START.md
       - Environment: TESTING_ENVIRONMENT.md
       - .ansible/ Directory: ANSIBLE_CACHE_DIRECTORY.md
-      - Contributing: CONTRIBUTING.md
   - Reference:
       - Quick Reference: QUICK_REFERENCE.md
       - Release Process:
@@ -124,6 +124,8 @@ nav:
           - Changelog: CHANGELOG.md
       - Documentation Site: DOCUMENTATION_SITE.md  # How to use MkDocs
       - Documentation Sync: DOCS_SYNC_WORKFLOW.md  # How README.md syncs to docs/
+      - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md
+      - Github pages disabled: GITHUB_PAGES_DISABLED.md
       - Workspace Setup: WORKSPACE.md
       - DevContainer Setup: DEVCONTAINER_SETUP.md
       - DevContainer Mounts: DEVCONTAINER_MOUNTS.md

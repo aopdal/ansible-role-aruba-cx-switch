@@ -167,6 +167,7 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
 ### Example 1: Simple EVPN Spine-Leaf
 
 **Spine 1 (10.255.255.1):**
+
 - Custom Field: `device_bgp` = `True`
 - Custom Field: `device_bgp_routerid` = `10.255.255.1`
 - Config Context:
@@ -185,6 +186,7 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
 ```
 
 **Leaf 1 (10.255.255.11):**
+
 - Custom Field: `device_bgp` = `True`
 - Custom Field: `device_bgp_routerid` = `10.255.255.11`
 - Config Context:
@@ -274,12 +276,14 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
 ## Field Descriptions
 
 ### config_context.bgp_as
+
 - **Type**: Integer
 - **Required**: Yes
 - **Description**: BGP Autonomous System number
 - **Example**: `65000`
 
 ### config_context.bgp_peers
+
 - **Type**: List of objects
 - **Required**: Yes (for EVPN)
 - **Description**: BGP neighbors for EVPN address family
@@ -289,12 +293,14 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
   - `update_source` (optional): Update source interface (defaults to "loopback 0")
 
 ### config_context.bgp_ipv4_peers
+
 - **Type**: List of objects
 - **Required**: No
 - **Description**: BGP neighbors for IPv4 unicast address family (underlay or external)
 - **Fields**: Same as bgp_peers
 
 ### config_context.bgp_vrfs
+
 - **Type**: List of objects
 - **Required**: No
 - **Description**: VRF instances for multi-tenancy
@@ -303,6 +309,7 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
   - `rd` (required): Route Distinguisher in format `IP:ID` or `ASN:ID`
 
 ### config_context.bgp_rr_clients
+
 - **Type**: List of objects
 - **Required**: No (only for route reflectors)
 - **Description**: Neighbors to be configured as route reflector clients
@@ -310,6 +317,7 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
   - `peer` (required): Neighbor IP address
 
 ### config_context.bgp_additional_config
+
 - **Type**: List of strings
 - **Required**: No
 - **Description**: Additional BGP configuration commands
@@ -355,6 +363,7 @@ flowchart TB
 ```
 
 ### BGP Configuration Roles:
+
 - **Spine**: Route reflectors for EVPN control plane
 - **Leaf**: VTEP endpoints, VRF for tenants
 - **All**: iBGP peering using loopback addresses
@@ -450,6 +459,7 @@ Device → Custom Fields → device_bgp_routerid = "10.255.255.11"
 ### EVPN Neighbors Not Establishing
 
 **Check**:
+
 1. Loopback 0 configured and reachable
 2. Underlay routing (OSPF) working
 3. BGP peer addresses correct in config_context
@@ -458,6 +468,7 @@ Device → Custom Fields → device_bgp_routerid = "10.255.255.11"
 ### VRF Configuration Failed
 
 **Check**:
+
 1. VRF exists (configure_vrfs.yml runs before BGP)
 2. Route distinguisher format correct: `IP:ID` or `ASN:ID`
 3. VRF name matches exactly

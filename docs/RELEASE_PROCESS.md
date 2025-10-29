@@ -7,7 +7,7 @@ Comprehensive guide to the automated release process for the Aruba CX Switch Ans
 The release process is fully automated using GitHub Actions. When code is merged to the `main` branch, an automated workflow:
 
 1. Determines the next version number
-2. Updates `galaxy.yml` and `CHANGELOG.md`
+2. Updates `VERSION` and `CHANGELOG.md`
 3. Creates a Git tag
 4. Creates a GitHub Release with release notes
 5. (Future) Publishes to Ansible Galaxy
@@ -180,7 +180,7 @@ on:
 
 1. **Checkout Code** - Fetches full git history
 2. **Determine Version** - Auto-increments patch version
-3. **Update galaxy.yml** - Sets new version
+3. **Update VERSION** - Sets new version
 4. **Update CHANGELOG.md** - Moves `[Unreleased]` to versioned section
 5. **Commit Changes** - Commits version files
 6. **Create Tag** - Tags commit with `v{version}`

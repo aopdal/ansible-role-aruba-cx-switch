@@ -13,33 +13,39 @@ A comprehensive BGP configuration task for EVPN/VXLAN fabrics based on your prod
 ## Key Features
 
 ### 1. BGP Router Process
+
 - Configures BGP AS number
 - Sets BGP Router ID
 - Basic BGP process initialization
 
 ### 2. EVPN Neighbors (Overlay)
+
 - L2VPN EVPN address family
 - Extended community support
 - Loopback-based peering
 - Update source configuration
 
 ### 3. IPv4 Unicast Neighbors (Optional)
+
 - Underlay routing
 - External connectivity
 - Border leaf support
 
 ### 4. VRF Support
+
 - Multi-tenant configuration
 - Route Distinguisher (RD) assignment
 - IPv4/IPv6 address families
 - Redistribute connected routes
 
 ### 5. Route Reflector
+
 - Configure RR clients
 - Spine as RR pattern
 - Reduces BGP mesh complexity
 
 ### 6. Additional Settings
+
 - Custom BGP configuration
 - Maximum paths
 - BGP timers
@@ -119,6 +125,7 @@ Config: bgp_vrfs for tenants
 ## Configuration Workflow
 
 ### Prerequisites (Must run first)
+
 1. **Loopback interfaces** - VTEP source, BGP peering
 2. **Underlay routing (OSPF)** - Reachability between loopbacks
 3. **VRFs** - Must exist before BGP VRF configuration
@@ -138,6 +145,7 @@ show bgp vrf all
 ## Differences from Your Original
 
 ### Enhancements
+
 1. **Structured task organization** - Clear task separation
 2. **Debug output** - Optional debug mode
 3. **Default values** - Safe defaults with `| default()`
@@ -148,6 +156,7 @@ show bgp vrf all
 8. **Additional config** - Flexible custom settings
 
 ### Preserved from Original
+
 1. **Network CLI connection** - Uses `vars: ansible_connection: network_cli`
 2. **EVPN address family** - l2vpn evpn configuration
 3. **Extended community** - send-community extended
@@ -155,22 +164,26 @@ show bgp vrf all
 5. **Loop structure** - Configures multiple neighbors
 
 ### Removed/Commented
+
 - VRF RD configuration from API call (now from config_context)
 
 ## Example Configurations
 
 ### Simple Spine-Leaf
 **Spine:**
+
 - 4 EVPN neighbors (leafs)
 - Route reflector for all leafs
 - Maximum paths for load balancing
 
 **Leaf:**
+
 - 2 EVPN neighbors (spines)
 - 2 VRFs (tenants)
 - Connected route redistribution
 
 ### Border Leaf
+
 - 2 EVPN neighbors (spines) - overlay
 - 1 IPv4 neighbor (external router) - underlay
 - Internet VRF

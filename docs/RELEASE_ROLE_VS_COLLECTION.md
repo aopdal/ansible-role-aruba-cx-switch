@@ -47,6 +47,7 @@ galaxy_info:
 **Purpose**: Package multiple plugins, modules, roles together
 
 **Structure**:
+
 ```
 namespace/
   collection_name/
@@ -67,6 +68,7 @@ namespace/
 **Purpose**: Reusable task automation for specific purpose
 
 **Structure**:
+
 ```
 ansible-role-name/
   meta/main.yml            ← Galaxy metadata here
@@ -95,6 +97,7 @@ ansible-role-name/
 **Location**: `/VERSION`
 
 **Format**: Plain text, single line
+
 ```
 0.1.0
 ```
@@ -108,6 +111,7 @@ ansible-role-name/
 **Location**: `/meta/main.yml`
 
 **Content**:
+
 ```yaml
 galaxy_info:
   role_name: aruba_cx_switch
@@ -133,6 +137,7 @@ galaxy_info:
 **File**: `.github/workflows/release.yml`
 
 **Changes**:
+
 - ✅ Reads from `VERSION` file (not `galaxy.yml`)
 - ✅ Updates `VERSION` file (not `galaxy.yml`)
 - ✅ Creates Git tags and GitHub releases
@@ -239,6 +244,7 @@ ansible-galaxy role install aopdal.aruba_cx_switch
 **Install**: `ansible-galaxy role install aopdal.aruba_cx_switch`
 
 **Requirements.yml**:
+
 ```yaml
 roles:
   - name: aopdal.aruba_cx_switch
@@ -256,6 +262,7 @@ The `.ansible/` directory is created by:
 3. **Development** - Normal Ansible behavior
 
 **Structure**:
+
 ```
 .ansible/
 ├── collections/

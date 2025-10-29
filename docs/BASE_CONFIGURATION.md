@@ -72,6 +72,7 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 ## Features
 
 ### Banner Configuration (`tasks/configure_banner.yml`)
+
 - **Login Banner**: Sets MOTD displayed at login
 - **Exec Banner**: Optional post-login banner
 - **Template Support**: Supports Ansible variables in banner text (e.g., `{{ inventory_hostname }}`)
@@ -79,11 +80,13 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 - **Conditional**: Only runs if `config_context.motd` is defined and non-empty
 
 ### Timezone Configuration (`tasks/configure_timezone.yml`)
+
 - **Simple Setup**: Sets timezone using `clock timezone` command
 - **Validation**: Only runs if timezone is defined and non-empty
 - **Standard Format**: Supports standard timezone strings (e.g., "europe/oslo")
 
 ### NTP Configuration (`tasks/configure_ntp.yml`)
+
 - **Multiple Servers**: Supports multiple NTP servers
 - **Preferred Server**: Supports marking servers as preferred with `iburst prefer`
 - **Regular Servers**: Non-preferred servers use `iburst` only

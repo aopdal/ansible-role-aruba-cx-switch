@@ -11,10 +11,12 @@ make docs-sync
 ```
 
 **What happens:**
+
 1. Copies `README.md` → `docs/index.md`
 2. Fixes links automatically:
-   - Removes `docs/` prefix: `docs/FILE.md` → `FILE.md`
-   - Adds `../` to root paths: `tests/` → `../tests/`
+
+    - Removes `docs/` prefix: `docs/FILE.md` → `FILE.md`
+    - Adds `../` to root paths: `tests/` → `../tests/`
 
 ## ⚠️ Important: Edit README.md First!
 
@@ -56,6 +58,7 @@ The `docs/` prefix is automatically removed because `index.md` is already inside
 ## When to Run docs-sync
 
 Run `make docs-sync` whenever you:
+
 - ✅ Update `README.md` with new documentation links
 - ✅ Change documentation structure in `README.md`
 - ✅ Add new features to the role description
@@ -83,18 +86,21 @@ make docs-build
 ## What's Safe to Edit Directly
 
 ### Edit `README.md` only:
+
 - ✅ Documentation links
 - ✅ Feature descriptions
 - ✅ Getting started instructions
 - ✅ Badges and metadata
 
 ### Edit other docs directly:
+
 - ✅ `docs/README.md` - Documentation index
 - ✅ `docs/VLAN_*.md` - VLAN guides
 - ✅ `docs/BGP_*.md` - BGP guides
 - ✅ Any other `docs/*.md` files (except `docs/index.md`)
 
 ### NEVER edit directly:
+
 - ❌ `docs/index.md` - Always synced from `README.md`
 
 ## VLAN Documentation Example
@@ -134,6 +140,7 @@ docs-sync: ## Sync README.md to docs/index.md
 ```
 
 **sed commands:**
+
 - `s|(docs/|(|g` - Remove `docs/` prefix from links
 - `s|(tests/|(../tests/|g` - Add `../` to root directory links
 - Similar for `defaults/` and `testing-scripts/`
@@ -158,6 +165,7 @@ docs-sync: ## Sync README.md to docs/index.md
 **Cause:** Edited `docs/index.md` directly, then ran `make docs-sync`
 
 **Solution:**
+
 1. Find your changes in git history: `git log -p docs/index.md`
 2. Apply them to `README.md` instead
 3. Run `make docs-sync` again
@@ -167,6 +175,7 @@ docs-sync: ## Sync README.md to docs/index.md
 **Cause:** `docs/index.md` should be identical to `README.md` (with link fixes)
 
 **Solution:**
+
 - Keep custom content in separate files (e.g., `docs/README.md`)
 - `docs/index.md` is only for the role's main README
 
@@ -180,6 +189,7 @@ docs-sync: ## Sync README.md to docs/index.md
    ```
 
 2. **Document in the right place:**
+
    - Role overview → `README.md` (syncs to `docs/index.md`)
    - Documentation index → `docs/README.md`
    - Feature guides → `docs/FEATURE_*.md`

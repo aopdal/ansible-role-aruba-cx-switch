@@ -29,50 +29,50 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 ## 🔌 Filter Plugins (Essential Reading)
 
 - **[FILTER_PLUGINS.md](FILTER_PLUGINS.md)** - Complete filter plugin reference
-  - **22 custom filters** for NetBox data transformation
-  - Detailed documentation for VLAN, VRF, interface, OSPF operations
-  - Real-world usage examples and complete workflows
-  - Development guide and architecture
-  - **Critical for understanding how the role processes NetBox data**
+    - **22 custom filters** for NetBox data transformation
+    - Detailed documentation for VLAN, VRF, interface, OSPF operations
+    - Real-world usage examples and complete workflows
+    - Development guide and architecture
+    - **Critical for understanding how the role processes NetBox data**
 
 ## Configuration Guides
 
 ### Base System Configuration
 - **[BASE_CONFIGURATION.md](BASE_CONFIGURATION.md)** - Base system settings
-  - Banner, timezone, NTP, and DNS configuration
-  - Configuration flags and NetBox variables
-  - Task execution order
+    - Banner, timezone, NTP, and DNS configuration
+    - Configuration flags and NetBox variables
+    - Task execution order
 
 - **[DNS_CONFIGURATION.md](DNS_CONFIGURATION.md)** - DNS configuration examples
-  - Complete config_context examples
-  - Domain name, nameservers, and host mappings
-  - Management vs. non-management VRF setup
+    - Complete config_context examples
+    - Domain name, nameservers, and host mappings
+    - Management vs. non-management VRF setup
 
 ### VLAN Management
 
 - **[VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN change workflow
-  - Single source of truth for VLAN analysis
-  - Configuration and cleanup phases
-  - Integration with EVPN/VXLAN
-  - Benefits and safety features
+    - Single source of truth for VLAN analysis
+    - Configuration and cleanup phases
+    - Integration with EVPN/VXLAN
+    - Benefits and safety features
 
 - **[VLAN_WORKFLOW_DIAGRAMS.md](VLAN_WORKFLOW_DIAGRAMS.md)** - Visual workflow diagrams
-  - Mermaid diagrams for configuration and cleanup phases
-  - Fact dependencies visualization
-  - Timeline comparison (before/after refactoring)
+    - Mermaid diagrams for configuration and cleanup phases
+    - Fact dependencies visualization
+    - Timeline comparison (before/after refactoring)
 
 - **[VLAN_DEVELOPER_GUIDE.md](VLAN_DEVELOPER_GUIDE.md)** - Developer quick reference
-  - Adding new VLAN-related tasks
-  - Common patterns and best practices
-  - Available facts and debugging
+    - Adding new VLAN-related tasks
+    - Common patterns and best practices
+    - Available facts and debugging
 
 ### Routing Protocols
 
 - **[BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)** - BGP/EVPN configuration guide
-  - Complete EVPN/VXLAN fabric setup
-  - Route reflector configuration
-  - IPv4 unicast and EVPN address families
-  - VRF route distinguishers
+    - Complete EVPN/VXLAN fabric setup
+    - Route reflector configuration
+    - IPv4 unicast and EVPN address families
+    - VRF route distinguishers
 
 - **[BGP_SUMMARY.md](BGP_SUMMARY.md)** - BGP configuration summary
 - **[BGP_MIGRATION_GUIDE.md](BGP_MIGRATION_GUIDE.md)** - Migration from config_context to NetBox BGP plugin
@@ -80,16 +80,16 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 - **[BGP_HYBRID_CONFIGURATION.md](BGP_HYBRID_CONFIGURATION.md)** - Hybrid config_context + plugin approach
 - **[BGP_HYBRID_SUMMARY.md](BGP_HYBRID_SUMMARY.md)** - Hybrid approach summary
 - **[NETBOX_BGP_PLUGIN.md](NETBOX_BGP_PLUGIN.md)** - NetBox BGP plugin integration guide
-  - Plugin installation and setup
-  - Data models and API usage
-  - Advantages over config_context
+    - Plugin installation and setup
+    - Data models and API usage
+    - Advantages over config_context
 
 ### Tag-Dependent Configuration
 
 - **[TAG_DEPENDENT_SUMMARY.md](TAG_DEPENDENT_SUMMARY.md)** - Tag-dependent task overview
-  - BGP, OSPF, and VSX now require explicit tags
-  - Behavior matrix for different tag combinations
-  - Safety improvements for daily operations
+    - BGP, OSPF, and VSX now require explicit tags
+    - Behavior matrix for different tag combinations
+    - Safety improvements for daily operations
 
 - **[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md)** - Technical implementation details
 - **[TAG_DEPENDENT_TESTING.md](TAG_DEPENDENT_TESTING.md)** - Testing tag-dependent tasks
@@ -98,22 +98,22 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 ## Development
 
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Complete development guide
-  - Dev container setup
-  - Local development setup
-  - Coding standards and pre-commit hooks
-  - Testing procedures
-  - Contribution workflow
+    - Dev container setup
+    - Local development setup
+    - Coding standards and pre-commit hooks
+    - Testing procedures
+    - Contribution workflow
 
 - **[DEVCONTAINER_SETUP.md](DEVCONTAINER_SETUP.md)** - Detailed dev container configuration
 - **[DEVCONTAINER_MOUNTS.md](DEVCONTAINER_MOUNTS.md)** - Mounting additional folders in devcontainer
-  - Access test environments and other projects
-  - Mount syntax and examples
-  - Multi-folder workspace setup
+    - Access test environments and other projects
+    - Mount syntax and examples
+    - Multi-folder workspace setup
 
 - **[WORKSPACE.md](WORKSPACE.md)** - Multi-folder workspace guide
-  - Using `ansible-workspace.code-workspace`
-  - Working with multiple projects simultaneously
-  - Customization and folder management
+    - Using `ansible-workspace.code-workspace`
+    - Working with multiple projects simultaneously
+    - Customization and folder management
 
 - **[SETUP_COMPLETE.md](SETUP_COMPLETE.md)** - Dev environment setup verification
 
@@ -121,63 +121,63 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 - **[TESTING.md](TESTING.md)** - General testing documentation
 - **[TESTING_ENVIRONMENT.md](TESTING_ENVIRONMENT.md)** - Comprehensive integration testing guide
-  - Complete architecture and topology options
-  - NetBox, EVE-NG, and test controller setup
-  - 20+ test scenarios
-  - Implementation timeline and resource requirements
+    - Complete architecture and topology options
+    - NetBox, EVE-NG, and test controller setup
+    - 20+ test scenarios
+    - Implementation timeline and resource requirements
 
 - **[TESTING_QUICK_START.md](TESTING_QUICK_START.md)** - 30-minute quick start for testing
-  - Condensed setup instructions
-  - First test walkthrough
-  - Troubleshooting guide
+    - Condensed setup instructions
+    - First test walkthrough
+    - Troubleshooting guide
 
 - **[TESTING_PROPOSAL.md](TESTING_PROPOSAL.md)** - Testing environment proposal
-  - Executive summary
-  - Cost analysis and ROI
-  - Decision-making guide
+    - Executive summary
+    - Cost analysis and ROI
+    - Decision-making guide
 
 ## Internal Documentation
 
 ### VLAN Refactoring (October 2025)
 
 - **[REFACTOR_SUMMARY.md](REFACTOR_SUMMARY.md)** - VLAN change identification refactoring
-  - Executive summary of VLAN workflow changes
-  - Before/after comparison
-  - Testing checklist
+    - Executive summary of VLAN workflow changes
+    - Before/after comparison
+    - Testing checklist
 
 - **[COMPLETE_SUMMARY.md](COMPLETE_SUMMARY.md)** - Complete refactoring overview
-  - All changes made (code + docs)
-  - Documentation statistics
-  - File locations and structure
-  - Learning path and key concepts
+    - All changes made (code + docs)
+    - Documentation statistics
+    - File locations and structure
+    - Learning path and key concepts
 
 - **[DOCUMENTATION_INTEGRATION.md](DOCUMENTATION_INTEGRATION.md)** - Documentation integration details
-  - How new docs were integrated into MkDocs
-  - Navigation structure
-  - Build verification
+    - How new docs were integrated into MkDocs
+    - Navigation structure
+    - Build verification
 
 - **[VERIFICATION_CHECKLIST.md](VERIFICATION_CHECKLIST.md)** - Final verification checklist
-  - All changes verified
-  - Testing checklist
-  - Commit readiness
+    - All changes verified
+    - Testing checklist
+    - Commit readiness
 
 - **[DOCS_SYNC_WORKFLOW.md](DOCS_SYNC_WORKFLOW.md)** - Documentation sync workflow
-  - How make docs-sync works
-  - When to use it
-  - Best practices
+    - How make docs-sync works
+    - When to use it
+    - Best practices
 
 - **[EVPN_VXLAN_DETECTION_FIX.md](EVPN_VXLAN_DETECTION_FIX.md)** - EVPN/VXLAN detection fix
-  - Issue with command and regex patterns
-  - Solution using `show evpn evi`
-  - Updated regex patterns for accurate detection
-  - Testing and verification
+    - Issue with command and regex patterns
+    - Solution using `show evpn evi`
+    - Updated regex patterns for accurate detection
+    - Testing and verification
 
 ### Historical Refactoring
 
 - **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - History of code refactoring and improvements
-  - Filter plugin reorganization
-  - Task splitting and optimization
-  - Architecture improvements
+    - Filter plugin reorganization
+    - Task splitting and optimization
+    - Architecture improvements
 
 ## Root Documentation
 
@@ -191,20 +191,23 @@ The following files are in the repository root for standard compliance:
 
 ### Testing Scripts
 - **[../testing-scripts/](../testing-scripts/)** - Helper scripts for testing environment
-  - `populate_netbox.py` - Populate NetBox with test data
-  - `validate_deployment.py` - Validate switch configurations
-  - `README.md` - Script usage documentation
+    - `populate_netbox.py` - Populate NetBox with test data
+    - `validate_deployment.py` - Validate switch configurations
+    - `README.md` - Script usage documentation
 
 ## Document Categories
 
 ### 📚 Quick Reference (2 docs)
+
 - QUICKSTART.md
 - QUICK_REFERENCE.md
 
 ### 🔌 Filter Plugins (1 doc)
+
 - FILTER_PLUGINS.md - **Essential for understanding data transformation**
 
 ### ⚙️ Configuration Guides (17 docs)
+
 - BASE_CONFIGURATION.md
 - DNS_CONFIGURATION.md
 - VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
@@ -224,6 +227,7 @@ The following files are in the repository root for standard compliance:
 - TAG_INHERITANCE_FIX.md
 
 ### 🔧 Development (5 docs)
+
 - DEVELOPMENT.md
 - DEVCONTAINER_SETUP.md
 - DEVCONTAINER_MOUNTS.md
@@ -231,12 +235,14 @@ The following files are in the repository root for standard compliance:
 - SETUP_COMPLETE.md
 
 ### 🧪 Testing (4 docs)
+
 - TESTING.md
 - TESTING_ENVIRONMENT.md
 - TESTING_QUICK_START.md
 - TESTING_PROPOSAL.md
 
 ### 📋 Internal (12 docs)
+
 - REFACTORING_SUMMARY.md (historical)
 - REFACTOR_SUMMARY.md (VLAN refactoring)
 - COMPLETE_SUMMARY.md

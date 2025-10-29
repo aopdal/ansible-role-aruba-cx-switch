@@ -20,11 +20,13 @@ README.md (copied to) → docs/index.md
 ### 2. mkdocs.yml Updates
 
 **Added docs_dir setting:**
+
 ```yaml
 docs_dir: docs
 ```
 
 **Updated navigation paths:**
+
 ```yaml
 nav:
   - Home: index.md              # Was: README.md
@@ -38,12 +40,14 @@ nav:
 ### 3. Makefile Updates
 
 **Added docs-sync target:**
+
 ```makefile
 docs-sync: ## Sync README.md to docs/index.md
 	@cp README.md docs/index.md
 ```
 
 **Updated .PHONY:**
+
 ```makefile
 .PHONY: ... docs-sync
 ```
@@ -51,14 +55,17 @@ docs-sync: ## Sync README.md to docs/index.md
 ### 4. Documentation Created
 
 **docs/index.md**
+
 - Copy of README.md for MkDocs home page
 
 **docs/README_SYNC.md**
+
 - Explains why two files exist (README.md and index.md)
 - Instructions for keeping them in sync
 - Automation options
 
 **docs/DOCUMENTATION_STRUCTURE.md**
+
 - Complete guide to documentation organization
 - Best practices
 - Migration notes
@@ -95,6 +102,7 @@ ansible-role-aruba-cx-switch/
 ### ✅ Clean Repository Root
 
 Only essential files at root:
+
 - README.md (for GitHub/Galaxy)
 - mkdocs.yml
 - Makefile
@@ -205,23 +213,27 @@ make docs-serve
 ## Next Steps
 
 1. **Test the documentation:**
+
    ```bash
    pip install -r requirements-docs.txt
    make docs-serve
    ```
 
 2. **Commit the changes:**
+
    ```bash
    git add docs/ mkdocs.yml Makefile
    git commit -m "Reorganize docs: move all to docs/ folder per MkDocs convention"
    ```
 
 3. **Remember to sync README:**
+
    - When updating README.md
    - Run `make docs-sync`
    - Commit both files
 
 4. **Optional: Add pre-commit hook**
+
    - See `docs/README_SYNC.md` for automation
    - Auto-sync README.md to docs/index.md
 

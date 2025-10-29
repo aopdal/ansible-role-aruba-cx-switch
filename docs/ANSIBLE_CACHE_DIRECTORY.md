@@ -11,14 +11,17 @@ The `.ansible/` directory is a **cache directory** created by various Ansible to
 The `.ansible/` directory is automatically created by:
 
 1. **ansible-lint** (via pre-commit hooks)
+
    - Caches module information for faster linting
    - Creates `.ansible/modules/`
 
 2. **ansible-galaxy**
+
    - Caches installed collections
    - Creates `.ansible/collections/`
 
 3. **Ansible playbook runs**
+
    - Caches roles during execution
    - Creates `.ansible/roles/`
 
@@ -198,17 +201,20 @@ All are already in `.gitignore`.
 **Answer**: **Yes!** This is completely normal and expected behavior.
 
 **What it is**:
+
 - Cache directory for Ansible tools
 - Created by ansible-lint, ansible-galaxy, etc.
 - Contains temporary/cached data
 
 **What to do**:
+
 - ✅ Nothing! It's already in `.gitignore`
 - ✅ Safe to delete anytime (will be recreated)
 - ❌ Don't commit it to git
 - ❌ Don't worry about it
 
 **When you see it**:
+
 - After running `git commit` (pre-commit hooks)
 - After running `ansible-lint`
 - After running `ansible-galaxy install`

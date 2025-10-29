@@ -40,18 +40,21 @@ aoscx_ztp_admin_password: "{{ vault_ztp_password }}"  # Use Ansible Vault
 The ZTP template requires management interfaces to be configured in NetBox:
 
 1. **Management Interface**: Create interface with name containing "mgmt"
+
    ```
    Name: mgmt
    Type: 1000BASE-T (1GE)
    ```
 
 2. **IP Address**: Assign IP to management interface
+
    ```
    Address: 192.168.1.100/24
    Interface: mgmt
    ```
 
 3. **Config Context**: Add management settings
+
    ```json
    {
      "mgmt_defaultgateway": "192.168.1.1",
@@ -158,11 +161,13 @@ The template uses these variables from NetBox integration:
 ## File Output
 
 Generated files are saved as:
+
 ```
 <output_directory>/<inventory_hostname>_ztp_base.cfg
 ```
 
 Example:
+
 ```
 ./ztp_configs/sw01-lab_ztp_base.cfg
 ./ztp_configs/sw02-prod_ztp_base.cfg
@@ -262,6 +267,7 @@ if __name__ == "__main__":
 **Error**: "No management interfaces found"
 
 **Solution**: Ensure NetBox has:
+
 1. Interface with name containing "mgmt"
 2. IP address assigned to the interface
 3. Device properly configured in NetBox
@@ -271,6 +277,7 @@ if __name__ == "__main__":
 **Error**: Missing gateway or DNS configuration
 
 **Solution**: Add config context to device or device type:
+
 ```json
 {
   "mgmt_defaultgateway": "192.168.1.1",
@@ -283,6 +290,7 @@ if __name__ == "__main__":
 **Error**: `mgmt_interfaces` variable not defined
 
 **Solution**: Ensure fact gathering is enabled:
+
 ```yaml
 aoscx_gather_facts: true
 ```
@@ -292,6 +300,7 @@ aoscx_gather_facts: true
 **Issue**: Config file not created
 
 **Check**:
+
 1. `aoscx_generate_ztp_config: true` is set
 2. Output directory exists and is writable
 3. Task runs with proper tags: `--tags ztp`
@@ -299,6 +308,7 @@ aoscx_gather_facts: true
 ## Best Practices
 
 ### 1. Use Version Control
+
 Store generated ZTP configurations in version control:
 
 ```bash
@@ -307,6 +317,7 @@ git commit -m "Update ZTP configurations for new switches"
 ```
 
 ### 2. Validate Configurations
+
 Test generated configs before deployment:
 
 ```bash
@@ -328,6 +339,7 @@ Integrate with ZTP server deployment:
 ```
 
 ### 4. Monitor ZTP Process
+
 Log ZTP deployments for troubleshooting:
 
 ```yaml

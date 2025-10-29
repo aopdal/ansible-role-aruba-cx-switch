@@ -54,6 +54,7 @@ ls -la
 ```
 
 **Parameters:**
+
 - `source`: Path on your host machine
   - Use `${localEnv:HOME}` for home directory
   - Use `${localWorkspaceFolder}` for current workspace
@@ -147,6 +148,7 @@ EXPLORER
 ### Step 3: Customize Folder Names
 
 Edit `ansible-workspace.code-workspace` to:
+
 - Change folder display names (the `name` field)
 - Add emojis for visual distinction
 - Remove folders you don't need
@@ -178,10 +180,12 @@ cd other-repo
 ```
 
 **Pros:**
+
 - Simple, no configuration needed
 - Works for any repository
 
 **Cons:**
+
 - Changes are lost when container is rebuilt (unless you commit them)
 - Need to reclone after rebuild
 

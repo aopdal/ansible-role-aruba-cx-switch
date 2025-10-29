@@ -5,7 +5,61 @@
 [![codecov](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch/branch/main/graph/badge.svg)](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch)
 [![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/aopdal/aruba_cx_switch)
 
-Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as the source of truth.
+Comprehensive Ansible role for configuring Aruba AOS-CX switches with **NetBox as the source of truth**.
+
+## Table of Contents
+
+- [NetBox Integration Requirement](#netbox-integration-requirement)
+- [Getting Started](#getting-started)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Documentation](#-documentation)
+- [Role Variables](#role-variables)
+- [Example Playbook](#example-playbook)
+- [Usage Examples](#usage-examples)
+- [Tags](#tags)
+- [Idempotent Mode](#idempotent-mode)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [License](#license)
+
+## NetBox Integration Requirement
+
+**This role requires NetBox** as the authoritative source for all network configuration data. Before using this role, ensure you have:
+
+- **NetBox instance** (v3.0+) installed and accessible
+- **NetBox API token** with appropriate permissions
+- **Network devices** added to NetBox with required custom fields
+- **VLANs, interfaces, and IP addresses** configured in NetBox
+
+See [NetBox Integration](#netbox-configuration) below for detailed setup requirements and [docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md) for comprehensive integration documentation.
+
+## Getting Started
+
+This section covers using the role for network configuration. For development setup, see [Developer Documentation](#developer-documentation).
+
+### Prerequisites
+
+1. **NetBox** - Install and configure NetBox with your network devices
+2. **Ansible** - Version 2.9 or higher
+3. **Python libraries** - See [Requirements](#requirements) below
+4. **Network access** - Connectivity to your Aruba switches and NetBox API
+
+### Quick Start
+
+```bash
+# 1. Install the role and dependencies
+ansible-galaxy install -r requirements.yml
+pip install -r requirements.txt
+
+# 2. Configure NetBox inventory (see NetBox Configuration section)
+# 3. Create your playbook
+# 4. Run configuration
+ansible-playbook site.yml
+```
+
+For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
 ## Features
 
@@ -52,27 +106,6 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 ### Important Notes
 
 ⚠️ **Idempotency Behavior**: L3 interface tasks using `aoscx_config` may show `changed` status even when the configuration already exists. This is a limitation of the `aoscx_config` module's state detection, but the actual device configuration remains correct and idempotent at the CLI level.
-
-## Getting Started
-
-### 🚀 Quick Start (Recommended: Dev Container)
-
-The easiest way to start developing is using the **VS Code Dev Container** which provides a pre-configured environment with all dependencies:
-
-1. **Prerequisites**: Install [VS Code](https://code.visualstudio.com/) and [Docker](https://www.docker.com/get-started)
-2. **Install Extension**: Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-3. **Open in Container**:
-   - Open this folder in VS Code
-   - When prompted, click **"Reopen in Container"** (or press `F1` → `Dev Containers: Reopen in Container`)
-4. **Start Coding**: The container automatically installs all dependencies!
-
-All Python packages, Ansible collections, and tools are pre-configured. No manual setup needed! 🎉
-
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed development guidelines.
-
-### 📦 Alternative: Traditional Setup
-
-If you don't have Docker, you can use a traditional virtual environment setup. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed instructions.
 
 ## Requirements
 
@@ -180,6 +213,53 @@ roles:
     version: ">=1.0.0"
 ```
 
+## 📚 Documentation
+
+### Quick Start & Usage
+
+- **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide for using the role
+- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Common tasks reference
+- **[docs/README.md](docs/README.md)** - Complete documentation index
+
+### NetBox Integration (Essential)
+
+- **[docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md)** - **Required reading** - Comprehensive NetBox integration guide
+  - Custom fields required for device configuration
+  - Config context structure and examples
+  - NetBox inventory plugin setup
+  - Troubleshooting NetBox integration issues
+
+- **[docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md)** - NetBox data transformation
+  - 22 custom filters for VLAN, VRF, interface, and OSPF operations
+  - Critical for understanding how the role processes NetBox data
+
+### Configuration Guides
+
+- **[docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md)** - Base system (banner, NTP, DNS, timezone)
+- **[docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN management workflow
+- **[docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)** - BGP/EVPN fabric configuration
+- **[docs/TAG_DEPENDENT_SUMMARY.md](docs/TAG_DEPENDENT_SUMMARY.md)** - Tag-dependent tasks (BGP, OSPF, VSX)
+
+### Developer Documentation
+
+For contributors and developers:
+
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Complete development guide
+  - Dev Container setup (recommended)
+  - Local development environment setup
+  - Testing and code standards
+
+- **[docs/TESTING_ENVIRONMENT.md](docs/TESTING_ENVIRONMENT.md)** - Integration testing guide
+
+### Documentation Site
+
+View all documentation with beautiful formatting using MkDocs:
+
+```bash
+pip install -r requirements-docs.txt
+make docs-serve  # Opens at http://127.0.0.1:8000
+```
+
 ### NetBox Configuration
 
 This role requires the NetBox dynamic inventory plugin with specific settings:
@@ -201,42 +281,6 @@ group_by:
   - device_roles
   - sites
   - platforms
-```
-
-## 📚 Documentation
-
-Comprehensive documentation is available in the `docs/` folder:
-
-### Essential Reading
-
-- **[docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md)** - **Essential** - Custom filters for NetBox data transformation
-  - 22 filters for VLAN, VRF, interface, and OSPF operations
-  - Real-world examples and workflows
-  - Critical for understanding how the role processes NetBox data
-
-- **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide
-- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Common tasks reference
-
-### Configuration Guides
-
-- **[docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md)** - Base system (banner, NTP, DNS, timezone)
-- **[docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN management workflow
-- **[docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)** - BGP/EVPN fabric configuration
-- **[docs/TAG_DEPENDENT_SUMMARY.md](docs/TAG_DEPENDENT_SUMMARY.md)** - Tag-dependent tasks (BGP, OSPF, VSX)
-
-### Development & Testing
-
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Complete development guide
-- **[docs/TESTING_ENVIRONMENT.md](docs/TESTING_ENVIRONMENT.md)** - Integration testing guide
-- **[docs/README.md](docs/README.md)** - Complete documentation index
-
-### MkDocs Site
-
-View documentation with beautiful formatting:
-
-```bash
-pip install -r requirements-docs.txt
-make docs-serve  # Opens at http://127.0.0.1:8000
 ```
 
 ## Role Variables
@@ -729,100 +773,12 @@ approach. Both modes now use `configure_l2_interfaces.yml` which intelligently h
 
 ## Testing
 
-This role includes comprehensive testing at multiple levels: unit tests for filter plugins, integration tests with NetBox data, and molecule tests for role execution.
+This role includes comprehensive testing. For detailed testing information, see:
 
-### Unit Tests
-
-**22 filter functions** across **6 modules** are covered by comprehensive unit tests with **>90% code coverage**:
-
-```bash
-# Run all unit tests
-make test-unit
-
-# Run with coverage report
-make test-unit-coverage
-
-# Run specific test file
-pytest tests/unit/test_vlan_filters.py -v
-```
-
-**Test Coverage:**
-- ✅ **VLAN filters** (7 functions) - Extract, filter, and manage VLANs
-- ✅ **VRF filters** (4 functions) - Extract and filter VRFs
-- ✅ **Interface filters** (3 functions) - Categorize L2/L3 interfaces
-- ✅ **Comparison functions** (3 functions) - Compare and detect configuration changes
-- ✅ **OSPF filters** (4 functions) - OSPF configuration management
-- ✅ **Utility functions** (1 function) - VLAN range collapsing
-
-See **[tests/unit/README.md](tests/unit/README.md)** for detailed testing documentation.
-
-### Integration Tests
-
-This role includes comprehensive integration testing documentation and scripts for testing with real/virtual Aruba AOS-CX switches.
-
-#### Testing Documentation
-
-- **[Testing Environment](docs/TESTING_ENVIRONMENT.md)** - Complete testing setup guide
-- **[Quick Start](docs/TESTING_QUICK_START.md)** - 30-minute quick start to first test
-- **[Testing Proposal](docs/TESTING_PROPOSAL.md)** - Executive summary for stakeholders
-
-### Test Playbooks
-
-- **[tests/test.yml](tests/test.yml)** - Basic integration test with mock data
-- **[tests/test_real_data.yml](tests/test_real_data.yml)** - Comprehensive test with real NetBox data (z13-cx3)
-
-The real data test includes:
-- **19 interfaces** (physical, LAG, virtual) from production NetBox inventory
-- **Multi-VRF OSPF** (default + z13-cust_2 VRFs)
-- **Complex LAG configurations** (MCLAG, ISL, tagged/access)
-- **VSX and VXLAN features** with real IP addressing schemes
-- **Point-to-point and broadcast OSPF networks**
-- **Production-like device configuration** from actual Aruba deployment
-
-### Testing Architecture
-
-The testing environment uses:
-- **EVE-NG** - Virtual network lab for AOS-CX switches
-- **NetBox** - Source of truth for network configuration
-- **Ansible** - Role execution and validation
-- **pytest** - Automated test validation
-
-### Test Scenarios Covered
-
-1. ✅ VLAN creation and deletion
-2. ✅ Orphaned VLAN cleanup (not in NetBox)
-3. ✅ L2 interface configuration (trunk/access)
-4. ✅ L3 interface configuration (SVIs, routed ports)
-5. ✅ VRF configuration
-6. ✅ Routing protocols (OSPF, BGP)
-7. ✅ EVPN/VXLAN (fabric topology)
-8. ✅ VSX configuration
-9. ✅ Idempotent operations
-
-### Quick Test Setup
-
-```bash
-# 1. Deploy NetBox
-git clone https://github.com/netbox-community/netbox-docker.git
-cd netbox-docker && docker-compose up -d
-
-# 2. Populate test data
-python testing-scripts/populate_netbox.py \
-  --url http://localhost:8000 \
-  --token YOUR_TOKEN \
-  --topology simple
-
-# 3. Run tests
-ansible-playbook -i inventory/hosts.yml playbooks/test_vlans.yml
-
-# 4. Validate
-python testing-scripts/validate_deployment.py \
-  --switches spine1,leaf1 \
-  --netbox-url http://localhost:8000 \
-  --netbox-token YOUR_TOKEN
-```
-
-See [testing-scripts/README.md](testing-scripts/README.md) for detailed script usage.
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Unit tests and development testing
+- **[docs/TESTING_ENVIRONMENT.md](docs/TESTING_ENVIRONMENT.md)** - Integration testing setup
+- **[tests/unit/README.md](tests/unit/README.md)** - Unit test documentation
+- **[testing-scripts/README.md](testing-scripts/README.md)** - Testing scripts usage
 
 ## License
 

@@ -7,6 +7,7 @@ Refactored VLAN change identification to eliminate duplicate logic and establish
 ## Execution Flow
 
 ### Before Configuration (Create)
+
 ```
 identify_vlan_changes.yml    ← Sets: vlans, vlans_in_use, vlan_changes
   ↓
@@ -18,6 +19,7 @@ configure_vxlan.yml          ← Uses: vlans, vlans_in_use
 ```
 
 ### Before Cleanup (Delete) - Idempotent Mode Only
+
 ```
 identify_vlan_changes.yml    ← RE-analyze with current state
   ↓
@@ -31,26 +33,31 @@ cleanup_vlans.yml            ← Uses: vlan_changes.vlans_to_delete
 ## Files Modified
 
 ### Enhanced
+
 - ✅ `tasks/identify_vlan_changes.yml` - Now the single source of truth
-  - Fetches VLANs from NetBox (if not provided)
-  - Gathers device VLAN facts
-  - Calculates vlans_in_use
-  - Determines vlan_changes
+    - Fetches VLANs from NetBox (if not provided)
+    - Gathers device VLAN facts
+    - Calculates vlans_in_use
+    - Determines vlan_changes
 
 ### Simplified (Removed Duplicate Logic)
+
 - ✅ `tasks/configure_vlans.yml` - Now requires identify_vlan_changes.yml first
 - ✅ `tasks/configure_evpn.yml` - Now requires identify_vlan_changes.yml first
 - ✅ `tasks/configure_vxlan.yml` - Now requires identify_vlan_changes.yml first
 
 ### Safety Enhanced (Added Assertions)
+
 - ✅ `tasks/cleanup_vlans.yml` - Verifies prerequisites
 - ✅ `tasks/cleanup_evpn.yml` - Verifies prerequisites
 - ✅ `tasks/cleanup_vxlan.yml` - Verifies prerequisites
 
 ### Orchestration Updated
+
 - ✅ `tasks/main.yml` - Added identify_vlan_changes.yml before configuration
 
 ### Documentation
+
 - ✅ `docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md` - Complete workflow guide
 
 ## Key Benefits
