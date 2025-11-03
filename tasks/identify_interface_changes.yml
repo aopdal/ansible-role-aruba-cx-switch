@@ -36,6 +36,19 @@
   tags:
     - always
 
+- name: Debug - Show interface 1/1/5 from device facts
+  ansible.builtin.debug:
+    msg:
+      - "Interface 1/1/5 from device facts:"
+      - "{{ ansible_facts.network_resources.interfaces['1/1/5'] | default('NOT FOUND') }}"
+  when:
+    - aoscx_debug | default(false) | bool
+    - ansible_facts is defined
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+  tags:
+    - always
+
 - name: Identify interfaces needing configuration changes
   ansible.builtin.set_fact:
     interface_changes: >-

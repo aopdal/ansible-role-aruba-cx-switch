@@ -542,17 +542,28 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                 "admin_state"
             )
 
+            # Check user_config.admin first (most reliable for configured state)
+            user_config = device_intf.get("user_config", {})
+            if isinstance(user_config, dict) and "admin" in user_config:
+                device_admin_state = user_config.get("admin")
+                device_enabled = device_admin_state == "up"
+                _debug(f"Using user_config.admin for {intf_name}: {device_admin_state}")
             # Check forwarding_state.enablement for more accurate admin state
             # This is especially important for LAG member interfaces
-            forwarding_state = device_intf.get("forwarding_state", {})
-            if isinstance(forwarding_state, dict):
-                enablement = forwarding_state.get("enablement")
-                if enablement is not None:
-                    # Use enablement field as the source of truth
-                    device_enabled = enablement
-                    device_admin_state = "up" if enablement else "down"
+            elif "forwarding_state" in device_intf:
+                forwarding_state = device_intf.get("forwarding_state", {})
+                if isinstance(forwarding_state, dict):
+                    enablement = forwarding_state.get("enablement")
+                    if enablement is not None:
+                        # Use enablement field as the source of truth
+                        device_enabled = enablement
+                        device_admin_state = "up" if enablement else "down"
+                    else:
+                        # Fall back to admin_state
+                        device_enabled = (
+                            device_admin_state == "up" if device_admin_state else None
+                        )
                 else:
-                    # Fall back to admin_state
                     device_enabled = (
                         device_admin_state == "up" if device_admin_state else None
                     )
@@ -568,17 +579,14 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                     f"enabled mismatch (NB: {nb_enabled}, device: {device_enabled})"
                 )
 
-            # Get enablement value for debug output
-            fs_enablement = (
-                forwarding_state.get("enablement")
-                if isinstance(forwarding_state, dict)
-                else "N/A"
-            )
+            # Debug output showing which field was used
             _debug(
                 f"Interface {intf_name}: NB enabled={nb_enabled}, "
                 f"device admin_state={device_admin_state}, "
                 f"device_enabled={device_enabled}, "
-                f"forwarding_state.enablement={fs_enablement}"
+                f"user_config.admin="
+                f"{user_config.get('admin') if isinstance(user_config, dict) else 'N/A'}, "
+                f"needs_change={needs_change}"
             )
 
             # Check description (only if NetBox has a description)
@@ -665,20 +673,35 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                 )
 
                 if has_vlan_config and device_mode:
+                    # Determine effective mode from NetBox configuration
+                    # If mode is "tagged" but no tagged VLANs and only untagged VLAN,
+                    # it's effectively an access port
+                    nb_has_tagged_vlans = nb_tagged_vlans and len(nb_tagged_vlans) > 0
+                    effective_nb_mode = nb_mode
+                    if (
+                        nb_mode in ["tagged", "tagged-all"]
+                        and not nb_has_tagged_vlans
+                        and nb_untagged_vlan
+                    ):
+                        effective_nb_mode = "access"
+
                     # Mode mismatch check
-                    if nb_mode == "access" and device_mode != "access":
+                    if effective_nb_mode == "access" and device_mode != "access":
                         needs_change = True
                         change_reasons.append(
-                            f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
+                            f"VLAN mode mismatch (NB: {effective_nb_mode}, device: {device_mode})"
                         )
-                    elif nb_mode in ["tagged", "tagged-all"] and device_mode not in [
+                    elif effective_nb_mode in [
+                        "tagged",
+                        "tagged-all",
+                    ] and device_mode not in [
                         "native-tagged",
                         "native-untagged",
                         "trunk",  # Some AOS-CX versions use "trunk"
                     ]:
                         needs_change = True
                         change_reasons.append(
-                            f"VLAN mode mismatch (NB: {nb_mode}, device: {device_mode})"
+                            f"VLAN mode mismatch (NB: {effective_nb_mode}, device: {device_mode})"
                         )
                 elif has_vlan_config and not device_mode:
                     # NetBox has VLAN config but device doesn't

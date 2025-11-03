@@ -131,7 +131,8 @@ While not used for configuration automation, these provide critical context for:
 - Provide IP address to new switches
 - Provide default gateway
 - Provide DNS servers
-- **Provide ZTP script location** (DHCP Option 66/67 or bootfile-name)
+- Provide ZTP script location (DHCP Option 66/67 or bootfile-name)
+- Provide firmware version and location
 
 **Example Configuration (ISC DHCP):**
 ```conf
@@ -205,9 +206,10 @@ def main():
 **Lifecycle Phases:**
 
 1. **Factory Default** → DHCP request
-2. **ZTP Phase** → Download and apply base config
-3. **Bootstrap Complete** → Management connectivity established
-4. **Ongoing Management** → Full configuration via Ansible
+2. **ZTP 1. Phase** → Download and compare firmware version
+3. **ZTP 2. Phase** → Download and apply base config
+4. **Bootstrap Complete** → Management connectivity established
+5. **Ongoing Management** → Full configuration via Ansible
 
 ---
 
@@ -218,36 +220,37 @@ def main():
 **Objective:** Define the desired network state before any equipment arrives.
 
 **Activities:**
-1. **Site Planning**
 
-   - Create sites in NetBox
-   - Document racks and rack units
-   - Plan power distribution
+**Site Planning**
 
-2. **Device Documentation**
+- Create sites in NetBox
+- Document racks and rack units
+- Plan power distribution
 
-   - Add devices to NetBox (can be pre-populated before physical arrival)
-   - Set device type, role, platform
-   - Record serial numbers (when known)
-   - Assign management IP addresses
+**Device Documentation**
 
-3. **Network Design**
+- Add devices to NetBox (can be pre-populated before physical arrival)
+- Set device type, role, platform
+- Record serial numbers (when known)
+- Assign management IP addresses
 
-   - Define VLANs and prefixes
-   - Create VRFs for multi-tenancy
-   - Plan IP addressing scheme
-   - Design routing topology (BGP AS, OSPF areas)
+**Network Design**
 
-4. **Configuration Context**
+- Define VLANs and prefixes
+- Create VRFs for multi-tenancy
+- Plan IP addressing scheme
+- Design routing topology (BGP AS, OSPF areas)
 
-   - Set system-wide settings (NTP, DNS, timezone)
-   - Define site-specific or role-specific configurations
-   - Configure BGP fallback parameters
+**Configuration Context**
 
-5. **Custom Fields**
+- Set system-wide settings (NTP, DNS, timezone)
+- Define site-specific or role-specific configurations
+- Configure BGP fallback parameters
 
-   - Set feature flags (device_bgp, device_evpn, device_vxlan, device_vsx)
-   - Tag devices for automation (ztp_ready, staging, production)
+**Custom Fields**
+
+- Set feature flags (device_bgp, device_evpn, device_vxlan, device_vsx)
+- Tag devices for automation (ztp_ready, staging, production)
 
 **Output:** Complete network design documented in NetBox.
 
@@ -282,6 +285,7 @@ ansible-playbook generate-ztp-configs.yml
 - SSH and HTTPS API access
 
 **Deployment:**
+
 ```bash
 # Copy generated configs to ZTP server
 scp ztp_configs/*.cfg ztp-server:/var/lib/ztp/configs/
@@ -301,31 +305,33 @@ scp ztp_configs/*.cfg ztp-server:/var/lib/ztp/configs/
 **Objective:** Install equipment in data center or network closet.
 
 **Activities:**
-1. **Physical Installation** (Documented in NetBox)
 
-   - Mount devices in racks
-   - Connect power cables (document in NetBox)
-   - Connect network cables (document in NetBox)
-   - Connect management interface to ZTP network
+**Physical Installation** (Documented in NetBox)
 
-2. **Power On**
+- Mount devices in racks
+- Connect power cables (document in NetBox)
+- Connect network cables (document in NetBox)
+- Connect management interface to ZTP network
 
-   - Device boots to factory default
-   - DHCP request on management interface
-   - Receives IP address and ZTP script URL
+**Power On**
 
-3. **ZTP Process** (Automatic)
-   ```
-   Switch powers on
-   ├─→ DHCP request
-   ├─→ Receives IP, gateway, DNS, ZTP script URL
-   ├─→ Downloads ZTP script
-   ├─→ Script identifies device (serial number, MAC)
-   ├─→ Looks up hostname in NetBox
-   ├─→ Downloads base configuration
-   ├─→ Applies configuration
-   └─→ Reboots (management connectivity established)
-   ```
+- Device boots to factory default
+- DHCP request on management interface
+- Receives IP address and ZTP script URL
+
+**ZTP Process** (Automatic)
+
+```
+Switch powers on
+├─→ DHCP request
+├─→ Receives IP, gateway, DNS, ZTP script URL
+├─→ Downloads ZTP script
+├─→ Script identifies device (serial number, MAC)
+├─→ Looks up hostname in NetBox
+├─→ Downloads base configuration
+├─→ Applies configuration
+└─→ Reboots (management connectivity established)
+```
 
 **Output:** Device accessible via management IP with base configuration.
 
@@ -384,36 +390,40 @@ ansible-playbook -i netbox_inventory.yml site.yml --tags vlans,bgp
 
 **Activities:**
 
-1. **Configuration Changes**
-   ```
-   Change Request → Update NetBox → Run Ansible → Verify
-   ```
+**Configuration Changes**
 
-2. **Idempotent Mode**
-   ```yaml
-   aoscx_idempotent_mode: true
-   ```
-   - Adds configurations from NetBox
-   - **Removes** configurations not in NetBox
-   - Ensures switches match NetBox exactly
+```
+Change Request → Update NetBox → Run Ansible → Verify
+```
 
-3. **Regular Synchronization**
-   ```bash
-   # Daily/weekly scheduled job
-   ansible-playbook -i netbox_inventory.yml site.yml
-   ```
+**Idempotent Mode**
 
-4. **Change Validation**
+```yaml
+aoscx_idempotent_mode: true
+```
 
-   - Ansible reports changes made
-   - Compare before/after state
-   - Rollback if needed
+- Adds configurations from NetBox
+- **Removes** configurations not in NetBox
+- Ensures switches match NetBox exactly
 
-5. **Documentation Updates**
+**Regular Synchronization**
 
-   - Update NetBox when changes occur
-   - NetBox remains authoritative source
-   - Audit trail of all changes
+```bash
+# Daily/weekly scheduled job
+ansible-playbook -i netbox_inventory.yml site.yml
+```
+
+**Change Validation**
+
+- Ansible reports changes made
+- Compare before/after state
+- Rollback if needed
+
+**Documentation Updates**
+
+- Update NetBox when changes occur
+- NetBox remains authoritative source
+- Audit trail of all changes
 
 ---
 
@@ -491,6 +501,7 @@ graph TB
 ### NetBox API Integration
 
 **Authentication:**
+
 ```yaml
 netbox_url: https://netbox.example.com
 netbox_token: "{{ vault_netbox_token }}"
@@ -509,6 +520,7 @@ netbox_token: "{{ vault_netbox_token }}"
 - BGP sessions (netbox-bgp plugin)
 
 **Dynamic Inventory:**
+
 ```bash
 # Use NetBox as dynamic inventory source
 ansible-playbook -i netbox_inventory.yml site.yml
@@ -530,28 +542,28 @@ ansible-playbook -i netbox_inventory.yml site.yml
 
 While not managed by this role, integration points exist for:
 
-- **Monitoring Systems** (Prometheus, SNMP)
+**Monitoring Systems** (Prometheus, SNMP)
 
-  - Switch metrics and health
-  - Interface statistics
-  - BGP/OSPF status
+- Switch metrics and health
+- Interface statistics
+- BGP/OSPF status
 
-- **Logging Systems** (Syslog, ELK)
+**Logging Systems** (Syslog, ELK)
 
-  - Configuration changes
-  - System events
-  - Security logs
+- Configuration changes
+- System events
+- Security logs
 
-- **Backup Systems**
+**Backup Systems**
 
-  - Configuration backups
-  - Automated snapshots before changes
+- Configuration backups
+- Automated snapshots before changes
 
-- **CI/CD Pipelines**
+**CI/CD Pipelines**
 
-  - Automated testing of configuration changes
-  - Rollback procedures
-  - Change approval workflows
+- Automated testing of configuration changes
+- Rollback procedures
+- Change approval workflows
 
 ---
 
@@ -609,6 +621,7 @@ While not managed by this role, integration points exist for:
 ### 4. Change Management
 
 **Process:**
+
 ```
 1. Create change request
 2. Update NetBox (staging)
@@ -672,6 +685,7 @@ While not managed by this role, integration points exist for:
 - Troubleshooting guides
 
 **Why Document Physical Infrastructure?**
+
 Even though physical documentation isn't used for automation:
 
 - Essential for troubleshooting
@@ -732,12 +746,12 @@ Even though physical documentation isn't used for automation:
 
 This network automation ecosystem provides:
 
-✅ **Single Source of Truth:** NetBox contains all network design and configuration
-✅ **Automated Deployment:** ZTP for initial setup, Ansible for full configuration
-✅ **Idempotent State:** Switches automatically sync with NetBox
-✅ **Complete Lifecycle:** From planning through ongoing management
-✅ **Scalability:** Handle hundreds of switches from single control point
-✅ **Auditability:** All changes tracked through NetBox and Ansible
+- ✅ **Single Source of Truth:** NetBox contains all network design and configuration
+- ✅ **Automated Deployment:** ZTP for initial setup, Ansible for full configuration
+- ✅ **Idempotent State:** Switches automatically sync with NetBox
+- ✅ **Complete Lifecycle:** From planning through ongoing management
+- ✅ **Scalability:** Handle hundreds of switches from single control point
+- ✅ **Auditability:** All changes tracked through NetBox and Ansible
 
 The `aopdal.aruba_cx_switch` role is a key component in this ecosystem, bridging NetBox (source of truth) with Aruba CX switches (network infrastructure), while integrating with ZTP infrastructure for seamless initial deployment.
 

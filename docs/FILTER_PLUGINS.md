@@ -6,6 +6,75 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 This library provides **22 custom filters** organized into 7 focused modules totaling ~1,500 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
 
+## ⚠️ Important: NetBox Data Interpretation
+
+### Source of Truth Philosophy
+
+These filters implement **intelligent interpretation** of NetBox data to handle common configuration patterns and edge cases. While this improves usability, it introduces a layer of logic between NetBox (the source of truth) and device configuration.
+
+**Trade-off**: The filters compensate for certain NetBox configuration patterns, which means:
+- ✅ **Benefit**: More forgiving of NetBox data modeling variations
+- ⚠️ **Risk**: May mask incorrect NetBox configurations
+- 📋 **Recommendation**: Maintain strict NetBox data hygiene to preserve true "source of truth" integrity
+
+### Specific Interpretation Logic
+
+#### Interface Mode Detection (`interface_filters.py`)
+
+**Problem**: NetBox uses `mode: tagged` for both trunk ports and access ports with only a native VLAN.
+
+**Filter Behavior**:
+```python
+# If NetBox has:
+#   - mode: "tagged"
+#   - untagged_vlan: <vlan_id>
+#   - tagged_vlans: [] (empty or missing)
+#
+# Filter interprets as: mode: "access"
+```
+
+**Rationale**: A "tagged" port with no tagged VLANs and only an untagged VLAN is functionally an access port.
+
+**Impact**:
+- Prevents false positives when comparing NetBox `mode: tagged` against device `vlan_mode: access`
+- Masks potential NetBox misconfiguration where user intended trunk but forgot to add tagged VLANs
+
+**Best Practice**:
+- Use NetBox `mode: access` explicitly for access ports
+- Use NetBox `mode: tagged` only when `tagged_vlans` list is populated
+- Document your organization's NetBox modeling standards
+
+#### Admin State Detection (`interface_filters.py`)
+
+**Problem**: AOS-CX devices expose multiple admin state fields with different meanings:
+- `admin_state`: May show "down" for ports without physical link
+- `forwarding_state.enablement`: Shows operational forwarding state
+- `user_config.admin`: Shows configured admin intent (most reliable)
+
+**Filter Behavior**:
+```python
+# Priority order:
+# 1. user_config.admin (if exists)
+# 2. forwarding_state.enablement (fallback)
+# 3. admin_state (last resort)
+```
+
+**Impact**:
+- Correctly handles ports configured as "up" but without physical link
+- Prevents false positives where `admin_state: down` (no link) is compared against NetBox `enabled: true`
+
+**Best Practice**:
+- Trust that filter uses the most reliable state field
+- Use `DEBUG_ANSIBLE=true` to see which state fields are being compared
+
+### Recommendations
+
+1. **Validate NetBox Data**: Regularly audit your NetBox configurations to ensure they accurately reflect intended state
+2. **Use Debug Mode**: Set `DEBUG_ANSIBLE=true` to see filter decision-making in real-time
+3. **Document Patterns**: Establish and document your organization's NetBox modeling patterns
+4. **Test Changes**: When modifying filter logic, test against known-good configurations
+5. **Consider Strictness**: For strict "source of truth" enforcement, consider removing interpretation logic and requiring exact NetBox data accuracy
+
 ## Structure
 
 ```
