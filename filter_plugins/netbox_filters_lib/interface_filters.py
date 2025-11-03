@@ -674,12 +674,14 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
 
                 if has_vlan_config and device_mode:
                     # Determine effective mode from NetBox configuration
-                    # If mode is "tagged" but no tagged VLANs and only untagged VLAN,
-                    # it's effectively an access port
+                    # If mode is "tagged" (not "tagged-all") with no tagged VLANs
+                    # and only untagged VLAN, it's effectively an access port.
+                    # Note: "tagged-all" with just untagged_vlan is a valid trunk
+                    # configuration (native-untagged mode allowing all VLANs).
                     nb_has_tagged_vlans = nb_tagged_vlans and len(nb_tagged_vlans) > 0
                     effective_nb_mode = nb_mode
                     if (
-                        nb_mode in ["tagged", "tagged-all"]
+                        nb_mode == "tagged"  # Only "tagged", not "tagged-all"
                         and not nb_has_tagged_vlans
                         and nb_untagged_vlan
                     ):

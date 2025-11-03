@@ -26,22 +26,29 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 **Filter Behavior**:
 ```python
 # If NetBox has:
-#   - mode: "tagged"
+#   - mode: "tagged" (not "tagged-all")
 #   - untagged_vlan: <vlan_id>
 #   - tagged_vlans: [] (empty or missing)
 #
 # Filter interprets as: mode: "access"
+#
+# Note: mode: "tagged-all" is always treated as trunk,
+# even with empty tagged_vlans list (allows all VLANs)
 ```
 
-**Rationale**: A "tagged" port with no tagged VLANs and only an untagged VLAN is functionally an access port.
+**Rationale**:
+- A `mode: tagged` port with no tagged VLANs and only an untagged VLAN is functionally an access port
+- A `mode: tagged-all` port allows all VLANs and is always a trunk, even if `tagged_vlans` list is empty
 
 **Impact**:
-- Prevents false positives when comparing NetBox `mode: tagged` against device `vlan_mode: access`
-- Masks potential NetBox misconfiguration where user intended trunk but forgot to add tagged VLANs
+- Prevents false positives when comparing NetBox `mode: tagged` (empty list) against device `vlan_mode: access`
+- Correctly handles `mode: tagged-all` as trunk configuration
+- Masks potential NetBox misconfiguration where user intended trunk but used `mode: tagged` with no VLANs
 
 **Best Practice**:
 - Use NetBox `mode: access` explicitly for access ports
 - Use NetBox `mode: tagged` only when `tagged_vlans` list is populated
+- Use NetBox `mode: tagged-all` for trunk ports that allow all VLANs (with or without native VLAN)
 - Document your organization's NetBox modeling standards
 
 #### Admin State Detection (`interface_filters.py`)
@@ -74,6 +81,23 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 3. **Document Patterns**: Establish and document your organization's NetBox modeling patterns
 4. **Test Changes**: When modifying filter logic, test against known-good configurations
 5. **Consider Strictness**: For strict "source of truth" enforcement, consider removing interpretation logic and requiring exact NetBox data accuracy
+
+### Performance Optimization
+
+**Fact Gathering Strategy**: The role uses a centralized fact gathering approach to minimize API calls:
+
+1. **Initial Gather** (`gather_facts.yml`): Collects interfaces + VLANs once at the start
+2. **Analysis Phase**: Filters use existing facts from step 1 (no re-gathering)
+   - `identify_vlan_changes.yml`: Uses existing `ansible_facts.network_resources`
+   - `identify_interface_changes.yml`: Uses existing `ansible_facts.network_resources`
+3. **Cleanup Phase** (idempotent mode only): Re-gathers facts after configuration to detect what needs cleanup
+
+**Why This Matters**:
+- Gathering facts makes REST API calls to the device (slow, especially for large configs)
+- Original implementation gathered facts twice before any configuration (wasteful)
+- Optimized version gathers once initially, then only re-gathers before cleanup when state has changed
+
+**Debug Mode**: Use `DEBUG_ANSIBLE=true` to see filter decisions without debug output from fact gathering overhead
 
 ## Structure
 

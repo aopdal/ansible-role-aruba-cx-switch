@@ -314,11 +314,30 @@
 # VLAN/EVPN/VXLAN Cleanup (only in idempotent mode)
 # ============================================================================
 # Cleanup order is critical:
-# 1. Re-identify VLAN changes (what needs to be deleted) based on current state
-# 2. Remove EVPN configuration (no vlan X under evpn)
-# 3. Remove VXLAN VNI and VLAN-to-VNI mappings
-# 4. Delete VLANs themselves
+# 1. Re-gather facts to get post-configuration device state
+# 2. Re-identify VLAN changes (what needs to be deleted) based on current state
+# 3. Remove EVPN configuration (no vlan X under evpn)
+# 4. Remove VXLAN VNI and VLAN-to-VNI mappings
+# 5. Delete VLANs themselves
 # This ensures proper cleanup without orphaned configurations
+
+- name: Re-gather facts before cleanup
+  ansible.builtin.include_tasks:
+    file: gather_facts.yml
+    apply:
+      tags:
+        - vlans
+        - layer2
+        - cleanup
+        - idempotent
+  when:
+    - aoscx_configure_vlans | bool
+    - aoscx_idempotent_mode | bool
+  tags:
+    - vlans
+    - layer2
+    - cleanup
+    - idempotent
 
 - name: Re-identify VLAN changes before cleanup
   ansible.builtin.include_tasks:

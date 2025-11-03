@@ -38,17 +38,9 @@
     - nb_vlans_response.json is defined
     - nb_vlans_response.json.results is defined
 
-# Re-gather facts to get current device state for comparison
-# IMPORTANT: Must gather BOTH vlans AND interfaces to avoid overwriting
-# the network_resources dict which would delete interface facts needed
-# by configure_l2_interfaces.yml and other tasks
-# TODO: Consider using include_tasks: gather_facts.yml instead for consistency
-- name: Gather VLAN and interface facts from device for change identification
-  arubanetworks.aoscx.aoscx_facts:
-    gather_network_resources:
-      - vlans
-      - interfaces
-  register: device_facts_for_vlan_changes
+# Note: We use existing facts gathered by gather_facts.yml (earlier in main.yml)
+# No need to re-gather here - facts are already available in ansible_facts.network_resources
+# This avoids duplicate API calls and improves performance
 
 - name: Calculate VLANs currently in use by interfaces
   ansible.builtin.set_fact:
