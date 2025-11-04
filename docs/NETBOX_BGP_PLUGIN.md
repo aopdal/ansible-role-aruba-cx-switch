@@ -381,6 +381,58 @@ The role could support **both** approaches:
 - Multiple fabrics/sites
 - Change management tracking
 
+## Route Reflector Configuration
+
+### Automatic Configuration Based on Device Role
+
+The role automatically configures route reflector settings based on the device's role in NetBox:
+
+**Supported Roles:**
+- `spine`
+- `route-reflector`
+- `rr`
+
+**Behavior:**
+- ✅ All BGP neighbors are automatically configured as route-reflector clients
+- ✅ No need to manually specify RR clients in config_context
+- ✅ Consistent with spine-leaf EVPN architecture best practices
+
+### Example
+
+**NetBox Setup:**
+
+1. **Device**: spine-1
+2. **Role**: spine
+3. **BGP Sessions**: 4 sessions to leaf switches
+
+**Result:**
+```bash
+router bgp 65000
+  neighbor 10.255.255.11 route-reflector-client
+  neighbor 10.255.255.12 route-reflector-client
+  neighbor 10.255.255.13 route-reflector-client
+  neighbor 10.255.255.14 route-reflector-client
+```
+
+### Fallback to config_context
+
+If netbox-bgp plugin is not available or not in use, the role falls back to `config_context.bgp_rr_clients`:
+
+```json
+{
+  "bgp_rr_clients": [
+    {"peer": "10.255.255.11"},
+    {"peer": "10.255.255.12"}
+  ]
+}
+```
+
+### Customization
+
+To disable automatic RR configuration:
+- Set device role to something other than spine/route-reflector/rr
+- Or use config_context fallback for granular control
+
 ## Next Steps
 
 Would you like me to:

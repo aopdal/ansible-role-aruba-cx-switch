@@ -6,6 +6,11 @@
 # 2. config_context (fallback) - for simple configurations during migration
 #
 # This allows smooth migration from config_context to netbox-bgp plugin
+#
+# Route Reflector Configuration:
+# - When using netbox-bgp plugin: Automatically configured if device role is
+#   'spine', 'route-reflector', or 'rr'. All BGP neighbors become RR clients.
+# - When using config_context: Configured via config_context.bgp_rr_clients list
 
 - name: Get BGP sessions from NetBox BGP plugin
   when: aoscx_use_netbox_bgp_plugin | default(true) | bool
@@ -189,8 +194,27 @@
     ansible_connection: network_cli
 
 # ============================================================================
-# BGP Route Reflector Settings (config_context only for now)
+# BGP Route Reflector Settings
 # ============================================================================
+# If device role is "spine", automatically configure all BGP neighbors as
+# route-reflector clients. This is common in spine-leaf EVPN architectures.
+
+- name: Configure BGP route reflector settings from netbox-bgp plugin (spine role)
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - neighbor {{ item.remote_address.address.split('/')[0] }} route-reflector-client
+  loop: "{{ device_bgp_sessions | default([]) }}"
+  loop_control:
+    label: "Device: {{ inventory_hostname }} RR Client: {{ item.remote_address.address.split('/')[0] }}"
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+    - role | default('') | lower in ['spine', 'route-reflector', 'rr']
+  vars:
+    ansible_connection: network_cli
 
 - name: Configure BGP route reflector settings from config_context
   arubanetworks.aoscx.aoscx_command:
@@ -202,6 +226,7 @@
   loop_control:
     label: "Device: {{ inventory_hostname }} RR Client: {{ item.peer }}"
   when:
+    - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)
     - custom_fields.device_bgp | default(false) | bool
     - config_context.bgp_rr_clients is defined
     - config_context.bgp_rr_clients | length > 0
@@ -233,11 +258,13 @@
     msg:
       - "=== BGP Configuration (netbox-bgp plugin) ==="
       - "Device: {{ inventory_hostname }}"
+      - "Device Role: {{ role | default('not set') }}"
       - "Local AS: {{ device_bgp_sessions[0].local_as.asn }}"
       - "Router ID: {{ device_bgp_sessions[0].local_address.address.split('/')[0] }}"
       - "Total Sessions: {{ device_bgp_sessions | length }}"
       - "Active Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'active') | list | length }}"
       - "Planned Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'planned') | list | length }}"
+      - "Route Reflector: {{ 'Yes (all neighbors are RR clients)' if (role | default('') | lower in ['spine', 'route-reflector', 'rr']) else 'No' }}"
   when:
     - aoscx_debug | default(false) | bool
     - netbox_bgp_plugin_available | default(false)

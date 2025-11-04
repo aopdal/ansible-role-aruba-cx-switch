@@ -45,6 +45,9 @@ This task configures BGP with EVPN (Ethernet VPN) address family support for ove
 #### Complete EVPN/VXLAN Fabric Configuration
 
 **Spine (Route Reflector):**
+
+> **Note**: When using the netbox-bgp plugin, route reflector configuration is **automatic** for devices with role `spine`, `route-reflector`, or `rr`. All BGP neighbors are automatically configured as route-reflector clients. See [NetBox BGP Plugin Integration](NETBOX_BGP_PLUGIN.md) for details.
+
 ```json
 {
   "bgp_as": 65000,
@@ -311,10 +314,11 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
 ### config_context.bgp_rr_clients
 
 - **Type**: List of objects
-- **Required**: No (only for route reflectors)
+- **Required**: No (only for route reflectors when using config_context)
 - **Description**: Neighbors to be configured as route reflector clients
 - **Fields**:
   - `peer` (required): Neighbor IP address
+- **Note**: When using netbox-bgp plugin, this is **automatic** for devices with role `spine`, `route-reflector`, or `rr`. All BGP neighbors are automatically configured as RR clients.
 
 ### config_context.bgp_additional_config
 

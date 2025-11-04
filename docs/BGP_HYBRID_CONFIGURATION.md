@@ -267,7 +267,7 @@ ansible-playbook configure_aoscx.yml -l leaf-3 -t bgp \
 | **EVPN Neighbors** | ✅ | ✅ |
 | **IPv4 Unicast** | ⏳ Future | ✅ |
 | **VRF Instances** | ⏳ Future | ✅ |
-| **Route Reflector** | ⏳ Future | ✅ |
+| **Route Reflector** | ✅ (auto for spine role) | ✅ |
 | **Additional Config** | ⏳ Future | ✅ |
 | **Status Tracking** | ✅ (active/planned) | ❌ |
 | **Change History** | ✅ NetBox audit | ❌ |
@@ -282,12 +282,14 @@ ansible-playbook configure_aoscx.yml -l leaf-3 -t bgp \
 
 - ✅ BGP router process (AS, Router ID)
 - ✅ EVPN neighbors (L2VPN EVPN address family)
+- ✅ Route reflector clients
+  - **netbox-bgp plugin**: Automatic for devices with role `spine`, `route-reflector`, or `rr`
+  - **config_context**: Manual via `bgp_rr_clients` list
 
 **Implemented (config_context Only):**
 
 - ✅ IPv4 unicast neighbors
 - ✅ VRF instances
-- ✅ Route reflector clients
 - ✅ Additional BGP settings
 
 **Future Enhancements (netbox-bgp Plugin):**
