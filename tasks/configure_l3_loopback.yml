@@ -10,7 +10,9 @@
   loop: "{{ l3_interfaces.loopback }}"
   loop_control:
     label: "Interface: {{ item.interface_name }}"
-  when: l3_interfaces.loopback | length > 0
+  when:
+    - l3_interfaces.loopback | length > 0
+    - item.interface.name not in (ansible_facts.network_resources.interfaces.keys() | list if ansible_facts.network_resources.interfaces is defined else [])
 
 # Define built-in VRFs
 - name: Set built-in VRF list
@@ -39,7 +41,7 @@
     ipv4:
       - "{{ item.address }}"
     vrf: default
-  loop: "{{ loopback_default_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop: "{{ loopback_default_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf | default('default') }}"
   when:
@@ -52,7 +54,7 @@
     ipv6:
       - "{{ item.address }}"
     vrf: default
-  loop: "{{ loopback_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop: "{{ loopback_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf | default('default') }}"
   when:
@@ -66,7 +68,7 @@
       - ip address {{ item.address }}
     parents: interface {{ item.interface_name }}
     match: line
-  loop: "{{ loopback_custom_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop: "{{ loopback_custom_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
   when:
@@ -82,7 +84,7 @@
       - ipv6 address {{ item.address }}
     parents: interface {{ item.interface_name }}
     match: line
-  loop: "{{ loopback_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
+  loop: "{{ loopback_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
   when:

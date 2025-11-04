@@ -56,6 +56,8 @@
       vrf: "{{ item.1.vrf.name if item.1.vrf is defined and item.1.vrf.name is defined else 'default' }}"
       description: "{{ item.0.description | default('') }}"
       enabled: "{{ item.0.enabled | default(true) }}"
+      # Track if this specific IP needs to be added
+      _needs_add: "{{ (item.1.address in (item.0._ip_changes.ipv4_to_add | default([]))) or (item.1.address in (item.0._ip_changes.ipv6_to_add | default([]))) }}"
   loop: "{{ interfaces_with_ips | subelements('ip_addresses', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }} - {{ item.1.address }}"
@@ -88,7 +90,9 @@
   loop: "{{ vlan_interfaces }}"
   loop_control:
     label: "Interface: {{ item.name }}"
-  when: vlan_interfaces | length > 0
+  when:
+    - vlan_interfaces | length > 0
+    - item.name not in (ansible_facts.network_resources.interfaces.keys() | list if ansible_facts.network_resources.interfaces is defined else [])
 
 - name: Categorize L3 interfaces
   ansible.builtin.set_fact:

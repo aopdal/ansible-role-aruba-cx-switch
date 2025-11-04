@@ -783,6 +783,66 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                                     f"VLANs to remove: {vlans_to_remove}"
                                 )
 
+        # Check L3 configuration (IP addresses)
+        # Compare IP addresses defined in NetBox with those on the device
+        nb_ip_addresses = nb_intf.get("ip_addresses", [])
+        if nb_ip_addresses:
+            # Extract IP addresses from NetBox (format: "192.168.1.1/24" or "2001:db8::1/64")
+            nb_ipv4 = set()
+            nb_ipv6 = set()
+            for ip_obj in nb_ip_addresses:
+                if isinstance(ip_obj, dict):
+                    ip_addr = ip_obj.get("address")
+                    if ip_addr:
+                        # Separate IPv4 and IPv6
+                        if ":" in ip_addr:
+                            nb_ipv6.add(ip_addr)
+                        else:
+                            nb_ipv4.add(ip_addr)
+
+            # Extract IP addresses from device facts
+            device_ipv4 = set()
+
+            # IPv4 addresses
+            device_ip4 = device_intf.get("ip4_address")
+            if device_ip4:
+                device_ipv4.add(device_ip4)
+
+            device_ip4_secondary = device_intf.get("ip4_address_secondary", [])
+            if device_ip4_secondary:
+                for ip in device_ip4_secondary:
+                    if ip:
+                        device_ipv4.add(ip)
+
+            # Compare the IP addresses
+            ipv4_to_add = nb_ipv4 - device_ipv4
+            ipv4_to_remove = device_ipv4 - nb_ipv4
+
+            # For IPv6, if NetBox has IPv6 addresses, we need to configure them
+            # Since we can't fully compare IPv6 from facts (aoscx_facts returns URLs not data),
+            # we'll mark as needing change if NetBox has any IPv6 addresses
+            ipv6_needs_config = len(nb_ipv6) > 0
+
+            if ipv4_to_add or ipv4_to_remove or ipv6_needs_config:
+                needs_change = True
+                if ipv4_to_add:
+                    change_reasons.append(f"IPv4 addresses to add: {ipv4_to_add}")
+                if ipv4_to_remove:
+                    change_reasons.append(f"IPv4 addresses to remove: {ipv4_to_remove}")
+                if ipv6_needs_config:
+                    change_reasons.append(
+                        f"IPv6 addresses need configuration: {nb_ipv6}"
+                    )
+
+                # Store IP change details in the interface object for task-level filtering
+                if ipv4_to_add or ipv6_needs_config:
+                    if "_ip_changes" not in nb_intf:
+                        nb_intf["_ip_changes"] = {}
+                    if ipv4_to_add:
+                        nb_intf["_ip_changes"]["ipv4_to_add"] = list(ipv4_to_add)
+                    if ipv6_needs_config:
+                        nb_intf["_ip_changes"]["ipv6_to_add"] = list(nb_ipv6)
+
         if needs_change:
             _debug(f"Interface {intf_name} needs changes: {', '.join(change_reasons)}")
             _categorize_interface_for_changes(nb_intf, result, needs_change=True)
