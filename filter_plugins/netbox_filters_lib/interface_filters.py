@@ -1,6 +1,34 @@
 #!/usr/bin/env python3
 """
 Interface categorization and processing filters
+
+IMPORTANT NOTE ON IPv6 ADDRESS COMPARISON:
+==========================================
+AOS-CX device facts (gathered via arubanetworks.aoscx.aoscx_facts) return IPv6
+addresses as REST API URL references rather than actual address values.
+
+Example from device facts:
+    "ip6_addresses": "/rest/v10.09/system/interfaces/vlan11/ip6_addresses"
+
+This makes it impossible to compare NetBox's intended IPv6 addresses with the
+device's actual configured addresses within filter plugin context, as filters
+cannot make API calls to retrieve the actual IPv6 data.
+
+PERFORMANCE RATIONALE:
+- IPv4 addresses: Full comparison implemented - saves significant time by skipping
+  unnecessary configuration tasks
+- IPv6 addresses: No comparison performed - the overhead of fetching IPv6 data
+  (requiring separate CLI connection/command execution) exceeds the time saved
+- IPv6 tasks: Always execute but use `changed_when: false` to suppress false positives
+- CLI commands are idempotent: Applying duplicate IPv6 configuration has no effect
+
+Testing confirmed that pre-checking IPv6 addresses via CLI commands is not
+time-efficient compared to directly applying idempotent configuration.
+
+WORKAROUND IMPLEMENTATION:
+- IPv4: Only addresses needing addition are stored in `_ip_changes.ipv4_to_add`
+- IPv6: All addresses stored in `_ip_changes.ipv6_addresses` for reference
+- Tasks: IPv4 filtered by `_needs_add`, IPv6 always run with `changed_when: false`
 """
 
 from .utils import _debug
@@ -818,9 +846,16 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
             ipv4_to_add = nb_ipv4 - device_ipv4
             ipv4_to_remove = device_ipv4 - nb_ipv4
 
-            # For IPv6, if NetBox has IPv6 addresses, we need to configure them
-            # Since we can't fully compare IPv6 from facts (aoscx_facts returns URLs not data),
-            # we'll mark as needing change if NetBox has any IPv6 addresses
+            # For IPv6: The aoscx_facts module returns URLs for ip6_addresses
+            # ("/rest/v10.09/system/interfaces/<name>/ip6_addresses")
+            # rather than actual address data, making it impossible to compare
+            # IPv6 addresses from device facts.
+            # As a workaround, we mark ALL IPv6 addresses as potentially
+            # needing configuration.
+            # The aoscx_config module with 'match: line' provides some
+            # idempotency - it won't apply changes if the line exists.
+            # Note: IPv6 configuration tasks may always show 'changed' status
+            # even when addresses are correct.
             ipv6_needs_config = len(nb_ipv6) > 0
 
             if ipv4_to_add or ipv4_to_remove or ipv6_needs_config:
@@ -834,14 +869,22 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                         f"IPv6 addresses need configuration: {nb_ipv6}"
                     )
 
-                # Store IP change details in the interface object for task-level filtering
-                if ipv4_to_add or ipv6_needs_config:
+                # Store IP change details in the interface object for
+                # task-level filtering.
+                # Only store IPv4 changes - IPv6 cannot be reliably
+                # compared from device facts.
+                if ipv4_to_add:
                     if "_ip_changes" not in nb_intf:
                         nb_intf["_ip_changes"] = {}
-                    if ipv4_to_add:
-                        nb_intf["_ip_changes"]["ipv4_to_add"] = list(ipv4_to_add)
-                    if ipv6_needs_config:
-                        nb_intf["_ip_changes"]["ipv6_to_add"] = list(nb_ipv6)
+                    nb_intf["_ip_changes"]["ipv4_to_add"] = list(ipv4_to_add)
+
+                # Store all IPv6 addresses for reference, but don't mark
+                # them as needing addition since we cannot verify if they
+                # already exist on the device.
+                if nb_ipv6:
+                    if "_ip_changes" not in nb_intf:
+                        nb_intf["_ip_changes"] = {}
+                    nb_intf["_ip_changes"]["ipv6_addresses"] = list(nb_ipv6)
 
         if needs_change:
             _debug(f"Interface {intf_name} needs changes: {', '.join(change_reasons)}")

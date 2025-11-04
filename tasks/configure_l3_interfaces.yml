@@ -57,7 +57,8 @@
       description: "{{ item.0.description | default('') }}"
       enabled: "{{ item.0.enabled | default(true) }}"
       # Track if this specific IP needs to be added
-      _needs_add: "{{ (item.1.address in (item.0._ip_changes.ipv4_to_add | default([]))) or (item.1.address in (item.0._ip_changes.ipv6_to_add | default([]))) }}"
+      # Only mark IPv4 addresses - IPv6 comparison is unreliable due to device facts limitations
+      _needs_add: "{{ item.1.address in (item.0._ip_changes.ipv4_to_add | default([])) }}"
   loop: "{{ interfaces_with_ips | subelements('ip_addresses', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }} - {{ item.1.address }}"

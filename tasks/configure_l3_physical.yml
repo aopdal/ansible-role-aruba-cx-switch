@@ -25,10 +25,11 @@
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ l3_config_lines }}"
     parents: interface {{ item.interface_name }}
-  loop: "{{ l3_interfaces.physical_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
+  loop: "{{ l3_interfaces.physical_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }}"
   when: l3_interfaces.physical_default_vrf | length > 0
+  changed_when: false  # IPv6 comparison not reliable - suppress false positives
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
     # Build configuration lines for IPv6 L3 interface
@@ -64,10 +65,11 @@
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ l3_config_lines }}"
     parents: interface {{ item.interface_name }}
-  loop: "{{ l3_interfaces.physical_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
+  loop: "{{ l3_interfaces.physical_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }}"
   when: l3_interfaces.physical_custom_vrf | length > 0
+  changed_when: false  # IPv6 comparison not reliable - suppress false positives
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
     # Get VRF from the interface configuration, not from IP address

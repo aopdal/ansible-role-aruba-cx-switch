@@ -54,12 +54,13 @@
     ipv6:
       - "{{ item.address }}"
     vrf: default
-  loop: "{{ loopback_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
+  loop: "{{ loopback_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf | default('default') }}"
   when:
     - loopback_default_vrf is defined
     - loopback_default_vrf | length > 0
+  changed_when: false  # IPv6 comparison not reliable - suppress false positives
 
 - name: Configure loopback interfaces (custom VRF) - IPv4
   arubanetworks.aoscx.aoscx_config:
@@ -84,11 +85,12 @@
       - ipv6 address {{ item.address }}
     parents: interface {{ item.interface_name }}
     match: line
-  loop: "{{ loopback_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
+  loop: "{{ loopback_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
   when:
     - loopback_custom_vrf is defined
     - loopback_custom_vrf | length > 0
+  changed_when: false  # IPv6 comparison not reliable - suppress false positives
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
