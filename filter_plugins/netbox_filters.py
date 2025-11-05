@@ -34,10 +34,14 @@ from netbox_filters_lib.vrf_filters import (
     get_vrfs_in_use,
     filter_configurable_vrfs,
 )
-from netbox_filters_lib.interface_filters import (
+from netbox_filters_lib.interface_categorization import (
     categorize_l2_interfaces,
     categorize_l3_interfaces,
+)
+from netbox_filters_lib.interface_ip_processing import (
     get_interface_ip_addresses,
+)
+from netbox_filters_lib.interface_change_detection import (
     get_interfaces_needing_config_changes,
 )
 from netbox_filters_lib.comparison import (

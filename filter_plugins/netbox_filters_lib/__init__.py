@@ -21,10 +21,15 @@ from .vrf_filters import (
     get_vrfs_in_use,
     filter_configurable_vrfs,
 )
-from .interface_filters import (
+from .interface_categorization import (
     categorize_l2_interfaces,
     categorize_l3_interfaces,
+)
+from .interface_ip_processing import (
     get_interface_ip_addresses,
+)
+from .interface_change_detection import (
+    get_interfaces_needing_config_changes,
 )
 from .comparison import (
     compare_interface_vlans,
@@ -53,6 +58,7 @@ __all__ = [
     "categorize_l2_interfaces",
     "categorize_l3_interfaces",
     "get_interface_ip_addresses",
+    "get_interfaces_needing_config_changes",
     # Comparison filters
     "compare_interface_vlans",
     "get_interfaces_needing_changes",

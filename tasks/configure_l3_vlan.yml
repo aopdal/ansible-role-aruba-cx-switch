@@ -9,14 +9,17 @@
     parents: interface {{ item.interface_name }}
   loop: "{{ l3_interfaces.vlan_default_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
   loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }}"
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Role: {{ item.ip_role | default('none') }}"
   when: l3_interfaces.vlan_default_vrf | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
     # Build configuration lines for IPv4 VLAN L3 interface
+    # For anycast IPs: Use ONLY active-gateway command (not regular ip address)
+    #   Note: active-gateway requires IP without prefix, so we use ansible.utils.ipaddr('address') filter
+    # For regular IPs: Use ip address command (with prefix)
     l3_config_lines: >-
       {{
-        (['ip address ' + item.address] +
+        ((['active-gateway ip ' + (item.address | ansible.utils.ipaddr('address')) + ' mac ' + item.anycast_mac] if (item.ip_role == 'anycast' and item.anycast_mac) else ['ip address ' + item.address]) +
          (['ip mtu ' + (item.interface.mtu | string)] if (item.interface.mtu is defined and item.interface.mtu is not none) else []) +
          (['l3-counters'] if aoscx_l3_counters_enable | default(true) else []))
       }}
@@ -27,15 +30,18 @@
     parents: interface {{ item.interface_name }}
   loop: "{{ l3_interfaces.vlan_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }}"
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Role: {{ item.ip_role | default('none') }}"
   when: l3_interfaces.vlan_default_vrf | length > 0
   changed_when: false  # IPv6 comparison not reliable - suppress false positives
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
     # Build configuration lines for IPv6 VLAN L3 interface
+    # For anycast IPs: Use ONLY active-gateway command (not regular ipv6 address)
+    #   Note: active-gateway requires IP without prefix, so we use ansible.utils.ipaddr('address') filter
+    # For regular IPs: Use ipv6 address command (with prefix)
     l3_config_lines: >-
       {{
-        (['ipv6 address ' + item.address] +
+        ((['active-gateway ipv6 ' + (item.address | ansible.utils.ipaddr('address')) + ' mac ' + item.anycast_mac] if (item.ip_role == 'anycast' and item.anycast_mac) else ['ipv6 address ' + item.address]) +
          (['ip mtu ' + (item.interface.mtu | string)] if (item.interface.mtu is defined and item.interface.mtu is not none) else []) +
          (['l3-counters'] if aoscx_l3_counters_enable | default(true) else []))
       }}
@@ -46,17 +52,20 @@
     parents: interface {{ item.interface_name }}
   loop: "{{ l3_interfaces.vlan_custom_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
   loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }}"
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }} Role: {{ item.ip_role | default('none') }}"
   when: l3_interfaces.vlan_custom_vrf | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
     # Get VRF from the interface configuration, not from IP address
     interface_vrf: "{{ item.interface.vrf.name if item.interface.vrf is defined and item.interface.vrf.name is defined else 'default' }}"
     # Build configuration lines for IPv4 VLAN L3 interface with VRF
+    # For anycast IPs: Use ONLY active-gateway command (not regular ip address)
+    #   Note: active-gateway requires IP without prefix, so we use ansible.utils.ipaddr('address') filter
+    # For regular IPs: Use ip address command (with prefix)
     l3_config_lines: >-
       {{
         (['vrf attach ' + interface_vrf] +
-         ['ip address ' + item.address] +
+         (['active-gateway ip ' + (item.address | ansible.utils.ipaddr('address')) + ' mac ' + item.anycast_mac] if (item.ip_role == 'anycast' and item.anycast_mac) else ['ip address ' + item.address]) +
          (['ip mtu ' + (item.interface.mtu | string)] if (item.interface.mtu is defined and item.interface.mtu is not none) else []) +
          (['l3-counters'] if aoscx_l3_counters_enable | default(true) else []))
       }}
@@ -67,7 +76,7 @@
     parents: interface {{ item.interface_name }}
   loop: "{{ l3_interfaces.vlan_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
   loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }}"
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} Interface VRF: {{ interface_vrf }} Role: {{ item.ip_role | default('none') }}"
   when: l3_interfaces.vlan_custom_vrf | length > 0
   changed_when: false  # IPv6 comparison not reliable - suppress false positives
   vars:
@@ -75,10 +84,13 @@
     # Get VRF from the interface configuration, not from IP address
     interface_vrf: "{{ item.interface.vrf.name if item.interface.vrf is defined and item.interface.vrf.name is defined else 'default' }}"
     # Build configuration lines for IPv6 VLAN L3 interface with VRF
+    # For anycast IPs: Use ONLY active-gateway command (not regular ipv6 address)
+    #   Note: active-gateway requires IP without prefix, so we use ipaddr('address') filter
+    # For regular IPs: Use ipv6 address command (with prefix)
     l3_config_lines: >-
       {{
         (['vrf attach ' + interface_vrf] +
-         ['ipv6 address ' + item.address] +
+         (['active-gateway ipv6 ' + (item.address | ipaddr('address')) + ' mac ' + item.anycast_mac] if (item.ip_role == 'anycast' and item.anycast_mac) else ['ipv6 address ' + item.address]) +
          (['ip mtu ' + (item.interface.mtu | string)] if (item.interface.mtu is defined and item.interface.mtu is not none) else []) +
          (['l3-counters'] if aoscx_l3_counters_enable | default(true) else []))
       }}

@@ -56,6 +56,10 @@
       vrf: "{{ item.1.vrf.name if item.1.vrf is defined and item.1.vrf.name is defined else 'default' }}"
       description: "{{ item.0.description | default('') }}"
       enabled: "{{ item.0.enabled | default(true) }}"
+      # IP address role (e.g., "anycast")
+      ip_role: "{{ item.1.role.value if item.1.role is defined and item.1.role.value is defined else none }}"
+      # Anycast gateway MAC from interface custom fields
+      anycast_mac: "{{ item.0.custom_fields.if_anycast_gateway_mac if item.0.custom_fields is defined and item.0.custom_fields.if_anycast_gateway_mac is defined else none }}"
       # Track if this specific IP needs to be added
       # Only mark IPv4 addresses - IPv6 comparison is unreliable due to device facts limitations
       _needs_add: "{{ item.1.address in (item.0._ip_changes.ipv4_to_add | default([])) }}"

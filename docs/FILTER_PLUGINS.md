@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **22 custom filters** organized into 7 focused modules totaling ~1,500 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
+This library provides **25 custom filters** organized into 9 focused modules totaling ~1,800 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
@@ -19,7 +19,9 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 
 ### Specific Interpretation Logic
 
-#### Interface Mode Detection (`interface_filters.py`)
+#### Interface Mode Detection
+
+**Filters**: `interface_categorization.py` and `interface_change_detection.py`
 
 **Problem**: NetBox uses `mode: tagged` for both trunk ports and access ports with only a native VLAN.
 
@@ -51,7 +53,9 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 - Use NetBox `mode: tagged-all` for trunk ports that allow all VLANs (with or without native VLAN)
 - Document your organization's NetBox modeling standards
 
-#### Admin State Detection (`interface_filters.py`)
+#### Admin State Detection
+
+**Filter**: `interface_change_detection.py`
 
 **Problem**: AOS-CX devices expose multiple admin state fields with different meanings:
 - `admin_state`: May show "down" for ports without physical link
@@ -230,16 +234,23 @@ ansible-playbook your-playbook.yml
 
 ```
 filter_plugins/
-├── netbox_filters.py          # Main entry point (FilterModule class)
-└── netbox_filters_lib/        # Package directory
-    ├── __init__.py            # Package initialization
-    ├── utils.py               # Helper functions (53 lines)
-    ├── vlan_filters.py        # VLAN operations (395 lines)
-    ├── vrf_filters.py         # VRF operations (194 lines)
-    ├── interface_filters.py   # Interface categorization (373 lines)
-    ├── comparison.py          # Comparison logic (279 lines)
-    └── ospf_filters.py        # OSPF operations (116 lines)
+├── netbox_filters.py                    # Main entry point (FilterModule class)
+└── netbox_filters_lib/                  # Package directory
+    ├── __init__.py                      # Package initialization
+    ├── utils.py                         # Helper functions (53 lines)
+    ├── vlan_filters.py                  # VLAN operations (395 lines)
+    ├── vrf_filters.py                   # VRF operations (194 lines)
+    ├── interface_categorization.py      # L2/L3 interface categorization (294 lines)
+    ├── interface_ip_processing.py       # IP address matching (106 lines)
+    ├── interface_change_detection.py    # Change detection & idempotency (621 lines)
+    ├── comparison.py                    # State comparison (279 lines)
+    └── ospf_filters.py                  # OSPF operations (116 lines)
 ```
+
+**Note**: The `interface_filters.py` module was split into three focused modules in November 2025:
+- `interface_categorization.py` - Interface type and VLAN mode categorization
+- `interface_ip_processing.py` - IP address to interface matching and anycast gateway processing
+- `interface_change_detection.py` - NetBox vs device comparison and change detection
 
 ## Modules
 
@@ -312,16 +323,16 @@ VRF extraction and filtering (4 filters):
     - Filters out: mgmt, MGMT, Global, global, default, Default
     - Returns: List of configurable VRF objects
 
-### `interface_filters.py` - Interface Categorization
+### `interface_categorization.py` - Interface Categorization
 
-Interface processing and categorization (4 filters):
+L2 and L3 interface categorization by type and configuration (2 filters, 294 lines):
 
 - **`categorize_l2_interfaces(interfaces)`**
     - Categorize L2 interfaces by VLAN mode and type
     - Returns dict with 15 categories:
-    - Regular interfaces: `access`, `tagged_with_untagged`, `tagged_no_untagged`,   `tagged_all_with_untagged`, `tagged_all_no_untagged`
-    - LAG interfaces: `lag_access`, `lag_tagged_with_untagged`, `lag_tagged_no_untagged`,   `lag_tagged_all_with_untagged`, `lag_tagged_all_no_untagged`
-    - MCLAG interfaces: `mclag_access`, `mclag_tagged_with_untagged`, `mclag_tagged_no_untagged`,   `mclag_tagged_all_with_untagged`, `mclag_tagged_all_no_untagged`
+    - Regular interfaces: `access`, `tagged_with_untagged`, `tagged_no_untagged`, `tagged_all_with_untagged`, `tagged_all_no_untagged`
+    - LAG interfaces: `lag_access`, `lag_tagged_with_untagged`, `lag_tagged_no_untagged`, `lag_tagged_all_with_untagged`, `lag_tagged_all_no_untagged`
+    - MCLAG interfaces: `mclag_access`, `mclag_tagged_with_untagged`, `mclag_tagged_no_untagged`, `mclag_tagged_all_with_untagged`, `mclag_tagged_all_no_untagged`
 
 - **`categorize_l3_interfaces(interfaces)`**
     - Categorize L3 interfaces by type and VRF
@@ -334,18 +345,51 @@ Interface processing and categorization (4 filters):
     - `lag_custom_vrf`: LAG interfaces in custom VRFs
     - `loopback`: Loopback interfaces
 
+### `interface_ip_processing.py` - IP Address Processing
+
+IP address to interface matching and anycast gateway processing (1 filter, 106 lines):
+
 - **`get_interface_ip_addresses(interfaces, ip_addresses)`**
     - Match IP addresses to their interfaces
-    - Returns: Dict mapping interface names to IP address objects
+    - Extracts IP role (e.g., "anycast") from NetBox IP address objects
+    - Extracts anycast gateway MAC from interface custom field `if_anycast_gateway_mac`
+    - Returns: List of dicts with interface and IP information including:
+      - `interface`: Full interface object
+      - `interface_name`: Interface name
+      - `address`: IP address with prefix (e.g., "192.168.1.1/24")
+      - `vrf`: VRF name
+      - `ip_role`: IP address role (e.g., "anycast", None for regular IPs)
+      - `anycast_mac`: MAC address for anycast gateway (e.g., "02:01:00:00:01:00")
+    - Used for L3 configuration including anycast gateway setup
+
+### `interface_change_detection.py` - Change Detection
+
+NetBox vs device comparison and idempotency logic (2 filters, 621 lines):
 
 - **`get_interfaces_needing_config_changes(interfaces, device_facts)`**
-    - Compare NetBox L3 interface configuration with device state
-    - Identifies which specific IP addresses need to be added (IPv4 only)
-    - Returns: Interfaces with `_ip_changes` dict containing:
-      - `ipv4_to_add`: List of IPv4 addresses needing configuration
+    - Compare NetBox interface configuration with device state
+    - Implements granular change detection for:
+      - Physical properties (enabled/disabled, description, MTU)
+      - LAG membership
+      - L2 VLAN configuration
+      - L3 IP addresses (IPv4 with specific address tracking, IPv6 reference only)
+    - Returns: Dict with categorized interfaces:
+      - `physical`: Physical interfaces needing changes
+      - `lag`: LAG interfaces needing changes
+      - `mclag`: MCLAG interfaces needing changes
+      - `l2`: L2 interfaces needing VLAN changes
+      - `l3`: L3 interfaces needing IP address changes
+      - `lag_members`: Physical interfaces needing LAG assignment changes
+      - `no_changes`: Interfaces that don't need any changes
+    - Adds `_ip_changes` dict to L3 interfaces containing:
+      - `ipv4_to_add`: List of specific IPv4 addresses needing configuration
       - `ipv6_addresses`: List of all IPv6 addresses (for reference, not filtered)
-    - Used by L3 configuration tasks to implement granular idempotency
-    - See "L3 Interface IP Address Idempotency" section for details
+    - See "L3 Interface IP Address Idempotency" section for performance details
+
+- **`_categorize_interface_for_changes(intf, result_dict, needs_change=True)`**
+    - Helper function to categorize interfaces into appropriate change categories
+    - Handles multi-category assignment (e.g., LAG member in both `lag_members` and `physical`)
+    - Internal use only
 
 ### `comparison.py` - State Comparison
 NetBox vs device state comparison (3 filters):

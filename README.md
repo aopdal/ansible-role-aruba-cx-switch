@@ -124,6 +124,7 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 collections:
   - arubanetworks.aoscx >= 4.4.0
   - netbox.netbox >= 3.21.0
+  - ansible.utils >= 2.0.0
 ```
 
 Install with:
