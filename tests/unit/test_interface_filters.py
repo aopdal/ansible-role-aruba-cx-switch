@@ -2,9 +2,11 @@
 Unit tests for interface filter functions
 """
 import pytest
-from netbox_filters_lib.interface_filters import (
+from netbox_filters_lib.interface_categorization import (
     categorize_l2_interfaces,
     categorize_l3_interfaces,
+)
+from netbox_filters_lib.interface_ip_processing import (
     get_interface_ip_addresses,
 )
 from .fixtures import get_sample_interfaces, get_sample_ip_addresses
