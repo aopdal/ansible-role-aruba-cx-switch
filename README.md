@@ -68,7 +68,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **Physical Interface Configuration** - Enable/disable and description
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support, ip mtu, and l3-counters
-- ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
+- ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration, and active gateway
 - ✅ **Loopback Interfaces** - Automatic detection, IPv4/IPv6, with VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
 - ✅ **VSX Configuration** - Active-active redundancy with system MAC, ISL, and keepalive

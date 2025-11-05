@@ -68,7 +68,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **Physical Interface Configuration** - Enable/disable and description
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support, ip mtu, and l3-counters
-- ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration
+- ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration, and active gateway
 - ✅ **Loopback Interfaces** - Automatic detection, IPv4/IPv6, with VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
 - ✅ **VSX Configuration** - Active-active redundancy with system MAC, ISL, and keepalive
@@ -124,6 +124,7 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 collections:
   - arubanetworks.aoscx >= 4.4.0
   - netbox.netbox >= 3.21.0
+  - ansible.utils >= 2.0.0
 ```
 
 Install with:

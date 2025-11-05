@@ -297,14 +297,16 @@ class TestGetInterfaceIpAddresses:
 
     def test_get_interface_no_ips(self):
         """Test with no IP addresses"""
-        interfaces = [{"id": 1, "name": "1/1/1", "type": {"value": "1000base-t"}}]
+        interfaces = [{"id": 1, "name": "1/1/1",
+                       "type": {"value": "1000base-t"}}]
         ip_addresses = []
         result = get_interface_ip_addresses(interfaces, ip_addresses)
         assert result == []
 
     def test_get_interface_no_match(self):
         """Test when IP addresses don't match any interfaces"""
-        interfaces = [{"id": 1, "name": "1/1/1", "type": {"value": "1000base-t"}}]
+        interfaces = [{"id": 1, "name": "1/1/1",
+                       "type": {"value": "1000base-t"}}]
         ip_addresses = [
             {
                 "address": "10.1.1.1/30",
