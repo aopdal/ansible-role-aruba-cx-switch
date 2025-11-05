@@ -4,9 +4,33 @@ One-page cheat sheet for the release process.
 
 ## TL;DR
 
-1. Update `CHANGELOG.md` under `[Unreleased]`
-2. Merge to `main`
-3. Release workflow runs automatically
+1. Use conventional commit messages (`feat:`, `fix:`, etc.)
+2. Update `CHANGELOG.md` under `[Unreleased]`
+3. Merge to `main`
+4. Release workflow analyzes commits and creates appropriate release automatically
+
+---
+
+## Commit Message Format
+
+Use conventional commits to automatically determine release type:
+
+```bash
+# Minor version bump (new feature)
+git commit -m "feat: add anycast gateway support"
+
+# Patch version bump (bug fix)
+git commit -m "fix: correct ipaddr filter usage"
+
+# Major version bump (breaking change)
+git commit -m "feat!: redesign configuration API"
+```
+
+**Commit Prefixes:**
+- `feat:` → Minor version bump (0.1.x → 0.2.0)
+- `fix:` → Patch version bump (0.1.x → 0.1.y)
+- `feat!:` or `BREAKING CHANGE:` → Major version bump (0.x.x → 1.0.0)
+- `chore:`, `docs:`, `style:` → Patch version bump
 
 ---
 
@@ -16,16 +40,17 @@ One-page cheat sheet for the release process.
 # 1. Update CHANGELOG.md
 vim CHANGELOG.md  # Add your changes under [Unreleased]
 
-# 2. Commit and merge to main
+# 2. Commit with conventional commit message
 git add CHANGELOG.md
-git commit -m "docs: update changelog for v0.2.0"
+git commit -m "feat: add new OSPF configuration support"
 git push
 
 # 3. Create and merge PR
 gh pr create --fill
 gh pr merge --merge
 
-# ✅ Done! Workflow creates patch release automatically
+# ✅ Done! Workflow analyzes commits and creates release
+#    In this case: feat: → Minor version bump
 ```
 
 ---
@@ -43,16 +68,19 @@ gh pr merge --merge
 ### Via GitHub CLI
 
 ```bash
-# Patch release (0.1.0 → 0.1.1)
+# Auto-detect from commits (recommended)
 gh workflow run release.yml --ref main
 
-# Minor release (0.1.0 → 0.2.0)
+# Force minor release (0.1.0 → 0.2.0)
 gh workflow run release.yml --ref main -f release_type=minor
 
-# Major release (0.1.0 → 1.0.0)
+# Force major release (0.1.0 → 1.0.0)
 gh workflow run release.yml --ref main -f release_type=major
 
-# Specific version
+# Force patch release (0.1.0 → 0.1.1)
+gh workflow run release.yml --ref main -f release_type=patch
+
+# Specific version (override auto-detection)
 gh workflow run release.yml --ref main -f version=1.0.0
 ```
 
@@ -95,6 +123,12 @@ gh workflow run release.yml --ref main -f version=1.0.0
 MAJOR.MINOR.PATCH
 ```
 
+**Automatic (Conventional Commits):**
+- `feat:` → **Minor** (`0.1.0` → `0.2.0`) - New features
+- `fix:` → **Patch** (`0.1.0` → `0.1.1`) - Bug fixes
+- `feat!:` or `BREAKING CHANGE:` → **Major** (`0.1.0` → `1.0.0`) - Breaking changes
+
+**Manual Override:**
 - **Patch** (`0.1.0` → `0.1.1`) - Bug fixes, docs
 - **Minor** (`0.1.0` → `0.2.0`) - New features, backward compatible
 - **Major** (`0.1.0` → `1.0.0`) - Breaking changes

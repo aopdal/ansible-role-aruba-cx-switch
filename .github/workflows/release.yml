@@ -48,6 +48,75 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml semver
 
+      - name: Analyze commits to determine version bump
+        id: analyze_commits
+        run: |
+          python3 << 'EOF'
+          import os
+          import subprocess
+          import re
+
+          # Get commits since last tag
+          try:
+              last_tag = subprocess.check_output(
+                  ["git", "describe", "--tags", "--abbrev=0"],
+                  stderr=subprocess.DEVNULL
+              ).decode().strip()
+              commit_range = f"{last_tag}..HEAD"
+          except subprocess.CalledProcessError:
+              # No tags yet, check all commits
+              commit_range = "HEAD"
+
+          # Get commit messages
+          commits = subprocess.check_output(
+              ["git", "log", commit_range, "--pretty=format:%s"],
+              stderr=subprocess.DEVNULL
+          ).decode().strip().split("\n")
+
+          print(f"Analyzing {len(commits)} commits since {commit_range}")
+
+          # Determine release type based on conventional commits
+          has_breaking = False
+          has_feat = False
+          has_fix = False
+
+          for commit in commits:
+              if not commit:
+                  continue
+              print(f"  - {commit}")
+
+              # Check for breaking changes
+              if re.search(r'^(.*!):|BREAKING CHANGE:', commit, re.IGNORECASE):
+                  has_breaking = True
+                  print(f"    → BREAKING CHANGE detected")
+              # Check for features
+              elif commit.startswith("feat:") or commit.startswith("feat("):
+                  has_feat = True
+                  print(f"    → feature detected")
+              # Check for fixes
+              elif commit.startswith("fix:") or commit.startswith("fix("):
+                  has_fix = True
+                  print(f"    → fix detected")
+
+          # Determine release type
+          if has_breaking:
+              release_type = "major"
+              print(f"\n→ Version bump: MAJOR (breaking changes detected)")
+          elif has_feat:
+              release_type = "minor"
+              print(f"\n→ Version bump: MINOR (features detected)")
+          elif has_fix:
+              release_type = "patch"
+              print(f"\n→ Version bump: PATCH (fixes detected)")
+          else:
+              release_type = "patch"
+              print(f"\n→ Version bump: PATCH (default)")
+
+          # Write to GitHub output
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"release_type={release_type}\n")
+          EOF
+
       - name: Determine version
         id: version
         run: |
@@ -57,7 +126,11 @@ jobs:
 
           # Get manual version if provided
           manual_version = "${{ github.event.inputs.version }}"
-          release_type = "${{ github.event.inputs.release_type }}" or "patch"
+          manual_release_type = "${{ github.event.inputs.release_type }}"
+          auto_release_type = "${{ steps.analyze_commits.outputs.release_type }}"
+
+          # Use manual release type if provided, otherwise use auto-detected
+          release_type = manual_release_type if manual_release_type else auto_release_type
 
           # Read current version from VERSION file
           version_file = Path("VERSION")
@@ -67,6 +140,7 @@ jobs:
               current_version = "0.0.0"
 
           print(f"Current version: {current_version}")
+          print(f"Release type: {release_type}")
 
           if manual_version:
               new_version = manual_version
@@ -93,6 +167,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"version={new_version}\n")
               f.write(f"current_version={current_version}\n")
+              f.write(f"release_type={release_type}\n")
           EOF
 
       - name: Update VERSION file
@@ -184,6 +259,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Previous Version:** ${{ steps.version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Type:** ${{ steps.version.outputs.release_type }}" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY

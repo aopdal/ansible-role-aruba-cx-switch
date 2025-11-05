@@ -21,8 +21,13 @@ The release process is fully automated using GitHub Actions. When code is merged
 ### Automatic Release (Recommended)
 
 1. Ensure `CHANGELOG.md` has content under `[Unreleased]` section
-2. Merge your PR to `main` branch
-3. The release workflow automatically creates a patch release (e.g., `0.1.0` → `0.1.1`)
+2. Use conventional commit messages in your commits (see below)
+3. Merge your PR to `main` branch
+4. The release workflow automatically analyzes commit messages and creates the appropriate release:
+   - `feat:` commits → **Minor** release (e.g., `0.1.0` → `0.2.0`)
+   - `fix:` commits → **Patch** release (e.g., `0.1.0` → `0.1.1`)
+   - `BREAKING CHANGE:` or `feat!:` → **Major** release (e.g., `0.1.0` → `1.0.0`)
+   - Other commits → **Patch** release (default)
 
 ### Manual Release
 
@@ -55,6 +60,49 @@ MAJOR.MINOR.PATCH
   │     └─────── Minor: New features, backward compatible
   └───────────── Major: Breaking changes
 ```
+
+### Conventional Commits
+
+The release workflow uses [Conventional Commits](https://www.conventionalcommits.org/) to automatically determine the version bump type:
+
+| Commit Prefix | Version Bump | Example | Release Type |
+|--------------|--------------|---------|--------------|
+| `feat:` or `feat(scope):` | **Minor** | `0.1.17` → `0.2.0` | New feature |
+| `fix:` or `fix(scope):` | **Patch** | `0.1.17` → `0.1.18` | Bug fix |
+| `BREAKING CHANGE:` | **Major** | `0.1.17` → `1.0.0` | Breaking change |
+| `feat!:` or `fix!:` | **Major** | `0.1.17` → `1.0.0` | Breaking change |
+| `chore:`, `docs:`, `style:`, etc. | **Patch** | `0.1.17` → `0.1.18` | Other changes |
+
+**Examples:**
+
+```bash
+# Minor version bump (new feature)
+git commit -m "feat: add anycast gateway support for SVIs"
+git commit -m "feat(l3): implement active-gateway configuration"
+
+# Patch version bump (bug fix)
+git commit -m "fix: correct ipaddr filter usage in L3 tasks"
+git commit -m "fix(filters): handle None values in interface categorization"
+
+# Major version bump (breaking change)
+git commit -m "feat!: redesign configuration variable structure"
+git commit -m "fix: remove deprecated aoscx_vlan module
+
+BREAKING CHANGE: The aoscx_vlan module has been removed. Use aoscx_vlans instead."
+
+# Patch version bump (other changes)
+git commit -m "chore: update documentation for release process"
+git commit -m "docs: add examples for anycast gateway setup"
+```
+
+**Commit Scope (Optional):**
+
+You can add a scope in parentheses to categorize changes:
+
+- `feat(l3): ...` - L3 features
+- `feat(vlan): ...` - VLAN features
+- `fix(filters): ...` - Filter plugin fixes
+- `docs(release): ...` - Release documentation
 
 ### Version Examples
 
@@ -179,13 +227,17 @@ on:
 **Steps:**
 
 1. **Checkout Code** - Fetches full git history
-2. **Determine Version** - Auto-increments patch version
-3. **Update VERSION** - Sets new version
-4. **Update CHANGELOG.md** - Moves `[Unreleased]` to versioned section
-5. **Commit Changes** - Commits version files
-6. **Create Tag** - Tags commit with `v{version}`
-7. **Create Release** - Creates GitHub release with notes
-8. **Summary** - Displays release summary in Actions UI
+2. **Analyze Commits** - Scans commit messages since last tag for conventional commit patterns
+3. **Determine Version** - Auto-increments version based on detected commit types:
+   - Breaking changes → Major bump
+   - Features (`feat:`) → Minor bump
+   - Fixes (`fix:`) or other → Patch bump
+4. **Update VERSION** - Sets new version
+5. **Update CHANGELOG.md** - Moves `[Unreleased]` to versioned section
+6. **Commit Changes** - Commits version files
+7. **Create Tag** - Tags commit with `v{version}`
+8. **Create Release** - Creates GitHub release with notes
+9. **Summary** - Displays release summary including detected release type
 
 ### Manual Release Workflow
 
@@ -194,12 +246,13 @@ Triggered via GitHub Actions UI or CLI:
 **Parameters:**
 
 - **version** (optional) - Explicit version (e.g., `1.0.0`)
-- **release_type** (optional) - `major`, `minor`, or `patch` (default: `patch`)
+- **release_type** (optional) - `major`, `minor`, or `patch` (default: auto-detected from commits)
 
 **Logic:**
 
 - If `version` provided: Use that version
-- If `version` empty: Auto-increment based on `release_type`
+- If `release_type` provided: Use that release type
+- If both empty: Auto-detect from commit messages (conventional commits)
 
 ### Version Determination
 
