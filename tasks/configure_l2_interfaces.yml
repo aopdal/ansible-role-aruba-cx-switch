@@ -78,7 +78,9 @@
       ansible.builtin.include_tasks: cleanup_l2_vlans.yml
       when: interfaces_needing_changes.cleanup | length > 0
 
-  when: aoscx_idempotent_mode | bool
+  when:
+    - aoscx_idempotent_mode | bool
+    - not (aoscx_fast_mode | default(false) | bool)
 
 # ============================================================================
 # BOTH MODES: Categorize and configure interfaces

@@ -32,6 +32,12 @@ aoscx_configure_vsx: false
 # Idempotency mode - when true, removes configs not in NetBox
 aoscx_idempotent_mode: false
 
+# Performance optimization mode
+# When true: Skips fact gathering and idempotent cleanup for faster execution
+# Use for: Initial deployments, trusted NetBox data, lab environments
+# Warning: Will not detect/remove configurations not in NetBox
+aoscx_fast_mode: false
+
 # NetBox BGP plugin settings
 aoscx_use_netbox_bgp_plugin: true  # Try to use netbox-bgp plugin, fallback to config_context
 aoscx_netbox_validate_certs: true  # Validate SSL certificates when querying NetBox API

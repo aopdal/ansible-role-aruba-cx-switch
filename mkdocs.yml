@@ -117,6 +117,7 @@ nav:
       - .ansible/ Directory: ANSIBLE_CACHE_DIRECTORY.md
   - Reference:
       - Quick Reference: QUICK_REFERENCE.md
+      - Performance Optimization: PERFORMANCE_OPTIMIZATION.md
       - Release Process:
           - Full Guide: RELEASE_PROCESS.md
           - Quick Reference: RELEASE_QUICK_REFERENCE.md

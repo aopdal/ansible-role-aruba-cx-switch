@@ -24,10 +24,10 @@ The release process is fully automated using GitHub Actions. When code is merged
 2. Use conventional commit messages in your commits (see below)
 3. Merge your PR to `main` branch
 4. The release workflow automatically analyzes commit messages and creates the appropriate release:
-   - `feat:` commits → **Minor** release (e.g., `0.1.0` → `0.2.0`)
-   - `fix:` commits → **Patch** release (e.g., `0.1.0` → `0.1.1`)
-   - `BREAKING CHANGE:` or `feat!:` → **Major** release (e.g., `0.1.0` → `1.0.0`)
-   - Other commits → **Patch** release (default)
+    - `feat:` commits → **Minor** release (e.g., `0.1.0` → `0.2.0`)
+    - `fix:` commits → **Patch** release (e.g., `0.1.0` → `0.1.1`)
+    - `BREAKING CHANGE:` or `feat!:` → **Major** release (e.g., `0.1.0` → `1.0.0`)
+    - Other commits → **Patch** release (default)
 
 ### Manual Release
 
@@ -229,9 +229,11 @@ on:
 1. **Checkout Code** - Fetches full git history
 2. **Analyze Commits** - Scans commit messages since last tag for conventional commit patterns
 3. **Determine Version** - Auto-increments version based on detected commit types:
-   - Breaking changes → Major bump
-   - Features (`feat:`) → Minor bump
-   - Fixes (`fix:`) or other → Patch bump
+
+    - Breaking changes → Major bump
+    - Features (`feat:`) → Minor bump
+    - Fixes (`fix:`) or other → Patch bump
+
 4. **Update VERSION** - Sets new version
 5. **Update CHANGELOG.md** - Moves `[Unreleased]` to versioned section
 6. **Commit Changes** - Commits version files

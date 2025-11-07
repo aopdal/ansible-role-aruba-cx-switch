@@ -85,12 +85,12 @@
     interface_vrf: "{{ item.interface.vrf.name if item.interface.vrf is defined and item.interface.vrf.name is defined else 'default' }}"
     # Build configuration lines for IPv6 VLAN L3 interface with VRF
     # For anycast IPs: Use ONLY active-gateway command (not regular ipv6 address)
-    #   Note: active-gateway requires IP without prefix, so we use ipaddr('address') filter
+    #   Note: active-gateway requires IP without prefix, so we use ansible.utils.ipaddr('address') filter
     # For regular IPs: Use ipv6 address command (with prefix)
     l3_config_lines: >-
       {{
         (['vrf attach ' + interface_vrf] +
-         (['active-gateway ipv6 ' + (item.address | ipaddr('address')) + ' mac ' + item.anycast_mac] if (item.ip_role == 'anycast' and item.anycast_mac) else ['ipv6 address ' + item.address]) +
+         (['active-gateway ipv6 ' + (item.address | ansible.utils.ipaddr('address')) + ' mac ' + item.anycast_mac] if (item.ip_role == 'anycast' and item.anycast_mac) else ['ipv6 address ' + item.address]) +
          (['ip mtu ' + (item.interface.mtu | string)] if (item.interface.mtu is defined and item.interface.mtu is not none) else []) +
          (['l3-counters'] if aoscx_l3_counters_enable | default(true) else []))
       }}
