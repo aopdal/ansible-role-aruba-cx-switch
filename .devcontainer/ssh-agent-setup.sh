@@ -7,7 +7,19 @@ check_ssh_agent() {
     if ! ssh-add -l >/dev/null 2>&1; then
         echo "⚠️  SSH agent not responding, attempting reconnection..."
 
-        # Try to find VS Code SSH agent socket first
+        # Try mounted SSH agent socket first (devcontainer mount)
+        if [ -S "/ssh-agent" ]; then
+            export SSH_AUTH_SOCK="/ssh-agent"
+            if ssh-add -l >/dev/null 2>&1; then
+                echo "✅ Reconnected to mounted SSH agent"
+                return 0
+            else
+                echo "⚠️  /ssh-agent exists but not working"
+                echo "   Check host SSH agent: ssh-add -l"
+            fi
+        fi
+
+        # Fallback: Try VS Code's dynamic SSH agent socket
         VSCODE_SSH_SOCK=$(find /tmp -name "vscode-ssh-auth-*.sock" 2>/dev/null | head -1)
         if [ -n "$VSCODE_SSH_SOCK" ] && [ -S "$VSCODE_SSH_SOCK" ]; then
             export SSH_AUTH_SOCK="$VSCODE_SSH_SOCK"
@@ -17,26 +29,10 @@ check_ssh_agent() {
             fi
         fi
 
-        # Try to find WSL2 SSH agent socket
-        WSL_SSH_SOCK=$(find /mnt/wslg/runtime-dir -name "ssh-agent.sock" 2>/dev/null | head -1)
-        if [ -n "$WSL_SSH_SOCK" ] && [ -S "$WSL_SSH_SOCK" ]; then
-            export SSH_AUTH_SOCK="$WSL_SSH_SOCK"
-            if ssh-add -l >/dev/null 2>&1; then
-                echo "✅ Reconnected to WSL2 SSH agent"
-                return 0
-            fi
-        fi        # Try existing agent sockets
-        for sock in /tmp/ssh-*/agent.*; do
-            if [ -S "$sock" ]; then
-                export SSH_AUTH_SOCK="$sock"
-                if ssh-add -l >/dev/null 2>&1; then
-                    echo "✅ Reconnected to existing SSH agent"
-                    return 0
-                fi
-            fi
-        done
-
-        echo "❌ Could not reconnect SSH agent. Run: /workspaces/ansible-role-aruba-cx-switch/.devcontainer/reconnect-ssh.sh"
+        echo "❌ Could not reconnect SSH agent"
+        echo "   1. Ensure SSH agent is running on host: eval \$(ssh-agent -s)"
+        echo "   2. Add your key on host: ssh-add ~/.ssh/id_ed25519"
+        echo "   3. Rebuild devcontainer to remount: F1 → 'Rebuild Container'"
     fi
 }
 

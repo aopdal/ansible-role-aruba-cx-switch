@@ -7,6 +7,10 @@ SSH agent suddenly stops working in dev container while it works fine in WSL2.
 
 ### **Immediate Fix (One Command)**
 ```bash
+# The dev container mounts SSH agent at /ssh-agent
+export SSH_AUTH_SOCK=/ssh-agent && ssh-add -l
+
+# Fallback if mount not available: find VS Code socket
 export SSH_AUTH_SOCK=$(find /tmp -name "vscode-ssh-auth-*.sock" 2>/dev/null | head -1) && ssh-add -l
 ```
 
@@ -16,31 +20,40 @@ export SSH_AUTH_SOCK=$(find /tmp -name "vscode-ssh-auth-*.sock" 2>/dev/null | he
    ```bash
    ssh-add -l
    echo $SSH_AUTH_SOCK
+   ls -la $SSH_AUTH_SOCK
    ```
 
-2. **Find VS Code's SSH socket:**
+2. **Try the mounted SSH agent first (new approach):**
+   ```bash
+   export SSH_AUTH_SOCK=/ssh-agent
+   ssh-add -l
+   ```
+
+3. **Fallback: Find VS Code's dynamic SSH socket:**
    ```bash
    find /tmp -name "vscode-ssh-auth-*.sock"
-   ```
-
-3. **Connect to it:**
-   ```bash
    export SSH_AUTH_SOCK=/tmp/vscode-ssh-auth-XXXXX.sock
    ssh-add -l
    ```
 
 4. **Make it permanent for new terminals:**
    ```bash
-   echo "export SSH_AUTH_SOCK=$(find /tmp -name "vscode-ssh-auth-*.sock" | head -1)" >> ~/.bashrc
+   # Prefer mounted agent (set by devcontainer.json)
+   echo "export SSH_AUTH_SOCK=/ssh-agent" >> ~/.bashrc
    ```
 
 ## Why This Happens
 
-VS Code creates its own SSH agent socket forwarding from WSL2 to the dev container. The socket path is:
+The dev container now uses a direct SSH agent socket mount:
+- **Mount point**: `/ssh-agent` (configured in `devcontainer.json`)
+- **Source**: `${localEnv:SSH_AUTH_SOCK}` from your host/WSL2
+- **Environment**: `SSH_AUTH_SOCK=/ssh-agent` is set automatically
+- **Benefit**: More reliable than VS Code's dynamic sockets
+
+**Fallback**: VS Code still creates dynamic sockets if needed:
 - **Format**: `/tmp/vscode-ssh-auth-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.sock`
 - **Created by**: VS Code's remote container extension
-- **Forwards from**: WSL2's SSH agent
-- **Problem**: The `SSH_AUTH_SOCK` environment variable points to the wrong/old path
+- **Problem**: The `SSH_AUTH_SOCK` environment variable might point to wrong/old path
 
 ## Automated Solution
 
@@ -56,12 +69,13 @@ ssh-reconnect
 
 ## Prevention
 
-The script now checks for VS Code's socket **first** before trying other methods:
+The script now checks for the mounted agent **first** before trying fallback methods:
 
-1. ✅ VS Code SSH agent socket (`/tmp/vscode-ssh-auth-*.sock`)
-2. ✅ WSL2 SSH agent socket (`/mnt/wslg/runtime-dir/ssh-agent.sock`)
-3. ✅ Existing agent sockets in `/tmp/ssh-*/agent.*`
-4. ✅ Start new agent as last resort
+1. ✅ Mounted SSH agent socket (`/ssh-agent`) - **New approach**
+2. ✅ VS Code SSH agent socket (`/tmp/vscode-ssh-auth-*.sock`) - Fallback
+3. ✅ Start new agent as last resort
+
+The dev container configuration (`devcontainer.json`) mounts your host SSH agent directly at `/ssh-agent`.
 
 ## Verification
 
@@ -94,15 +108,23 @@ The `REMOTE_CONTAINERS_SOCKETS` variable contains the actual VS Code socket path
    ssh-add -l && echo "✅ Working" || echo "❌ Broken"
    ```
 
-2. **Find the VS Code socket quickly:**
+2. **Check the mounted SSH agent:**
    ```bash
-   env | grep REMOTE_CONTAINERS_SOCKETS
+   ls -la /ssh-agent
+   SSH_AUTH_SOCK=/ssh-agent ssh-add -l
    ```
 
-3. **Auto-fix on every shell startup:**
-   Add to `~/.bashrc`:
+3. **Find the VS Code socket quickly (fallback):**
    ```bash
-   export SSH_AUTH_SOCK=$(find /tmp -name "vscode-ssh-auth-*.sock" 2>/dev/null | head -1)
+   env | grep REMOTE_CONTAINERS_SOCKETS
+   find /tmp -name "vscode-ssh-auth-*.sock"
+   ```
+
+4. **Verify devcontainer mount:**
+   ```bash
+   echo "Host SSH_AUTH_SOCK: $(echo $SSH_AUTH_SOCK)"
+   echo "Container mount: /ssh-agent"
+   [ -S /ssh-agent ] && echo "✅ Mount exists" || echo "❌ Mount missing"
    ```
 
 ## Related Files

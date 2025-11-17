@@ -16,9 +16,19 @@ ssh-add -l >/dev/null 2>&1 && echo "✅ Working" || echo "❌ Broken"
 
 ## 🚀 **Quick Fixes** (Try in order)
 
-### 1. **Reconnect Script** (Recommended)
+### 1. **Check Mounted SSH Agent** (New Approach)
 ```bash
-# Use the provided reconnection script
+# The devcontainer mounts SSH agent at /ssh-agent
+export SSH_AUTH_SOCK=/ssh-agent
+ssh-add -l
+
+# Verify mount exists
+ls -la /ssh-agent
+```
+
+### 2. **Reconnect Script** (Recommended)
+```bash
+# Use the provided reconnection script (tries mount first, then fallbacks)
 /workspaces/ansible-role-aruba-cx-switch/.devcontainer/reconnect-ssh.sh
 
 # Or create alias and use
@@ -26,10 +36,10 @@ alias ssh-reconnect="/workspaces/ansible-role-aruba-cx-switch/.devcontainer/reco
 ssh-reconnect
 ```
 
-### 2. **Manual WSL2 Agent Reconnection**
+### 3. **Manual VS Code Socket Reconnection** (Fallback)
 ```bash
-# Find WSL2 SSH agent socket
-export SSH_AUTH_SOCK=$(find /mnt/wslg/runtime-dir -name "ssh-agent.sock" 2>/dev/null | head -1)
+# Find VS Code SSH agent socket
+export SSH_AUTH_SOCK=$(find /tmp -name "vscode-ssh-auth-*.sock" 2>/dev/null | head -1)
 ssh-add -l
 ```
 
@@ -89,14 +99,16 @@ fi
 Ensure your `.devcontainer/devcontainer.json` includes:
 ```json
 {
-  "remoteEnv": {
-    "SSH_AUTH_SOCK": "${localEnv:SSH_AUTH_SOCK}"
-  },
   "mounts": [
-    "source=/tmp,target=/tmp,type=bind"
-  ]
+    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
+  ],
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "/ssh-agent"
+  }
 }
 ```
+
+This mounts your host's SSH agent socket directly to `/ssh-agent` in the container.
 
 ## 🔍 **Debugging Steps**
 
@@ -119,10 +131,15 @@ echo $SSH_AUTH_SOCK
 ```bash
 # In Dev Container - full diagnostic
 echo "SSH_AUTH_SOCK: $SSH_AUTH_SOCK"
-ls -la $SSH_AUTH_SOCK 2>/dev/null || echo "Socket not found"
+echo "Expected mount: /ssh-agent"
+ls -la /ssh-agent 2>/dev/null && echo "✅ Mount exists" || echo "❌ Mount missing"
+ls -la $SSH_AUTH_SOCK 2>/dev/null || echo "Socket not found at SSH_AUTH_SOCK"
 ssh-add -l 2>/dev/null || echo "Agent not responsive"
 ps aux | grep ssh-agent
 find /tmp -name "*ssh*" -type d 2>/dev/null
+
+# Check if mount is working
+SSH_AUTH_SOCK=/ssh-agent ssh-add -l 2>/dev/null && echo "✅ /ssh-agent works" || echo "❌ /ssh-agent not working"
 ```
 
 ## 🎯 **Root Cause Solutions**

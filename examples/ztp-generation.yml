@@ -43,7 +43,10 @@
     aoscx_gather_facts: false
 
   tasks:
-    - name: Set management interface data (when NetBox is not available)
+    # Option 1: Manually set management interface data (when NetBox inventory not used)
+    # Note: If using NetBox inventory with 'interfaces: true', the 'interfaces' variable
+    #       is automatically populated and this task will be skipped
+    - name: Set management interface data manually (fallback)
       ansible.builtin.set_fact:
         mgmt_interfaces:
           - name: mgmt
@@ -52,7 +55,9 @@
         config_context:
           mgmt_defaultgateway: "{{ mgmt_gateway | default('192.168.1.1') }}"
           mgmt_nameserver: "{{ mgmt_dns | default('8.8.8.8') }}"
-      when: mgmt_interfaces is not defined
+      when:
+        - mgmt_interfaces is not defined
+        - interfaces is not defined  # Only if NetBox inventory not providing interfaces
       tags:
         - ztp
         - config_generation

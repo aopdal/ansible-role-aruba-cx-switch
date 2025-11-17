@@ -7,6 +7,7 @@
     }
   },
   "mounts": [
+    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
     "source=${localEnv:HOME}/code/aruba-role-testing,target=/workspaces/aruba-role-testing,type=bind",
     "source=${localEnv:HOME}/code/auto-netops-ansible,target=/workspaces/auto-netops-ansible,type=bind,readonly"
   ],
@@ -23,7 +24,7 @@
     "PY_COLORS": "1"
   },
   "remoteEnv": {
-    "SSH_AUTH_SOCK": "${localEnv:SSH_AUTH_SOCK}"
+    "SSH_AUTH_SOCK": "/ssh-agent"
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {

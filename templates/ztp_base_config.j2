@@ -8,12 +8,18 @@
 # - inventory_hostname: Switch hostname from Ansible inventory
 # - aoscx_ztp_admin_user: Admin username (default: admin)
 # - aoscx_ztp_admin_password: Admin password (required)
-# - mgmt_interfaces: Management interfaces from NetBox (filtered by role)
+# - mgmt_interfaces: Management interfaces from NetBox (filtered by mgmt_only=True)
+#                    This includes both:
+#                    - Dedicated mgmt interfaces (e.g., "mgmt")
+#                    - VLAN interfaces used for management (e.g., "vlan100")
 # - config_context: NetBox config context for management settings
 #
 # Generated configuration includes:
 # - Basic system settings (hostname, user, security)
-# - Management interface configuration
+# - Management interface configuration (mgmt or VLAN SVI)
+#   * Dedicated mgmt: Uses 'default-gateway' command under interface
+#   * VLAN SVI: Uses global 'ip route 0.0.0.0/0 <gateway>' with auto-calculated gateway
+#   * VRF support: Adds 'vrf <name>' to ip route if IP assigned to VRF in NetBox
 # - Basic services (SSH, HTTPS API access)
 # - ZTP-specific settings for initial deployment
 #}
@@ -51,18 +57,22 @@ aruba-central
 ! === MANAGEMENT INTERFACE CONFIGURATION ===
 !
 {% if mgmt_interfaces is defined and mgmt_interfaces | length > 0 %}
+{#- Modern NetBox format with mgmt_only=True -#}
 {%   for intf in mgmt_interfaces %}
-{%     if intf.ip_addresses and intf.ip_addresses | length > 0 %}
+{%     if intf.ip_addresses is defined and intf.ip_addresses | length > 0 %}
 interface {{ intf.name }}
 {%       for ip in intf.ip_addresses %}
-{%         if ip.address %}
+{%         if ip.address is defined %}
     ip static {{ ip.address }}
-{%           if config_context.mgmt_defaultgateway is defined %}
+{#-         For dedicated mgmt interface, use default-gateway command -#}
+{%           if 'mgmt' in intf.name | lower and 'vlan' not in intf.name | lower %}
+{%             if config_context is defined and config_context.mgmt_defaultgateway is defined %}
     default-gateway {{ config_context.mgmt_defaultgateway }}
+{%             endif %}
 {%           endif %}
-{%           if config_context.mgmt_nameserver is defined %}
+{%           if config_context is defined and config_context.mgmt_nameserver is defined %}
     nameserver {{ config_context.mgmt_nameserver }}
-{%           elif config_context.dns_servers is defined %}
+{%           elif config_context is defined and config_context.dns_servers is defined %}
 {%             for dns_server in config_context.dns_servers[:2] %}
     nameserver {{ dns_server }}
 {%             endfor %}
@@ -72,36 +82,106 @@ interface {{ intf.name }}
 {%     else %}
 ! Warning: No IP address configured for management interface {{ intf.name }}
 interface {{ intf.name }}
-    ! Configure management IP manually or via DHCP
+    ! Configure management IP manually or via DHCP:
+    ! ip static <IP>/<MASK>
+    ! default-gateway <GATEWAY>
+    ! nameserver <DNS>
 {%     endif %}
 {%   endfor %}
-{% else %}
-! === FALLBACK: Legacy NetBox API format ===
-{% if nb_interfaces is defined and nb_interfaces.json is defined %}
-{%   for intf in nb_interfaces.json.results %}
-{%     if 'mgmt' in intf.name %}
+{% elif interfaces is defined %}
+{#- Fallback: Search all interfaces for management interfaces by name -#}
+{%   set mgmt_found = false %}
+{%   for intf in interfaces %}
+{%     if 'mgmt' in intf.name | lower %}
+{%       set mgmt_found = true %}
 interface {{ intf.name }}
-{%       for address in nb_ips.json.results %}
-{%         if address.assigned_object.name == intf.name %}
-    ip static {{ address.address }}
-{%           if config_context.mgmt_defaultgateway is defined %}
+{%       if intf.ip_addresses is defined and intf.ip_addresses | length > 0 %}
+{%         for ip in intf.ip_addresses %}
+{%           if ip.address is defined %}
+    ip static {{ ip.address }}
+{%             if config_context is defined and config_context.mgmt_defaultgateway is defined %}
     default-gateway {{ config_context.mgmt_defaultgateway }}
-{%           endif %}
-{%           if config_context.mgmt_nameserver is defined %}
+{%             endif %}
+{%             if config_context is defined and config_context.mgmt_nameserver is defined %}
     nameserver {{ config_context.mgmt_nameserver }}
+{%             elif config_context is defined and config_context.dns_servers is defined %}
+{%               for dns_server in config_context.dns_servers[:2] %}
+    nameserver {{ dns_server }}
+{%               endfor %}
+{%             endif %}
 {%           endif %}
-{%         endif %}
-{%       endfor %}
+{%         endfor %}
+{%       else %}
+    ! No IP address found in NetBox
+    ! Configure management IP manually or via DHCP:
+    ! ip static <IP>/<MASK>
+    ! default-gateway <GATEWAY>
+    ! nameserver <DNS>
+{%       endif %}
 {%     endif %}
 {%   endfor %}
+{%   if not mgmt_found %}
+! Warning: No management interfaces found in NetBox
+! Please configure management interface manually:
+! interface mgmt
+!     ip static <IP>/<MASK>
+!     default-gateway <GATEWAY>
+!     nameserver <DNS>
+{%   endif %}
 {% else %}
-! Warning: No management interfaces found
+! Warning: No interfaces data available from NetBox
 ! Please configure management interface manually:
 ! interface mgmt
 !     ip static <IP>/<MASK>
 !     default-gateway <GATEWAY>
 !     nameserver <DNS>
 {% endif %}
+
+!
+! === DEFAULT ROUTE FOR VLAN MANAGEMENT INTERFACES ===
+!
+{#- Add global default route for VLAN interfaces (SVI management) -#}
+{% if mgmt_interfaces is defined and mgmt_interfaces | length > 0 %}
+{%   for intf in mgmt_interfaces %}
+{%     if 'vlan' in intf.name | lower and intf.ip_addresses is defined and intf.ip_addresses | length > 0 %}
+{%       for ip in intf.ip_addresses %}
+{%         if ip.address is defined %}
+{%           set ip_parts = ip.address.split('/') %}
+{%           if ip_parts | length == 2 %}
+{%             set ip_addr = ip_parts[0] %}
+{%             set prefix_len = ip_parts[1] | int %}
+{#-             Calculate first usable IP in the prefix (network + 1) -#}
+{%             set ip_octets = ip_addr.split('.') %}
+{%             if ip_octets | length == 4 %}
+{%               set network_bits = (prefix_len / 8) | int %}
+{%               set host_bits = prefix_len % 8 %}
+{#-               For simplicity, assume first usable is .1 in the last octet for common masks -#}
+{%               if prefix_len >= 24 %}
+{%                 set gateway = ip_octets[0] + '.' + ip_octets[1] + '.' + ip_octets[2] + '.1' %}
+{%               elif prefix_len >= 16 %}
+{%                 set gateway = ip_octets[0] + '.' + ip_octets[1] + '.0.1' %}
+{%               else %}
+{%                 set gateway = ip_octets[0] + '.0.0.1' %}
+{%               endif %}
+{#-               Check if VRF is assigned to this IP address -#}
+{%               set vrf_name = '' %}
+{%               if ip.vrf is defined and ip.vrf is not none %}
+{%                 if ip.vrf.name is defined %}
+{%                   set vrf_name = ip.vrf.name %}
+{%                 endif %}
+{%               endif %}
+{#-               Generate ip route command with or without VRF -#}
+{%               if vrf_name and vrf_name != 'default' and vrf_name | lower != 'global' %}
+ip route 0.0.0.0/0 {{ gateway }} vrf {{ vrf_name }}
+{%               else %}
+ip route 0.0.0.0/0 {{ gateway }}
+{%               endif %}
+{%             endif %}
+{%           endif %}
+{%         endif %}
+{%       endfor %}
+{%     endif %}
+{%   endfor %}
 {% endif %}
 
 !

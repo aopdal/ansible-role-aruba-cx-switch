@@ -1,6 +1,42 @@
 ---
 # tasks/generate_ztp_config.yml
 # Generate ZTP base configuration for initial switch deployment
+#
+# Prerequisites:
+# - interfaces variable from NetBox dynamic inventory (set 'interfaces: true' in inventory config)
+# - Management interfaces should have mgmt_only=True in NetBox
+# - config_context should contain mgmt_defaultgateway and mgmt_nameserver
+#
+# This task filters interfaces where mgmt_only=True to generate management config
+# The 'interfaces' variable is automatically populated by NetBox inventory plugin
+# when 'interfaces: true' is configured in inventory.netbox.yml
+#
+# Note: This captures both:
+# - Dedicated management interfaces (e.g., "mgmt")
+# - VLAN interfaces used for management (e.g., "vlan100" with mgmt_only=True)
+
+- name: "Filter management interfaces from NetBox"
+  ansible.builtin.set_fact:
+    mgmt_interfaces: "{{ interfaces | default([]) | selectattr('mgmt_only', 'defined') | selectattr('mgmt_only') | list }}"
+  when:
+    - mgmt_interfaces is not defined
+    - interfaces is defined
+  tags:
+    - ztp
+    - config_generation
+
+- name: "Debug - Show management interfaces found"
+  ansible.builtin.debug:
+    msg:
+      - "Management interfaces found: {{ mgmt_interfaces | default([]) | length }}"
+      - "Interface names: {{ mgmt_interfaces | default([]) | map(attribute='name') | list }}"
+      - "Interface types: {{ mgmt_interfaces | default([]) | map(attribute='type') | map(attribute='label') | list }}"
+  when:
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+    - aoscx_generate_ztp_config | default(false) | bool
+  tags:
+    - ztp
+    - config_generation
 
 - name: "Create ZTP output directory"
   ansible.builtin.file:
@@ -12,8 +48,8 @@
   when:
     - aoscx_generate_ztp_config | default(false) | bool
   tags:
-    - aoscx_ztp
-    - aoscx_config_generation
+    - ztp
+    - config_generation
 
 - name: "Generate ZTP base configuration"
   ansible.builtin.template:
@@ -24,8 +60,8 @@
   delegate_to: localhost
   run_once: false
   tags:
-    - aoscx_ztp
-    - aoscx_config_generation
+    - ztp
+    - config_generation
   when:
     - aoscx_generate_ztp_config | default(false) | bool
 
@@ -39,8 +75,8 @@
   when:
     - aoscx_generate_ztp_config | default(false) | bool
   tags:
-    - aoscx_ztp
-    - aoscx_config_generation
+    - ztp
+    - config_generation
 
 - name: "Create ZTP configuration summary"
   ansible.builtin.set_fact:
@@ -53,5 +89,5 @@
   when:
     - aoscx_generate_ztp_config | default(false) | bool
   tags:
-    - aoscx_ztp
-    - aoscx_config_generation
+    - ztp
+    - config_generation
