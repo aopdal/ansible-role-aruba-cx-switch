@@ -7,9 +7,7 @@
     }
   },
   "mounts": [
-    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
-    "source=${localEnv:HOME}/code/aruba-role-testing,target=/workspaces/aruba-role-testing,type=bind",
-    "source=${localEnv:HOME}/code/auto-netops-ansible,target=/workspaces/auto-netops-ansible,type=bind,readonly"
+    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
   ],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {

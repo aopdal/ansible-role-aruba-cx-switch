@@ -44,8 +44,9 @@ RUN mkdir -p /home/vscode/.ansible/collections \
     && chown -R vscode:vscode /home/vscode/.ansible
 
 # Set up bash completion for ansible commands
-RUN echo 'source <(ansible --completion bash)' >> /home/vscode/.bashrc \
-    && echo 'source <(ansible-playbook --completion bash)' >> /home/vscode/.bashrc
+# Note: --completion flag requires argcomplete to be installed
+# RUN echo 'source <(ansible --completion bash)' >> /home/vscode/.bashrc \
+#     && echo 'source <(ansible-playbook --completion bash)' >> /home/vscode/.bashrc
 
 # Configure git to be safe
 RUN git config --system --add safe.directory '*'
