@@ -56,6 +56,9 @@ aruba-central
 !
 ! === MANAGEMENT INTERFACE CONFIGURATION ===
 !
+!
+! === MANAGEMENT INTERFACE CONFIGURATION ===
+!
 {% if mgmt_interfaces is defined and mgmt_interfaces | length > 0 %}
 {#- Modern NetBox format with mgmt_only=True -#}
 {%   for intf in mgmt_interfaces %}
@@ -63,7 +66,16 @@ aruba-central
 interface {{ intf.name }}
 {%       for ip in intf.ip_addresses %}
 {%         if ip.address is defined %}
-    ip static {{ ip.address }}
+{#-           For VLAN interfaces, attach VRF first if defined -#}
+{%           if 'vlan' in intf.name | lower %}
+{%             if ip.vrf is defined and ip.vrf is not none and ip.vrf.name is defined %}
+{%               set vrf_name = ip.vrf.name %}
+{%               if vrf_name and vrf_name != 'default' and vrf_name | lower != 'global' %}
+    vrf attach {{ vrf_name }}
+{%               endif %}
+{%             endif %}
+{%           endif %}
+    ip address {{ ip.address }}
 {#-         For dedicated mgmt interface, use default-gateway command -#}
 {%           if 'mgmt' in intf.name | lower and 'vlan' not in intf.name | lower %}
 {%             if config_context is defined and config_context.mgmt_defaultgateway is defined %}
@@ -140,42 +152,23 @@ interface {{ intf.name }}
 !
 ! === DEFAULT ROUTE FOR VLAN MANAGEMENT INTERFACES ===
 !
-{#- Add global default route for VLAN interfaces (SVI management) -#}
 {% if mgmt_interfaces is defined and mgmt_interfaces | length > 0 %}
 {%   for intf in mgmt_interfaces %}
 {%     if 'vlan' in intf.name | lower and intf.ip_addresses is defined and intf.ip_addresses | length > 0 %}
 {%       for ip in intf.ip_addresses %}
 {%         if ip.address is defined %}
-{%           set ip_parts = ip.address.split('/') %}
-{%           if ip_parts | length == 2 %}
-{%             set ip_addr = ip_parts[0] %}
-{%             set prefix_len = ip_parts[1] | int %}
-{#-             Calculate first usable IP in the prefix (network + 1) -#}
-{%             set ip_octets = ip_addr.split('.') %}
-{%             if ip_octets | length == 4 %}
-{%               set network_bits = (prefix_len / 8) | int %}
-{%               set host_bits = prefix_len % 8 %}
-{#-               For simplicity, assume first usable is .1 in the last octet for common masks -#}
-{%               if prefix_len >= 24 %}
-{%                 set gateway = ip_octets[0] + '.' + ip_octets[1] + '.' + ip_octets[2] + '.1' %}
-{%               elif prefix_len >= 16 %}
-{%                 set gateway = ip_octets[0] + '.' + ip_octets[1] + '.0.1' %}
-{%               else %}
-{%                 set gateway = ip_octets[0] + '.0.0.1' %}
-{%               endif %}
-{#-               Check if VRF is assigned to this IP address -#}
-{%               set vrf_name = '' %}
-{%               if ip.vrf is defined and ip.vrf is not none %}
-{%                 if ip.vrf.name is defined %}
-{%                   set vrf_name = ip.vrf.name %}
-{%                 endif %}
-{%               endif %}
-{#-               Generate ip route command with or without VRF -#}
-{%               if vrf_name and vrf_name != 'default' and vrf_name | lower != 'global' %}
+{%           set gateway = ip.address | ansible.utils.ipaddr('first_usable') %}
+{%           set vrf_name = '' %}
+{%           if ip.vrf is defined and ip.vrf is not none %}
+{%             if ip.vrf.name is defined %}
+{%               set vrf_name = ip.vrf.name %}
+{%             endif %}
+{%           endif %}
+{%           if gateway %}
+{%             if vrf_name and vrf_name != 'default' and vrf_name | lower != 'global' %}
 ip route 0.0.0.0/0 {{ gateway }} vrf {{ vrf_name }}
-{%               else %}
+{%             else %}
 ip route 0.0.0.0/0 {{ gateway }}
-{%               endif %}
 {%             endif %}
 {%           endif %}
 {%         endif %}

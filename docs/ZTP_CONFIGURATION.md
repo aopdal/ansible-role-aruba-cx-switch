@@ -60,6 +60,7 @@ group_by:
 ```
 
 This automatically populates the `interfaces` variable for each device, which includes all interface data needed for ZTP configuration. This approach:
+
 - ✅ Works with virtual chassis (stacked switches)
 - ✅ Works with regular switches
 - ✅ No additional API queries needed
@@ -117,6 +118,7 @@ Switches using an in-band VLAN interface (SVI) for management:
    ```
 
 **Important**:
+
 - The `Management Only` checkbox must be enabled
 - For VLAN interfaces, a default route is automatically generated using the first usable IP in the prefix (e.g., `10.0.100.1` for `10.0.100.10/24`)
 - If the IP address is assigned to a VRF, the default route includes the VRF specification
@@ -144,7 +146,9 @@ Switches using an in-band VLAN interface (SVI) for management:
 The template handles default gateway configuration differently based on interface type:
 
 #### Dedicated Management Interface (`mgmt`)
+
 Uses the `default-gateway` command under the interface:
+
 ```
 interface mgmt
     ip static 192.168.1.10/24
@@ -153,26 +157,43 @@ interface mgmt
 Gateway is taken from `config_context.mgmt_defaultgateway`.
 
 #### VLAN Interface (SVI)
+
 Uses a global `ip route` command with automatically calculated gateway:
+
 ```
 interface vlan100
-    ip static 10.0.100.10/24
+    vrf attach mgmt-vrf
+    ip address 10.0.100.10/24
 
-ip route 0.0.0.0/0 10.0.100.1
+ip route 0.0.0.0/0 10.0.100.1 vrf mgmt-vrf
 ```
 
+**Important**:
+- VRF is attached to the interface using `vrf attach <name>` if the IP address has a VRF assigned in NetBox
+- The `ip address` command is used (not `ip static` like on mgmt interfaces)
+- The global `ip route` includes the VRF name when applicable
+
 **Gateway Calculation**:
-- The first usable IP in the prefix is used as the gateway
-- For `/24` networks: `x.x.x.1`
-- For `/16` networks: `x.x.0.1`
-- For `/8` networks: `x.0.0.1`
+
+- Uses `ansible.utils.ipaddr` filter for accurate network calculations
+- Calculates: `network_address + 1` to get the first usable IP
+- Works with any subnet mask (not just /8, /16, /24)
 - Examples:
-  - `10.0.100.10/24` → gateway `10.0.100.1`
-  - `172.16.50.10/16` → gateway `172.16.0.1`
-  - `192.168.1.10/24` → gateway `192.168.1.1`
+    - `10.0.100.10/24` → gateway `10.0.100.1`
+    - `172.16.50.10/16` → gateway `172.16.0.1`
+    - `192.168.1.10/24` → gateway `192.168.1.1`
+    - `10.1.2.100/22` → gateway `10.1.0.1`
+
+**Implementation**:
+
+```jinja2
+{% set gateway = ip.address | ansible.utils.ipaddr('network') | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') %}
+```
 
 **VRF Support**:
+
 If the IP address is assigned to a VRF in NetBox, the route includes the VRF:
+
 ```
 ip route 0.0.0.0/0 10.0.100.1 vrf mgmt-vrf
 ```
@@ -184,20 +205,20 @@ This is required for proper routing when management traffic is isolated in a sep
 The `interfaces` variable is automatically populated by the NetBox inventory plugin when `interfaces: true` is configured. The role then filters management interfaces:
 
 1. **Primary Method**: Filter by `mgmt_only=True` flag in NetBox
-   - Works with any interface type: mgmt, VLAN, physical
-   - Most reliable and explicit
-   - Recommended approach
-   - Task: `generate_ztp_config.yml` filters `interfaces | selectattr('mgmt_only')`
-   - Works with virtual chassis and regular switches
-   - Examples:
-     - Dedicated mgmt interface: `mgmt` with `mgmt_only=True`
-     - VLAN management: `vlan100` with `mgmt_only=True`
+    - Works with any interface type: mgmt, VLAN, physical
+    - Most reliable and explicit
+    - Recommended approach
+    - Task: `generate_ztp_config.yml` filters `interfaces | selectattr('mgmt_only')`
+    - Works with virtual chassis and regular switches
+    - Examples:
+      - Dedicated mgmt interface: `mgmt` with `mgmt_only=True`
+      - VLAN management: `vlan100` with `mgmt_only=True`
 
 2. **Fallback Method**: Search interface names for "mgmt"
-   - Used if `mgmt_interfaces` not defined
-   - Template searches `interfaces` for names containing "mgmt"
-   - Only finds dedicated mgmt interfaces, not VLAN interfaces
-   - Less reliable but provides compatibility
+    - Used if `mgmt_interfaces` not defined
+    - Template searches `interfaces` for names containing "mgmt"
+    - Only finds dedicated mgmt interfaces, not VLAN interfaces
+    - Less reliable but provides compatibility
 
    ```
    Address: 192.168.1.100/24
@@ -206,13 +227,13 @@ The `interfaces` variable is automatically populated by the NetBox inventory plu
 
 3. **Config Context**: Add management settings
 
-   ```json
-   {
-     "mgmt_defaultgateway": "192.168.1.1",
-     "mgmt_nameserver": "8.8.8.8",
-     "dns_servers": ["8.8.8.8", "1.1.1.1"]
-   }
-   ```
+    ```json
+    {
+      "mgmt_defaultgateway": "192.168.1.1",
+      "mgmt_nameserver": "8.8.8.8",
+      "dns_servers": ["8.8.8.8", "1.1.1.1"]
+    }
+    ```
 
 ## Generated Configuration Example
 
@@ -418,6 +439,7 @@ if __name__ == "__main__":
 **Problem**: ZTP config shows "Warning: No management interfaces found"
 
 **Causes**:
+
 1. Interface doesn't have `Management Only` checkbox enabled in NetBox
 2. `interfaces` variable not defined in playbook
 3. Interface name doesn't contain "mgmt" (fallback method)
@@ -448,11 +470,13 @@ ansible_verbosity: 1
 **Problem**: Template doesn't find management interface with `mgmt_only=True`
 
 **Common Scenarios**:
+
 1. Using VLAN interface for management but forgot to check `mgmt_only`
 2. Using dedicated `mgmt` interface but forgot to check `mgmt_only`
 3. Interface exists but `mgmt_only` field not set in NetBox
 
 **Check NetBox Configuration**:
+
 ```bash
 # Verify interface has mgmt_only flag
 curl -H "Authorization: Token $NETBOX_TOKEN" \
@@ -464,6 +488,7 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 ```
 
 **Verify in Playbook**:
+
 ```yaml
 - name: Debug - Check interfaces
   ansible.builtin.debug:
@@ -475,6 +500,7 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 ```
 
 **Solution for VLAN Management**:
+
 1. In NetBox, edit the VLAN interface (e.g., `vlan100`)
 2. Check the `Management Only` checkbox
 3. Ensure IP address is assigned to the VLAN interface
@@ -485,6 +511,7 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 **Problem**: Management interface found but no IP configured
 
 **Solutions**:
+
 1. Assign IP address to management interface in NetBox
 2. Or use DHCP configuration (manual config needed):
    ```
