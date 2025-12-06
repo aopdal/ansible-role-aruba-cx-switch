@@ -14,16 +14,12 @@
     - l3_interfaces.loopback | length > 0
     - item.interface.name not in (ansible_facts.network_resources.interfaces.keys() | list if ansible_facts.network_resources.interfaces is defined else [])
 
-# Define built-in VRFs
-- name: Set built-in VRF list
-  ansible.builtin.set_fact:
-    builtin_vrfs: ['default', 'Default', 'Global', 'global', 'mgmt', 'MGMT', '']
-
 # Separate loopback into built-in and custom VRF
+# Uses aoscx_builtin_vrfs from defaults/main.yml
 - name: Set loopback interface facts
   ansible.builtin.set_fact:
-    loopback_default_vrf: "{{ l3_interfaces.loopback | selectattr('vrf', 'in', builtin_vrfs + [none]) | list }}"
-    loopback_custom_vrf: "{{ l3_interfaces.loopback | rejectattr('vrf', 'in', builtin_vrfs + [none]) | list }}"
+    loopback_default_vrf: "{{ l3_interfaces.loopback | selectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
+    loopback_custom_vrf: "{{ l3_interfaces.loopback | rejectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
   when: l3_interfaces.loopback | length > 0
 
 - name: Debug - Show loopback categorization

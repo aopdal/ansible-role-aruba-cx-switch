@@ -1,0 +1,51 @@
+---
+# Unified L3 interface configuration task
+#
+# This task file provides a single, reusable implementation for configuring
+# L3 interfaces across all interface types (physical, LAG, VLAN).
+#
+# Required Parameters:
+#   - interface_list: List of interface/IP combinations to configure
+#   - interface_type: Type of interface ('physical', 'lag', 'vlan')
+#   - ip_version: IP version to configure ('ipv4' or 'ipv6')
+#   - vrf_type: VRF type ('default' or 'custom')
+#
+# Optional Parameters:
+#   - l3_counters_enable: Enable L3 counters (default: from aoscx_l3_counters_enable)
+#
+# Usage Example:
+#   - ansible.builtin.include_tasks:
+#       file: configure_l3_interface_common.yml
+#     vars:
+#       interface_list: "{{ l3_interfaces.physical_default_vrf }}"
+#       interface_type: physical
+#       ip_version: ipv4
+#       vrf_type: default
+
+- name: "Configure {{ interface_type }} L3 interfaces ({{ vrf_type }} VRF) - {{ ip_version | upper }}"
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item | build_l3_config_lines(interface_type, ip_version, vrf_type, aoscx_l3_counters_enable | default(true)) }}"
+    parents: "interface {{ item.interface_name | format_interface_name(interface_type) }}"
+  loop: "{{ filtered_interfaces }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} IP: {{ item.address }}{{ ' VRF: ' + (item.interface | get_interface_vrf) if vrf_type == 'custom' else '' }}"
+  when: filtered_interfaces | length > 0
+  changed_when: "{{ false if ip_version == 'ipv6' else omit }}"
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+    # Filter interfaces based on IP version and _needs_add flag
+    # IPv4: Only configure if _needs_add is true (idempotent check)
+    # IPv6: Always configure (comparison not reliable due to device facts limitation)
+    # Use regex patterns to match IP versions (can't use custom test filters in selectattr)
+    filtered_interfaces: >-
+      {{
+        interface_list
+        | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/')
+        | selectattr('_needs_add', 'equalto', true)
+        | list
+        if ip_version == 'ipv4'
+        else
+        interface_list
+        | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/')
+        | list
+      }}

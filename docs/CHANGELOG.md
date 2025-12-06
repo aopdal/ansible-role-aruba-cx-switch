@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Code Optimizations & Refactoring**
+  - New L3 Configuration Helpers module (`l3_config_helpers.py`)
+    - `format_interface_name()` - Interface name formatting for AOS-CX
+    - `is_ipv4_address()` / `is_ipv6_address()` - IP version detection
+    - `get_interface_vrf()` - VRF extraction with safe fallback
+    - `build_l3_config_lines()` - Complete L3 config line generation
+  - IP address extraction helpers in utils module
+    - `extract_ip_addresses()` - Extract and categorize IPv4/IPv6
+    - `populate_ip_changes()` - Populate idempotent change tracking
+  - Unified L3 interface configuration task (`configure_l3_interface_common.yml`)
+    - Single reusable task for all interface types
+    - Supports physical, LAG, and VLAN interfaces
+    - Handles IPv4, IPv6, default/custom VRFs, and anycast gateways
+  - Configurable built-in VRFs list (`aoscx_builtin_vrfs` in defaults)
+  - Comprehensive documentation for new filter helpers
+
 - Comprehensive CI/CD testing infrastructure
   - GitHub Actions workflow for automated testing
   - Molecule testing framework for role validation
@@ -22,12 +38,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Major Code Consolidation**
+  - Refactored L3 interface configuration tasks (53% reduction)
+    - `configure_l3_physical.yml`: 85 → 43 lines (-49%)
+    - `configure_l3_lag.yml`: 85 → 43 lines (-49%)
+    - `configure_l3_vlan.yml`: 105 → 43 lines (-59%)
+  - Eliminated 186 lines of duplicated code across the role
+  - Moved complex Jinja2 logic to testable Python functions
+  - Centralized IP address extraction (removed 3 duplicate code blocks)
+
 - Enhanced .gitignore for testing artifacts
 - Updated role structure for better maintainability
+- Improved filter plugins documentation with new L3 helpers
 
 ### Fixed
 
-- N/A
+- **Critical**: VLAN interface IPv4 addresses not configured on first run
+  - Root cause: Missing `_ip_changes.ipv4_to_add` for new interfaces
+  - Solution: Populate IP changes before early continue in interface detection
+  - Impact: IPv4 now configures correctly on initial deployment
+  - Details: [VLAN_INTERFACE_FIX_SUMMARY.md](../VLAN_INTERFACE_FIX_SUMMARY.md)
+
+- Inconsistent IPv6 `changed_when` handling (now consistent across all tasks)
+- Magic strings for built-in VRFs (moved to configurable defaults)
 
 ## [1.0.0] - YYYY-MM-DD
 

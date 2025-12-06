@@ -4,11 +4,11 @@ Comprehensive documentation for the NetBox Filters Library used with Aruba AOS-C
 
 ## Overview
 
-The filter plugins library provides 22 custom Ansible filters organized into 6 specialized modules. These filters transform NetBox data for use in switch configuration playbooks, handle state comparison for idempotent operations, and categorize interfaces for targeted configuration.
+The filter plugins library provides 27 custom Ansible filters organized into 7 specialized modules. These filters transform NetBox data for use in switch configuration playbooks, handle state comparison for idempotent operations, and categorize interfaces for targeted configuration.
 
-**Total Filters**: 22
-**Total Lines of Code**: ~1,500
-**Modules**: 6 feature modules + 1 utility module
+**Total Filters**: 27
+**Total Lines of Code**: ~2,100
+**Modules**: 7 feature modules + 1 utility module
 
 ---
 
@@ -17,13 +17,36 @@ The filter plugins library provides 22 custom Ansible filters organized into 6 s
 ### Core Utilities
 
 **[Utils Module](utils.md)** - Helper functions and debugging
-**Functions**: 3
-**Lines**: 100
+**Functions**: 5
+**Lines**: 159
 
 Foundation module providing:
 - Debug message printing with environment variable control
 - VLAN list range formatting (e.g., `10-12,20-21`)
 - Interface selection for idempotent mode
+- IP address extraction and categorization (IPv4/IPv6)
+- IP changes population for idempotent checks
+
+---
+
+### L3 Configuration
+
+**[L3 Config Helpers](l3_config_helpers.md)** - L3 interface configuration optimization
+**Filters**: 5
+**Lines**: 162
+
+Configuration building and helper functions:
+- Interface name formatting for AOS-CX
+- IP version detection (IPv4/IPv6)
+- VRF extraction with safe fallback
+- Complete L3 config line generation
+- Supports physical, LAG, and VLAN interfaces
+
+**Key Filters:**
+- `format_interface_name()` - Format interface names
+- `is_ipv4_address()` / `is_ipv6_address()` - IP version detection
+- `get_interface_vrf()` - Extract VRF with fallback
+- `build_l3_config_lines()` - Build configuration commands
 
 ---
 
@@ -377,13 +400,14 @@ EOF
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| **utils.py** | 3 | 100 | Helper functions and utilities |
+| **utils.py** | 5 | 159 | Helper functions and utilities |
+| **l3_config_helpers.py** | 5 | 162 | L3 configuration optimization |
 | **vlan_filters.py** | 9 | 455 | VLAN lifecycle management |
 | **vrf_filters.py** | 4 | 192 | VRF operations |
 | **interface_filters.py** | 4 | 802 | Interface categorization |
 | **comparison.py** | 2 | 279 | State comparison logic |
 | **ospf_filters.py** | 4 | 112 | OSPF configuration |
-| **Total** | **26** | **~1,940** | 6 modules + utilities |
+| **Total** | **33** | **~2,161** | 7 modules + utilities |
 
 ---
 

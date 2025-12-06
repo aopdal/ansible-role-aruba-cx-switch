@@ -16,15 +16,16 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 
 ## Overview
 
-This role includes comprehensive CI/CD testing infrastructure with **7 layers of testing**:
+This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
 
-1. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
-2. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
-3. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
-4. ✅ **Molecule Testing** - Role integration testing (Docker-based)
-5. ✅ **Integration Testing** - Full playbook testing
-6. ✅ **Pre-commit Hooks** - Automated checks before commits
-7. ✅ **CI/CD Pipeline** - GitHub Actions automation
+1. ✅ **Python Unit Tests** (`pytest`) - 124 tests for filter plugins *(NEW)*
+2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
+3. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
+4. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
+5. ✅ **Molecule Testing** - Role integration testing (Docker-based)
+6. ✅ **Integration Testing** - Full playbook testing
+7. ✅ **Pre-commit Hooks** - Automated checks before commits
+8. ✅ **CI/CD Pipeline** - GitHub Actions automation
 
 ### Key Benefits
 
@@ -373,7 +374,42 @@ https://github.com/your-org/ansible-role-aruba-cx-switch/actions
 
 ## Test Types
 
-### Unit Tests (Molecule)
+### Python Unit Tests (Filter Plugins)
+
+Located in: `tests/unit/`
+
+**NEW**: Comprehensive unit tests for custom filter plugins using pytest.
+
+The role includes **124 unit tests** covering all custom Ansible filters:
+
+```bash
+# Run all unit tests
+pytest tests/unit/
+
+# Run specific test file
+pytest tests/unit/test_l3_config_helpers.py
+
+# Run with coverage
+pytest tests/unit/ --cov=filter_plugins --cov-report=html
+
+# Run specific test categories
+pytest tests/unit/ -m vlan      # VLAN filter tests
+pytest tests/unit/ -m l3_config  # L3 config helper tests
+pytest tests/unit/ -m utils      # Utility function tests
+```
+
+**Test Coverage**:
+- `test_l3_config_helpers.py` - 28 tests for L3 configuration optimization
+- `test_utils.py` - 19 tests for utility functions
+- `test_vlan_filters.py` - VLAN lifecycle management
+- `test_vrf_filters.py` - VRF operations
+- `test_interface_filters.py` - Interface categorization
+- `test_comparison.py` - State comparison logic
+- `test_ospf_filters.py` - OSPF configuration
+
+**Configuration**: `pytest.ini` defines test discovery, markers, and coverage settings
+
+### Molecule Tests (Role Validation)
 
 Located in: `molecule/default/`
 
@@ -446,6 +482,13 @@ make setup             # Complete setup (venv + dependencies)
 make info              # Show system and venv info
 make help              # Show all commands
 
+# Python Unit Tests (NEW)
+pytest tests/unit/                           # Run all unit tests
+pytest tests/unit/ -v                        # Verbose output
+pytest tests/unit/ --cov=filter_plugins      # With coverage
+pytest tests/unit/test_l3_config_helpers.py  # Specific test file
+pytest tests/unit/ -m l3_config              # By marker
+
 # Testing
 make lint              # YAML + Ansible linting
 make syntax            # Syntax check
@@ -471,6 +514,53 @@ make pre-commit        # Run hooks on all files
 For a complete command reference, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md).
 
 ## Writing New Tests
+
+### Adding Python Unit Tests for Filters
+
+**NEW**: When adding new filter plugins, create comprehensive unit tests:
+
+1. **Create test file** in `tests/unit/`:
+   ```bash
+   # Follow naming convention: test_<module_name>.py
+   tests/unit/test_my_new_filters.py
+   ```
+
+2. **Structure your tests**:
+   ```python
+   """Unit tests for my new filters"""
+   import pytest
+   from netbox_filters_lib.my_new_filters import my_filter_function
+
+   class TestMyFilterFunction:
+       """Tests for my_filter_function"""
+
+       def test_basic_functionality(self):
+           """Test basic use case"""
+           result = my_filter_function(input_data)
+           assert result == expected_output
+
+       def test_edge_cases(self):
+           """Test edge cases"""
+           assert my_filter_function([]) == []
+           assert my_filter_function(None) == default_value
+   ```
+
+3. **Run your tests**:
+   ```bash
+   # Run just your new tests
+   pytest tests/unit/test_my_new_filters.py -v
+
+   # Run with coverage
+   pytest tests/unit/test_my_new_filters.py --cov=filter_plugins.netbox_filters_lib.my_new_filters
+   ```
+
+4. **Add test markers** in `pytest.ini` if needed
+
+**Best Practices**:
+- Test normal inputs, edge cases, and error conditions
+- Use descriptive test names: `test_<what>_<condition>`
+- Aim for high code coverage (>80%)
+- Test both expected behavior and failure modes
 
 ### Adding Molecule Scenarios
 

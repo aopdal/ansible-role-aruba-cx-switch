@@ -55,6 +55,13 @@ from netbox_filters_lib.ospf_filters import (
     get_ospf_interfaces_by_area,
     validate_ospf_config,
 )
+from netbox_filters_lib.l3_config_helpers import (
+    format_interface_name,
+    is_ipv4_address,
+    is_ipv6_address,
+    get_interface_vrf,
+    build_l3_config_lines,
+)
 
 # fmt: on
 
@@ -90,4 +97,10 @@ class FilterModule:
             "extract_ospf_areas": extract_ospf_areas,
             "get_ospf_interfaces_by_area": get_ospf_interfaces_by_area,
             "validate_ospf_config": validate_ospf_config,
+            # L3 configuration helpers
+            "format_interface_name": format_interface_name,
+            "is_ipv4_address": is_ipv4_address,
+            "is_ipv6_address": is_ipv6_address,
+            "get_interface_vrf": get_interface_vrf,
+            "build_l3_config_lines": build_l3_config_lines,
         }

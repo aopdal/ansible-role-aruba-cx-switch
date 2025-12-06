@@ -97,3 +97,63 @@ def select_interfaces_to_configure(
     )
 
     return configure_list
+
+
+def extract_ip_addresses(nb_intf):
+    """
+    Extract and categorize IPv4 and IPv6 addresses from a NetBox interface.
+
+    This helper function centralizes the logic for extracting IP addresses
+    from NetBox interface data and separating them into IPv4 and IPv6 lists.
+
+    Args:
+        nb_intf: NetBox interface object containing ip_addresses
+
+    Returns:
+        Tuple of (ipv4_list, ipv6_list) where:
+        - ipv4_list: List of IPv4 addresses (e.g., ["192.168.1.1/24"])
+        - ipv6_list: List of IPv6 addresses (e.g., ["2001:db8::1/64"])
+    """
+    nb_ip_addresses = nb_intf.get("ip_addresses", [])
+    nb_ipv4 = []
+    nb_ipv6 = []
+
+    for ip_obj in nb_ip_addresses:
+        if isinstance(ip_obj, dict):
+            ip_addr = ip_obj.get("address")
+            if ip_addr:
+                # Separate IPv4 and IPv6 by presence of colon
+                if ":" in ip_addr:
+                    nb_ipv6.append(ip_addr)
+                else:
+                    nb_ipv4.append(ip_addr)
+
+    return nb_ipv4, nb_ipv6
+
+
+def populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6):
+    """
+    Populate the _ip_changes dictionary with IP addresses to add.
+
+    This helper function centralizes the logic for populating the _ip_changes
+    field in NetBox interface objects, which is used by task files to determine
+    which IP addresses need to be configured.
+
+    Args:
+        nb_intf: NetBox interface object to modify
+        nb_ipv4: List of IPv4 addresses to add
+        nb_ipv6: List of IPv6 addresses to add
+
+    Side Effects:
+        Modifies nb_intf by adding/updating the _ip_changes dictionary:
+        - _ip_changes.ipv4_to_add: IPv4 addresses needing configuration
+        - _ip_changes.ipv6_addresses: IPv6 addresses needing configuration
+    """
+    if nb_ipv4 or nb_ipv6:
+        nb_intf["_ip_changes"] = {}
+        if nb_ipv4:
+            nb_intf["_ip_changes"]["ipv4_to_add"] = nb_ipv4
+            _debug(f"  IPv4 addresses to add: {nb_ipv4}")
+        if nb_ipv6:
+            nb_intf["_ip_changes"]["ipv6_addresses"] = nb_ipv6
+            _debug(f"  IPv6 addresses to add: {nb_ipv6}")

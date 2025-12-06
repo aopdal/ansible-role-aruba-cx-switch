@@ -34,7 +34,7 @@ Provides functions to compare NetBox interface configuration with device facts
 and identify which interfaces need configuration changes.
 """
 
-from .utils import _debug
+from .utils import _debug, extract_ip_addresses, populate_ip_changes
 
 
 def get_interfaces_needing_config_changes(interfaces, device_facts):
@@ -170,27 +170,9 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
 
                 # Populate _ip_changes with all IP addresses that need to be added
                 # since the interface doesn't exist yet
-                nb_ip_addresses = nb_intf.get("ip_addresses", [])
-                if nb_ip_addresses:
-                    nb_ipv4 = []
-                    nb_ipv6 = []
-                    for ip_obj in nb_ip_addresses:
-                        if isinstance(ip_obj, dict):
-                            ip_addr = ip_obj.get("address")
-                            if ip_addr:
-                                if ":" in ip_addr:
-                                    nb_ipv6.append(ip_addr)
-                                else:
-                                    nb_ipv4.append(ip_addr)
-
-                    if nb_ipv4 or nb_ipv6:
-                        nb_intf["_ip_changes"] = {}
-                        if nb_ipv4:
-                            nb_intf["_ip_changes"]["ipv4_to_add"] = nb_ipv4
-                            _debug(f"  IPv4 addresses to add: {nb_ipv4}")
-                        if nb_ipv6:
-                            nb_intf["_ip_changes"]["ipv6_addresses"] = nb_ipv6
-                            _debug(f"  IPv6 addresses to add: {nb_ipv6}")
+                if nb_intf.get("ip_addresses"):
+                    nb_ipv4, nb_ipv6 = extract_ip_addresses(nb_intf)
+                    populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6)
 
                 _categorize_interface_for_changes(nb_intf, result, needs_change=True)
                 continue
@@ -204,27 +186,9 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
             _debug(f"Available interface keys: {available_keys}")
 
             # Populate _ip_changes with all IP addresses for new interfaces
-            nb_ip_addresses = nb_intf.get("ip_addresses", [])
-            if nb_ip_addresses:
-                nb_ipv4 = []
-                nb_ipv6 = []
-                for ip_obj in nb_ip_addresses:
-                    if isinstance(ip_obj, dict):
-                        ip_addr = ip_obj.get("address")
-                        if ip_addr:
-                            if ":" in ip_addr:
-                                nb_ipv6.append(ip_addr)
-                            else:
-                                nb_ipv4.append(ip_addr)
-
-                if nb_ipv4 or nb_ipv6:
-                    nb_intf["_ip_changes"] = {}
-                    if nb_ipv4:
-                        nb_intf["_ip_changes"]["ipv4_to_add"] = nb_ipv4
-                        _debug(f"  IPv4 addresses to add: {nb_ipv4}")
-                    if nb_ipv6:
-                        nb_intf["_ip_changes"]["ipv6_addresses"] = nb_ipv6
-                        _debug(f"  IPv6 addresses to add: {nb_ipv6}")
+            if nb_intf.get("ip_addresses"):
+                nb_ipv4, nb_ipv6 = extract_ip_addresses(nb_intf)
+                populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6)
 
             _categorize_interface_for_changes(nb_intf, result, needs_change=True)
             continue
@@ -499,20 +463,11 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
 
         # Check L3 configuration (IP addresses)
         # Compare IP addresses defined in NetBox with those on the device
-        nb_ip_addresses = nb_intf.get("ip_addresses", [])
-        if nb_ip_addresses:
+        if nb_intf.get("ip_addresses"):
             # Extract IP addresses from NetBox (format: "192.168.1.1/24" or "2001:db8::1/64")
-            nb_ipv4 = set()
-            nb_ipv6 = set()
-            for ip_obj in nb_ip_addresses:
-                if isinstance(ip_obj, dict):
-                    ip_addr = ip_obj.get("address")
-                    if ip_addr:
-                        # Separate IPv4 and IPv6
-                        if ":" in ip_addr:
-                            nb_ipv6.add(ip_addr)
-                        else:
-                            nb_ipv4.add(ip_addr)
+            nb_ipv4_list, nb_ipv6_list = extract_ip_addresses(nb_intf)
+            nb_ipv4 = set(nb_ipv4_list)
+            nb_ipv6 = set(nb_ipv6_list)
 
             # Extract IP addresses from device facts
             device_ipv4 = set()

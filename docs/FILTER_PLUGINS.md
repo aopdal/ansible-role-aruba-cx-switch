@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **25 custom filters** organized into 9 focused modules totaling ~1,800 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
+This library provides **33 custom filters** organized into 8 focused modules totaling ~2,161 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
@@ -237,15 +237,21 @@ filter_plugins/
 ├── netbox_filters.py                    # Main entry point (FilterModule class)
 └── netbox_filters_lib/                  # Package directory
     ├── __init__.py                      # Package initialization
-    ├── utils.py                         # Helper functions (53 lines)
-    ├── vlan_filters.py                  # VLAN operations (395 lines)
-    ├── vrf_filters.py                   # VRF operations (194 lines)
+    ├── utils.py                         # Helper functions (159 lines)
+    ├── l3_config_helpers.py             # L3 configuration optimization (162 lines)
+    ├── vlan_filters.py                  # VLAN operations (455 lines)
+    ├── vrf_filters.py                   # VRF operations (192 lines)
     ├── interface_categorization.py      # L2/L3 interface categorization (294 lines)
     ├── interface_ip_processing.py       # IP address matching (106 lines)
     ├── interface_change_detection.py    # Change detection & idempotency (621 lines)
     ├── comparison.py                    # State comparison (279 lines)
-    └── ospf_filters.py                  # OSPF operations (116 lines)
+    └── ospf_filters.py                  # OSPF operations (112 lines)
 ```
+
+**Recent Updates** (January 2025):
+- Added `l3_config_helpers.py` module for L3 configuration optimization (5 filters)
+- Enhanced `utils.py` with IP address extraction helpers (2 new functions)
+- Updated `interface_change_detection.py` with bug fix for VLAN IPv4 address configuration
 
 **Note**: The `interface_filters.py` module was split into three focused modules in November 2025:
 - `interface_categorization.py` - Interface type and VLAN mode categorization
@@ -256,7 +262,7 @@ filter_plugins/
 
 ### `utils.py` - Helper Functions
 
-Core utilities used across all modules:
+Core utilities used across all modules (5 functions, 159 lines):
 
 - **`_debug(message)`**
     - Print debug messages when `DEBUG_ANSIBLE=true` environment variable is set
@@ -265,9 +271,52 @@ Core utilities used across all modules:
     - Format VLAN IDs as compact ranges
     - Example: `[10, 11, 12, 20, 21]` → `"10-12,20-21"`
 
+- **`select_interfaces_to_configure(interfaces, idempotent_mode, changes)`**
+    - Select which interfaces to configure based on idempotent mode
+    - Used for smart interface filtering in change detection
+
+- **`extract_ip_addresses(nb_intf)`** *(Added January 2025)*
+    - Extract and categorize IPv4 and IPv6 addresses from interface objects
+    - Returns tuple: `(ipv4_list, ipv6_list)`
+
+- **`populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6)`** *(Added January 2025)*
+    - Populate `_ip_changes` dict for idempotent IP address configuration
+    - Supports anycast gateway IP address handling
+
+### `l3_config_helpers.py` - L3 Configuration Optimization *(New in January 2025)*
+
+Configuration building and helper functions for L3 interfaces (5 filters, 162 lines):
+
+- **`format_interface_name(interface_name, interface_type)`**
+    - Format interface names for AOS-CX CLI
+    - Handles LAG interface name formatting (adds space: "lag1" → "lag 1")
+
+- **`is_ipv4_address(address)`**
+    - Check if an address is IPv4
+    - Returns: Boolean
+
+- **`is_ipv6_address(address)`**
+    - Check if an address is IPv6
+    - Returns: Boolean
+
+- **`get_interface_vrf(interface)`**
+    - Extract VRF name from interface object with safe fallback
+    - Returns: VRF name or "default"
+
+- **`build_l3_config_lines(item, interface_type, ip_version, vrf_type, l3_counters_enable=True)`**
+    - Build complete L3 configuration command list
+    - Handles: VRF attachment, IP addressing, MTU, L3 counters, anycast gateway
+    - Supports: Physical, LAG, and VLAN interfaces
+    - Returns: List of configuration commands
+
+**Key Benefits**:
+- Eliminates 146 lines of duplicated task code
+- Replaces complex Jinja2 with testable Python
+- Single source of truth for L3 configuration logic
+
 ### `vlan_filters.py` - VLAN Operations
 
-Complete VLAN lifecycle management (7 filters):
+Complete VLAN lifecycle management (9 filters, 455 lines):
 
 - **`extract_vlan_ids(interfaces)`**
     - Extract all VLAN IDs in use from interfaces
@@ -301,7 +350,7 @@ Complete VLAN lifecycle management (7 filters):
 
 ### `vrf_filters.py` - VRF Operations
 
-VRF extraction and filtering (4 filters):
+VRF extraction and filtering (4 filters, 192 lines):
 
 - **`extract_interface_vrfs(interfaces)`**
     - Extract unique VRF names from interfaces
@@ -535,6 +584,31 @@ All filters are available through standard Ansible filter syntax:
 # Match IP addresses to interfaces
 - set_fact:
     interface_ips: "{{ interfaces | get_interface_ip_addresses(ip_addresses) }}"
+```
+
+### L3 Configuration Helpers
+
+```yaml
+# Build L3 configuration lines
+- set_fact:
+    config_lines: "{{ item | build_l3_config_lines('physical', 'ipv4', 'custom', true) }}"
+    # Returns: ['vrf attach CUST-A', 'ip address 10.1.1.1/24', 'ip mtu 9000', 'l3-counters']
+
+# Format interface names
+- set_fact:
+    formatted_name: "{{ 'lag1' | format_interface_name('lag') }}"
+    # Returns: "lag 1"
+
+# Check IP version
+- set_fact:
+    is_v4: "{{ '192.168.1.1/24' | is_ipv4_address }}"
+    is_v6: "{{ '2001:db8::1/64' | is_ipv6_address }}"
+    # Returns: true, true
+
+# Get VRF name with fallback
+- set_fact:
+    vrf_name: "{{ interface | get_interface_vrf }}"
+    # Returns: VRF name or "default"
 ```
 
 ### State Comparison
@@ -797,9 +871,9 @@ netbox_filters.py (main entry point)
 
 ## Statistics
 
-- **Total Filters**: 22
-- **Total Lines**: ~1,500 (including docstrings and comments)
-- **Modules**: 7 (6 feature modules + 1 utility)
+- **Total Filters**: 33
+- **Total Lines**: ~2,161 (including docstrings and comments)
+- **Modules**: 8 (7 feature modules + 1 utility)
 - **Test Coverage**: Used in production for 100+ switches
 - **Code Quality**: Pylint score 9.30/10
 
@@ -807,12 +881,16 @@ netbox_filters.py (main entry point)
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| `vlan_filters.py` | 7 | 395 | VLAN lifecycle management |
-| `interface_filters.py` | 3 | 373 | Interface categorization |
+| `interface_change_detection.py` | 2 | 621 | Change detection & idempotency |
+| `vlan_filters.py` | 9 | 455 | VLAN lifecycle management |
+| `interface_categorization.py` | 2 | 294 | Interface categorization |
 | `comparison.py` | 3 | 279 | State comparison logic |
-| `vrf_filters.py` | 4 | 194 | VRF operations |
-| `ospf_filters.py` | 4 | 116 | OSPF configuration |
-| `utils.py` | 2 | 53 | Helper functions |
+| `vrf_filters.py` | 4 | 192 | VRF operations |
+| `l3_config_helpers.py` | 5 | 162 | L3 configuration optimization |
+| `utils.py` | 5 | 159 | Helper functions |
+| `ospf_filters.py` | 4 | 112 | OSPF configuration |
+| `interface_ip_processing.py` | 1 | 106 | IP address matching |
+| **Total** | **33** | **~2,161** | **9 modules** |
 
 ## Migration Guide
 
@@ -892,13 +970,10 @@ ansible-playbook your-playbook.yml
 
 This will print detailed debug messages showing how filters process data.
 
-## Module Statistics
+## See Also
 
-- **Total filters**: 18
-- **Largest module**: 361 lines (vlan_filters.py)
-- **All modules**: Under 1000 lines each
-- **Code quality**: Pylint 9.30/10
-
-## Migration from Old Version
-
-No changes needed! The refactored version maintains 100% backward compatibility with the original monolithic `netbox_filters.py` file. All existing playbooks will continue to work without modification.
+- **[Detailed Filter Reference](filter_plugins/index.md)** - Complete module and filter documentation
+- **[L3 Config Helpers](filter_plugins/l3_config_helpers.md)** - L3 configuration optimization details
+- **[Code Optimization Summary](CODE_OPTIMIZATION_2025.md)** - January 2025 optimization details
+- **[Development Guide](DEVELOPMENT.md)** - Contributing guidelines
+- **[NetBox Integration](NETBOX_INTEGRATION.md)** - NetBox setup and configuration
