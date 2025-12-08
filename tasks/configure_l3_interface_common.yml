@@ -30,7 +30,6 @@
   loop_control:
     label: "Interface: {{ item.interface_name }} IP: {{ item.address }}{{ ' VRF: ' + (item.interface | get_interface_vrf) if vrf_type == 'custom' else '' }}"
   when: filtered_interfaces | length > 0
-  changed_when: false
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
     # Filter interfaces based on IP version only

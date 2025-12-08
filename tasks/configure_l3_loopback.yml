@@ -56,7 +56,6 @@
   when:
     - loopback_default_vrf is defined
     - loopback_default_vrf | length > 0
-  changed_when: false  # IPv6 comparison not reliable - suppress false positives
 
 - name: Configure loopback interfaces (custom VRF) - IPv4
   arubanetworks.aoscx.aoscx_config:
@@ -87,6 +86,5 @@
   when:
     - loopback_custom_vrf is defined
     - loopback_custom_vrf | length > 0
-  changed_when: false  # IPv6 comparison not reliable - suppress false positives
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"

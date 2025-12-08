@@ -113,23 +113,23 @@ The role implements intelligent comparison of L3 interface IP addresses to minim
 
 **Implementation**: Full comparison and granular change tracking
 
-IPv4 addresses are compared between NetBox and device facts:
-- Only IP addresses that **actually need to be added** are marked for configuration
-- Tasks filter interfaces using `selectattr('_needs_add', 'equalto', true)`
-- Significantly reduces configuration time by skipping unnecessary device connections
+IPv4 addresses are configured using `aoscx_config` with `match: line`:
+- All IPv4 addresses in NetBox are configured on each run
+- The `aoscx_config` module is inherently idempotent (won't apply duplicate configs)
+- IP version filtering uses simple colon check: IPv6 has `:`, IPv4 doesn't
 
 **Example**:
 ```yaml
-# Interface has 10 IP addresses configured, NetBox adds 1 more
-# OLD behavior: Task runs for all 11 IPs (10 already configured + 1 new)
-# NEW behavior: Task runs for only 1 IP (the new one)
+# Filter IPv4 addresses (no colon)
+filtered_interfaces: >-
+  {{ interface_list | rejectattr('address', 'search', ':') | list }}
+
+# Filter IPv6 addresses (has colon)
+filtered_interfaces: >-
+  {{ interface_list | selectattr('address', 'search', ':') | list }}
 ```
 
-**Performance Impact**:
-- Typical environment: 50+ interfaces with 2-5 IPs each
-- Without filtering: 100-250 unnecessary configuration tasks
-- With filtering: Only 5-10 tasks for actual changes
-- Time saved: 60-90% reduction in L3 configuration phase
+**Note**: The `_needs_add` flag is still calculated for potential use in loopback configuration which uses `aoscx_l3_interface` module (not idempotent).
 
 ### IPv6 Address Performance Trade-off
 
@@ -157,7 +157,6 @@ Testing confirmed that fetching IPv6 addresses for comparison is **slower** than
 
 **Current Implementation**:
 - IPv6 tasks **always execute** (no pre-comparison performed)
-- Tasks use `changed_when: false` to suppress false "changed" status
 - Configuration remains idempotent at CLI level (duplicate commands have no effect)
 
 **Example**:
@@ -165,12 +164,12 @@ Testing confirmed that fetching IPv6 addresses for comparison is **slower** than
 - name: Configure IPv6 address on VLAN interface
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - ipv6 address {{ item.1.address }}
-    parents: interface vlan{{ item.0.vlan.vid }}
-  loop: "{{ l3_interfaces.vlan_custom_vrf | subelements('ip_addresses') }}"
-  # Note: No _needs_add filter - all IPv6 tasks run
-  when: item.1.address is match('^[0-9a-fA-F:]+/')
-  changed_when: false  # Suppress false positives
+      - ipv6 address {{ item.address }}
+    parents: interface {{ item.interface_name | format_interface_name('vlan') }}
+  loop: "{{ filtered_interfaces }}"
+  vars:
+    filtered_interfaces: >-
+      {{ interface_list | selectattr('address', 'search', ':') | list }}
 ```
 
 ### Filter Implementation Details
@@ -186,9 +185,9 @@ The `get_interfaces_needing_config_changes()` filter returns:
 ```
 
 Tasks in `configure_l3_*.yml` files then:
-1. Set `_needs_add` flag by checking if IP is in `ipv4_to_add` list
-2. Filter IPv4 tasks: `selectattr('_needs_add', 'equalto', true)`
-3. Run IPv6 tasks without filtering: `changed_when: false`
+1. Filter by IP version using colon check: `rejectattr('address', 'search', ':')` for IPv4
+2. Use `aoscx_config` module which is inherently idempotent
+3. Loopback tasks still use `_needs_add` with `aoscx_l3_interface` module
 
 ### Best Practices
 
@@ -199,7 +198,6 @@ Tasks in `configure_l3_*.yml` files then:
 
 **IPv6 Configuration**:
 - ✅ Fastest approach: Apply idempotent configuration without pre-checking
-- ✅ Use `changed_when: false` to avoid misleading playbook output
 - ⚠️ Accept that IPv6 tasks always run (performance-optimal trade-off)
 
 **Debugging**:

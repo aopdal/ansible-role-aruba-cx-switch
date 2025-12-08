@@ -110,7 +110,6 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 ⚠️ **IPv6 Performance Trade-off**: IPv6 addresses in AOS-CX device facts are returned as REST API URL references (e.g., `/rest/v10.09/system/interfaces/vlan11/ip6_addresses`) rather than actual address values. While it's technically possible to retrieve IPv6 addresses via CLI commands, testing confirmed that the overhead of fetching and comparing IPv6 data exceeds the time it takes to simply apply the idempotent configuration. As a result:
 
 - IPv6 configuration tasks always execute (no pre-comparison)
-- Tasks use `changed_when: false` to suppress false positive "changed" status
 - IPv6 configuration remains idempotent at the CLI level (duplicate commands have no effect)
 - This approach is faster than checking before applying
 

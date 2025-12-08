@@ -59,7 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Impact: IPv4 now configures correctly on initial deployment
   - Details: [VLAN_INTERFACE_FIX_SUMMARY.md](../VLAN_INTERFACE_FIX_SUMMARY.md)
 
-- Inconsistent IPv6 `changed_when` handling (now consistent across all tasks)
+- **Critical**: IPv4 filtering broken in unified L3 configuration task
+  - Root cause: Regex pattern `^\d+\.\d+\.\d+\.\d+/` not working with `selectattr/rejectattr`
+  - Solution: Changed to simple colon check (IPv6 has `:`, IPv4 doesn't)
+  - Impact: IPv4 addresses now correctly filtered and configured on all interface types
+
+- **Critical**: IPv4 not configuring due to `_needs_add` filter
+  - Root cause: Overly complex `_needs_add` logic filtering out valid IPv4 addresses
+  - Solution: Removed `_needs_add` filter from common task (aoscx_config is idempotent)
+  - Impact: All IPv4 addresses now configure regardless of change tracking state
+
 - Magic strings for built-in VRFs (moved to configurable defaults)
 
 ## [1.0.0] - YYYY-MM-DD

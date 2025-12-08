@@ -19,7 +19,6 @@ PERFORMANCE RATIONALE:
   unnecessary configuration tasks
 - IPv6 addresses: No comparison performed - the overhead of fetching IPv6 data
   (requiring separate CLI connection/command execution) exceeds the time saved
-- IPv6 tasks: Always execute but use `changed_when: false` to suppress false positives
 - CLI commands are idempotent: Applying duplicate IPv6 configuration has no effect
 
 Testing confirmed that pre-checking IPv6 addresses via CLI commands is not
@@ -28,7 +27,7 @@ time-efficient compared to directly applying idempotent configuration.
 WORKAROUND IMPLEMENTATION:
 - IPv4: Only addresses needing addition are stored in `_ip_changes.ipv4_to_add`
 - IPv6: All addresses stored in `_ip_changes.ipv6_addresses` for reference
-- Tasks: IPv4 filtered by `_needs_add`, IPv6 always run with `changed_when: false`
+- Tasks: IPv4 filtered by `_needs_add`
 
 Provides functions to compare NetBox interface configuration with device facts
 and identify which interfaces need configuration changes.

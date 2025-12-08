@@ -148,7 +148,6 @@ interface vlan11
 The anycast gateway configuration follows the same idempotency patterns as other L3 interface configuration:
 
 - **IPv4**: Only configured when the IP address needs to be added
-- **IPv6**: Always run with `changed_when: false` (see [FILTER_PLUGINS.md](FILTER_PLUGINS.md#l3-interface-ip-address-idempotency))
 
 ## Troubleshooting
 

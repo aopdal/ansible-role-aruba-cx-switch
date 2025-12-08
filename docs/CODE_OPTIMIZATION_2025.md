@@ -193,13 +193,6 @@ vars:
 - Regex patterns well-documented and consistent
 - Filters available for Python code and future use
 
-#### Optimization #6: IPv6 changed_when Consistency
-
-**Status**: Already consistent
-- Common task: Dynamic based on `ip_version`
-- Loopback task: Explicit `changed_when: false`
-- No inconsistencies found
-
 #### Optimization #7: Built-in VRFs to Defaults
 
 **Before**: Magic strings in task file

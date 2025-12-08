@@ -77,7 +77,7 @@ is_ipv4_address(address: str) -> bool
   when: not (item.address | is_ipv4_address)
 ```
 
-**Note**: For use in task conditionals and Python code. Cannot be used directly with `selectattr` due to Ansible limitations (use regex patterns instead).
+**Note**: For use in task conditionals and Python code. For filtering with `selectattr`, use the `search` test with `:` (e.g., `selectattr('address', 'search', ':')` for IPv6).
 
 ---
 
@@ -265,7 +265,6 @@ The filters are used by `tasks/configure_l3_interface_common.yml`, a single reus
     parents: "interface {{ item.interface_name | format_interface_name(interface_type) }}"
   loop: "{{ filtered_interfaces }}"
   when: filtered_interfaces | length > 0
-  changed_when: "{{ false if ip_version == 'ipv6' else omit }}"
   vars:
     # ... filtering logic ...
 ```
@@ -412,20 +411,29 @@ def build_l3_config_lines(item, interface_type, ip_version, vrf_type, l3_counter
 - ✅ Version controllable
 - ✅ Debuggable
 
-### Why Keep Regex for IP Version Filtering?
+### IP Version Filtering in Tasks
 
-Ansible's `selectattr` cannot use custom test filters, only built-in tests like `match`, `equalto`, etc. Therefore, in task files we use regex patterns:
+Ansible's `selectattr` cannot use custom test filters, but we can use the `search` test to check for colons:
 
 ```yaml
-# In tasks - regex patterns required
+# In tasks - filter by IP version using colon presence
 filtered_interfaces: >-
   {{
     interface_list
-    | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/')  # IPv4
-    | selectattr('_needs_add', 'equalto', true)
+    | rejectattr('address', 'search', ':')  # IPv4 (no colon)
+    | list
+    if ip_version == 'ipv4'
+    else
+    interface_list
+    | selectattr('address', 'search', ':')  # IPv6 (has colon)
     | list
   }}
 ```
+
+**Note**: We use colon check instead of regex because:
+- IPv6 addresses always contain `:` (e.g., `2001:db8::1/64`)
+- IPv4 addresses never contain `:` (e.g., `192.168.1.1/24`)
+- Simpler and more reliable than regex patterns
 
 The `is_ipv4_address` / `is_ipv6_address` filters are available for:
 - Python code
