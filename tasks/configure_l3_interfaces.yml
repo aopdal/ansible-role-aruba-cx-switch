@@ -62,8 +62,9 @@
       anycast_mac: "{{ item.0.custom_fields.if_anycast_gateway_mac if item.0.custom_fields is defined and item.0.custom_fields.if_anycast_gateway_mac is defined else none }}"
       # Track if this specific IP needs to be added
       # Only mark IPv4 addresses - IPv6 comparison is unreliable due to device facts limitations
-      # If _ip_changes is not defined, assume all IPs need to be added (new interface)
-      _needs_add: "{{ item.1.address in (item.0._ip_changes.ipv4_to_add | default([])) if item.0._ip_changes is defined else true }}"
+      # For IPv4: Check if in ipv4_to_add list, default to true if not trackable
+      # For IPv6: Always true (comparison unreliable)
+      _needs_add: "{{ item.1.address in (item.0._ip_changes.ipv4_to_add | default([])) if (item.0._ip_changes is defined and 'ipv4_to_add' in item.0._ip_changes) else (':' not in item.1.address) }}"
   loop: "{{ interfaces_with_ips | subelements('ip_addresses', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }} - {{ item.1.address }}"
