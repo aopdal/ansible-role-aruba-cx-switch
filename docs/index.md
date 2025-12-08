@@ -316,6 +316,11 @@ aoscx_configure_ospf: true
 # Idempotent mode - removes configs not in NetBox
 aoscx_idempotent_mode: false
 
+# Fast mode - skip fact gathering and cleanup for faster execution
+# WARNING: Only use for initial deployments or when cleanup is not needed
+# See docs/PERFORMANCE_OPTIMIZATION.md for details
+aoscx_fast_mode: false
+
 # Save configuration after changes
 aoscx_save_config: true
 
