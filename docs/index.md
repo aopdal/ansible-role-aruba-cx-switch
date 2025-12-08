@@ -708,7 +708,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `vlans`, `layer2` - VLAN configuration
 - `interfaces`, `physical_interfaces`, `layer1` - Physical interface configuration
 - `interfaces`, `lag_interfaces`, `layer2` - LAG interface configuration
-- `interfaces`, `mclag_interfaces`, `vsx` - MCLAG interface configuration (VSX)
+- `interfaces`, `mclag_interfaces` - MCLAG interface configuration
 - `interfaces`, `lag_interfaces`, `mclag_interfaces`, `lag_assignment` - LAG member assignment
 - `interfaces`, `l2_interfaces`, `layer2` - L2 interface configuration (access/trunk)
 - `interfaces`, `l3_interfaces`, `layer3` - L3 interface configuration (IP addresses)

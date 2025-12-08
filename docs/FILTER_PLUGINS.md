@@ -279,8 +279,9 @@ Core utilities used across all modules (5 functions, 159 lines):
     - Select which interfaces to configure based on idempotent mode
     - Used for smart interface filtering in change detection
 
-- **`extract_ip_addresses(nb_intf)`** *(Added January 2025)*
+- **`extract_ip_addresses(nb_intf, exclude_anycast=False)`** *(Added January 2025)*
     - Extract and categorize IPv4 and IPv6 addresses from interface objects
+    - `exclude_anycast`: If True, skip IPs with role="anycast" (for change detection)
     - Returns tuple: `(ipv4_list, ipv6_list)`
 
 - **`populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6)`** *(Added January 2025)*

@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Solution: Fixed logic to default to `true` for IPv4 when change tracking unavailable
   - Impact: New interfaces now configure correctly on first run while maintaining performance optimization
 
+- **Critical**: Anycast/active-gateway IPs being reconfigured unnecessarily
+  - Root cause: Device facts only report regular IPs in `ip4_address`, not active-gateway IPs
+  - Solution: Added `exclude_anycast` parameter to `extract_ip_addresses()` function
+  - Change detection now excludes anycast IPs when comparing with device facts
+  - Impact: Anycast IPs no longer trigger unnecessary reconfiguration
+
 - Magic strings for built-in VRFs (moved to configurable defaults)
 
 ## [1.0.0] - YYYY-MM-DD
