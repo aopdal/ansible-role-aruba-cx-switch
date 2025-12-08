@@ -113,23 +113,29 @@ The role implements intelligent comparison of L3 interface IP addresses to minim
 
 **Implementation**: Full comparison and granular change tracking
 
-IPv4 addresses are configured using `aoscx_config` with `match: line`:
-- All IPv4 addresses in NetBox are configured on each run
-- The `aoscx_config` module is inherently idempotent (won't apply duplicate configs)
+IPv4 addresses are compared between NetBox and device facts:
+- Only IP addresses that **actually need to be added** are marked for configuration
+- Tasks filter interfaces using `selectattr('_needs_add', 'equalto', true)`
+- Significantly reduces configuration time by skipping unnecessary device connections
 - IP version filtering uses simple colon check: IPv6 has `:`, IPv4 doesn't
 
 **Example**:
 ```yaml
-# Filter IPv4 addresses (no colon)
+# Filter IPv4 addresses that need configuration
 filtered_interfaces: >-
-  {{ interface_list | rejectattr('address', 'search', ':') | list }}
-
-# Filter IPv6 addresses (has colon)
-filtered_interfaces: >-
-  {{ interface_list | selectattr('address', 'search', ':') | list }}
+  {{
+    interface_list
+    | rejectattr('address', 'search', ':')
+    | selectattr('_needs_add', 'equalto', true)
+    | list
+  }}
 ```
 
-**Note**: The `_needs_add` flag is still calculated for potential use in loopback configuration which uses `aoscx_l3_interface` module (not idempotent).
+**Performance Impact**:
+- Typical environment: 50+ interfaces with 2-5 IPs each
+- Without filtering: 100-250 unnecessary configuration tasks
+- With filtering: Only tasks for actual changes
+- Time saved: Significant reduction in L3 configuration phase
 
 ### IPv6 Address Performance Trade-off
 

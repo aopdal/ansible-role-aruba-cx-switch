@@ -49,6 +49,19 @@
   tags:
     - always
 
+- name: Debug - Show VLAN interface facts (for anycast/active-gateway debugging)
+  ansible.builtin.debug:
+    msg:
+      - "=== VLAN Interface Facts (first 3) ==="
+      - "{{ ansible_facts.network_resources.interfaces | dict2items | selectattr('key', 'match', '^vlan') | list | first | default('No VLAN interfaces found') }}"
+  when:
+    - aoscx_debug | default(false) | bool
+    - ansible_facts is defined
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+  tags:
+    - always
+
 - name: Identify interfaces needing configuration changes
   ansible.builtin.set_fact:
     interface_changes: >-

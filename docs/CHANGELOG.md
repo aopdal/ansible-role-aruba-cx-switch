@@ -64,10 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Solution: Changed to simple colon check (IPv6 has `:`, IPv4 doesn't)
   - Impact: IPv4 addresses now correctly filtered and configured on all interface types
 
-- **Critical**: IPv4 not configuring due to `_needs_add` filter
-  - Root cause: Overly complex `_needs_add` logic filtering out valid IPv4 addresses
-  - Solution: Removed `_needs_add` filter from common task (aoscx_config is idempotent)
-  - Impact: All IPv4 addresses now configure regardless of change tracking state
+- **Critical**: IPv4 `_needs_add` logic not defaulting correctly for new interfaces
+  - Root cause: Complex conditional not handling missing `_ip_changes` dictionary
+  - Solution: Fixed logic to default to `true` for IPv4 when change tracking unavailable
+  - Impact: New interfaces now configure correctly on first run while maintaining performance optimization
 
 - Magic strings for built-in VRFs (moved to configurable defaults)
 

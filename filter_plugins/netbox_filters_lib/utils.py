@@ -99,7 +99,7 @@ def select_interfaces_to_configure(
     return configure_list
 
 
-def extract_ip_addresses(nb_intf):
+def extract_ip_addresses(nb_intf, exclude_anycast=False):
     """
     Extract and categorize IPv4 and IPv6 addresses from a NetBox interface.
 
@@ -108,6 +108,9 @@ def extract_ip_addresses(nb_intf):
 
     Args:
         nb_intf: NetBox interface object containing ip_addresses
+        exclude_anycast: If True, skip IPs with role="anycast" (for change detection,
+                        since anycast IPs are configured via active-gateway command
+                        and not reported in device facts ip4_address field)
 
     Returns:
         Tuple of (ipv4_list, ipv6_list) where:
@@ -122,6 +125,20 @@ def extract_ip_addresses(nb_intf):
         if isinstance(ip_obj, dict):
             ip_addr = ip_obj.get("address")
             if ip_addr:
+                # Skip anycast IPs if requested (they're configured via active-gateway,
+                # not ip address, and aren't in device facts ip4_address)
+                if exclude_anycast:
+                    role_obj = ip_obj.get("role")
+                    if role_obj:
+                        role_value = (
+                            role_obj.get("value")
+                            if isinstance(role_obj, dict)
+                            else role_obj
+                        )
+                        if role_value == "anycast":
+                            _debug(f"  Skipping anycast IP from comparison: {ip_addr}")
+                            continue
+
                 # Separate IPv4 and IPv6 by presence of colon
                 if ":" in ip_addr:
                     nb_ipv6.append(ip_addr)

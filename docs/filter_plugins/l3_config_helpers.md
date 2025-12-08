@@ -416,17 +416,18 @@ def build_l3_config_lines(item, interface_type, ip_version, vrf_type, l3_counter
 Ansible's `selectattr` cannot use custom test filters, but we can use the `search` test to check for colons:
 
 ```yaml
-# In tasks - filter by IP version using colon presence
+# In tasks - filter by IP version and change detection
 filtered_interfaces: >-
   {{
     interface_list
     | rejectattr('address', 'search', ':')  # IPv4 (no colon)
+    | selectattr('_needs_add', 'equalto', true)  # Only IPs needing config
     | list
     if ip_version == 'ipv4'
     else
     interface_list
     | selectattr('address', 'search', ':')  # IPv6 (has colon)
-    | list
+    | list  # No _needs_add filter - IPv6 can't be compared from facts
   }}
 ```
 
@@ -434,6 +435,8 @@ filtered_interfaces: >-
 - IPv6 addresses always contain `:` (e.g., `2001:db8::1/64`)
 - IPv4 addresses never contain `:` (e.g., `192.168.1.1/24`)
 - Simpler and more reliable than regex patterns
+
+**Performance**: IPv4 filtering by `_needs_add` skips already-configured addresses, significantly reducing configuration time.
 
 The `is_ipv4_address` / `is_ipv6_address` filters are available for:
 - Python code

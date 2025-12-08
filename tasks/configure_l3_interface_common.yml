@@ -32,13 +32,15 @@
   when: filtered_interfaces | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
-    # Filter interfaces based on IP version only
-    # aoscx_config with match: line is idempotent - no need to check _needs_add
+    # Filter interfaces based on IP version and change detection
+    # IPv4: Filter by _needs_add to skip already-configured addresses (performance)
+    # IPv6: No change detection possible (facts don't include IPv6 data)
     # IPv6 addresses contain ':', IPv4 addresses don't
     filtered_interfaces: >-
       {{
         interface_list
         | rejectattr('address', 'search', ':')
+        | selectattr('_needs_add', 'equalto', true)
         | list
         if ip_version == 'ipv4'
         else

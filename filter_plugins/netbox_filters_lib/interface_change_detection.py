@@ -464,7 +464,11 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
         # Compare IP addresses defined in NetBox with those on the device
         if nb_intf.get("ip_addresses"):
             # Extract IP addresses from NetBox (format: "192.168.1.1/24" or "2001:db8::1/64")
-            nb_ipv4_list, nb_ipv6_list = extract_ip_addresses(nb_intf)
+            # Exclude anycast IPs from comparison - they're configured via active-gateway
+            # command and not reported in device facts ip4_address field
+            nb_ipv4_list, nb_ipv6_list = extract_ip_addresses(
+                nb_intf, exclude_anycast=True
+            )
             nb_ipv4 = set(nb_ipv4_list)
             nb_ipv6 = set(nb_ipv6_list)
 
