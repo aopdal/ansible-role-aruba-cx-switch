@@ -1,0 +1,221 @@
+---
+# REST API-based fact gathering (v10.15+)
+#
+# This is a faster alternative to the aoscx_facts module that:
+# - Uses direct REST API calls with a single authenticated session
+# - Provides complete IPv6 address data (not just URI references)
+# - Includes VSX virtual IPs for anycast/active-gateway configurations
+# - Gathers interfaces, VLANs, EVPN, and VXLAN data in parallel queries
+#
+# Requirements:
+# - REST API version 10.15 or later
+# - aoscx_use_rest_api_facts: true
+#
+# Output facts:
+# - ansible_facts.network_resources.interfaces
+# - ansible_facts.network_resources.vlans
+# - aoscx_enhanced_interface_facts (raw REST API response)
+# - aoscx_evpn_facts (when EVPN enabled)
+# - aoscx_vni_facts (when VXLAN enabled)
+
+- name: Set REST API variables
+  ansible.builtin.set_fact:
+    _rest_host: "{{ aoscx_rest_host | default(ansible_host) }}"
+    _rest_user: "{{ aoscx_rest_user | default(ansible_user) }}"
+    _rest_password: "{{ aoscx_rest_password | default(ansible_password) }}"
+    _rest_validate_certs: "{{ aoscx_rest_validate_certs | default(false) }}"
+    _rest_api_version: "{{ aoscx_rest_api_version | default('10.15') }}"
+  no_log: true
+  tags:
+    - always
+
+- name: Set REST API base URL
+  ansible.builtin.set_fact:
+    _rest_api_base: "https://{{ _rest_host }}/rest/v{{ _rest_api_version }}"
+  tags:
+    - always
+
+- name: Debug - Show REST API configuration
+  ansible.builtin.debug:
+    msg:
+      - "REST API host: {{ _rest_host }}"
+      - "REST API version: {{ _rest_api_version }}"
+      - "REST API base URL: {{ _rest_api_base }}"
+  when:
+    - aoscx_debug | default(false) | bool
+  tags:
+    - always
+
+- name: Login to AOS-CX REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/login"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ _rest_user }}"
+      password: "{{ _rest_password }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: _rest_login
+  delegate_to: localhost
+  no_log: "{{ aoscx_no_log | default(true) }}"
+  tags:
+    - always
+
+# Query interfaces with depth=2 to get expanded IPv6 addresses and VSX virtual IPs
+- name: Query interfaces via REST API
+  ansible.builtin.uri:
+    url: >-
+      {{ _rest_api_base }}/system/interfaces?depth=2&attributes=name,admin,description,mtu,type,ip4_address,ip4_address_secondary,ip6_addresses,vsx_virtual_ip4,vsx_virtual_ip6,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6,vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,other_config,routing,vrf
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: _rest_interfaces
+  delegate_to: localhost
+  tags:
+    - always
+
+# Query VLANs
+# Note: Using depth=2 to get full VLAN data (depth=1 may return URIs only)
+- name: Query VLANs via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/vlans?depth=2"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: _rest_vlans
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Debug - Show raw VLAN REST API response
+  ansible.builtin.debug:
+    msg:
+      - "VLAN response type: {{ _rest_vlans.json | type_debug }}"
+      - "VLAN response keys: {{ _rest_vlans.json.keys() | list if _rest_vlans.json is mapping else 'NOT A DICT' }}"
+      - "VLAN response (first 500 chars): {{ _rest_vlans.json | string | truncate(500) }}"
+  when:
+    - aoscx_debug | default(false) | bool
+  tags:
+    - always
+
+# Query EVPN configuration (optional)
+- name: Query EVPN configuration via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/evpn?depth=2"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  register: _rest_evpn
+  delegate_to: localhost
+  when: aoscx_configure_evpn | default(false) | bool
+  tags:
+    - always
+
+# Query EVPN VLANs (optional)
+- name: Query EVPN VLANs via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/evpn/evpn_vlans?depth=1"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  register: _rest_evpn_vlans
+  delegate_to: localhost
+  when: aoscx_configure_evpn | default(false) | bool
+  tags:
+    - always
+
+# Query VNI/VXLAN mappings (optional)
+- name: Query VNI mappings via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/virtual_network_ids?depth=1"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  register: _rest_vnis
+  delegate_to: localhost
+  when: aoscx_configure_vxlan | default(false) | bool
+  tags:
+    - always
+
+# Logout to clean up session
+- name: Logout from AOS-CX REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/logout"
+    method: POST
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 204]
+  delegate_to: localhost
+  no_log: true
+  tags:
+    - always
+
+# Transform REST API responses to ansible_facts format
+# IMPORTANT: Do NOT set ansible_aoscx_rest_version here!
+# pyaoscx modules require ansible_aoscx_rest_version: 10.09 (max supported)
+# We use aoscx_rest_api_version separately for direct REST API calls
+- name: Set interface facts from REST API response
+  ansible.builtin.set_fact:
+    ansible_facts:
+      network_resources:
+        interfaces: "{{ _rest_interfaces.json | rest_api_to_aoscx_interfaces }}"
+        vlans: "{{ _rest_vlans.json | rest_api_to_aoscx_vlans }}"
+    # Store raw REST API response for enhanced facts (IPv6, VSX virtual IPs)
+    aoscx_enhanced_interface_facts: "{{ _rest_interfaces.json }}"
+  tags:
+    - always
+
+# Set EVPN facts if queried
+- name: Set EVPN facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_evpn_facts: "{{ _rest_evpn.json | default({}) }}"
+    aoscx_evpn_vlans_facts: "{{ _rest_evpn_vlans.json | default({}) }}"
+  when:
+    - aoscx_configure_evpn | default(false) | bool
+    - _rest_evpn is defined
+    - _rest_evpn.status == 200
+  tags:
+    - always
+
+# Set VNI/VXLAN facts if queried
+- name: Set VNI facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_vni_facts: "{{ _rest_vnis.json | default({}) }}"
+  when:
+    - aoscx_configure_vxlan | default(false) | bool
+    - _rest_vnis is defined
+    - _rest_vnis.status == 200
+  tags:
+    - always
+
+- name: Debug - Show REST API facts summary
+  ansible.builtin.debug:
+    msg:
+      - "=== REST API Fact Gathering Complete ==="
+      - "Interfaces found: {{ ansible_facts.network_resources.interfaces | length }}"
+      - "VLANs found: {{ ansible_facts.network_resources.vlans | length }}"
+      - "Enhanced interface facts: {{ aoscx_enhanced_interface_facts | length }}"
+      - "EVPN facts available: {{ aoscx_evpn_facts is defined }}"
+      - "VNI facts available: {{ aoscx_vni_facts is defined }}"
+  when:
+    - aoscx_debug | default(false) | bool
+  tags:
+    - always

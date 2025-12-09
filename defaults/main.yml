@@ -1,7 +1,9 @@
 ---
 # Default variables for aruba_cx_switch role
 
-# REST API version to use
+# REST API version for pyaoscx modules (aoscx_facts, aoscx_vlan, etc.)
+# pyaoscx library supports up to v10.09 - DO NOT CHANGE unless pyaoscx is updated
+# For direct REST API calls (enhanced facts), use aoscx_rest_api_version instead
 ansible_aoscx_rest_version: 10.09
 
 # Enable/disable fact gathering
@@ -49,7 +51,21 @@ aoscx_save_config: true
 # Connection settings
 aoscx_connection_type: network_cli  # or httpapi
 
-# Enhanced fact gathering via REST API with depth=2
+# REST API-based fact gathering (v10.15+ recommended)
+# When true, uses direct REST API calls instead of aoscx_facts module
+# Benefits:
+#   - 3-5x faster fact gathering (single authenticated session)
+#   - IPv6 addresses included (not just URI references)
+#   - VSX virtual IPs for anycast/active-gateway
+#   - EVPN/VXLAN facts in same session
+# Requirements:
+#   - aoscx_rest_api_version: "10.15" or later
+#   - REST API credentials (defaults to ansible_user/ansible_password)
+# Note: When enabled, aoscx_gather_enhanced_facts is automatically included
+aoscx_use_rest_api_facts: false
+
+# Enhanced fact gathering via REST API with depth=2 (legacy option)
+# Only used when aoscx_use_rest_api_facts is false
 # When enabled, gathers additional data not available in standard facts:
 # - IPv6 addresses (actual values, not URI references)
 # - VSX virtual IPs (vsx_virtual_ip4, vsx_virtual_ip6)
@@ -63,12 +79,12 @@ aoscx_gather_enhanced_facts: false
 # aoscx_rest_password: "{{ ansible_password }}"  # REST API password
 aoscx_rest_validate_certs: false  # Validate SSL certificates for REST API
 
-# REST API version override (RECOMMENDED when using enhanced facts)
-# The aoscx_facts module reports an older version (e.g., 10.09) which returns
-# ip6_addresses as URL strings. Newer versions (10.13+) return actual addresses.
+# REST API version for direct REST API calls (enhanced facts, REST API fact gathering)
+# This is SEPARATE from ansible_aoscx_rest_version (which is for pyaoscx modules)
+# Direct REST API calls require v10.15+ for proper ip6_addresses expansion with depth=2
 # Auto-detection via /rest/v1/firmware may require authentication.
-# Set this explicitly for reliable IPv6 change detection:
-aoscx_rest_api_version: "10.13"  # Tested: 10.13, 10.14, 10.17 work
+# Set this to match your switch firmware version:
+aoscx_rest_api_version: "10.15"  # Minimum for IPv6 expansion; 10.15, 10.17 tested
 
 # L3 interface settings
 aoscx_l3_counters_enable: true  # Enable l3-counters on L3 interfaces

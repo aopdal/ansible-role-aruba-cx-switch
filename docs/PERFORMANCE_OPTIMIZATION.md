@@ -547,15 +547,84 @@ time ansible-playbook site.yml -i inventory.yml --limit test_switches
 
 ---
 
-## Enhanced Fact Gathering (Experimental)
+## REST API-Based Fact Gathering (Recommended)
 
-For more precise change detection, especially for IPv6 and anycast/active-gateway configurations, enable enhanced fact gathering via REST API with `depth=2`.
+For the fastest fact gathering with complete data, use direct REST API calls instead of the `aoscx_facts` module.
 
 ### Configuration
 
 ```yaml
 # group_vars or playbook
-aoscx_gather_enhanced_facts: true
+aoscx_use_rest_api_facts: true
+aoscx_rest_api_version: "10.15"  # Minimum version required
+
+# REST API credentials (optional - defaults to ansible_host/ansible_user/ansible_password)
+aoscx_rest_host: "{{ ansible_host }}"  # Switch management IP/hostname
+aoscx_rest_user: "admin"                # REST API username
+aoscx_rest_password: "{{ vault_switch_password }}"  # REST API password
+aoscx_rest_validate_certs: false        # SSL certificate validation
+```
+
+### Benefits
+
+| Metric | aoscx_facts Module | REST API Direct |
+|--------|-------------------|-----------------|
+| Typical time (50 interfaces) | 15-30 seconds | 3-5 seconds |
+| API calls | Multiple (per resource) | 2-4 total (single session) |
+| IPv6 addresses | URI references | Actual addresses |
+| VSX virtual IPs | Not included | Included |
+| EVPN/VXLAN facts | Separate queries | Same session |
+
+### What It Provides
+
+Single authenticated REST API session that gathers:
+- **Interfaces** - Full config with IPv6, VSX virtual IPs, VLAN assignments
+- **VLANs** - Complete VLAN definitions
+- **EVPN** - Global EVPN config and per-VLAN settings (when enabled)
+- **VXLAN/VNI** - VNI mappings (when enabled)
+
+### How It Works
+
+```
+1. Login to REST API (single authentication)
+2. Query /system/interfaces?depth=2 (interfaces + IPv6 + VSX)
+3. Query /system/vlans?depth=2 (VLANs)
+4. Query /system/evpn?depth=2 (if EVPN enabled)
+5. Query /system/virtual_network_ids?depth=1 (if VXLAN enabled)
+6. Logout (cleanup session)
+```
+
+### Requirements
+
+- REST API version 10.15 or later
+- Direct network access from Ansible controller to switch management interface
+
+### Migration from aoscx_facts
+
+Simply enable the variable - the role handles the data transformation:
+
+```yaml
+# Before (using aoscx_facts module)
+aoscx_gather_facts: true
+
+# After (using REST API direct)
+aoscx_use_rest_api_facts: true
+aoscx_rest_api_version: "10.15"
+```
+
+The `aoscx_gather_enhanced_facts` option is automatically included when using REST API facts.
+
+---
+
+## Enhanced Fact Gathering (Legacy)
+
+For users who cannot use REST API-based fact gathering, the legacy `aoscx_gather_enhanced_facts` option provides IPv6 and VSX data as a supplement to `aoscx_facts`.
+
+### Configuration
+
+```yaml
+# group_vars or playbook
+aoscx_gather_enhanced_facts: true  # Only when NOT using aoscx_use_rest_api_facts
 
 # REST API credentials (optional - defaults to ansible_host/ansible_user/ansible_password)
 aoscx_rest_host: "{{ ansible_host }}"  # Switch management IP/hostname
@@ -575,13 +644,6 @@ With enhanced facts (`depth=2`), you get actual values:
 - `vsx_virtual_ip4` / `vsx_virtual_ip6` - Anycast/active-gateway IPs
 - `vsx_virtual_gw_mac_v4` / `vsx_virtual_gw_mac_v6` - Anycast MAC addresses
 
-### How It Works
-
-1. Task logs into the switch REST API using provided credentials
-2. Queries `/system/interfaces?depth=2&attributes=...`
-3. Stores results in `aoscx_enhanced_interface_facts`
-4. Logs out to clean up the session
-
 ### Trade-offs
 
 | Aspect | Standard Facts | Enhanced Facts |
@@ -593,22 +655,28 @@ With enhanced facts (`depth=2`), you get actual values:
 
 ### REST API Version Requirement
 
-**Important:** The `aoscx_facts` module reports an older REST API version (e.g., `10.09`), but this version returns `ip6_addresses` as URL references instead of actual data. You need a newer API version for proper IPv6 expansion.
+**Important:** There are two different REST API versions at play:
+
+1. **pyaoscx (aoscx_facts module)**: Supports up to v10.09 - returns `ip6_addresses` as URL references
+2. **Enhanced facts (direct REST API)**: Requires v10.15+ for proper `ip6_addresses` expansion with `depth=2`
 
 The role attempts to auto-detect the best version via `/rest/v1/firmware`, but this may require authentication. If auto-detection fails, set the version manually:
 
 ```yaml
-# Tested working versions for ip6_addresses expansion:
-aoscx_rest_api_version: "10.14"  # or "10.13", "10.17", etc.
+# Required for IPv6 change detection:
+aoscx_rest_api_version: "10.15"  # Minimum version for ip6_addresses expansion
 ```
 
-| REST API Version | ip6_addresses Format |
-|------------------|---------------------|
-| 10.09 | URL string (❌ doesn't work) |
-| 10.13+ | Dict with addresses (✅ works) |
+| REST API Version | ip6_addresses Format | Notes |
+|------------------|---------------------|-------|
+| ≤10.09 | URL string (❌) | pyaoscx maximum |
+| 10.10 - 10.14 | URL string (❌) | Not tested |
+| 10.15+ | Dict with addresses (✅) | Required for enhanced facts |
 
 **Testing tip:** Check what version your switch supports via web browser:
-`https://<switch-ip>/rest/v10.14/system/interfaces?depth=2`
+`https://<switch-ip>/rest/v10.15/system/interfaces/vlan11?depth=2`
+
+Look for `ip6_addresses` - if it's a dict with addresses as keys, the version works.
 
 ### Current Status
 

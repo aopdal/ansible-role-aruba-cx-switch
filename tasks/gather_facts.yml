@@ -1,6 +1,19 @@
 ---
 # Gather facts from AOS-CX switches
 #
+# This task file supports two modes of operation:
+#
+# 1. REST API Mode (aoscx_use_rest_api_facts: true)
+#    - Uses direct REST API calls with a single authenticated session
+#    - Faster (3-5x improvement over aoscx_facts)
+#    - Requires REST API v10.15+ for full functionality
+#    - Automatically includes enhanced facts (IPv6 addresses, VSX virtual IPs)
+#
+# 2. aoscx_facts Mode (default, aoscx_use_rest_api_facts: false)
+#    - Uses the arubanetworks.aoscx.aoscx_facts module
+#    - Compatible with older firmware versions
+#    - Optionally enable enhanced facts with aoscx_gather_enhanced_facts: true
+#
 # IMPORTANT: This task gathers ALL network resources needed by the role.
 # When gathering facts elsewhere in the role, ALWAYS include ALL resources
 # listed below, not just a subset. The aoscx_facts module OVERWRITES the
@@ -9,23 +22,36 @@
 # If you need to re-gather facts during the playbook run, either:
 # 1. Use include_tasks: gather_facts.yml (recommended)
 # 2. Or gather ALL resources: gather_network_resources: [interfaces, vlans]
-#
-# Enhanced Facts (optional):
-# Set aoscx_gather_enhanced_facts: true to also gather via REST API with depth=2.
-# This provides IPv6 addresses and VSX virtual IPs for better change detection.
 
-- name: Gather device facts
+# ===========================================================================
+# Option 1: REST API-based fact gathering (faster, requires v10.15+)
+# ===========================================================================
+- name: Include REST API-based fact gathering
+  ansible.builtin.include_tasks:
+    file: gather_facts_rest_api.yml
+  when:
+    - aoscx_use_rest_api_facts | default(false) | bool
+  tags:
+    - always
+
+# ===========================================================================
+# Option 2: aoscx_facts module (default, compatible with all versions)
+# ===========================================================================
+- name: Gather device facts via aoscx_facts module
   arubanetworks.aoscx.aoscx_facts:
     gather_network_resources:
       - interfaces
       - vlans
   register: device_facts_result
+  when:
+    - not (aoscx_use_rest_api_facts | default(false) | bool)
   tags:
     - always
 
 - name: Debug - Show device facts structure
   ansible.builtin.debug:
     msg:
+      - "Fact gathering mode: {{ 'REST API' if aoscx_use_rest_api_facts | default(false) | bool else 'aoscx_facts module' }}"
       - "ansible_facts keys: {{ ansible_facts.keys() | list if ansible_facts is defined else 'ansible_facts not defined' }}"
       - "Has network_resources: {{ 'network_resources' in ansible_facts if ansible_facts is defined else false }}"
       - >-
@@ -40,10 +66,12 @@
 
 # Optional: Gather enhanced facts via REST API with depth=2
 # This provides IPv6 addresses (actual values) and VSX virtual IPs
+# NOTE: When using REST API facts, enhanced facts are already included
 - name: Include enhanced fact gathering
   ansible.builtin.include_tasks:
     file: gather_enhanced_facts.yml
   when:
+    - not (aoscx_use_rest_api_facts | default(false) | bool)
     - aoscx_gather_enhanced_facts | default(false) | bool
   tags:
     - always
