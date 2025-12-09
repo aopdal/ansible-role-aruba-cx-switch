@@ -70,7 +70,13 @@
 
     # Enable features for testing - all disabled for Molecule testing
     aoscx_gather_facts: false  # Skip fact gathering in tests
+    aoscx_use_rest_api_facts: false  # REST API fact gathering disabled in tests
+    aoscx_gather_enhanced_facts: false  # Enhanced facts disabled in tests
     aoscx_generate_ztp_config: false  # No ZTP generation
+
+    # REST API version settings (for reference, not used in tests)
+    ansible_aoscx_rest_version: 10.09  # pyaoscx max version
+    aoscx_rest_api_version: "10.17"  # Direct REST API version
     aoscx_configure_banner: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_ntp: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_timezone: false  # Disabled - no AOS-CX modules in test env

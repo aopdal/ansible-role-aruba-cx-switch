@@ -6,6 +6,7 @@ from netbox_filters_lib.utils import (
     collapse_vlan_list,
     extract_ip_addresses,
     populate_ip_changes,
+    select_interfaces_to_configure,
 )
 
 
@@ -171,3 +172,95 @@ class TestPopulateIPChanges:
         assert nb_intf["type"] == "physical"
         assert nb_intf["enabled"] is True
         assert "_ip_changes" in nb_intf
+
+
+class TestSelectInterfacesToConfigure:
+    """Tests for select_interfaces_to_configure function"""
+
+    def test_standard_mode_returns_all(self):
+        """Test that standard mode returns all interfaces"""
+        interfaces = [
+            {"name": "1/1/1", "type": {"value": "1000base-t"}},
+            {"name": "1/1/2", "type": {"value": "1000base-t"}},
+            {"name": "lag1", "type": {"value": "lag"}},
+        ]
+        result = select_interfaces_to_configure(interfaces, idempotent_mode=False)
+        assert len(result) == 3
+        assert result == interfaces
+
+    def test_idempotent_mode_with_changes(self):
+        """Test idempotent mode with interfaces needing changes"""
+        interfaces = [
+            {"name": "1/1/1", "type": {"value": "1000base-t"}},
+            {"name": "1/1/2", "type": {"value": "1000base-t"}},
+            {"name": "lag1", "type": {"value": "lag"}},
+        ]
+        interfaces_needing_changes = {
+            "configure": [interfaces[0], interfaces[2]],  # Only 1/1/1 and lag1
+        }
+        result = select_interfaces_to_configure(
+            interfaces, idempotent_mode=True, interfaces_needing_changes=interfaces_needing_changes
+        )
+        assert len(result) == 2
+        assert result[0]["name"] == "1/1/1"
+        assert result[1]["name"] == "lag1"
+
+    def test_idempotent_mode_no_changes(self):
+        """Test idempotent mode when no changes needed"""
+        interfaces = [
+            {"name": "1/1/1", "type": {"value": "1000base-t"}},
+            {"name": "1/1/2", "type": {"value": "1000base-t"}},
+        ]
+        interfaces_needing_changes = {
+            "configure": [],  # No interfaces need changes
+        }
+        result = select_interfaces_to_configure(
+            interfaces, idempotent_mode=True, interfaces_needing_changes=interfaces_needing_changes
+        )
+        assert len(result) == 0
+
+    def test_idempotent_mode_without_changes_dict(self):
+        """Test idempotent mode when no changes dict provided returns all interfaces"""
+        interfaces = [
+            {"name": "1/1/1", "type": {"value": "1000base-t"}},
+            {"name": "1/1/2", "type": {"value": "1000base-t"}},
+        ]
+        # When idempotent mode is True but no changes dict provided, return all interfaces
+        result = select_interfaces_to_configure(interfaces, idempotent_mode=True)
+        assert len(result) == 2
+
+    def test_idempotent_mode_with_invalid_changes_dict(self):
+        """Test idempotent mode with invalid changes dict returns all interfaces"""
+        interfaces = [
+            {"name": "1/1/1", "type": {"value": "1000base-t"}},
+        ]
+        # Invalid dict (not a dict)
+        result = select_interfaces_to_configure(
+            interfaces, idempotent_mode=True, interfaces_needing_changes="not-a-dict"
+        )
+        assert len(result) == 1
+
+    def test_empty_interfaces(self):
+        """Test with empty interface list"""
+        result = select_interfaces_to_configure([], idempotent_mode=False)
+        assert result == []
+
+    def test_none_interfaces(self):
+        """Test with None interfaces"""
+        result = select_interfaces_to_configure(None, idempotent_mode=False)
+        assert result == []
+
+    def test_standard_mode_ignores_changes_dict(self):
+        """Test that standard mode ignores the interfaces_needing_changes dict"""
+        interfaces = [
+            {"name": "1/1/1", "type": {"value": "1000base-t"}},
+            {"name": "1/1/2", "type": {"value": "1000base-t"}},
+        ]
+        interfaces_needing_changes = {
+            "configure": [interfaces[0]],  # Only 1/1/1
+        }
+        # In standard mode (idempotent_mode=False), all interfaces should be returned
+        result = select_interfaces_to_configure(
+            interfaces, idempotent_mode=False, interfaces_needing_changes=interfaces_needing_changes
+        )
+        assert len(result) == 2

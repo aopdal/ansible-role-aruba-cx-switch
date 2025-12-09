@@ -27,51 +27,193 @@
     aoscx_configure_vsx: false
     aoscx_save_config: false
 
-    # Test data for filter plugins
+    # Test data for filter plugins (standardized with unit test fixtures)
     test_interfaces:
       - name: "1/1/1"
         type:
           value: "1000base-t"
-        mode: "access"
+        mode:
+          value: "access"
         untagged_vlan:
-          vid: 100
+          vid: 10
+          name: "VLAN10"
         enabled: true
         ip_addresses: []
         custom_fields: {}
       - name: "1/1/2"
         type:
           value: "1000base-t"
-        mode: "trunk"
+        mode:
+          value: "tagged"
+        untagged_vlan: null
         tagged_vlans:
+          - vid: 20
+            name: "VLAN20"
           - vid: 100
-          - vid: 200
+            name: "VLAN100"
         enabled: true
         ip_addresses: []
         custom_fields: {}
-      - name: "vlan100"
+      - name: "vlan10"
         type:
           value: "virtual"
         vrf:
           name: "default"
         ip_addresses:
-          - address: "10.0.0.1/24"
+          - address: "10.1.10.1/24"
+            vrf:
+              name: "default"
+        custom_fields: {}
+      - name: "loopback0"
+        type:
+          value: "virtual"
+        ip_addresses:
+          - address: "10.255.255.1/32"
+            vrf:
+              name: "default"
+        custom_fields: {}
+      - name: "lag1"
+        type:
+          value: "lag"
+        mode:
+          value: "access"
+        untagged_vlan:
+          vid: 10
+          name: "VLAN10"
+        enabled: true
+        custom_fields: {}
+      - name: "1/1/10"
+        type:
+          value: "1000base-t"
+        enabled: true
+        description: "LAG member"
+        lag:
+          name: "lag1"
+          id: 6
         custom_fields: {}
 
     test_vlans:
-      - id: 100
+      - id: 1
+        vid: 10
+        name: "VLAN10"
+        description: "Data VLAN"
+        custom_fields: {}
+      - id: 2
+        vid: 20
+        name: "VLAN20"
+        description: "Voice VLAN"
+        custom_fields: {}
+      - id: 3
         vid: 100
-        name: "DATA"
-      - id: 200
-        vid: 200
-        name: "VOICE"
+        name: "VLAN100"
+        description: "Server VLAN"
+        custom_fields: {}
+        l2vpn_termination:
+          l2vpn:
+            name: "EVPN"
+            identifier: 10100
 
     test_vrfs:
-      - name: "CUSTOMER_A"
+      - name: "customer_a"
         rd: "65000:100"
-      - name: "MGMT"
-        rd: "65000:200"
+        import_targets: ["65000:100"]
+        export_targets: ["65000:100"]
+      - name: "mgmt"
+        rd: null
+        import_targets: []
+        export_targets: []
       - name: "default"
         rd: null
+        import_targets: []
+        export_targets: []
+
+    # OSPF test data
+    test_ospf_interfaces:
+      - name: "1/1/1"
+        ip_addresses:
+          - address: "10.1.1.1/30"
+            vrf:
+              name: "default"
+        custom_fields:
+          if_ip_ospf_1_area: "0.0.0.0"
+          if_ip_ospf_network: "point-to-point"
+      - name: "1/1/2"
+        ip_addresses:
+          - address: "10.2.2.1/24"
+            vrf:
+              name: "customer_a"
+        custom_fields:
+          if_ip_ospf_1_area: "0.0.0.1"
+          if_ip_ospf_network: "broadcast"
+      - name: "1/1/3"
+        ip_addresses:
+          - address: "10.3.3.1/24"
+            vrf:
+              name: "default"
+        custom_fields: {}
+
+    test_ospf_device_config:
+      custom_fields:
+        device_ospf_1_routerid: "10.255.255.1"
+      config_context:
+        ospf_areas:
+          - ospf_1_area: "0.0.0.0"
+          - ospf_1_area: "0.0.0.1"
+
+    # REST API test data (simulating REST API responses)
+    test_rest_api_interfaces:
+      "1/1/1":
+        admin_state: "up"
+        description: "Uplink port"
+        mtu: 9198
+        type: "physical"
+      "vlan10":
+        admin_state: "up"
+        description: "Data VLAN SVI"
+        ip6_addresses:
+          "2001%3Adb8%3A%3A1%2F64":
+            address: "2001:db8::1/64"
+        vsx_virtual_ip4: "10.1.10.254/24"
+
+    test_rest_api_vlans:
+      "10":
+        id: 10
+        name: "VLAN10"
+        description: "Data VLAN"
+        admin: "up"
+      "20":
+        id: 20
+        name: "VLAN20"
+        description: "Voice VLAN"
+        admin: "up"
+
+    test_rest_api_evpn_vlans:
+      "100":
+        vlan: 100
+        rd: "auto"
+        export_route_targets: ["auto"]
+        import_route_targets: ["auto"]
+
+    test_rest_api_vnis:
+      "vxlan,10100":
+        type: "vxlan"
+        id: 10100
+        vlan: "/rest/v10.17/system/vlans/100"
+
+    # EVPN EVI command output for parsing test
+    test_evpn_evi_output: |
+      L2VNI : 10100
+          Route Distinguisher        : 172.20.1.33:10
+          VLAN                       : 10
+          Status                     : up
+          RT Import                  : 65005:10
+          RT Export                  : 65005:10
+      L2VNI : 10200
+          Route Distinguisher        : 172.20.1.33:20
+          VLAN                       : 20
+          Status                     : up
+          RT Import                  : 65005:20
+          RT Export                  : 65005:20
 
   pre_tasks:
     - name: "Verify instance is running"
@@ -102,8 +244,9 @@
         that:
           - vlan_ids_result is defined
           - vlan_ids_result is iterable
+          - 10 in vlan_ids_result
+          - 20 in vlan_ids_result
           - 100 in vlan_ids_result
-          - 200 in vlan_ids_result
         success_msg: "✅ extract_vlan_ids filter works correctly"
         fail_msg: "❌ extract_vlan_ids filter failed"
 
@@ -115,7 +258,7 @@
       ansible.builtin.assert:
         that:
           - vlans_in_use is defined
-          - vlans_in_use | length == 2
+          - vlans_in_use | length == 3
         success_msg: "✅ filter_vlans_in_use filter works correctly"
         fail_msg: "❌ filter_vlans_in_use filter failed"
 
@@ -141,7 +284,7 @@
         that:
           - configurable_vrfs is defined
           - configurable_vrfs | length == 1
-          - configurable_vrfs[0].name == 'CUSTOMER_A'
+          - configurable_vrfs[0].name == 'customer_a'
         success_msg: "✅ filter_configurable_vrfs filter works correctly"
         fail_msg: "❌ filter_configurable_vrfs filter failed"
 
@@ -191,15 +334,244 @@
         success_msg: "✅ collapse_vlan_list filter works correctly"
         fail_msg: "❌ collapse_vlan_list filter failed"
 
+    # ==========================================
+    # OSPF filter tests
+    # ==========================================
+    - name: "Test select_ospf_interfaces filter"
+      ansible.builtin.set_fact:
+        ospf_interfaces: "{{ test_ospf_interfaces | select_ospf_interfaces }}"
+
+    - name: "Verify select_ospf_interfaces result"
+      ansible.builtin.assert:
+        that:
+          - ospf_interfaces is defined
+          - ospf_interfaces | length == 2
+          - ospf_interfaces[0].name == '1/1/1'
+          - ospf_interfaces[1].name == '1/1/2'
+        success_msg: "✅ select_ospf_interfaces filter works correctly"
+        fail_msg: "❌ select_ospf_interfaces filter failed"
+
+    - name: "Test extract_ospf_areas filter"
+      ansible.builtin.set_fact:
+        ospf_areas: "{{ test_ospf_interfaces | extract_ospf_areas }}"
+
+    - name: "Verify extract_ospf_areas result"
+      ansible.builtin.assert:
+        that:
+          - ospf_areas is defined
+          - ospf_areas | length == 2
+          - "'0.0.0.0' in ospf_areas"
+          - "'0.0.0.1' in ospf_areas"
+        success_msg: "✅ extract_ospf_areas filter works correctly"
+        fail_msg: "❌ extract_ospf_areas filter failed"
+
+    - name: "Test get_ospf_interfaces_by_area filter"
+      ansible.builtin.set_fact:
+        area0_interfaces: "{{ test_ospf_interfaces | get_ospf_interfaces_by_area('0.0.0.0') }}"
+
+    - name: "Verify get_ospf_interfaces_by_area result"
+      ansible.builtin.assert:
+        that:
+          - area0_interfaces is defined
+          - area0_interfaces | length == 1
+          - area0_interfaces[0].name == '1/1/1'
+        success_msg: "✅ get_ospf_interfaces_by_area filter works correctly"
+        fail_msg: "❌ get_ospf_interfaces_by_area filter failed"
+
+    - name: "Test validate_ospf_config filter"
+      ansible.builtin.set_fact:
+        ospf_validation: "{{ test_ospf_device_config | validate_ospf_config(test_ospf_interfaces) }}"
+
+    - name: "Verify validate_ospf_config result"
+      ansible.builtin.assert:
+        that:
+          - ospf_validation is defined
+          - ospf_validation.valid is defined
+          - ospf_validation.warnings is defined
+          - ospf_validation.errors is defined
+        success_msg: "✅ validate_ospf_config filter works correctly"
+        fail_msg: "❌ validate_ospf_config filter failed"
+
+    # ==========================================
+    # REST API transform filter tests
+    # ==========================================
+    - name: "Test rest_api_to_aoscx_interfaces filter"
+      ansible.builtin.set_fact:
+        aoscx_interfaces: "{{ test_rest_api_interfaces | rest_api_to_aoscx_interfaces }}"
+
+    - name: "Verify rest_api_to_aoscx_interfaces result"
+      ansible.builtin.assert:
+        that:
+          - aoscx_interfaces is defined
+          - "'1/1/1' in aoscx_interfaces"
+          - "'vlan10' in aoscx_interfaces"
+          - aoscx_interfaces['1/1/1'].admin == 'up'
+          - aoscx_interfaces['1/1/1'].mtu == 9198
+          - aoscx_interfaces['vlan10'].vsx_virtual_ip4 == '10.1.10.254/24'
+        success_msg: "✅ rest_api_to_aoscx_interfaces filter works correctly"
+        fail_msg: "❌ rest_api_to_aoscx_interfaces filter failed"
+
+    - name: "Test rest_api_to_aoscx_vlans filter"
+      ansible.builtin.set_fact:
+        aoscx_vlans: "{{ test_rest_api_vlans | rest_api_to_aoscx_vlans }}"
+
+    - name: "Verify rest_api_to_aoscx_vlans result"
+      ansible.builtin.assert:
+        that:
+          - aoscx_vlans is defined
+          - "'10' in aoscx_vlans"
+          - "'20' in aoscx_vlans"
+          - aoscx_vlans['10'].name == 'VLAN10'
+          - aoscx_vlans['10'].id == 10
+        success_msg: "✅ rest_api_to_aoscx_vlans filter works correctly"
+        fail_msg: "❌ rest_api_to_aoscx_vlans filter failed"
+
+    - name: "Test rest_api_to_aoscx_evpn_vlans filter"
+      ansible.builtin.set_fact:
+        aoscx_evpn_vlans: "{{ test_rest_api_evpn_vlans | rest_api_to_aoscx_evpn_vlans }}"
+
+    - name: "Verify rest_api_to_aoscx_evpn_vlans result"
+      ansible.builtin.assert:
+        that:
+          - aoscx_evpn_vlans is defined
+          - "'100' in aoscx_evpn_vlans"
+          - aoscx_evpn_vlans['100'].vlan == 100
+          - aoscx_evpn_vlans['100'].rd == 'auto'
+        success_msg: "✅ rest_api_to_aoscx_evpn_vlans filter works correctly"
+        fail_msg: "❌ rest_api_to_aoscx_evpn_vlans filter failed"
+
+    - name: "Test rest_api_to_aoscx_vnis filter"
+      ansible.builtin.set_fact:
+        aoscx_vnis: "{{ test_rest_api_vnis | rest_api_to_aoscx_vnis }}"
+
+    - name: "Verify rest_api_to_aoscx_vnis result"
+      ansible.builtin.assert:
+        that:
+          - aoscx_vnis is defined
+          - "'10100' in aoscx_vnis"
+          - aoscx_vnis['10100'].id == 10100
+          - aoscx_vnis['10100'].type == 'vxlan'
+        success_msg: "✅ rest_api_to_aoscx_vnis filter works correctly"
+        fail_msg: "❌ rest_api_to_aoscx_vnis filter failed"
+
+    # ==========================================
+    # Additional VLAN filter tests
+    # ==========================================
+    - name: "Test parse_evpn_evi_output filter"
+      ansible.builtin.set_fact:
+        evpn_evi_parsed: "{{ test_evpn_evi_output | parse_evpn_evi_output }}"
+
+    - name: "Verify parse_evpn_evi_output result"
+      ansible.builtin.assert:
+        that:
+          - evpn_evi_parsed is defined
+          - evpn_evi_parsed.evpn_vlans | length == 2
+          - 10 in evpn_evi_parsed.evpn_vlans
+          - 20 in evpn_evi_parsed.evpn_vlans
+          - evpn_evi_parsed.vxlan_vnis | length == 2
+          - 10100 in evpn_evi_parsed.vxlan_vnis
+          - 10200 in evpn_evi_parsed.vxlan_vnis
+          - evpn_evi_parsed.vxlan_mappings | length == 2
+        success_msg: "✅ parse_evpn_evi_output filter works correctly"
+        fail_msg: "❌ parse_evpn_evi_output filter failed"
+
+    - name: "Test extract_evpn_vlans filter"
+      ansible.builtin.set_fact:
+        evpn_vlans: "{{ test_vlans | extract_evpn_vlans(test_interfaces) }}"
+
+    - name: "Verify extract_evpn_vlans result"
+      ansible.builtin.assert:
+        that:
+          - evpn_vlans is defined
+          - evpn_vlans | length == 1
+          - evpn_vlans[0].vid == 100
+        success_msg: "✅ extract_evpn_vlans filter works correctly"
+        fail_msg: "❌ extract_evpn_vlans filter failed"
+
+    - name: "Test extract_vxlan_mappings filter"
+      ansible.builtin.set_fact:
+        vxlan_mappings: "{{ test_vlans | extract_vxlan_mappings(test_interfaces) }}"
+
+    - name: "Verify extract_vxlan_mappings result"
+      ansible.builtin.assert:
+        that:
+          - vxlan_mappings is defined
+          - vxlan_mappings | length == 1
+          - vxlan_mappings[0].vni == 10100
+          - vxlan_mappings[0].vlan == 100
+        success_msg: "✅ extract_vxlan_mappings filter works correctly"
+        fail_msg: "❌ extract_vxlan_mappings filter failed"
+
+    - name: "Test get_vlans_in_use filter"
+      ansible.builtin.set_fact:
+        vlans_in_use_result: "{{ test_interfaces | get_vlans_in_use }}"
+
+    - name: "Verify get_vlans_in_use result"
+      ansible.builtin.assert:
+        that:
+          - vlans_in_use_result is defined
+          - vlans_in_use_result.vids is defined
+          - 10 in vlans_in_use_result.vids
+          - 20 in vlans_in_use_result.vids
+          - 100 in vlans_in_use_result.vids
+        success_msg: "✅ get_vlans_in_use filter works correctly"
+        fail_msg: "❌ get_vlans_in_use filter failed"
+
+    - name: "Test get_vlan_interfaces filter"
+      ansible.builtin.set_fact:
+        vlan_interfaces: "{{ test_interfaces | get_vlan_interfaces }}"
+
+    - name: "Verify get_vlan_interfaces result"
+      ansible.builtin.assert:
+        that:
+          - vlan_interfaces is defined
+          - vlan_interfaces | length == 1
+          - vlan_interfaces[0].name == 'vlan10'
+        success_msg: "✅ get_vlan_interfaces filter works correctly"
+        fail_msg: "❌ get_vlan_interfaces filter failed"
+
+    # ==========================================
+    # Utility filter tests
+    # ==========================================
+    - name: "Test select_interfaces_to_configure filter (standard mode)"
+      ansible.builtin.set_fact:
+        interfaces_to_configure: "{{ test_interfaces | select_interfaces_to_configure(false) }}"
+
+    - name: "Verify select_interfaces_to_configure result (standard mode)"
+      ansible.builtin.assert:
+        that:
+          - interfaces_to_configure is defined
+          - interfaces_to_configure | length == 6
+        success_msg: "✅ select_interfaces_to_configure filter (standard mode) works correctly"
+        fail_msg: "❌ select_interfaces_to_configure filter (standard mode) failed"
+
+    - name: "Test select_interfaces_to_configure filter (idempotent mode, no changes)"
+      ansible.builtin.set_fact:
+        interfaces_idempotent: "{{ test_interfaces | select_interfaces_to_configure(true, {'configure': []}) }}"
+
+    - name: "Verify select_interfaces_to_configure result (idempotent mode)"
+      ansible.builtin.assert:
+        that:
+          - interfaces_idempotent is defined
+          - interfaces_idempotent | length == 0
+        success_msg: "✅ select_interfaces_to_configure filter (idempotent mode) works correctly"
+        fail_msg: "❌ select_interfaces_to_configure filter (idempotent mode) failed"
+
     - name: "Display all filter test results"
       ansible.builtin.debug:
         msg:
           - "✅ All filter plugin tests passed!"
           - "Tested filters:"
-          - "  - VLAN filters: extract_vlan_ids, filter_vlans_in_use"
+          - "  - VLAN filters: extract_vlan_ids, filter_vlans_in_use, extract_evpn_vlans,"
+          - "                  extract_vxlan_mappings, get_vlans_in_use, get_vlan_interfaces,"
+          - "                  parse_evpn_evi_output"
           - "  - VRF filters: extract_interface_vrfs, filter_configurable_vrfs"
           - "  - Interface filters: categorize_l2_interfaces, categorize_l3_interfaces"
-          - "  - Utility filters: collapse_vlan_list"
+          - "  - OSPF filters: select_ospf_interfaces, extract_ospf_areas,"
+          - "                  get_ospf_interfaces_by_area, validate_ospf_config"
+          - "  - REST API transforms: rest_api_to_aoscx_interfaces, rest_api_to_aoscx_vlans,"
+          - "                         rest_api_to_aoscx_evpn_vlans, rest_api_to_aoscx_vnis"
+          - "  - Utility filters: collapse_vlan_list, select_interfaces_to_configure"
 
     - name: "Display success message"
       ansible.builtin.debug:

@@ -10,6 +10,7 @@ from netbox_filters_lib.vlan_filters import (
     get_vlans_in_use,
     get_vlans_needing_changes,
     get_vlan_interfaces,
+    parse_evpn_evi_output,
 )
 from .fixtures import get_sample_interfaces, get_sample_vlans, get_sample_ansible_facts
 
@@ -244,3 +245,90 @@ class TestGetVlanInterfaces:
         ]
         result = get_vlan_interfaces(interfaces)
         assert len(result) == 0
+
+
+class TestParseEvpnEviOutput:
+    """Tests for parse_evpn_evi_output function"""
+
+    def test_parse_single_l2vni(self):
+        """Test parsing output with single L2VNI entry"""
+        output = """L2VNI : 10100
+    Route Distinguisher        : 172.20.1.33:10
+    VLAN                       : 10
+    Status                     : up
+    RT Import                  : 65005:10
+    RT Export                  : 65005:10"""
+        result = parse_evpn_evi_output(output)
+        assert result["evpn_vlans"] == [10]
+        assert result["vxlan_vnis"] == [10100]
+        assert result["vxlan_vlans"] == [10]
+        assert result["vxlan_mappings"] == [[10100, 10]]
+
+    def test_parse_multiple_l2vnis(self):
+        """Test parsing output with multiple L2VNI entries"""
+        output = """L2VNI : 10100
+    Route Distinguisher        : 172.20.1.33:10
+    VLAN                       : 10
+    Status                     : up
+    RT Import                  : 65005:10
+    RT Export                  : 65005:10
+L2VNI : 10200
+    Route Distinguisher        : 172.20.1.33:20
+    VLAN                       : 20
+    Status                     : up
+    RT Import                  : 65005:20
+    RT Export                  : 65005:20
+L2VNI : 10300
+    Route Distinguisher        : 172.20.1.33:30
+    VLAN                       : 30
+    Status                     : up
+    RT Import                  : 65005:30
+    RT Export                  : 65005:30"""
+        result = parse_evpn_evi_output(output)
+        assert result["evpn_vlans"] == [10, 20, 30]
+        assert result["vxlan_vnis"] == [10100, 10200, 10300]
+        assert result["vxlan_vlans"] == [10, 20, 30]
+        assert len(result["vxlan_mappings"]) == 3
+        assert [10100, 10] in result["vxlan_mappings"]
+        assert [10200, 20] in result["vxlan_mappings"]
+        assert [10300, 30] in result["vxlan_mappings"]
+
+    def test_parse_empty_output(self):
+        """Test parsing empty output"""
+        result = parse_evpn_evi_output("")
+        assert result["evpn_vlans"] == []
+        assert result["vxlan_vnis"] == []
+        assert result["vxlan_vlans"] == []
+        assert result["vxlan_mappings"] == []
+
+    def test_parse_none_output(self):
+        """Test parsing None output"""
+        result = parse_evpn_evi_output(None)
+        assert result["evpn_vlans"] == []
+        assert result["vxlan_vnis"] == []
+        assert result["vxlan_vlans"] == []
+        assert result["vxlan_mappings"] == []
+
+    def test_parse_non_string_output(self):
+        """Test parsing non-string output"""
+        result = parse_evpn_evi_output(12345)
+        assert result["evpn_vlans"] == []
+        assert result["vxlan_vnis"] == []
+
+    def test_parse_output_with_no_matching_data(self):
+        """Test parsing output with no EVPN data"""
+        output = """Some other command output
+that doesn't contain L2VNI data"""
+        result = parse_evpn_evi_output(output)
+        assert result["evpn_vlans"] == []
+        assert result["vxlan_vnis"] == []
+
+    def test_parse_large_vni_numbers(self):
+        """Test parsing output with large VNI numbers"""
+        output = """L2VNI : 16777200
+    Route Distinguisher        : 172.20.1.33:10
+    VLAN                       : 4094
+    Status                     : up"""
+        result = parse_evpn_evi_output(output)
+        assert result["vxlan_vnis"] == [16777200]
+        assert result["vxlan_vlans"] == [4094]

@@ -153,8 +153,15 @@ def rest_api_to_aoscx_evpn_vlans(rest_data):
             continue
 
         vlan_id_str = str(vlan_id)
+
+        # Get actual VLAN ID from data, or fall back to dict key
+        actual_vlan = evpn_data.get("vlan", vlan_id)
+        # Ensure it's an integer if it's a numeric string
+        if isinstance(actual_vlan, str) and actual_vlan.isdigit():
+            actual_vlan = int(actual_vlan)
+
         result[vlan_id_str] = {
-            "vlan": vlan_id,
+            "vlan": actual_vlan,
             "rd": evpn_data.get("rd"),
             "export_route_targets": evpn_data.get("export_route_targets", []),
             "import_route_targets": evpn_data.get("import_route_targets", []),
