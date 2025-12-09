@@ -591,12 +591,31 @@ With enhanced facts (`depth=2`), you get actual values:
 | Extra API call | No | Yes (login + query + logout) |
 | Credentials | Via aoscx modules | Direct REST API |
 
-### Future Enhancement
+### REST API Version Requirement
 
-Currently, the enhanced facts are gathered but not yet used in change detection. Future releases will:
-- Use IPv6 addresses for change detection (skip already-configured IPv6)
-- Use VSX virtual IPs for proper anycast comparison
-- Enable truly idempotent IPv6 and anycast configuration
+**Important:** The `aoscx_facts` module reports an older REST API version (e.g., `10.09`), but this version returns `ip6_addresses` as URL references instead of actual data. You need a newer API version for proper IPv6 expansion.
+
+The role attempts to auto-detect the best version via `/rest/v1/firmware`, but this may require authentication. If auto-detection fails, set the version manually:
+
+```yaml
+# Tested working versions for ip6_addresses expansion:
+aoscx_rest_api_version: "10.14"  # or "10.13", "10.17", etc.
+```
+
+| REST API Version | ip6_addresses Format |
+|------------------|---------------------|
+| 10.09 | URL string (❌ doesn't work) |
+| 10.13+ | Dict with addresses (✅ works) |
+
+**Testing tip:** Check what version your switch supports via web browser:
+`https://<switch-ip>/rest/v10.14/system/interfaces?depth=2`
+
+### Current Status
+
+With enhanced facts and correct REST API version:
+- ✅ IPv6 addresses used for change detection (skip already-configured)
+- ✅ VSX virtual IPs available for anycast comparison
+- ✅ Truly idempotent IPv6 and anycast configuration
 
 ---
 

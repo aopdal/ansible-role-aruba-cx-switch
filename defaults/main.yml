@@ -63,6 +63,13 @@ aoscx_gather_enhanced_facts: false
 # aoscx_rest_password: "{{ ansible_password }}"  # REST API password
 aoscx_rest_validate_certs: false  # Validate SSL certificates for REST API
 
+# REST API version override (RECOMMENDED when using enhanced facts)
+# The aoscx_facts module reports an older version (e.g., 10.09) which returns
+# ip6_addresses as URL strings. Newer versions (10.13+) return actual addresses.
+# Auto-detection via /rest/v1/firmware may require authentication.
+# Set this explicitly for reliable IPv6 change detection:
+aoscx_rest_api_version: "10.13"  # Tested: 10.13, 10.14, 10.17 work
+
 # L3 interface settings
 aoscx_l3_counters_enable: true  # Enable l3-counters on L3 interfaces
 

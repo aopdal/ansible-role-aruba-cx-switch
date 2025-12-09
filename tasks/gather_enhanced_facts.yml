@@ -24,9 +24,57 @@
   tags:
     - always
 
+# Query available API versions and use the latest one
+# The ansible_aoscx_rest_version may report an older version (e.g., 10.09)
+# but the switch may support newer versions (e.g., 10.17) that properly
+# expand ip6_addresses with depth=2
+- name: Query available REST API versions
+  ansible.builtin.uri:
+    url: "https://{{ _rest_host }}/rest/v1/firmware"
+    method: GET
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: _rest_firmware
+  delegate_to: localhost
+  ignore_errors: true
+  tags:
+    - always
+
+- name: Determine best REST API version
+  ansible.builtin.set_fact:
+    # The firmware endpoint returns current_version like "FL.10.14.0001"
+    # Extract major.minor version (e.g., "10.14") for the REST API path
+    # Fallback chain:
+    # 1. Extract from firmware current_version
+    # 2. Use user-specified aoscx_rest_api_version
+    # 3. Fallback to ansible_aoscx_rest_version
+    _rest_api_version: >-
+      {%- if _rest_firmware is succeeded and _rest_firmware.json.current_version is defined -%}
+        {{ _rest_firmware.json.current_version | regex_search('([0-9]+\\.[0-9]+)', '\\1') | first | default(ansible_aoscx_rest_version) }}
+      {%- elif aoscx_rest_api_version is defined -%}
+        {{ aoscx_rest_api_version }}
+      {%- else -%}
+        {{ ansible_aoscx_rest_version }}
+      {%- endif -%}
+  tags:
+    - always
+
 - name: Set REST API base URL
   ansible.builtin.set_fact:
-    _rest_api_base: "https://{{ _rest_host }}/rest/v{{ ansible_aoscx_rest_version }}"
+    _rest_api_base: "https://{{ _rest_host }}/rest/v{{ _rest_api_version }}"
+  tags:
+    - always
+
+- name: Debug - Show REST API version being used
+  ansible.builtin.debug:
+    msg:
+      - "ansible_aoscx_rest_version (from aoscx_facts): {{ ansible_aoscx_rest_version }}"
+      - "Firmware query result: {{ _rest_firmware.json | default('FAILED or N/A') }}"
+      - "Using REST API version: {{ _rest_api_version }}"
+      - "REST API base URL: {{ _rest_api_base }}"
+  when:
+    - aoscx_debug | default(false) | bool
   tags:
     - always
 

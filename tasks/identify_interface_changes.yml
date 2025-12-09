@@ -74,6 +74,20 @@
   tags:
     - always
 
+- name: Debug - Show enhanced facts for vlan11 (IPv6 debugging)
+  ansible.builtin.debug:
+    msg:
+      - "=== Enhanced Facts for vlan11 ==="
+      - "Keys available: {{ (aoscx_enhanced_interface_facts | default({})).keys() | select('match', '^vlan') | list }}"
+      - "vlan11 data: {{ aoscx_enhanced_interface_facts['vlan11'] | default('NOT FOUND') }}"
+      - "vlan11 ip6_addresses: {{ (aoscx_enhanced_interface_facts['vlan11'] | default({})).get('ip6_addresses', 'NOT FOUND') }}"
+  when:
+    - aoscx_debug | default(false) | bool
+    - aoscx_enhanced_interface_facts is defined
+    - aoscx_enhanced_interface_facts | length > 0
+  tags:
+    - always
+
 - name: Identify interfaces needing configuration changes
   ansible.builtin.set_fact:
     interface_changes: >-
