@@ -33,8 +33,9 @@
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
     # Filter interfaces based on IP version and change detection
-    # IPv4: Filter by _needs_add to skip already-configured addresses (performance)
-    # IPv6: No change detection possible (facts don't include IPv6 data)
+    # Both IPv4 and IPv6 use _needs_add field set during interface processing
+    # IPv4: Uses ipv4_to_add from change detection
+    # IPv6: Uses ipv6_to_add from enhanced facts when available
     # IPv6 addresses contain ':', IPv4 addresses don't
     filtered_interfaces: >-
       {{
@@ -46,5 +47,6 @@
         else
         interface_list
         | selectattr('address', 'search', ':')
+        | selectattr('_needs_add', 'equalto', true)
         | list
       }}

@@ -9,6 +9,10 @@
 # If you need to re-gather facts during the playbook run, either:
 # 1. Use include_tasks: gather_facts.yml (recommended)
 # 2. Or gather ALL resources: gather_network_resources: [interfaces, vlans]
+#
+# Enhanced Facts (optional):
+# Set aoscx_gather_enhanced_facts: true to also gather via REST API with depth=2.
+# This provides IPv6 addresses and VSX virtual IPs for better change detection.
 
 - name: Gather device facts
   arubanetworks.aoscx.aoscx_facts:
@@ -31,5 +35,15 @@
   when:
     - aoscx_debug | bool
     - ansible_verbosity >= 1
+  tags:
+    - always
+
+# Optional: Gather enhanced facts via REST API with depth=2
+# This provides IPv6 addresses (actual values) and VSX virtual IPs
+- name: Include enhanced fact gathering
+  ansible.builtin.include_tasks:
+    file: gather_enhanced_facts.yml
+  when:
+    - aoscx_gather_enhanced_facts | default(false) | bool
   tags:
     - always

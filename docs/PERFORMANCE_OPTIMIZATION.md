@@ -547,6 +547,59 @@ time ansible-playbook site.yml -i inventory.yml --limit test_switches
 
 ---
 
+## Enhanced Fact Gathering (Experimental)
+
+For more precise change detection, especially for IPv6 and anycast/active-gateway configurations, enable enhanced fact gathering via REST API with `depth=2`.
+
+### Configuration
+
+```yaml
+# group_vars or playbook
+aoscx_gather_enhanced_facts: true
+
+# REST API credentials (optional - defaults to ansible_host/ansible_user/ansible_password)
+aoscx_rest_host: "{{ ansible_host }}"  # Switch management IP/hostname
+aoscx_rest_user: "admin"                # REST API username
+aoscx_rest_password: "{{ vault_switch_password }}"  # REST API password
+aoscx_rest_validate_certs: false        # SSL certificate validation
+```
+
+### What It Provides
+
+The standard `aoscx_facts` module has limitations:
+- IPv6 addresses are returned as URI references (e.g., `/rest/v10.09/system/interfaces/vlan11/ip6_addresses`)
+- VSX virtual IPs (anycast/active-gateway) are not included
+
+With enhanced facts (`depth=2`), you get actual values:
+- `ip6_addresses` - Actual IPv6 addresses (not URIs)
+- `vsx_virtual_ip4` / `vsx_virtual_ip6` - Anycast/active-gateway IPs
+- `vsx_virtual_gw_mac_v4` / `vsx_virtual_gw_mac_v6` - Anycast MAC addresses
+
+### How It Works
+
+1. Task logs into the switch REST API using provided credentials
+2. Queries `/system/interfaces?depth=2&attributes=...`
+3. Stores results in `aoscx_enhanced_interface_facts`
+4. Logs out to clean up the session
+
+### Trade-offs
+
+| Aspect | Standard Facts | Enhanced Facts |
+|--------|---------------|----------------|
+| IPv6 addresses | URI references only | Actual addresses |
+| Anycast IPs | Not available | Available |
+| Extra API call | No | Yes (login + query + logout) |
+| Credentials | Via aoscx modules | Direct REST API |
+
+### Future Enhancement
+
+Currently, the enhanced facts are gathered but not yet used in change detection. Future releases will:
+- Use IPv6 addresses for change detection (skip already-configured IPv6)
+- Use VSX virtual IPs for proper anycast comparison
+- Enable truly idempotent IPv6 and anycast configuration
+
+---
+
 ## Notes for Users
 
 ### When to Use Fast Mode

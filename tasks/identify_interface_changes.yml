@@ -62,13 +62,28 @@
   tags:
     - always
 
+- name: Debug - Show enhanced facts status
+  ansible.builtin.debug:
+    msg:
+      - "=== Enhanced Facts Status ==="
+      - "Enhanced facts enabled: {{ aoscx_gather_enhanced_facts | default(false) }}"
+      - "Enhanced facts available: {{ aoscx_enhanced_interface_facts is defined and aoscx_enhanced_interface_facts | length > 0 }}"
+      - "Enhanced interfaces count: {{ aoscx_enhanced_interface_facts | default({}) | length }}"
+  when:
+    - aoscx_debug | default(false) | bool
+  tags:
+    - always
+
 - name: Identify interfaces needing configuration changes
   ansible.builtin.set_fact:
     interface_changes: >-
       {{
-        interfaces | get_interfaces_needing_config_changes(ansible_facts)
+        interfaces | get_interfaces_needing_config_changes(
+          ansible_facts,
+          aoscx_enhanced_interface_facts | default({})
+        )
         if ansible_facts is defined
-        else interfaces | get_interfaces_needing_config_changes({})
+        else interfaces | get_interfaces_needing_config_changes({}, {})
       }}
   tags:
     - always

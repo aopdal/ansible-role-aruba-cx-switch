@@ -14,29 +14,58 @@ This makes it impossible to compare NetBox's intended IPv6 addresses with the
 device's actual configured addresses within filter plugin context, as filters
 cannot make API calls to retrieve the actual IPv6 data.
 
+ENHANCED FACTS SOLUTION (Optional):
+===================================
+When `aoscx_gather_enhanced_facts: true` is set, the role gathers interface data
+via REST API with depth=2, which provides actual IPv6 addresses and VSX virtual IPs.
+This enhanced data is passed to the filter and enables:
+- IPv6 address comparison (skip already-configured IPv6 addresses)
+- VSX virtual IP comparison (proper anycast/active-gateway detection)
+
 PERFORMANCE RATIONALE:
 - IPv4 addresses: Full comparison implemented - saves significant time by skipping
   unnecessary configuration tasks
-- IPv6 addresses: No comparison performed - the overhead of fetching IPv6 data
-  (requiring separate CLI connection/command execution) exceeds the time saved
-- CLI commands are idempotent: Applying duplicate IPv6 configuration has no effect
-
-Testing confirmed that pre-checking IPv6 addresses via CLI commands is not
-time-efficient compared to directly applying idempotent configuration.
+- IPv6 addresses (without enhanced facts): No comparison performed - the overhead
+  of fetching IPv6 data exceeds the time saved
+- IPv6 addresses (with enhanced facts): Full comparison enabled
+- CLI commands are idempotent: Applying duplicate configuration has no effect
 
 WORKAROUND IMPLEMENTATION:
 - IPv4: Only addresses needing addition are stored in `_ip_changes.ipv4_to_add`
 - IPv6: All addresses stored in `_ip_changes.ipv6_addresses` for reference
-- Tasks: IPv4 filtered by `_needs_add`
+  (or only addresses needing addition when enhanced facts are available)
+- Tasks: IPv4 filtered by `_needs_add`, IPv6 filtered when enhanced facts available
 
 Provides functions to compare NetBox interface configuration with device facts
 and identify which interfaces need configuration changes.
 """
 
+import ipaddress
+from urllib.parse import unquote
+
 from .utils import _debug, extract_ip_addresses, populate_ip_changes
 
 
-def get_interfaces_needing_config_changes(interfaces, device_facts):
+def _normalize_ipv6(addr):
+    """Normalize IPv6 address to canonical form for comparison.
+
+    Returns tuple of (normalized_addr_without_prefix, original_addr)
+    """
+    try:
+        if "/" in addr:
+            network = ipaddress.IPv6Interface(addr)
+            return (str(network.ip), addr)
+        ip = ipaddress.IPv6Address(addr)
+        return (str(ip), addr)
+    except (ValueError, ipaddress.AddressValueError):
+        # If parsing fails, use original (stripped of prefix)
+        base = addr.split("/")[0] if "/" in addr else addr
+        return (base, addr)
+
+
+def get_interfaces_needing_config_changes(
+    interfaces, device_facts, enhanced_facts=None
+):
     """
     Compare NetBox interfaces with device facts to identify which interfaces need changes.
     This is the idempotent check to avoid unnecessary API calls.
@@ -44,6 +73,8 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
     Args:
         interfaces: List of interface objects from NetBox
         device_facts: Device facts containing current interface state
+        enhanced_facts: Optional dict of enhanced interface facts from REST API with depth=2
+                       Provides actual IPv6 addresses and VSX virtual IPs for better comparison
 
     Returns:
         Dict with categorized interfaces:
@@ -474,8 +505,11 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
 
             # Extract IP addresses from device facts
             device_ipv4 = set()
+            device_ipv6 = set()
+            device_vsx_virtual_ip4 = set()
+            device_vsx_virtual_ip6 = set()
 
-            # IPv4 addresses
+            # IPv4 addresses from standard facts
             device_ip4 = device_intf.get("ip4_address")
             if device_ip4:
                 device_ipv4.add(device_ip4)
@@ -486,21 +520,100 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                     if ip:
                         device_ipv4.add(ip)
 
+            # Check for enhanced facts (REST API with depth=2)
+            # These provide actual IPv6 addresses and VSX virtual IPs
+            enhanced_intf = None
+            if enhanced_facts and isinstance(enhanced_facts, dict):
+                enhanced_intf = enhanced_facts.get(intf_name)
+                if enhanced_intf and isinstance(enhanced_intf, dict):
+                    _debug(f"Using enhanced facts for {intf_name}")
+
+                    # Extract IPv6 addresses from enhanced facts
+                    # The REST API returns ip6_addresses as a dict where keys are
+                    # URL-encoded addresses (e.g., "2001%3Adb8%3A%3A1%2F64")
+                    enhanced_ip6 = enhanced_intf.get("ip6_addresses")
+                    if enhanced_ip6 and isinstance(enhanced_ip6, dict):
+                        for ip6_key, ip6_data in enhanced_ip6.items():
+                            # URL-decode the key first
+                            decoded_key = unquote(ip6_key)
+                            # The key is the address, or extract from data
+                            if isinstance(ip6_data, dict):
+                                addr = ip6_data.get("address", decoded_key)
+                            else:
+                                addr = decoded_key
+                            if addr and ":" in addr:
+                                device_ipv6.add(addr)
+                        _debug(f"Enhanced IPv6 for {intf_name}: {device_ipv6}")
+
+                    # Extract VSX virtual IPs (anycast/active-gateway)
+                    vsx_ip4 = enhanced_intf.get("vsx_virtual_ip4")
+                    if vsx_ip4:
+                        if isinstance(vsx_ip4, list):
+                            device_vsx_virtual_ip4.update(vsx_ip4)
+                        else:
+                            device_vsx_virtual_ip4.add(vsx_ip4)
+
+                    vsx_ip6 = enhanced_intf.get("vsx_virtual_ip6")
+                    if vsx_ip6:
+                        if isinstance(vsx_ip6, list):
+                            device_vsx_virtual_ip6.update(vsx_ip6)
+                        else:
+                            device_vsx_virtual_ip6.add(vsx_ip6)
+
+                    if device_vsx_virtual_ip4 or device_vsx_virtual_ip6:
+                        _debug(
+                            f"Enhanced VSX virtual IPs for {intf_name}: "
+                            f"IPv4={device_vsx_virtual_ip4}, IPv6={device_vsx_virtual_ip6}"
+                        )
+
             # Compare the IP addresses
             ipv4_to_add = nb_ipv4 - device_ipv4
             ipv4_to_remove = device_ipv4 - nb_ipv4
 
-            # For IPv6: The aoscx_facts module returns URLs for ip6_addresses
-            # ("/rest/v10.09/system/interfaces/<name>/ip6_addresses")
-            # rather than actual address data, making it impossible to compare
-            # IPv6 addresses from device facts.
-            # As a workaround, we mark ALL IPv6 addresses as potentially
-            # needing configuration.
-            # The aoscx_config module with 'match: line' provides some
-            # idempotency - it won't apply changes if the line exists.
-            # Note: IPv6 configuration tasks may always show 'changed' status
-            # even when addresses are correct.
-            ipv6_needs_config = len(nb_ipv6) > 0
+            # IPv6 comparison - depends on whether enhanced facts are available
+            ipv6_to_add = set()
+            ipv6_needs_config = False
+
+            if enhanced_intf:
+                # Enhanced facts available - we can do proper IPv6 comparison
+                # Even if device_ipv6 is empty, we can compare (all nb_ipv6 need adding)
+                #
+                # IMPORTANT: Normalize IPv6 addresses for comparison
+                # IPv6 can have different representations:
+                # - "2001:0db8:0a11::2" vs "2001:db8:a11::2" (leading zeros)
+                # - "2001:db8:a11:0:0:0:0:2" vs "2001:db8:a11::2" (compression)
+                # Use ipaddress module for canonical normalization
+
+                # Build mapping: normalized_addr -> original_netbox_address
+                nb_ipv6_normalized = {}
+                for addr in nb_ipv6:
+                    norm, orig = _normalize_ipv6(addr)
+                    nb_ipv6_normalized[norm] = orig
+
+                device_ipv6_normalized = set()
+                for addr in device_ipv6:
+                    norm, _ = _normalize_ipv6(addr)
+                    device_ipv6_normalized.add(norm)
+
+                # Find addresses in NetBox but not on device (comparing normalized)
+                for norm_addr, orig_addr in nb_ipv6_normalized.items():
+                    if norm_addr not in device_ipv6_normalized:
+                        ipv6_to_add.add(orig_addr)
+
+                ipv6_needs_config = len(ipv6_to_add) > 0
+                _debug(
+                    f"IPv6 comparison for {intf_name}: "
+                    f"NetBox={nb_ipv6}, device={device_ipv6}, "
+                    f"nb_normalized={set(nb_ipv6_normalized.keys())}, "
+                    f"device_normalized={device_ipv6_normalized}, to_add={ipv6_to_add}"
+                )
+            else:
+                # No enhanced facts - fall back to marking all IPv6 as needing config
+                # The aoscx_facts module returns URLs for ip6_addresses
+                # ("/rest/v10.09/system/interfaces/<name>/ip6_addresses")
+                # rather than actual address data.
+                ipv6_needs_config = len(nb_ipv6) > 0
+                ipv6_to_add = nb_ipv6  # Mark all as needing config
 
             if ipv4_to_add or ipv4_to_remove or ipv6_needs_config:
                 needs_change = True
@@ -509,25 +622,32 @@ def get_interfaces_needing_config_changes(interfaces, device_facts):
                 if ipv4_to_remove:
                     change_reasons.append(f"IPv4 addresses to remove: {ipv4_to_remove}")
                 if ipv6_needs_config:
-                    change_reasons.append(
-                        f"IPv6 addresses need configuration: {nb_ipv6}"
-                    )
+                    if enhanced_intf:
+                        change_reasons.append(f"IPv6 addresses to add: {ipv6_to_add}")
+                    else:
+                        change_reasons.append(
+                            f"IPv6 addresses need configuration: {nb_ipv6}"
+                        )
 
-                # Store IP change details in the interface object for
-                # task-level filtering.
-                # Only store IPv4 changes - IPv6 cannot be reliably
-                # compared from device facts.
+                # Store IPv4 change details in the interface object for task-level filtering
                 if ipv4_to_add:
                     if "_ip_changes" not in nb_intf:
                         nb_intf["_ip_changes"] = {}
                     nb_intf["_ip_changes"]["ipv4_to_add"] = list(ipv4_to_add)
 
-                # Store all IPv6 addresses for reference, but don't mark
-                # them as needing addition since we cannot verify if they
-                # already exist on the device.
-                if nb_ipv6:
-                    if "_ip_changes" not in nb_intf:
-                        nb_intf["_ip_changes"] = {}
+            # ALWAYS store IPv6 change info when enhanced facts available
+            # This allows task-level filtering even when interface needs changes
+            # for other reasons (description, MTU, etc.) but IPv6 is already configured
+            if nb_ipv6:
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                if enhanced_intf:
+                    # Enhanced facts available - store addresses that need adding
+                    # (might be empty if all are already configured)
+                    nb_intf["_ip_changes"]["ipv6_to_add"] = list(ipv6_to_add)
+                    nb_intf["_ip_changes"]["ipv6_addresses"] = list(nb_ipv6)
+                else:
+                    # No enhanced facts - store all addresses for reference
                     nb_intf["_ip_changes"]["ipv6_addresses"] = list(nb_ipv6)
 
         if needs_change:

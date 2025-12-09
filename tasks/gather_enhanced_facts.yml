@@ -1,0 +1,93 @@
+---
+# Gather enhanced interface facts via REST API with depth=2
+#
+# This task file gathers additional interface data not available in standard aoscx_facts:
+# - IPv6 addresses (actual values instead of URI references)
+# - VSX virtual IPs (vsx_virtual_ip4, vsx_virtual_ip6) for anycast/active-gateway
+# - VSX virtual gateway MACs (vsx_virtual_gw_mac_v4, vsx_virtual_gw_mac_v6)
+#
+# Prerequisites:
+# - aoscx_gather_enhanced_facts: true
+# - REST API credentials (aoscx_rest_host, aoscx_rest_user, aoscx_rest_password)
+#   or defaults to ansible_host, ansible_user, ansible_password
+#
+# Output:
+# - aoscx_enhanced_interface_facts: Dict of interface data with expanded attributes
+
+- name: Set REST API variables
+  ansible.builtin.set_fact:
+    _rest_host: "{{ aoscx_rest_host | default(ansible_host) }}"
+    _rest_user: "{{ aoscx_rest_user | default(ansible_user) }}"
+    _rest_password: "{{ aoscx_rest_password | default(ansible_password) }}"
+    _rest_validate_certs: "{{ aoscx_rest_validate_certs | default(false) }}"
+  no_log: true
+  tags:
+    - always
+
+- name: Set REST API base URL
+  ansible.builtin.set_fact:
+    _rest_api_base: "https://{{ _rest_host }}/rest/v{{ ansible_aoscx_rest_version }}"
+  tags:
+    - always
+
+- name: Login to AOS-CX REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/login"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ _rest_user }}"
+      password: "{{ _rest_password }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: _rest_login
+  delegate_to: localhost
+  no_log: "{{ aoscx_no_log | default(true) }}"
+  tags:
+    - always
+
+- name: Query interfaces with depth=2
+  ansible.builtin.uri:
+    url: >-
+      {{ _rest_api_base }}/system/interfaces?depth=2&attributes=name,ip4_address,ip4_address_secondary,ip6_addresses,ip_mtu,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6,vsx_virtual_ip4,vsx_virtual_ip6,admin,description
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: _rest_interfaces
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Logout from AOS-CX REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/logout"
+    method: POST
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 204]
+  delegate_to: localhost
+  no_log: true
+  tags:
+    - always
+
+- name: Store enhanced interface facts
+  ansible.builtin.set_fact:
+    aoscx_enhanced_interface_facts: "{{ _rest_interfaces.json }}"
+  tags:
+    - always
+
+- name: Debug - Show enhanced interface facts summary
+  ansible.builtin.debug:
+    msg:
+      - "=== Enhanced Interface Facts (REST API depth=2) ==="
+      - "Total interfaces: {{ aoscx_enhanced_interface_facts | length }}"
+      - "Sample interface keys: {{ (aoscx_enhanced_interface_facts | dict2items | first).value.keys() | list if aoscx_enhanced_interface_facts | length > 0 else 'N/A' }}"
+  when:
+    - aoscx_debug | default(false) | bool
+  tags:
+    - always

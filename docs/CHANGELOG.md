@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Enhanced Fact Gathering via REST API** (experimental)
+  - New `aoscx_gather_enhanced_facts` option to gather interface data with `depth=2`
+  - Provides actual IPv6 addresses instead of URI references
+  - Includes VSX virtual IPs (`vsx_virtual_ip4`, `vsx_virtual_ip6`)
+  - Includes anycast gateway MACs (`vsx_virtual_gw_mac_v4`, `vsx_virtual_gw_mac_v6`)
+  - New task file: `gather_enhanced_facts.yml`
+  - Configuration variables: `aoscx_rest_host`, `aoscx_rest_user`, `aoscx_rest_password`
+  - See PERFORMANCE_OPTIMIZATION.md for usage details
+
 - **Code Optimizations & Refactoring**
   - New L3 Configuration Helpers module (`l3_config_helpers.py`)
     - `format_interface_name()` - Interface name formatting for AOS-CX

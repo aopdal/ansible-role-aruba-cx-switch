@@ -60,18 +60,27 @@
       ip_role: "{{ item.1.role.value if item.1.role is defined and item.1.role.value is defined else none }}"
       # Anycast gateway MAC from interface custom fields
       anycast_mac: "{{ item.0.custom_fields.if_anycast_gateway_mac if item.0.custom_fields is defined and item.0.custom_fields.if_anycast_gateway_mac is defined else none }}"
-      # Track if this specific IP needs to be added (for IPv4 performance optimization)
-      # Logic:
+      # Track if this specific IP needs to be added (for performance optimization)
+      # IPv4 Logic:
       #   1. If ipv4_to_add exists: Check if address is in list
-      #   2. If _ip_changes exists but no ipv4_to_add: FALSE (IPv4 checked, no changes needed)
-      #   3. If no _ip_changes at all: TRUE for IPv4 (new interface, needs config)
+      #   2. If _ip_changes exists but no ipv4_to_add: FALSE (checked, no changes needed)
+      #   3. If no _ip_changes at all: TRUE (new interface, needs config)
+      # IPv6 Logic:
+      #   1. If ipv6_to_add exists (from enhanced facts): Check if address is in list
+      #   2. If _ip_changes exists but no ipv6_to_add: TRUE (no enhanced facts, configure all)
+      #   3. If no _ip_changes at all: TRUE (new interface, needs config)
       _needs_add: >-
         {{
           item.1.address in item.0._ip_changes.ipv4_to_add
-          if (item.0._ip_changes is defined and 'ipv4_to_add' in item.0._ip_changes)
+          if (':' not in item.1.address and item.0._ip_changes is defined and 'ipv4_to_add' in item.0._ip_changes)
           else (
-            false if item.0._ip_changes is defined
-            else (':' not in item.1.address)
+            false
+            if (':' not in item.1.address and item.0._ip_changes is defined)
+            else (
+              item.1.address in item.0._ip_changes.ipv6_to_add
+              if (':' in item.1.address and item.0._ip_changes is defined and 'ipv6_to_add' in item.0._ip_changes)
+              else true
+            )
           )
         }}
   loop: "{{ interfaces_with_ips | subelements('ip_addresses', skip_missing=True) }}"
@@ -84,6 +93,18 @@
       - "Total interface/IP combinations: {{ interface_ips | length }}"
       - "Sample: {{ interface_ips[:3] }}"
       - "Interface 1/1/5 data: {{ interface_ips | selectattr('interface_name', 'equalto', '1/1/5') | list }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Debug - Show IPv6 change detection results
+  ansible.builtin.debug:
+    msg:
+      - "=== IPv6 Change Detection Debug ==="
+      - "Enhanced facts enabled: {{ aoscx_gather_enhanced_facts | default(false) }}"
+      - "IPv6 addresses in list: {{ interface_ips | selectattr('address', 'search', ':') | list | length }}"
+      - "IPv6 addresses with _needs_add=true: {{ interface_ips | selectattr('address', 'search', ':') | selectattr('_needs_add', 'equalto', true) | list | length }}"
+      - "IPv6 addresses with _needs_add=false: {{ interface_ips | selectattr('address', 'search', ':') | selectattr('_needs_add', 'equalto', false) | list | length }}"
+      - "Sample IPv6 with _needs_add=true: {{ (interface_ips | selectattr('address', 'search', ':') | selectattr('_needs_add', 'equalto', true) | list)[:3] | map(attribute='address') | list }}"
+      - "Sample IPv6 _ip_changes: {{ (interfaces_with_ips | selectattr('_ip_changes', 'defined') | list)[:1] | map(attribute='_ip_changes') | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Get VLAN interfaces (from interfaces needing changes only)

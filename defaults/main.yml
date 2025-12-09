@@ -49,6 +49,20 @@ aoscx_save_config: true
 # Connection settings
 aoscx_connection_type: network_cli  # or httpapi
 
+# Enhanced fact gathering via REST API with depth=2
+# When enabled, gathers additional data not available in standard facts:
+# - IPv6 addresses (actual values, not URI references)
+# - VSX virtual IPs (vsx_virtual_ip4, vsx_virtual_ip6)
+# - Anycast gateway MACs (vsx_virtual_gw_mac_v4, vsx_virtual_gw_mac_v6)
+aoscx_gather_enhanced_facts: false
+
+# REST API credentials for enhanced fact gathering (delegated to localhost)
+# These default to ansible_host/ansible_user/ansible_password if not set
+# aoscx_rest_host: "{{ ansible_host }}"        # Switch management IP/hostname
+# aoscx_rest_user: "{{ ansible_user }}"        # REST API username
+# aoscx_rest_password: "{{ ansible_password }}"  # REST API password
+aoscx_rest_validate_certs: false  # Validate SSL certificates for REST API
+
 # L3 interface settings
 aoscx_l3_counters_enable: true  # Enable l3-counters on L3 interfaces
 
