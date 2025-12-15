@@ -472,15 +472,81 @@ def get_interfaces_needing_config_changes(
                         if nb_untagged:
                             nb_all_vlans.add(nb_untagged)
 
-                        if nb_untagged and nb_untagged != device_native:
+                        # Debug L2 VLAN comparison
+                        _debug(
+                            f"L2 VLAN comparison for {intf_name}: "
+                            f"mode={nb_mode}, nb_untagged={nb_untagged}, "
+                            f"nb_tagged={nb_tagged}, nb_all_vlans={nb_all_vlans}, "
+                            f"device_mode={device_mode}, device_native={device_native}, "
+                            f"device_trunks={device_trunks}"
+                        )
+
+                        # Check native VLAN and mode
+                        # AOS-CX trunk modes:
+                        # - native-untagged: native VLAN traffic is untagged (default)
+                        # - native-tagged: native VLAN traffic is tagged
+                        #
+                        # NetBox mapping:
+                        # - untagged_vlan set: device should be native-untagged
+                        # - no untagged_vlan (all tagged): device should be native-tagged
+                        native_vlan_matches = False
+
+                        if nb_untagged:
+                            # NetBox wants native-untagged mode
+                            if device_native and nb_untagged == device_native:
+                                native_vlan_matches = True
+                            elif (
+                                device_mode == "native-untagged"
+                                and nb_untagged in device_trunks
+                            ):
+                                # In native-untagged mode, native VLAN is in vlan_trunks
+                                native_vlan_matches = True
+                                _debug(
+                                    f"Native VLAN {nb_untagged} found in vlan_trunks "
+                                    f"(native-untagged mode)"
+                                )
+                        else:
+                            # NetBox wants native-tagged mode (no untagged VLAN)
+                            # Check if device is already in native-tagged mode
+                            if device_mode == "native-tagged":
+                                native_vlan_matches = True
+                                _debug("Device already in native-tagged mode")
+                            elif device_mode == "native-untagged":
+                                # Device is in native-untagged but NetBox wants native-tagged
+                                native_vlan_matches = False
+                                _debug(
+                                    "Mode mismatch: NetBox wants native-tagged "
+                                    "(no untagged_vlan), device has native-untagged"
+                                )
+
+                        if nb_untagged and not native_vlan_matches:
                             needs_change = True
                             change_reasons.append(
                                 f"native VLAN mismatch (NB: {nb_untagged}, "
-                                f"device: {device_native})"
+                                f"device mode: {device_mode}, device_native: {device_native})"
+                            )
+                        elif not nb_untagged and not native_vlan_matches:
+                            # NetBox wants native-tagged but device is native-untagged
+                            needs_change = True
+                            change_reasons.append(
+                                f"trunk mode mismatch (NB wants native-tagged, "
+                                f"device has: {device_mode})"
                             )
 
-                        vlans_to_add = nb_all_vlans - device_trunks
-                        vlans_to_remove = device_trunks - nb_all_vlans
+                        # For trunk mode comparison, use all VLANs from device
+                        # In native-untagged mode, all VLANs (including native) are in vlan_trunks
+                        device_all_vlans = set(device_trunks)
+                        if device_native:
+                            device_all_vlans.add(device_native)
+
+                        vlans_to_add = nb_all_vlans - device_all_vlans
+                        vlans_to_remove = device_all_vlans - nb_all_vlans
+
+                        _debug(
+                            f"L2 VLAN diff for {intf_name}: "
+                            f"device_all_vlans={device_all_vlans}, "
+                            f"vlans_to_add={vlans_to_add}, vlans_to_remove={vlans_to_remove}"
+                        )
 
                         if vlans_to_add or vlans_to_remove:
                             needs_change = True

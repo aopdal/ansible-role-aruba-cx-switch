@@ -6,6 +6,10 @@
 # - VSX virtual IPs (vsx_virtual_ip4, vsx_virtual_ip6) for anycast/active-gateway
 # - VSX virtual gateway MACs (vsx_virtual_gw_mac_v4, vsx_virtual_gw_mac_v6)
 #
+# Note: VSX-specific attributes (ip4_address_secondary, vsx_virtual_ip4, vsx_virtual_ip6,
+# vsx_virtual_gw_mac_v4, vsx_virtual_gw_mac_v6) are only queried when device_vsx is enabled.
+# Some switch models (e.g., CX 6000) don't support these attributes.
+#
 # Prerequisites:
 # - aoscx_gather_enhanced_facts: true
 # - REST API credentials (aoscx_rest_host, aoscx_rest_user, aoscx_rest_password)
@@ -66,6 +70,23 @@
   tags:
     - always
 
+# Build attributes list dynamically based on device capabilities
+# Base attributes are always queried; VSX-specific attributes only when device_vsx is enabled
+# CX 6000 and some other models don't support ip4_address_secondary or vsx_virtual_* fields
+- name: Set interface attributes to query
+  ansible.builtin.set_fact:
+    _rest_interface_base_attrs: "name,ip4_address,ip6_addresses,ip_mtu,admin,description"
+    _rest_interface_vsx_attrs: "ip4_address_secondary,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6,vsx_virtual_ip4,vsx_virtual_ip6"
+  tags:
+    - always
+
+- name: Build interface attributes query string
+  ansible.builtin.set_fact:
+    _rest_interface_attrs: >-
+      {{ _rest_interface_base_attrs }}{% if custom_fields.device_vsx | default(false) | bool %},{{ _rest_interface_vsx_attrs }}{% endif %}
+  tags:
+    - always
+
 - name: Debug - Show REST API version being used
   ansible.builtin.debug:
     msg:
@@ -73,6 +94,8 @@
       - "Firmware query result: {{ _rest_firmware.json | default('FAILED or N/A') }}"
       - "Using REST API version: {{ _rest_api_version }}"
       - "REST API base URL: {{ _rest_api_base }}"
+      - "Device VSX enabled: {{ custom_fields.device_vsx | default(false) }}"
+      - "Interface attributes to query: {{ _rest_interface_attrs }}"
   when:
     - aoscx_debug | default(false) | bool
   tags:
@@ -97,8 +120,7 @@
 
 - name: Query interfaces with depth=2
   ansible.builtin.uri:
-    url: >-
-      {{ _rest_api_base }}/system/interfaces?depth=2&attributes=name,ip4_address,ip4_address_secondary,ip6_addresses,ip_mtu,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6,vsx_virtual_ip4,vsx_virtual_ip6,admin,description
+    url: "{{ _rest_api_base }}/system/interfaces?depth=2&attributes={{ _rest_interface_attrs }}"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"

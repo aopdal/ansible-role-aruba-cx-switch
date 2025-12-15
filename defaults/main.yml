@@ -34,6 +34,15 @@ aoscx_configure_vsx: false
 # Idempotency mode - when true, removes configs not in NetBox
 aoscx_idempotent_mode: false
 
+# Force L2 interface configuration - bypasses change detection
+# When true: Configures ALL L2 interfaces from NetBox regardless of current state
+# Useful for:
+#   - Mode changes (native-untagged <-> native-tagged) that detection may miss
+#   - Troubleshooting idempotency issues
+#   - Ensuring configuration matches NetBox exactly
+# Default: false (use change detection for efficiency)
+aoscx_force_l2_config: false
+
 # Performance optimization mode
 # When true: Skips fact gathering and idempotent cleanup for faster execution
 # Use for: Initial deployments, trusted NetBox data, lab environments

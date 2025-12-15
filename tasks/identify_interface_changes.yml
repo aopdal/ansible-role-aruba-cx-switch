@@ -88,6 +88,31 @@
   tags:
     - always
 
+- name: Debug - Show LAG interfaces from device facts (L2 debugging)
+  ansible.builtin.debug:
+    msg:
+      - "=== LAG Interface Facts ==="
+      - "LAG keys: {{ ansible_facts.network_resources.interfaces | dict2items | selectattr('key', 'match', '^lag') | map(attribute='key') | list }}"
+      - "lag250 device facts: {{ ansible_facts.network_resources.interfaces['lag250'] | default('NOT FOUND') }}"
+  when:
+    - aoscx_debug | default(false) | bool
+    - ansible_facts is defined
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+  tags:
+    - always
+
+- name: Debug - Show LAG interfaces from NetBox (L2 debugging)
+  ansible.builtin.debug:
+    msg:
+      - "=== LAG Interfaces from NetBox ==="
+      - "lag250 NetBox: {{ interfaces | selectattr('name', 'equalto', 'lag250') | first | default('NOT FOUND') }}"
+  when:
+    - aoscx_debug | default(false) | bool
+    - interfaces is defined
+  tags:
+    - always
+
 - name: Identify interfaces needing configuration changes
   ansible.builtin.set_fact:
     interface_changes: >-

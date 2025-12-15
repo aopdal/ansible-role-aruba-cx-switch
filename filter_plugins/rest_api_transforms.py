@@ -76,9 +76,11 @@ def rest_api_to_aoscx_interfaces(rest_data):
             "vsx_virtual_gw_mac_v4": intf_data.get("vsx_virtual_gw_mac_v4"),
             "vsx_virtual_gw_mac_v6": intf_data.get("vsx_virtual_gw_mac_v6"),
             # VLAN configuration
+            # vlan_tag and vlan_trunks are dicts with VLAN IDs as keys
+            # e.g., {"1": "/rest/v10.16/system/vlans/1"}
             "vlan_mode": intf_data.get("vlan_mode"),
             "vlan_tag": intf_data.get("vlan_tag"),
-            "vlan_trunks": intf_data.get("vlan_trunks", []),
+            "vlan_trunks": intf_data.get("vlan_trunks", {}),
             # LAG configuration
             "lacp_status": intf_data.get("lacp_status"),
             "bond_status": intf_data.get("bond_status"),

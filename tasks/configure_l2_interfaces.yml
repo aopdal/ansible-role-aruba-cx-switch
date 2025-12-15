@@ -1,7 +1,7 @@
 ---
-# Configure L2 interfaces (supports both standard and idempotent modes)
+# Configure L2 interfaces (supports standard, idempotent, and force modes)
 #
-# This task file handles L2 interface configuration in two modes:
+# This task file handles L2 interface configuration in three modes:
 #
 # 1. Standard mode (aoscx_idempotent_mode=false):
 #    - Only configures interfaces from NetBox that need changes
@@ -13,6 +13,12 @@
 #    - Removes configurations not in NetBox
 #    - Ensures device matches NetBox exactly
 #    - Suitable for ongoing configuration management
+#
+# 3. Force mode (aoscx_force_l2_config=true):
+#    - Configures ALL L2 interfaces from NetBox
+#    - Bypasses change detection entirely
+#    - Useful for mode changes (native-untagged <-> native-tagged)
+#    - Use when change detection isn't working correctly
 
 # Verify that interface analysis has been performed
 - name: configure_l2_interfaces | Verify interface analysis has been performed
@@ -27,13 +33,18 @@
 
 - name: Set mode description for logging
   ansible.builtin.set_fact:
-    l2_config_mode: "{{ 'idempotent (full sync)' if (aoscx_idempotent_mode | bool) else 'standard (additive only)' }}"
+    l2_config_mode: >-
+      {{
+        'FORCE (all interfaces)' if (aoscx_force_l2_config | default(false) | bool)
+        else ('idempotent (full sync)' if (aoscx_idempotent_mode | bool) else 'standard (additive only)')
+      }}
 
 - name: Display L2 configuration mode
   ansible.builtin.debug:
     msg:
       - "=== L2 Interface Configuration Mode: {{ l2_config_mode }} ==="
       - "Device: {{ inventory_hostname }}"
+      - "Force mode enabled: {{ aoscx_force_l2_config | default(false) | bool }}"
       - "Total L2 interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
       - "L2 interfaces needing configuration changes: {{ interface_changes.l2 | default([]) | length }}"
       - "L2 interfaces NOT needing changes (skipped): {{ (interfaces | selectattr('mode', 'defined') | list | length) - (interface_changes.l2 | default([]) | length) }}"
@@ -83,17 +94,24 @@
     - not (aoscx_fast_mode | default(false) | bool)
 
 # ============================================================================
-# BOTH MODES: Categorize and configure interfaces
+# ALL MODES: Categorize and configure interfaces
 # ============================================================================
 
-# In idempotent mode, use filtered list; in standard mode, use only interfaces needing changes
+# Determine which interfaces to configure based on mode:
+# - Force mode: ALL L2 interfaces from NetBox (bypasses change detection)
+# - Idempotent mode: Use filtered list from change analysis
+# - Standard mode: Only interfaces detected as needing changes
 - name: Set interfaces to configure based on mode
   ansible.builtin.set_fact:
     interfaces_to_configure: >-
       {{
-        (interface_changes.l2 | default([]) | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes))
-        if (aoscx_idempotent_mode | bool)
-        else (interface_changes.l2 | default([]))
+        (interfaces | selectattr('mode', 'defined') | list)
+        if (aoscx_force_l2_config | default(false) | bool)
+        else (
+          (interface_changes.l2 | default([]) | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes))
+          if (aoscx_idempotent_mode | bool)
+          else (interface_changes.l2 | default([]))
+        )
       }}
 
 - name: Categorize interfaces for L2 configuration
