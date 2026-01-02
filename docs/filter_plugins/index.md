@@ -4,11 +4,11 @@ Comprehensive documentation for the NetBox Filters Library used with Aruba AOS-C
 
 ## Overview
 
-The filter plugins library provides 27 custom Ansible filters organized into 7 specialized modules. These filters transform NetBox data for use in switch configuration playbooks, handle state comparison for idempotent operations, and categorize interfaces for targeted configuration.
+The filter plugins library provides 29 custom Ansible filters organized into 9 specialized modules. These filters transform NetBox data for use in switch configuration playbooks, handle state comparison for idempotent operations, and categorize interfaces for targeted configuration.
 
-**Total Filters**: 27
-**Total Lines of Code**: ~2,100
-**Modules**: 7 feature modules + 1 utility module
+**Total Filters**: 29
+**Total Lines of Code**: ~2,700
+**Modules**: 8 feature modules + 1 utility module
 
 ---
 
@@ -17,8 +17,8 @@ The filter plugins library provides 27 custom Ansible filters organized into 7 s
 ### Core Utilities
 
 **[Utils Module](utils.md)** - Helper functions and debugging
-**Functions**: 5
-**Lines**: 159
+**Functions**: 5 (2 exposed as filters)
+**Lines**: 176
 
 Foundation module providing:
 - Debug message printing with environment variable control
@@ -33,7 +33,7 @@ Foundation module providing:
 
 **[L3 Config Helpers](l3_config_helpers.md)** - L3 interface configuration optimization
 **Filters**: 5
-**Lines**: 162
+**Lines**: 181
 
 Configuration building and helper functions:
 - Interface name formatting for AOS-CX
@@ -53,8 +53,8 @@ Configuration building and helper functions:
 ### VLAN Operations
 
 **[VLAN Filters](vlan_filters.md)** - Complete VLAN lifecycle management
-**Filters**: 8 + 1 parser
-**Lines**: 455
+**Filters**: 8
+**Lines**: 454
 
 Most comprehensive module handling:
 - VLAN ID extraction from interfaces
@@ -77,7 +77,7 @@ Most comprehensive module handling:
 
 **[VRF Filters](vrf_filters.md)** - VRF extraction and filtering
 **Filters**: 4
-**Lines**: 192
+**Lines**: 191
 
 Manages VRF identification and filtering:
 - VRF extraction from interfaces and IP addresses
@@ -95,21 +95,28 @@ Manages VRF identification and filtering:
 
 ### Interface Processing
 
-**[Interface Filters](interface_filters.md)** - Interface categorization and processing
-**Filters**: 4
-**Lines**: 802
+Interface processing is split into three focused modules:
 
-Advanced interface categorization:
+**Interface Categorization** (`interface_categorization.py`)
+**Filters**: 2 | **Lines**: 294
+
 - L2 interface categorization (15 categories)
 - L3 interface categorization (7 categories)
-- Interface/IP address matching
-- Idempotent change detection for interfaces
+- Key filters: `categorize_l2_interfaces()`, `categorize_l3_interfaces()`
 
-**Key Filters:**
-- `categorize_l2_interfaces()` - 15 L2 categories
-- `categorize_l3_interfaces()` - 7 L3 categories by type/VRF
-- `get_interface_ip_addresses()` - Match IPs to interfaces
-- `get_interfaces_needing_config_changes()` - Idempotent interface updates
+**IP Address Processing** (`interface_ip_processing.py`)
+**Filters**: 1 | **Lines**: 106
+
+- Interface/IP address matching with anycast gateway support
+- Key filter: `get_interface_ip_addresses()`
+
+**Change Detection** (`interface_change_detection.py`)
+**Filters**: 1 | **Lines**: 814
+
+- Idempotent change detection for interfaces
+- Key filter: `get_interfaces_needing_config_changes()`
+
+See **[Interface Filters](interface_filters.md)** for detailed documentation.
 
 ---
 
@@ -117,7 +124,7 @@ Advanced interface categorization:
 
 **[Comparison Module](comparison.md)** - NetBox vs device state comparison
 **Filters**: 2
-**Lines**: 279
+**Lines**: 295
 
 Enables idempotent operations:
 - VLAN configuration comparison
@@ -135,7 +142,7 @@ Enables idempotent operations:
 
 **[OSPF Filters](ospf_filters.md)** - OSPF interface selection and validation
 **Filters**: 4
-**Lines**: 112
+**Lines**: 138
 
 OSPF-specific operations:
 - OSPF interface identification from custom fields
@@ -260,12 +267,19 @@ OSPF-specific operations:
 
 ### By Module
 
-#### Utils (3 functions)
-- `_debug(message)` - Debug output
+#### Utils (2 filters + 3 internal)
 - `collapse_vlan_list(vlan_list)` - Format VLAN ranges
 - `select_interfaces_to_configure(interfaces, idempotent_mode, changes)` - Idempotent selection
+- *Internal*: `_debug()`, `extract_ip_addresses()`, `populate_ip_changes()`
 
-#### VLAN Filters (9)
+#### L3 Config Helpers (5 filters)
+- `format_interface_name(name, type)` - Format interface names
+- `is_ipv4_address(address)` - IPv4 detection
+- `is_ipv6_address(address)` - IPv6 detection
+- `get_interface_vrf(interface)` - Extract VRF name
+- `build_l3_config_lines(item, type, ip_version, vrf_type)` - Build config commands
+
+#### VLAN Filters (8)
 - `extract_vlan_ids(interfaces)` - Extract VLAN IDs
 - `filter_vlans_in_use(vlans, interfaces)` - Filter to used VLANs
 - `extract_evpn_vlans(vlans, interfaces, check_noevpn)` - EVPN VLANs
@@ -281,13 +295,17 @@ OSPF-specific operations:
 - `get_vrfs_in_use(interfaces, ip_addresses)` - Comprehensive VRF data
 - `filter_configurable_vrfs(vrfs)` - Remove built-in VRFs
 
-#### Interface Filters (4)
+#### Interface Categorization (2 filters)
 - `categorize_l2_interfaces(interfaces)` - 15 L2 categories
 - `categorize_l3_interfaces(interfaces)` - 7 L3 categories
-- `get_interface_ip_addresses(interfaces, ip_addresses)` - Match IPs
+
+#### Interface IP Processing (1 filter)
+- `get_interface_ip_addresses(interfaces, ip_addresses)` - Match IPs to interfaces
+
+#### Interface Change Detection (1 filter)
 - `get_interfaces_needing_config_changes(interfaces, facts)` - Change detection
 
-#### Comparison (2 active)
+#### Comparison (2 filters)
 - `compare_interface_vlans(nb_intf, device_intf)` - Single interface comparison
 - `get_interfaces_needing_changes(interfaces, facts)` - Batch comparison
 
@@ -398,14 +416,16 @@ EOF
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| **utils.py** | 5 | 159 | Helper functions and utilities |
-| **l3_config_helpers.py** | 5 | 162 | L3 configuration optimization |
-| **vlan_filters.py** | 9 | 455 | VLAN lifecycle management |
-| **vrf_filters.py** | 4 | 192 | VRF operations |
-| **interface_filters.py** | 4 | 802 | Interface categorization |
-| **comparison.py** | 2 | 279 | State comparison logic |
-| **ospf_filters.py** | 4 | 112 | OSPF configuration |
-| **Total** | **33** | **~2,161** | 7 modules + utilities |
+| **interface_change_detection.py** | 1 | 814 | Change detection & idempotency |
+| **vlan_filters.py** | 8 | 454 | VLAN lifecycle management |
+| **comparison.py** | 2 | 295 | State comparison logic |
+| **interface_categorization.py** | 2 | 294 | Interface categorization |
+| **vrf_filters.py** | 4 | 191 | VRF operations |
+| **l3_config_helpers.py** | 5 | 181 | L3 configuration optimization |
+| **utils.py** | 2 | 176 | Helper functions and utilities |
+| **ospf_filters.py** | 4 | 138 | OSPF configuration |
+| **interface_ip_processing.py** | 1 | 106 | IP address matching |
+| **Total** | **29** | **~2,700** | 9 modules |
 
 ---
 

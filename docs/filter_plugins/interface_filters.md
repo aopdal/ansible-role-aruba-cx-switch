@@ -1,18 +1,23 @@
-# Interface Filters Module
+# Interface Filters Documentation
 
 Part of the NetBox Filters Library for Aruba AOS-CX switches.
 
 ## Overview
 
-The `interface_filters.py` module provides interface categorization and processing functionality. It categorizes interfaces by L2/L3 configuration, VLAN mode, type (physical/LAG/MCLAG), and VRF membership for targeted configuration workflows.
+Interface processing functionality is split into three focused modules that handle categorization, IP address matching, and change detection.
 
-**File Location**: [filter_plugins/netbox_filters_lib/interface_filters.py](../../filter_plugins/netbox_filters_lib/interface_filters.py)
+### Module Structure
 
-**Lines of Code**: 802 lines
+| Module | Filters | Lines | Description |
+|--------|---------|-------|-------------|
+| `interface_categorization.py` | 2 | 294 | L2/L3 interface categorization |
+| `interface_ip_processing.py` | 1 | 106 | IP address to interface matching |
+| `interface_change_detection.py` | 1 | 814 | Idempotent change detection |
+| **Total** | **4** | **1,214** | |
 
-**Dependencies**: [utils.py](utils.md) (`_debug`)
+**Dependencies**: All modules depend on [utils.py](utils.md) (`_debug`)
 
-**Filter Count**: 4 filters
+---
 
 ## Filters
 

@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **32 custom filters** organized into 9 focused modules totaling ~2,161 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
+This library provides **29 custom filters** organized into 9 focused modules totaling ~2,700 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
@@ -107,7 +107,7 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 
 ### Overview
 
-The role implements intelligent comparison of L3 interface IP addresses to minimize configuration time. The `get_interfaces_needing_config_changes()` filter (in `interface_filters.py`) compares NetBox's intended IP configuration with device facts and tracks which specific IP addresses need to be added.
+The role implements intelligent comparison of L3 interface IP addresses to minimize configuration time. The `get_interfaces_needing_config_changes()` filter (in `interface_change_detection.py`) compares NetBox's intended IP configuration with device facts and tracks which specific IP addresses need to be added.
 
 ### IPv4 Address Optimization
 
@@ -241,15 +241,15 @@ filter_plugins/
 ├── netbox_filters.py                    # Main entry point (FilterModule class)
 └── netbox_filters_lib/                  # Package directory
     ├── __init__.py                      # Package initialization
-    ├── utils.py                         # Helper functions (159 lines)
-    ├── l3_config_helpers.py             # L3 configuration optimization (162 lines)
-    ├── vlan_filters.py                  # VLAN operations (455 lines)
-    ├── vrf_filters.py                   # VRF operations (192 lines)
+    ├── utils.py                         # Helper functions (176 lines)
+    ├── l3_config_helpers.py             # L3 configuration optimization (181 lines)
+    ├── vlan_filters.py                  # VLAN operations (454 lines)
+    ├── vrf_filters.py                   # VRF operations (191 lines)
     ├── interface_categorization.py      # L2/L3 interface categorization (294 lines)
     ├── interface_ip_processing.py       # IP address matching (106 lines)
-    ├── interface_change_detection.py    # Change detection & idempotency (621 lines)
-    ├── comparison.py                    # State comparison (279 lines)
-    └── ospf_filters.py                  # OSPF operations (112 lines)
+    ├── interface_change_detection.py    # Change detection & idempotency (814 lines)
+    ├── comparison.py                    # State comparison (295 lines)
+    └── ospf_filters.py                  # OSPF operations (138 lines)
 ```
 
 **Recent Updates** (January 2025):
@@ -266,7 +266,7 @@ filter_plugins/
 
 ### `utils.py` - Helper Functions
 
-Core utilities used across all modules (5 functions, 159 lines):
+Core utilities used across all modules (5 functions, 2 exposed as filters, 176 lines):
 
 - **`_debug(message)`**
     - Print debug messages when `DEBUG_ANSIBLE=true` environment variable is set
@@ -290,7 +290,7 @@ Core utilities used across all modules (5 functions, 159 lines):
 
 ### `l3_config_helpers.py` - L3 Configuration Optimization *(New in January 2025)*
 
-Configuration building and helper functions for L3 interfaces (5 filters, 162 lines):
+Configuration building and helper functions for L3 interfaces (5 filters, 181 lines):
 
 - **`format_interface_name(interface_name, interface_type)`**
     - Format interface names for AOS-CX CLI
@@ -321,7 +321,7 @@ Configuration building and helper functions for L3 interfaces (5 filters, 162 li
 
 ### `vlan_filters.py` - VLAN Operations
 
-Complete VLAN lifecycle management (9 filters, 455 lines):
+Complete VLAN lifecycle management (8 filters, 454 lines):
 
 - **`extract_vlan_ids(interfaces)`**
     - Extract all VLAN IDs in use from interfaces
@@ -355,7 +355,7 @@ Complete VLAN lifecycle management (9 filters, 455 lines):
 
 ### `vrf_filters.py` - VRF Operations
 
-VRF extraction and filtering (4 filters, 192 lines):
+VRF extraction and filtering (4 filters, 191 lines):
 
 - **`extract_interface_vrfs(interfaces)`**
     - Extract unique VRF names from interfaces
@@ -418,7 +418,7 @@ IP address to interface matching and anycast gateway processing (1 filter, 106 l
 
 ### `interface_change_detection.py` - Change Detection
 
-NetBox vs device comparison and idempotency logic (2 filters, 621 lines):
+NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
 
 - **`get_interfaces_needing_config_changes(interfaces, device_facts)`**
     - Compare NetBox interface configuration with device state
@@ -446,7 +446,7 @@ NetBox vs device comparison and idempotency logic (2 filters, 621 lines):
     - Internal use only
 
 ### `comparison.py` - State Comparison
-NetBox vs device state comparison (2 filters):
+NetBox vs device state comparison (2 filters, 295 lines):
 
 - **`compare_interface_vlans(netbox_interface, device_facts_interface)`**
     - Compare VLAN configuration between NetBox and device
@@ -463,7 +463,7 @@ NetBox vs device state comparison (2 filters):
     - `configure`: Interfaces needing VLAN additions
 
 ### `ospf_filters.py` - OSPF Configuration
-OSPF interface selection and validation (4 filters):
+OSPF interface selection and validation (4 filters, 138 lines):
 
 - **`select_ospf_interfaces(interfaces)`**
     - Filter interfaces that have OSPF configuration defined
@@ -873,8 +873,8 @@ netbox_filters.py (main entry point)
 
 ## Statistics
 
-- **Total Filters**: 32
-- **Total Lines**: ~2,161 (including docstrings and comments)
+- **Total Filters**: 29
+- **Total Lines**: ~2,700 (including docstrings and comments)
 - **Modules**: 9 (8 feature modules + 1 utility)
 - **Test Coverage**: Used in production for 100+ switches
 - **Code Quality**: Pylint score 9.30/10
@@ -883,16 +883,16 @@ netbox_filters.py (main entry point)
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| `interface_change_detection.py` | 2 | 621 | Change detection & idempotency |
-| `vlan_filters.py` | 9 | 455 | VLAN lifecycle management |
+| `interface_change_detection.py` | 1 | 814 | Change detection & idempotency |
+| `vlan_filters.py` | 8 | 454 | VLAN lifecycle management |
+| `comparison.py` | 2 | 295 | State comparison logic |
 | `interface_categorization.py` | 2 | 294 | Interface categorization |
-| `comparison.py` | 2 | 279 | State comparison logic |
-| `vrf_filters.py` | 4 | 192 | VRF operations |
-| `l3_config_helpers.py` | 5 | 162 | L3 configuration optimization |
-| `utils.py` | 5 | 159 | Helper functions |
-| `ospf_filters.py` | 4 | 112 | OSPF configuration |
+| `vrf_filters.py` | 4 | 191 | VRF operations |
+| `l3_config_helpers.py` | 5 | 181 | L3 configuration optimization |
+| `utils.py` | 2 | 176 | Helper functions |
+| `ospf_filters.py` | 4 | 138 | OSPF configuration |
 | `interface_ip_processing.py` | 1 | 106 | IP address matching |
-| **Total** | **32** | **~2,161** | **9 modules** |
+| **Total** | **29** | **~2,700** | **9 modules** |
 
 ## Migration Guide
 
