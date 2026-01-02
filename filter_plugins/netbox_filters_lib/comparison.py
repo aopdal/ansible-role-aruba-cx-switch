@@ -293,14 +293,3 @@ def get_interfaces_needing_changes(interfaces, device_facts):
     _debug(f"Interfaces skipped (no changes): {skipped_count}")
 
     return {"cleanup": cleanup_list, "configure": configure_list}
-
-
-# Keep the old function for backwards compatibility, but mark as deprecated
-def get_interfaces_needing_vlan_cleanup(interfaces, device_facts):
-    """
-    DEPRECATED: Use get_interfaces_needing_changes() instead
-
-    Get list of interfaces that need VLAN removal
-    """
-    result = get_interfaces_needing_changes(interfaces, device_facts)
-    return result["cleanup"]

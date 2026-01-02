@@ -813,8 +813,7 @@ aoscx_idempotent_mode: false
 aoscx_idempotent_mode: true
 ```
 
-**Migration Note:** The `configure_l2_interfaces_idempotent.yml` file has been deprecated in favor of a unified
-approach. Both modes now use `configure_l2_interfaces.yml` which intelligently handles both standard and idempotent operation.
+Both modes use `configure_l2_interfaces.yml` which intelligently handles standard and idempotent operation.
 
 ## Testing
 

@@ -116,7 +116,7 @@ Advanced interface categorization:
 ### State Comparison
 
 **[Comparison Module](comparison.md)** - NetBox vs device state comparison
-**Filters**: 3 (1 deprecated)
+**Filters**: 2
 **Lines**: 279
 
 Enables idempotent operations:
@@ -128,7 +128,6 @@ Enables idempotent operations:
 **Key Filters:**
 - `compare_interface_vlans()` - Single interface VLAN comparison
 - `get_interfaces_needing_changes()` - Batch interface analysis
-- ~~`get_interfaces_needing_vlan_cleanup()`~~ - Deprecated
 
 ---
 

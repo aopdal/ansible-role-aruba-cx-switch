@@ -34,7 +34,6 @@ from .interface_change_detection import (
 from .comparison import (
     compare_interface_vlans,
     get_interfaces_needing_changes,
-    get_interfaces_needing_vlan_cleanup,
 )
 
 __all__ = [
@@ -62,5 +61,4 @@ __all__ = [
     # Comparison filters
     "compare_interface_vlans",
     "get_interfaces_needing_changes",
-    "get_interfaces_needing_vlan_cleanup",
 ]

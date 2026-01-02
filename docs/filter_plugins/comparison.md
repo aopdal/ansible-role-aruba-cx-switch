@@ -12,7 +12,7 @@ The `comparison.py` module provides state comparison logic for determining confi
 
 **Dependencies**: [utils.py](utils.md) (`_debug`)
 
-**Filter Count**: 3 filters (1 active, 1 deprecated)
+**Filter Count**: 2 filters
 
 ## Purpose
 
@@ -436,36 +436,6 @@ network_resources:
         # ... configuration ...
       loop: "{{ changes.configure }}"
       when: changes.configure | length > 0
-```
-
----
-
-### 3. `get_interfaces_needing_vlan_cleanup(interfaces, device_facts)` [DEPRECATED]
-
-**Status**: Deprecated - Use `get_interfaces_needing_changes()` instead
-
-#### Purpose
-
-Legacy filter that returns only the cleanup list. Maintained for backward compatibility.
-
-#### Deprecation Notice
-
-This filter only returns interfaces needing VLAN removal. Use `get_interfaces_needing_changes()` instead, which returns both cleanup and configure lists in one call.
-
-#### Migration
-
-**Old Code:**
-```yaml
-- set_fact:
-    cleanup_list: "{{ interfaces | get_interfaces_needing_vlan_cleanup(ansible_facts) }}"
-```
-
-**New Code:**
-```yaml
-- set_fact:
-    changes: "{{ interfaces | get_interfaces_needing_changes(ansible_facts) }}"
-    cleanup_list: "{{ changes.cleanup }}"
-    configure_list: "{{ changes.configure }}"
 ```
 
 ---

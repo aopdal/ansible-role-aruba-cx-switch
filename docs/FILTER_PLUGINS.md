@@ -462,10 +462,6 @@ NetBox vs device state comparison (3 filters):
     - `cleanup`: Interfaces needing VLAN removal
     - `configure`: Interfaces needing VLAN additions
 
-- **`get_interfaces_needing_vlan_cleanup(interfaces, device_facts)`**
-  ⚠️ **DEPRECATED** - Use `get_interfaces_needing_changes()` instead
-  Legacy filter for backward compatibility
-
 ### `ospf_filters.py` - OSPF Configuration
 OSPF interface selection and validation (4 filters):
 
@@ -911,12 +907,6 @@ The refactoring:
 - ✅ Maintains identical return values
 - ✅ Keeps the same FilterModule interface
 - ✅ Supports all existing playbooks
-
-### Deprecation Notices
-
-- `get_interfaces_needing_vlan_cleanup()` is deprecated
-    - Use `get_interfaces_needing_changes()` instead
-    - Returns both cleanup and configure lists in one call
 
 ## Contributing
 

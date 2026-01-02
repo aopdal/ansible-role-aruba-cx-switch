@@ -4,7 +4,7 @@ Comprehensive unit tests for all custom Ansible filter plugins in this role.
 
 ## Test Coverage
 
-The test suite covers **22 filter functions** across **6 modules**:
+The test suite covers **21 filter functions** across **6 modules**:
 
 ### 1. Utility Functions (`test_utils.py`)
 - ✅ `collapse_vlan_list` - VLAN range collapsing (10 tests)
@@ -31,8 +31,7 @@ The test suite covers **22 filter functions** across **6 modules**:
 
 ### 5. Comparison Functions (`test_comparison.py`)
 - ✅ `compare_interface_vlans` - Compare VLAN configurations
-- ✅ `get_interfaces_needing_changes` - Identify interface changes
-- ✅ `get_interfaces_needing_vlan_cleanup` - Identify cleanup needs
+- ✅ `get_interfaces_needing_changes` - Identify interface changes (includes cleanup detection)
 
 ### 6. OSPF Filters (`test_ospf_filters.py`)
 - ✅ `select_ospf_interfaces` - Select OSPF-enabled interfaces

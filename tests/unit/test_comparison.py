@@ -5,7 +5,6 @@ import pytest
 from netbox_filters_lib.comparison import (
     compare_interface_vlans,
     get_interfaces_needing_changes,
-    get_interfaces_needing_vlan_cleanup,
 )
 from .fixtures import get_sample_interfaces, get_sample_ansible_facts
 
@@ -181,8 +180,8 @@ class TestGetInterfacesNeedingChanges:
         assert len(result["configure"]) == 1
 
 
-class TestGetInterfacesNeedingVlanCleanup:
-    """Tests for get_interfaces_needing_vlan_cleanup function"""
+class TestGetInterfacesNeedingChangesCleanup:
+    """Tests for cleanup functionality in get_interfaces_needing_changes"""
 
     def test_interfaces_needing_cleanup_extra_vlans(self):
         """Test identifying interfaces with extra VLANs to remove"""
@@ -211,11 +210,12 @@ class TestGetInterfacesNeedingVlanCleanup:
                 }
             }
         }
-        result = get_interfaces_needing_vlan_cleanup(interfaces, ansible_facts)
-        assert len(result) == 1
-        assert result[0]["interface"] == "1/1/1"
-        assert 30 in result[0]["vlans_to_remove"]
-        assert 40 in result[0]["vlans_to_remove"]
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        cleanup = result["cleanup"]
+        assert len(cleanup) == 1
+        assert cleanup[0]["interface"] == "1/1/1"
+        assert 30 in cleanup[0]["vlans_to_remove"]
+        assert 40 in cleanup[0]["vlans_to_remove"]
 
     def test_interfaces_needing_cleanup_none_needed(self):
         """Test when no cleanup is needed"""
@@ -242,8 +242,8 @@ class TestGetInterfacesNeedingVlanCleanup:
                 }
             }
         }
-        result = get_interfaces_needing_vlan_cleanup(interfaces, ansible_facts)
-        assert len(result) == 0
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert len(result["cleanup"]) == 0
 
     def test_interfaces_needing_cleanup_interface_not_on_device(self):
         """Test when interface doesn't exist on device yet"""
@@ -256,5 +256,5 @@ class TestGetInterfacesNeedingVlanCleanup:
             }
         ]
         ansible_facts = {"network_resources": {"interfaces": {}}}
-        result = get_interfaces_needing_vlan_cleanup(interfaces, ansible_facts)
-        assert len(result) == 0  # Can't cleanup what doesn't exist
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert len(result["cleanup"]) == 0  # Can't cleanup what doesn't exist

@@ -47,7 +47,6 @@ from netbox_filters_lib.interface_change_detection import (
 from netbox_filters_lib.comparison import (
     compare_interface_vlans,
     get_interfaces_needing_changes,
-    get_interfaces_needing_vlan_cleanup,
 )
 from netbox_filters_lib.ospf_filters import (
     select_ospf_interfaces,
@@ -91,7 +90,6 @@ class FilterModule:
             "get_interface_ip_addresses": get_interface_ip_addresses,
             "get_interfaces_needing_config_changes": get_interfaces_needing_config_changes,
             "compare_interface_vlans": compare_interface_vlans,
-            "get_interfaces_needing_vlan_cleanup": get_interfaces_needing_vlan_cleanup,
             "get_interfaces_needing_changes": get_interfaces_needing_changes,
             "select_ospf_interfaces": select_ospf_interfaces,
             "extract_ospf_areas": extract_ospf_areas,

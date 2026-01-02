@@ -158,19 +158,9 @@ The role uses custom filter plugins for data transformation:
 **Before (v1.0.0):**
 
 ```yaml
-# Two separate task files
-tasks/
-  configure_l2_interfaces.yml         # Empty or basic
-  configure_l2_interfaces_idempotent.yml  # Full implementation
-```
-
-**After (v1.1.0):**
-
-```yaml
 # Unified task file
 tasks/
-  configure_l2_interfaces.yml         # Handles both modes
-  configure_l2_interfaces_idempotent.yml  # Deprecated (redirects)
+  configure_l2_interfaces.yml         # Handles both modes automatically
 ```
 
 ### Updating Your Playbooks
@@ -178,7 +168,6 @@ tasks/
 **No changes required!** The role automatically detects the mode:
 
 ```yaml
-# This works in both versions
 - name: Configure switches
   hosts: switches
   roles:
@@ -186,12 +175,6 @@ tasks/
       vars:
         aoscx_idempotent_mode: true  # or false
 ```
-
-### Deprecation Timeline
-
-- **v1.1.0** (Current): `configure_l2_interfaces_idempotent.yml` deprecated but functional
-- **v1.2.0** (Next minor): Deprecation warnings in logs
-- **v2.0.0** (Next major): File removed
 
 ## Performance Comparison
 
@@ -314,18 +297,6 @@ aoscx_debug: true
 # Explicitly set to false
 aoscx_idempotent_mode: false
 ```
-
-### Issue: Deprecation Warnings
-
-**Symptoms:**
-
-```
-⚠️  WARNING: configure_l2_interfaces_idempotent.yml is DEPRECATED
-```
-
-**Solution:**
-
-Update your playbooks to use the unified file. The warning is informational - the role still works correctly.
 
 ## Examples
 
