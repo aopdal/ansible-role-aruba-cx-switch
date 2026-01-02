@@ -6,6 +6,8 @@ This module provides helper functions for building L3 interface configuration
 to reduce code duplication across physical, LAG, and VLAN interface types.
 """
 
+from .utils import _debug
+
 
 def format_interface_name(interface_name, interface_type):
     """
@@ -108,19 +110,28 @@ def build_l3_config_lines(
     _ = interface_type  # Suppress unused argument warning
     lines = []
 
+    interface_name = item.get("interface_name", "unknown")
+    address = item.get("address", "")
+
+    _debug(
+        f"Building L3 config for {interface_name}: "
+        f"ip_version={ip_version}, vrf_type={vrf_type}"
+    )
+
     # VRF attachment (only for custom VRFs)
     if vrf_type == "custom":
         interface_obj = item.get("interface", {})
         vrf_name = get_interface_vrf(interface_obj)
         lines.append(f"vrf attach {vrf_name}")
+        _debug(f"  Adding VRF attachment: {vrf_name}")
 
     # IP address or anycast gateway configuration
     ip_role = item.get("ip_role")
     anycast_mac = item.get("anycast_mac")
-    address = item.get("address", "")
 
     if ip_role == "anycast" and anycast_mac:
         # Anycast gateway configuration (VLAN interfaces only typically)
+        _debug(f"  Configuring anycast gateway: {address} (MAC: {anycast_mac})")
         if ip_version == "ipv6":
             # IPv6 anycast: active-gateway ipv6 mac <mac>, active-gateway ipv6 <addr>
             lines.append(f"active-gateway ipv6 mac {anycast_mac}")
@@ -135,6 +146,7 @@ def build_l3_config_lines(
             lines.append(f"active-gateway ip {addr_without_prefix}")
     else:
         # Regular IP address configuration
+        _debug(f"  Configuring IP address: {address}")
         if ip_version == "ipv6":
             lines.append(f"ipv6 address {address}")
         else:
@@ -146,11 +158,13 @@ def build_l3_config_lines(
         mtu = interface_obj.get("mtu")
         if mtu:
             lines.append(f"ip mtu {mtu}")
+            _debug(f"  Adding MTU: {mtu}")
 
     # L3 counters
     if l3_counters_enable:
         lines.append("l3-counters")
 
+    _debug(f"  Generated {len(lines)} config lines for {interface_name}")
     return lines
 
 

@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **33 custom filters** organized into 8 focused modules totaling ~2,161 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
+This library provides **32 custom filters** organized into 9 focused modules totaling ~2,161 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
@@ -446,7 +446,7 @@ NetBox vs device comparison and idempotency logic (2 filters, 621 lines):
     - Internal use only
 
 ### `comparison.py` - State Comparison
-NetBox vs device state comparison (3 filters):
+NetBox vs device state comparison (2 filters):
 
 - **`compare_interface_vlans(netbox_interface, device_facts_interface)`**
     - Compare VLAN configuration between NetBox and device
@@ -486,11 +486,6 @@ OSPF interface selection and validation (4 filters):
 ## Usage in Playbooks
 
 All filters are available through the standard Ansible filter syntax:
-
-```yaml
-## Usage in Playbooks
-
-All filters are available through standard Ansible filter syntax:
 
 ### VLAN Operations
 
@@ -758,9 +753,12 @@ All filters are available through standard Ansible filter syntax:
 1. **Choose the appropriate module** or create a new one:
     - VLAN operations → `vlan_filters.py`
     - VRF operations → `vrf_filters.py`
-    - Interface processing → `interface_filters.py`
+    - Interface categorization → `interface_categorization.py`
+    - IP address processing → `interface_ip_processing.py`
+    - Change detection → `interface_change_detection.py`
     - State comparison → `comparison.py`
     - OSPF operations → `ospf_filters.py`
+    - L3 configuration helpers → `l3_config_helpers.py`
     - General utilities → `utils.py`
 
 2. **Write your function** with proper docstring:
@@ -858,9 +856,12 @@ netbox_filters.py (main entry point)
     ├── utils.py (no dependencies)
     ├── vlan_filters.py → utils
     ├── vrf_filters.py → utils
-    ├── interface_filters.py → utils
+    ├── interface_categorization.py → utils
+    ├── interface_ip_processing.py → utils
+    ├── interface_change_detection.py → utils
+    ├── l3_config_helpers.py → utils
     ├── comparison.py → utils
-    └── ospf_filters.py (no dependencies)
+    └── ospf_filters.py → utils
 ```
 
 ### Performance Considerations
@@ -872,9 +873,9 @@ netbox_filters.py (main entry point)
 
 ## Statistics
 
-- **Total Filters**: 33
+- **Total Filters**: 32
 - **Total Lines**: ~2,161 (including docstrings and comments)
-- **Modules**: 8 (7 feature modules + 1 utility)
+- **Modules**: 9 (8 feature modules + 1 utility)
 - **Test Coverage**: Used in production for 100+ switches
 - **Code Quality**: Pylint score 9.30/10
 
@@ -885,13 +886,13 @@ netbox_filters.py (main entry point)
 | `interface_change_detection.py` | 2 | 621 | Change detection & idempotency |
 | `vlan_filters.py` | 9 | 455 | VLAN lifecycle management |
 | `interface_categorization.py` | 2 | 294 | Interface categorization |
-| `comparison.py` | 3 | 279 | State comparison logic |
+| `comparison.py` | 2 | 279 | State comparison logic |
 | `vrf_filters.py` | 4 | 192 | VRF operations |
 | `l3_config_helpers.py` | 5 | 162 | L3 configuration optimization |
 | `utils.py` | 5 | 159 | Helper functions |
 | `ospf_filters.py` | 4 | 112 | OSPF configuration |
 | `interface_ip_processing.py` | 1 | 106 | IP address matching |
-| **Total** | **33** | **~2,161** | **9 modules** |
+| **Total** | **32** | **~2,161** | **9 modules** |
 
 ## Migration Guide
 
@@ -929,41 +930,6 @@ See repository root for license information.
 - **Repository**: https://github.com/aopdal/ansible-role-aruba-cx-switch
 - **Issues**: Use GitHub Issues for bug reports
 - **Documentation**: See `docs/` folder in repository root
-
-```
-## Development
-
-### Adding New Filters
-
-1. Choose the appropriate module or create a new one
-2. Import the `_debug` helper from `utils.py`
-3. Add your function with proper docstring
-4. Export it in `__init__.py`
-5. Add it to the `FilterModule.filters()` dict in `netbox_filters.py`
-
-### Testing
-
-```bash
-# Test module loading
-python3 -c "from filter_plugins.netbox_filters import FilterModule; \
-            fm = FilterModule(); \
-            print(f'Loaded {len(fm.filters())} filters')"
-
-# Run pre-commit checks
-pre-commit run --files filter_plugins/netbox_filters.py \
-                        filter_plugins/netbox_filters_lib/*.py
-```
-
-### Debugging
-
-Enable debug output by setting the `DEBUG_ANSIBLE` environment variable:
-
-```bash
-export DEBUG_ANSIBLE=true
-ansible-playbook your-playbook.yml
-```
-
-This will print detailed debug messages showing how filters process data.
 
 ## See Also
 
