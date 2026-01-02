@@ -251,7 +251,7 @@ roles:
 - **[docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md)** - Base system (banner, NTP, DNS, timezone)
 - **[docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN management workflow
 - **[docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)** - BGP/EVPN fabric configuration
-- **[docs/TAG_DEPENDENT_SUMMARY.md](docs/TAG_DEPENDENT_SUMMARY.md)** - Tag-dependent tasks (BGP, OSPF, VSX)
+- **[docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md)** - Tag-dependent tasks (BGP, OSPF, VSX)
 
 ### Developer Documentation
 

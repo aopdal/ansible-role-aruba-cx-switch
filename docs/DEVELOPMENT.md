@@ -189,42 +189,74 @@ ansible-role-aruba-cx-switch/
 ├── .devcontainer/              # Dev container configuration
 │   ├── devcontainer.json       # VS Code dev container config
 │   ├── Dockerfile              # Custom container image
-│   └── post-create.sh          # Post-creation setup script
+│   ├── post-create.sh          # Post-creation setup script
+│   └── ssh-agent-setup.sh      # SSH agent configuration
+├── .github/
+│   ├── ISSUE_TEMPLATE/         # GitHub issue templates
+│   └── workflows/              # CI/CD pipelines
+│       ├── ci.yml              # Main CI (lint, test, molecule)
+│       ├── release.yml         # Release automation
+│       └── deploy-docs.yml     # Documentation deployment
 ├── defaults/
-│   └── main.yml                # Default variables
+│   └── main.yml                # Default variables (30+ options)
+├── docs/                       # MkDocs documentation site
+│   ├── archive/                # Archived development notes
+│   ├── filter_plugins/         # Filter plugin reference docs
+│   └── *.md                    # Configuration and user guides
+├── examples/
+│   └── ztp-generation.yml      # ZTP configuration example
 ├── files/                      # Static files
 ├── filter_plugins/             # Custom Jinja2 filters
-│   └── netbox_filters.py       # NetBox-specific filters
+│   ├── netbox_filters_lib/     # Filter library modules
+│   │   ├── comparison.py       # State comparison logic
+│   │   ├── interface_*.py      # Interface processing
+│   │   ├── vlan_filters.py     # VLAN operations
+│   │   ├── vrf_filters.py      # VRF operations
+│   │   ├── ospf_filters.py     # OSPF filtering
+│   │   └── utils.py            # Utility functions
+│   ├── netbox_filters.py       # Filter registration
+│   └── rest_api_transforms.py  # REST API data transforms
 ├── handlers/                   # Ansible handlers
 ├── meta/
-│   └── main.yml                # Role metadata
+│   └── main.yml                # Role metadata and dependencies
 ├── molecule/                   # Molecule test scenarios
 │   └── default/
 │       ├── converge.yml        # Test playbook
 │       ├── molecule.yml        # Molecule configuration
 │       ├── prepare.yml         # Preparation steps
 │       └── verify.yml          # Verification tests
-├── tasks/                      # Ansible tasks
+├── tasks/                      # Ansible tasks (38 files)
 │   ├── main.yml                # Main task orchestration
 │   ├── configure_*.yml         # Configuration tasks
-│   └── cleanup_*.yml           # Cleanup tasks
-├── templates/                  # Jinja2 templates
-├── tests/                      # Integration tests
-│   ├── test.yml                # Test playbook
+│   ├── cleanup_*.yml           # Cleanup tasks
+│   ├── gather_*.yml            # Fact gathering tasks
+│   └── identify_*.yml          # Change detection tasks
+├── templates/
+│   └── ztp_base_config.j2      # ZTP configuration template
+├── testing-scripts/            # Helper scripts for testing
+│   ├── populate_netbox.py      # Populate NetBox with test data
+│   └── validate_deployment.py  # Validate switch configurations
+├── tests/
+│   ├── unit/                   # Unit tests for filter plugins
+│   │   ├── test_*.py           # Test files
+│   │   └── conftest.py         # Pytest fixtures
+│   ├── integration.yml         # Integration test playbook
+│   ├── test.yml                # Main test playbook
 │   └── inventory               # Test inventory
 ├── vars/                       # Variables (higher precedence)
 ├── .ansible-lint               # Ansible-lint configuration
 ├── .pre-commit-config.yaml     # Pre-commit hooks configuration
 ├── .yamllint                   # YAML linting rules
-├── requirements.yml            # Ansible collections
-├── requirements-test.txt       # Python testing dependencies
-├── Makefile                    # Common development tasks
-├── README.md                   # Role documentation
-├── docs/                       # Documentation
-│   ├── DEVELOPMENT.md          # This file
-│   ├── TESTING*.md             # Testing guides
-│   └── ...                     # Other documentation
-└── CONTRIBUTING.md             # Contribution guidelines
+├── Makefile                    # Development tasks (lint, test, docs)
+├── mkdocs.yml                  # MkDocs site configuration
+├── requirements.yml            # Ansible collection dependencies
+├── requirements.txt            # Python dependencies
+├── requirements-test.txt       # Python test dependencies
+├── requirements-docs.txt       # MkDocs dependencies
+├── setup-testing.sh            # Testing environment setup
+├── README.md                   # Main documentation
+├── CHANGELOG.md                # Version history
+└── VERSION                     # Current version number
 ```
 
 ## Development Workflow

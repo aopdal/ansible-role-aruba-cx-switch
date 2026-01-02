@@ -392,7 +392,6 @@ EOF
 - [NetBox Integration](../NETBOX_INTEGRATION.md) - NetBox setup
 - [L2 Interface Modes](../L2_INTERFACE_MODES.md) - VLAN mode reference
 - [EVPN/VXLAN Configuration](../EVPN_VXLAN_CONFIGURATION.md) - EVPN/VXLAN guide
-- [Interface Idempotent Implementation](../INTERFACE_IDEMPOTENT_IMPLEMENTATION.md) - Idempotent mode
 
 ---
 

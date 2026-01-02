@@ -83,6 +83,7 @@ nav:
           - Interface Filters: filter_plugins/interface_filters.md
           - Comparison Module: filter_plugins/comparison.md
           - OSPF Filters: filter_plugins/ospf_filters.md
+          - L3 Config Helpers: filter_plugins/l3_config_helpers.md
   - Configuration:
       - Base System:
           - Overview: BASE_CONFIGURATION.md
@@ -92,19 +93,20 @@ nav:
           - Workflow Overview: VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
           - Visual Diagrams: VLAN_WORKFLOW_DIAGRAMS.md
           - Developer Guide: VLAN_DEVELOPER_GUIDE.md
+          - L2 Interface Modes: L2_INTERFACE_MODES.md
+          - Anycast Gateway: ANYCAST_GATEWAY.md
       - EVPN & VXLAN:
-          - Overview: EVPN_VXLAN_CONFIGURATION.md
+          - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
           - Configuration Modes: EVPN_VXLAN_MODES.md
-          - Cleanup Process: EVPN_VXLAN_CLEANUP_SUMMARY.md
-          - Idempotent Mode: EVPN_VXLAN_IDEMPOTENT_MODE.md
-          - Summary: EVPN_VXLAN_SUMMARY.md
       - BGP:
-          - Hybrid Configuration: BGP_HYBRID_CONFIGURATION.md
+          - Configuration Guide: BGP_CONFIGURATION.md
+          - Hybrid Mode (Plugin + Config Context): BGP_HYBRID_CONFIGURATION.md
           - NetBox BGP Plugin: NETBOX_BGP_PLUGIN.md
           - Migration Guide: BGP_MIGRATION_GUIDE.md
-          - Summary: BGP_HYBRID_SUMMARY.md
-          - BGP Configuration: BGP_CONFIGURATION.md
           - EVPN Fabric Example: BGP_EVPN_FABRIC_EXAMPLE.md
+      - Tag-Dependent Tasks:
+          - Overview: TAG_DEPENDENT_INCLUDES.md
+          - Testing: TAG_DEPENDENT_TESTING.md
   - Development:
       - Quick Start: QUICKSTART.md
       - Requirements: REQUIREMENTS.md
@@ -127,17 +129,13 @@ nav:
       - Documentation Site: DOCUMENTATION_SITE.md  # How to use MkDocs
       - Documentation Sync: DOCS_SYNC_WORKFLOW.md  # How README.md syncs to docs/
       - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md
-      - Github pages disabled: GITHUB_PAGES_DISABLED.md
       - Workspace Setup: WORKSPACE.md
       - DevContainer Setup: DEVCONTAINER_SETUP.md
       - DevContainer Mounts: DEVCONTAINER_MOUNTS.md
   - Internal:
-      - VLAN Refactoring:
-          - Summary: REFACTOR_SUMMARY.md
-          - Complete Overview: COMPLETE_SUMMARY.md
-          - Documentation Integration: DOCUMENTATION_INTEGRATION.md
-          - Verification Checklist: VERIFICATION_CHECKLIST.md
-      - Historical: REFACTORING_SUMMARY.md
+      - Documentation Integration: DOCUMENTATION_INTEGRATION.md
+      - Verification Checklist: VERIFICATION_CHECKLIST.md
+      - Archived Documentation: archive/README.md
 
 extra:
   social:

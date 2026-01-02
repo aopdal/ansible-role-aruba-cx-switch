@@ -608,4 +608,3 @@ DEBUG: Interfaces skipped (no changes): 46
 - [VLAN Filters](vlan_filters.md)
 - [Interface Filters](interface_filters.md)
 - [L2 Interface Modes](../L2_INTERFACE_MODES.md)
-- [Interface Idempotent Implementation](../INTERFACE_IDEMPOTENT_IMPLEMENTATION.md)
