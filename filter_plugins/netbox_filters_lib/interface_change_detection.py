@@ -374,8 +374,12 @@ def get_interfaces_needing_config_changes(
                 nb_tagged_vlans = nb_intf.get("tagged_vlans")
 
                 # Only compare mode if NetBox has actual VLAN assignments
-                has_vlan_config = (nb_untagged_vlan is not None) or (
-                    nb_tagged_vlans and len(nb_tagged_vlans) > 0
+                # Note: "tagged-all" mode implicitly has VLAN config (all VLANs)
+                # even without explicit VLAN assignments
+                has_vlan_config = (
+                    (nb_untagged_vlan is not None)
+                    or (nb_tagged_vlans and len(nb_tagged_vlans) > 0)
+                    or nb_mode == "tagged-all"
                 )
 
                 if has_vlan_config and device_mode:
