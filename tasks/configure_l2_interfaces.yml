@@ -124,12 +124,18 @@
       - "Physical access: {{ l2_interfaces.access | length }}"
       - "Physical tagged with untagged: {{ l2_interfaces.tagged_with_untagged | length }}"
       - "Physical tagged without untagged: {{ l2_interfaces.tagged_no_untagged | length }}"
+      - "Physical tagged-all with untagged: {{ l2_interfaces.tagged_all_with_untagged | length }}"
+      - "Physical tagged-all without untagged: {{ l2_interfaces.tagged_all_no_untagged | length }}"
       - "LAG access: {{ l2_interfaces.lag_access | length }}"
       - "LAG tagged with untagged: {{ l2_interfaces.lag_tagged_with_untagged | length }}"
       - "LAG tagged without untagged: {{ l2_interfaces.lag_tagged_no_untagged | length }}"
+      - "LAG tagged-all with untagged: {{ l2_interfaces.lag_tagged_all_with_untagged | length }}"
+      - "LAG tagged-all without untagged: {{ l2_interfaces.lag_tagged_all_no_untagged | length }}"
       - "MCLAG access: {{ l2_interfaces.mclag_access | length }}"
       - "MCLAG tagged with untagged: {{ l2_interfaces.mclag_tagged_with_untagged | length }}"
       - "MCLAG tagged without untagged: {{ l2_interfaces.mclag_tagged_no_untagged | length }}"
+      - "MCLAG tagged-all with untagged: {{ l2_interfaces.mclag_tagged_all_with_untagged | length }}"
+      - "MCLAG tagged-all without untagged: {{ l2_interfaces.mclag_tagged_all_no_untagged | length }}"
       - "Total to configure: {{ interfaces_to_configure | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
@@ -142,21 +148,27 @@
   when: >-
     (l2_interfaces.access | length > 0) or
     (l2_interfaces.tagged_with_untagged | length > 0) or
-    (l2_interfaces.tagged_no_untagged | length > 0)
+    (l2_interfaces.tagged_no_untagged | length > 0) or
+    (l2_interfaces.tagged_all_with_untagged | length > 0) or
+    (l2_interfaces.tagged_all_no_untagged | length > 0)
 
 - name: Phase 2 - Configure L2 LAG interfaces
   ansible.builtin.include_tasks: configure_l2_lag.yml
   when: >-
     (l2_interfaces.lag_access | length > 0) or
     (l2_interfaces.lag_tagged_with_untagged | length > 0) or
-    (l2_interfaces.lag_tagged_no_untagged | length > 0)
+    (l2_interfaces.lag_tagged_no_untagged | length > 0) or
+    (l2_interfaces.lag_tagged_all_with_untagged | length > 0) or
+    (l2_interfaces.lag_tagged_all_no_untagged | length > 0)
 
 - name: Phase 2 - Configure L2 MCLAG interfaces
   ansible.builtin.include_tasks: configure_l2_mclag.yml
   when: >-
     (l2_interfaces.mclag_access | length > 0) or
     (l2_interfaces.mclag_tagged_with_untagged | length > 0) or
-    (l2_interfaces.mclag_tagged_no_untagged | length > 0)
+    (l2_interfaces.mclag_tagged_no_untagged | length > 0) or
+    (l2_interfaces.mclag_tagged_all_with_untagged | length > 0) or
+    (l2_interfaces.mclag_tagged_all_no_untagged | length > 0)
 
 # ============================================================================
 # Summary
