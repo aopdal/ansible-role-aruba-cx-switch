@@ -556,6 +556,29 @@ def get_interfaces_needing_config_changes(
                                 change_reasons.append(
                                     f"VLANs to remove: {vlans_to_remove}"
                                 )
+                    elif nb_mode == "tagged-all":
+                        # For tagged-all, we only care about native VLAN
+                        # All VLANs are implicitly allowed, so no membership check needed
+                        _debug(
+                            f"L2 tagged-all comparison for {intf_name}: "
+                            f"nb_untagged={nb_untagged}, device_native={device_native}"
+                        )
+                        if nb_untagged:
+                            # Has native VLAN defined - check if it matches
+                            if nb_untagged != device_native:
+                                needs_change = True
+                                change_reasons.append(
+                                    f"native VLAN mismatch for tagged-all "
+                                    f"(NB: {nb_untagged}, device: {device_native})"
+                                )
+                        else:
+                            # No native VLAN - should be native-tagged mode
+                            if device_mode != "native-tagged":
+                                needs_change = True
+                                change_reasons.append(
+                                    f"trunk mode mismatch for tagged-all "
+                                    f"(NB wants native-tagged, device has: {device_mode})"
+                                )
 
         # Check L3 configuration (IP addresses)
         # Compare IP addresses defined in NetBox with those on the device
