@@ -74,4 +74,3 @@ warn_list:
 
 # Use FQCN for Ansible modules
 use_default_rules: true
-parseable: true
