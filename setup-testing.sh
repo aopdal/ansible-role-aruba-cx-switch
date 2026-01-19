@@ -3,7 +3,7 @@
 
 set -e
 
-echo "🚀 Setting up testing i# Summary
+echo "🚀 Setting up testing infrastructure for ansible-role-aruba-cx-switch"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Setup complete!"
@@ -31,7 +31,7 @@ echo "   make test-quick                               # Quick tests"
 echo "   make test                                     # Full test suite"
 echo ""
 echo "Happy testing! 🎉"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"sible-role-aruba-cx-switch"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 # Check Python version
@@ -95,12 +95,13 @@ fi
 # Setup pre-commit hooks
 echo ""
 echo "🪝 Setting up pre-commit hooks..."
-if command -v pre-commit &> /dev/null; then
-    pre-commit install
+# pre-commit should now be installed in the venv from requirements-test.txt
+if .venv/bin/pre-commit --version &> /dev/null; then
+    .venv/bin/pre-commit install
     echo "✅ Pre-commit hooks installed"
 else
-    echo "⚠️  pre-commit not found in PATH"
-    echo "   Run: pip3 install pre-commit && pre-commit install"
+    echo "⚠️  pre-commit installation failed"
+    echo "   Try manually: source .venv/bin/activate && pre-commit install"
 fi
 
 # Run initial tests

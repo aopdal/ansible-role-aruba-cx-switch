@@ -97,6 +97,133 @@ class TestCompareInterfaceVlans:
         result = compare_interface_vlans(netbox_config, device_config)
         assert result["needs_change"] is False  # Returns early
 
+    def test_compare_vlans_tagged_all_with_native_identical(self):
+        """Test comparing identical tagged-all with native VLAN"""
+        netbox_config = {
+            "name": "1/1/1",
+            "mode": {"value": "tagged-all"},
+            "untagged_vlan": {"vid": 100},
+            "tagged_vlans": [],
+        }
+        device_config = {
+            "vlan_mode": "native-tagged",
+            "vlan_tag": {"100": "/rest/v10.09/system/vlans/100"},
+            "vlan_trunks": {
+                "10": "/rest/v10.09/system/vlans/10",
+                "20": "/rest/v10.09/system/vlans/20",
+                "100": "/rest/v10.09/system/vlans/100",
+            },
+        }
+        result = compare_interface_vlans(netbox_config, device_config)
+        assert result["needs_change"] is False
+        assert result["vlans_to_add"] == []
+        assert result["vlans_to_remove"] == []
+
+    def test_compare_vlans_tagged_all_native_different(self):
+        """Test comparing tagged-all when native VLAN differs"""
+        netbox_config = {
+            "name": "1/1/1",
+            "mode": {"value": "tagged-all"},
+            "untagged_vlan": {"vid": 100},
+            "tagged_vlans": [],
+        }
+        device_config = {
+            "vlan_mode": "native-tagged",
+            "vlan_tag": {"200": "/rest/v10.09/system/vlans/200"},
+            "vlan_trunks": {
+                "10": "/rest/v10.09/system/vlans/10",
+                "20": "/rest/v10.09/system/vlans/20",
+            },
+        }
+        result = compare_interface_vlans(netbox_config, device_config)
+        assert result["needs_change"] is True
+        # For tagged-all, we only care about native VLAN, not trunk VLANs
+        assert result["vlans_to_add"] == []
+        assert result["vlans_to_remove"] == []
+
+    def test_compare_vlans_tagged_all_no_native(self):
+        """Test comparing tagged-all without native VLAN"""
+        netbox_config = {
+            "name": "1/1/1",
+            "mode": {"value": "tagged-all"},
+            "untagged_vlan": None,
+            "tagged_vlans": [],
+        }
+        device_config = {
+            "vlan_mode": "native-tagged",
+            "vlan_tag": None,
+            "vlan_trunks": {
+                "10": "/rest/v10.09/system/vlans/10",
+                "20": "/rest/v10.09/system/vlans/20",
+                "30": "/rest/v10.09/system/vlans/30",
+            },
+        }
+        result = compare_interface_vlans(netbox_config, device_config)
+        assert result["needs_change"] is False
+        # For tagged-all without native, trunk VLANs don't matter
+        assert result["vlans_to_add"] == []
+        assert result["vlans_to_remove"] == []
+
+    def test_compare_vlans_tagged_all_ignores_trunk_vlans(self):
+        """Test that tagged-all mode ignores trunk VLAN differences"""
+        netbox_config = {
+            "name": "1/1/1",
+            "mode": {"value": "tagged-all"},
+            "untagged_vlan": {"vid": 100},
+            "tagged_vlans": [],  # Empty - should allow all VLANs
+        }
+        device_config = {
+            "vlan_mode": "native-tagged",
+            "vlan_tag": {"100": "/rest/v10.09/system/vlans/100"},
+            "vlan_trunks": {
+                # Device has many VLANs, but tagged-all doesn't care
+                "10": "/rest/v10.09/system/vlans/10",
+                "20": "/rest/v10.09/system/vlans/20",
+                "30": "/rest/v10.09/system/vlans/30",
+                "40": "/rest/v10.09/system/vlans/40",
+                "50": "/rest/v10.09/system/vlans/50",
+                "100": "/rest/v10.09/system/vlans/100",
+            },
+        }
+        result = compare_interface_vlans(netbox_config, device_config)
+        assert result["needs_change"] is False
+        assert result["vlans_to_add"] == []
+        assert result["vlans_to_remove"] == []
+
+    def test_compare_vlans_mode_change_access_to_tagged_all(self):
+        """Test mode change from access to tagged-all"""
+        netbox_config = {
+            "name": "1/1/1",
+            "mode": {"value": "tagged-all"},
+            "untagged_vlan": {"vid": 10},
+            "tagged_vlans": [],
+        }
+        device_config = {
+            "vlan_mode": "access",
+            "vlan_tag": {"10": "/rest/v10.09/system/vlans/10"},
+            "vlan_trunks": {},
+        }
+        result = compare_interface_vlans(netbox_config, device_config)
+        assert result["needs_change"] is True
+        assert result["mode_change"] is True
+
+    def test_compare_vlans_mode_change_tagged_to_tagged_all(self):
+        """Test mode change from tagged to tagged-all"""
+        netbox_config = {
+            "name": "1/1/1",
+            "mode": {"value": "tagged-all"},
+            "untagged_vlan": {"vid": 100},
+            "tagged_vlans": [],
+        }
+        device_config = {
+            "vlan_mode": "access",  # Wrong mode
+            "vlan_tag": {"100": "/rest/v10.09/system/vlans/100"},
+            "vlan_trunks": {},
+        }
+        result = compare_interface_vlans(netbox_config, device_config)
+        assert result["needs_change"] is True
+        assert result["mode_change"] is True
+
 
 class TestGetInterfacesNeedingChanges:
     """Tests for get_interfaces_needing_changes function"""

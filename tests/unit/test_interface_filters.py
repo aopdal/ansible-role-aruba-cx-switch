@@ -65,6 +65,39 @@ class TestCategorizeL2Interfaces:
         assert len(result["tagged_no_untagged"]) == 1
         assert result["tagged_no_untagged"][0]["name"] == "1/1/3"
 
+    def test_categorize_physical_tagged_all_with_native(self):
+        """Test categorizing tagged-all ports with native VLAN"""
+        interfaces = [
+            {
+                "name": "1/1/4",
+                "type": {"value": "1000base-t"},
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": {"vid": 100},
+                "tagged_vlans": [],
+                "lag": None,
+            }
+        ]
+        result = categorize_l2_interfaces(interfaces)
+        assert len(result["tagged_all_with_untagged"]) == 1
+        assert result["tagged_all_with_untagged"][0]["name"] == "1/1/4"
+        assert result["tagged_all_with_untagged"][0]["untagged_vlan"]["vid"] == 100
+
+    def test_categorize_physical_tagged_all_no_native(self):
+        """Test categorizing tagged-all ports without native VLAN"""
+        interfaces = [
+            {
+                "name": "1/1/5",
+                "type": {"value": "1000base-t"},
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": None,
+                "tagged_vlans": [],
+                "lag": None,
+            }
+        ]
+        result = categorize_l2_interfaces(interfaces)
+        assert len(result["tagged_all_no_untagged"]) == 1
+        assert result["tagged_all_no_untagged"][0]["name"] == "1/1/5"
+
     def test_categorize_lag_access(self):
         """Test categorizing LAG access ports"""
         interfaces = [
@@ -94,6 +127,68 @@ class TestCategorizeL2Interfaces:
         result = categorize_l2_interfaces(interfaces)
         assert len(result["mclag_access"]) == 1
         assert result["mclag_access"][0]["name"] == "lag1"
+
+    def test_categorize_lag_tagged_all_with_native(self):
+        """Test categorizing LAG tagged-all with native VLAN"""
+        interfaces = [
+            {
+                "name": "lag2",
+                "type": {"value": "lag"},
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": {"vid": 100},
+                "tagged_vlans": [],
+            }
+        ]
+        result = categorize_l2_interfaces(interfaces)
+        assert len(result["lag_tagged_all_with_untagged"]) == 1
+        assert result["lag_tagged_all_with_untagged"][0]["name"] == "lag2"
+
+    def test_categorize_lag_tagged_all_no_native(self):
+        """Test categorizing LAG tagged-all without native VLAN"""
+        interfaces = [
+            {
+                "name": "lag3",
+                "type": {"value": "lag"},
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": None,
+                "tagged_vlans": [],
+            }
+        ]
+        result = categorize_l2_interfaces(interfaces)
+        assert len(result["lag_tagged_all_no_untagged"]) == 1
+        assert result["lag_tagged_all_no_untagged"][0]["name"] == "lag3"
+
+    def test_categorize_mclag_tagged_all_with_native(self):
+        """Test categorizing MCLAG tagged-all with native VLAN"""
+        interfaces = [
+            {
+                "name": "lag4",
+                "type": {"value": "lag"},
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": {"vid": 200},
+                "tagged_vlans": [],
+                "custom_fields": {"if_mclag": True},
+            }
+        ]
+        result = categorize_l2_interfaces(interfaces)
+        assert len(result["mclag_tagged_all_with_untagged"]) == 1
+        assert result["mclag_tagged_all_with_untagged"][0]["name"] == "lag4"
+
+    def test_categorize_mclag_tagged_all_no_native(self):
+        """Test categorizing MCLAG tagged-all without native VLAN"""
+        interfaces = [
+            {
+                "name": "lag5",
+                "type": {"value": "lag"},
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": None,
+                "tagged_vlans": [],
+                "custom_fields": {"if_mclag": True},
+            }
+        ]
+        result = categorize_l2_interfaces(interfaces)
+        assert len(result["mclag_tagged_all_no_untagged"]) == 1
+        assert result["mclag_tagged_all_no_untagged"][0]["name"] == "lag5"
 
     def test_categorize_mixed_interfaces(self):
         """Test categorizing mixed interface types"""
