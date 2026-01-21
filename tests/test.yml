@@ -153,29 +153,26 @@
           if_ip_ospf_network: "broadcast"
 
     # Mock device data with OSPF configuration (multi-VRF format)
+    # Flattened config_context (simulating NetBox inventory with plurals: true)
     device:
       custom_fields:
         device_ospf_1_routerid: "10.255.255.1"
-      config_context:
-        ospf_process_id: 1
-        ospf_vrfs:
-          - vrf: "default"
-            areas:
-              - area: "0.0.0.0"
-              - area: "0.0.0.1"
-          - vrf: "PROD"
-            areas:
-              - area: "0.0.0.0"
+
+    ospf_process_id: 1
+    ospf_vrfs:
+      - vrf: "default"
+        areas:
+          - area: "0.0.0.0"
+          - area: "0.0.0.1"
+      - vrf: "PROD"
+        areas:
+          - area: "0.0.0.0"
 
     # Alternative: Mock device data with OSPF configuration (legacy single-VRF format)
-    # device:
-    #   custom_fields:
-    #     device_ospf_1_routerid: "10.255.255.1"
-    #   config_context:
-    #     ospf_1_vrf: "default"
-    #     ospf_areas:
-    #       - ospf_1_area: "0.0.0.0"
-    #       - ospf_1_area: "0.0.0.1"
+    # ospf_1_vrf: "default"
+    # ospf_areas:
+    #   - ospf_1_area: "0.0.0.0"
+    #   - ospf_1_area: "0.0.0.1"
 
     # Role configuration
     aoscx_configure_vrfs: true

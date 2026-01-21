@@ -232,31 +232,33 @@ def get_sample_ansible_facts():
 
 
 def get_sample_ospf_config():
-    """Sample OSPF configuration data for testing"""
+    """Sample OSPF configuration data for testing
+
+    Note: config_context is flattened (simulating NetBox inventory with plurals: true)
+    """
     return {
         "device": {
             "custom_fields": {
                 "device_ospf_1_routerid": "10.255.255.1",
             },
-            "config_context": {
-                "ospf_process_id": 1,
-                "ospf_vrfs": [
-                    {
-                        "vrf": "default",
-                        "areas": [
-                            {"area": "0.0.0.0"},
-                            {"area": "0.0.0.1"},
-                        ],
-                    },
-                    {
-                        "vrf": "customer_a",
-                        "areas": [
-                            {"area": "0.0.0.0"},
-                        ],
-                    },
+        },
+        # Flattened config_context variables
+        "ospf_process_id": 1,
+        "ospf_vrfs": [
+            {
+                "vrf": "default",
+                "areas": [
+                    {"area": "0.0.0.0"},
+                    {"area": "0.0.0.1"},
                 ],
             },
-        },
+            {
+                "vrf": "customer_a",
+                "areas": [
+                    {"area": "0.0.0.0"},
+                ],
+            },
+        ],
         "interfaces": [
             {
                 "name": "1/1/1",

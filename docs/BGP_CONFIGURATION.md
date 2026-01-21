@@ -278,14 +278,14 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
 
 ## Field Descriptions
 
-### config_context.bgp_as
+### bgp_as
 
 - **Type**: Integer
 - **Required**: Yes
 - **Description**: BGP Autonomous System number
 - **Example**: `65000`
 
-### config_context.bgp_peers
+### bgp_peers
 
 - **Type**: List of objects
 - **Required**: Yes (for EVPN)
@@ -295,14 +295,14 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
   - `remote_as` (optional): Remote AS number (defaults to local AS for iBGP)
   - `update_source` (optional): Update source interface (defaults to "loopback 0")
 
-### config_context.bgp_ipv4_peers
+### bgp_ipv4_peers
 
 - **Type**: List of objects
 - **Required**: No
 - **Description**: BGP neighbors for IPv4 unicast address family (underlay or external)
 - **Fields**: Same as bgp_peers
 
-### config_context.bgp_vrfs
+### bgp_vrfs
 
 - **Type**: List of objects
 - **Required**: No
@@ -311,7 +311,7 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
   - `name` (required): VRF name
   - `rd` (required): Route Distinguisher in format `IP:ID` or `ASN:ID`
 
-### config_context.bgp_rr_clients
+### bgp_rr_clients
 
 - **Type**: List of objects
 - **Required**: No (only for route reflectors when using config_context)
@@ -320,7 +320,7 @@ Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
   - `peer` (required): Neighbor IP address
 - **Note**: When using netbox-bgp plugin, this is **automatic** for devices with role `spine`, `route-reflector`, or `rr`. All BGP neighbors are automatically configured as RR clients.
 
-### config_context.bgp_additional_config
+### bgp_additional_config
 
 - **Type**: List of strings
 - **Required**: No
@@ -366,7 +366,7 @@ flowchart TB
     style Servers3 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
 ```
 
-### BGP Configuration Roles:
+### BGP Configuration Roles
 
 - **Spine**: Route reflectors for EVPN control plane
 - **Leaf**: VTEP endpoints, VRF for tenants
@@ -375,12 +375,14 @@ flowchart TB
 ## Enable/Disable BGP
 
 ### Role Variable
+
 ```yaml
 # In your playbook or group_vars
 aoscx_configure_bgp: true
 ```
 
 ### NetBox Custom Field
+
 ```yaml
 # Per device in NetBox
 device_bgp: true
@@ -392,11 +394,13 @@ Both conditions must be true for BGP to be configured.
 ## Running BGP Configuration
 
 ### Full Run (Includes BGP)
+
 ```bash
 ansible-playbook configure_aoscx.yml -l leaf-switches
 ```
 
 ### Explicit BGP Only (Tag-Dependent)
+
 ```bash
 # Only configure BGP (tag-dependent - requires explicit request)
 ansible-playbook configure_aoscx.yml -l leaf-switches -t bgp
@@ -406,6 +410,7 @@ ansible-playbook configure_aoscx.yml -l leaf-switches -t routing
 ```
 
 ### Safe Run (Excludes BGP)
+
 ```bash
 # VLANs only - BGP will NOT run
 ansible-playbook configure_aoscx.yml -l leaf-switches -t vlans
@@ -440,6 +445,7 @@ show bgp neighbors
 **Issue**: BGP configuration skipped
 
 **Check**:
+
 ```yaml
 # 1. Role variable enabled
 aoscx_configure_bgp: true
@@ -456,6 +462,7 @@ ansible-playbook configure_aoscx.yml -t bgp  # or -t routing, or no tags
 **Issue**: Missing router ID
 
 **Solution**: Set `device_bgp_routerid` in NetBox custom fields
+
 ```
 Device → Custom Fields → device_bgp_routerid = "10.255.255.11"
 ```

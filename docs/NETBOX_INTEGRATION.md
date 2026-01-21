@@ -191,23 +191,23 @@ Config context provides **configuration data** for features. This is JSON data a
 
 | Feature | Config Context Key | Type | Purpose | Status |
 |---------|-------------------|------|---------|--------|
-| **Base System** | `config_context.motd` | String | Message of the Day banner | ✅ Active |
-| | `config_context.timezone` | String | System timezone | ✅ Active |
-| | `config_context.ntp.servers` | List | NTP server IPs | ✅ Active |
-| | `config_context.dns.domain` | String | DNS domain name | ✅ Active |
-| | `config_context.dns.servers` | List | DNS server IPs | ✅ Active |
-| **VSX** | `config_context.vsx_system_mac` | String | VSX system MAC address | ✅ Active |
-| | `config_context.vsx_role` | String | VSX role (primary or secondary) | ✅ Active |
-| | `config_context.vsx_isl_ports` | List | Inter-Switch Link ports | ✅ Active |
-| | `config_context.vsx_keepalive_peer` | String | VSX peer keepalive IP address | ✅ Active |
-| | `config_context.vsx_keepalive_src` | String | Source IP for keepalive | ✅ Active |
-| | `config_context.vsx_keepalive_vrf` | String | VRF for keepalive (default: mgmt) | ✅ Active |
-| **BGP (Fallback)** | `config_context.bgp_as` | Integer | BGP AS Number | ⚠️ Hybrid (fallback) |
-| | `config_context.bgp_peers` | List | BGP EVPN neighbors | ⚠️ Hybrid (fallback) |
-| | `config_context.bgp_ipv4_peers` | List | BGP IPv4 unicast peers | ⚠️ Hybrid (fallback) |
-| | `config_context.bgp_vrfs` | List | BGP VRF configurations | ⚠️ Hybrid (fallback) |
-| | `config_context.bgp_rr_clients` | List | Route reflector clients | ⚠️ Hybrid (fallback) |
-| | `config_context.bgp_additional_config` | List | Additional BGP commands | ⚠️ Hybrid (fallback) |
+| **Base System** | `motd` | String | Message of the Day banner | ✅ Active |
+| | `timezone` | String | System timezone | ✅ Active |
+| | `ntp.servers` | List | NTP server IPs | ✅ Active |
+| | `dns.domain` | String | DNS domain name | ✅ Active |
+| | `dns.servers` | List | DNS server IPs | ✅ Active |
+| **VSX** | `vsx_system_mac` | String | VSX system MAC address | ✅ Active |
+| | `vsx_role` | String | VSX role (primary or secondary) | ✅ Active |
+| | `vsx_isl_ports` | List | Inter-Switch Link ports | ✅ Active |
+| | `vsx_keepalive_peer` | String | VSX peer keepalive IP address | ✅ Active |
+| | `vsx_keepalive_src` | String | Source IP for keepalive | ✅ Active |
+| | `vsx_keepalive_vrf` | String | VRF for keepalive (default: mgmt) | ✅ Active |
+| **BGP (Fallback)** | `bgp_as` | Integer | BGP AS Number | ⚠️ Hybrid (fallback) |
+| | `bgp_peers` | List | BGP EVPN neighbors | ⚠️ Hybrid (fallback) |
+| | `bgp_ipv4_peers` | List | BGP IPv4 unicast peers | ⚠️ Hybrid (fallback) |
+| | `bgp_vrfs` | List | BGP VRF configurations | ⚠️ Hybrid (fallback) |
+| | `bgp_rr_clients` | List | Route reflector clients | ⚠️ Hybrid (fallback) |
+| | `bgp_additional_config` | List | Additional BGP commands | ⚠️ Hybrid (fallback) |
 
 ### Base System Config Context Examples
 
@@ -219,7 +219,7 @@ Config context provides **configuration data** for features. This is JSON data a
 }
 ```
 
-Ansible access: `config_context.motd`
+Ansible access: `motd`
 
 #### Timezone
 
@@ -229,7 +229,7 @@ Ansible access: `config_context.motd`
 }
 ```
 
-Ansible access: `config_context.timezone`
+Ansible access: `timezone`
 
 #### NTP Servers
 
@@ -244,7 +244,7 @@ Ansible access: `config_context.timezone`
 }
 ```
 
-Ansible access: `config_context.ntp.servers`
+Ansible access: `ntp.servers`
 
 #### DNS Configuration
 
@@ -265,9 +265,9 @@ Ansible access: `config_context.ntp.servers`
 ```
 
 Ansible access:
-- `config_context.dns.domain`
-- `config_context.dns.servers`
-- `config_context.dns.hosts`
+- `dns.domain`
+- `dns.servers`
+- `dns.hosts`
 
 ### BGP Config Context (Fallback Mode)
 
@@ -564,7 +564,7 @@ GET /api/plugins/bgp/session/?device_id=123&status=active
 - name: Configure BGP from config_context
   when:
     - bgp_sessions_api.status == 404 or device_bgp_sessions | length == 0
-    - config_context.bgp_as is defined
+    - bgp_as is defined
   # ... configure from config_context
 ```
 

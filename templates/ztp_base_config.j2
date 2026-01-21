@@ -78,14 +78,14 @@ interface {{ intf.name }}
     ip address {{ ip.address }}
 {#-         For dedicated mgmt interface, use default-gateway command -#}
 {%           if 'mgmt' in intf.name | lower and 'vlan' not in intf.name | lower %}
-{%             if config_context is defined and config_context.mgmt_defaultgateway is defined %}
-    default-gateway {{ config_context.mgmt_defaultgateway }}
+{%             if config_context is defined and mgmt_defaultgateway is defined %}
+    default-gateway {{ mgmt_defaultgateway }}
 {%             endif %}
 {%           endif %}
-{%           if config_context is defined and config_context.mgmt_nameserver is defined %}
-    nameserver {{ config_context.mgmt_nameserver }}
-{%           elif config_context is defined and config_context.dns_servers is defined %}
-{%             for dns_server in config_context.dns_servers[:2] %}
+{%           if config_context is defined and mgmt_nameserver is defined %}
+    nameserver {{ mgmt_nameserver }}
+{%           elif config_context is defined and dns_servers is defined %}
+{%             for dns_server in dns_servers[:2] %}
     nameserver {{ dns_server }}
 {%             endfor %}
 {%           endif %}
@@ -111,13 +111,13 @@ interface {{ intf.name }}
 {%         for ip in intf.ip_addresses %}
 {%           if ip.address is defined %}
     ip static {{ ip.address }}
-{%             if config_context is defined and config_context.mgmt_defaultgateway is defined %}
-    default-gateway {{ config_context.mgmt_defaultgateway }}
+{%             if config_context is defined and mgmt_defaultgateway is defined %}
+    default-gateway {{ mgmt_defaultgateway }}
 {%             endif %}
-{%             if config_context is defined and config_context.mgmt_nameserver is defined %}
-    nameserver {{ config_context.mgmt_nameserver }}
-{%             elif config_context is defined and config_context.dns_servers is defined %}
-{%               for dns_server in config_context.dns_servers[:2] %}
+{%             if config_context is defined and mgmt_nameserver is defined %}
+    nameserver {{ mgmt_nameserver }}
+{%             elif config_context is defined and dns_servers is defined %}
+{%               for dns_server in dns_servers[:2] %}
     nameserver {{ dns_server }}
 {%               endfor %}
 {%             endif %}

@@ -93,7 +93,9 @@ def validate_ospf_config(device_config, interfaces):
     Validate OSPF configuration consistency
 
     Args:
-        device_config (dict): Device configuration from NetBox
+        device_config (dict): Device configuration from NetBox.
+                             Can be either nested (with config_context key) or flattened
+                             (when using NetBox inventory with plurals: true)
         interfaces (list): List of interface objects from NetBox
 
     Returns:
@@ -116,10 +118,19 @@ def validate_ospf_config(device_config, interfaces):
         _debug("Warning: OSPF interfaces exist but no router ID defined")
 
     # Check if all interface areas are defined in device areas
-    device_areas = device_config.get("config_context", {}).get("ospf_areas", [])
+    # Support both nested config_context and flattened structure
+    if "config_context" in device_config:
+        # Nested structure (backward compatibility)
+        device_areas = device_config.get("config_context", {}).get("ospf_areas", [])
+        _debug("Using nested config_context structure")
+    else:
+        # Flattened structure (NetBox inventory with plurals: true)
+        device_areas = device_config.get("ospf_areas", [])
+        _debug("Using flattened structure (plurals: true)")
+
     device_area_ids = [area.get("ospf_1_area") for area in device_areas]
 
-    _debug(f"Device OSPF areas from config_context: {device_area_ids}")
+    _debug(f"Device OSPF areas: {device_area_ids}")
 
     interface_areas = extract_ospf_areas(interfaces)
 

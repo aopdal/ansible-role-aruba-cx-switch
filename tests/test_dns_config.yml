@@ -7,27 +7,25 @@
   vars:
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
 
-    # Test DNS configuration examples
-    config_context:
-      # Complete DNS configuration example
-      dns_domain_name: "hpe.com"
-      dns_mgmt_nameservers:
-        Primary: "10.10.2.10"
-        Secondary: "10.10.2.11"
-      dns_name_servers:
-        "0": "4.4.4.8"
-        "1": "4.4.4.10"
-        "2": "8.8.8.8"
-      dns_domain_list:
-        "0": "hp.com"
-        "1": "aru.com"
-        "2": "sea.com"
-      dns_host_v4_address_mapping:
-        host1: "5.5.44.5"
-        host2: "2.2.44.2"
-        jumphost: "10.10.1.100"
-        monitoring: "10.10.2.50"
-      dns_vrf: "green"
+    # Test DNS configuration - flattened (simulating NetBox inventory with plurals: true)
+    dns_domain_name: "hpe.com"
+    dns_mgmt_nameservers:
+      Primary: "10.10.2.10"
+      Secondary: "10.10.2.11"
+    dns_name_servers:
+      "0": "4.4.4.8"
+      "1": "4.4.4.10"
+      "2": "8.8.8.8"
+    dns_domain_list:
+      "0": "hp.com"
+      "1": "aru.com"
+      "2": "sea.com"
+    dns_host_v4_address_mapping:
+      host1: "5.5.44.5"
+      host2: "2.2.44.2"
+      jumphost: "10.10.1.100"
+      monitoring: "10.10.2.50"
+    dns_vrf: "green"
 
     # Enable debug output
     aoscx_debug: true
@@ -39,26 +37,26 @@
           Testing DNS Configuration:
 
           🌐 Domain Configuration:
-          - Primary domain: {{ config_context.dns_domain_name }}
-          - DNS VRF: {{ config_context.dns_vrf }}
+          - Primary domain: {{ dns_domain_name }}
+          - DNS VRF: {{ dns_vrf }}
 
           📡 Management Nameservers:
-          {% for key, server in config_context.dns_mgmt_nameservers.items() %}
+          {% for key, server in dns_mgmt_nameservers.items() %}
           - {{ key }}: {{ server }}
           {% endfor %}
 
           🔍 DNS Nameservers:
-          {% for key, server in config_context.dns_name_servers.items() %}
+          {% for key, server in dns_name_servers.items() %}
           - Server {{ key }}: {{ server }}
           {% endfor %}
 
           🔎 Search Domains:
-          {% for key, domain in config_context.dns_domain_list.items() %}
+          {% for key, domain in dns_domain_list.items() %}
           - Domain {{ key }}: {{ domain }}
           {% endfor %}
 
           🏠 Host Mappings:
-          {% for hostname, ip in config_context.dns_host_v4_address_mapping.items() %}
+          {% for hostname, ip in dns_host_v4_address_mapping.items() %}
           - {{ hostname }}: {{ ip }}
           {% endfor %}
 
@@ -74,12 +72,12 @@
               This is normal for testing - validating data structures and logic.
 
               ✅ DNS task successfully processed:
-              • Domain name: {{ config_context.dns_domain_name }}
-              • Management nameservers: {{ config_context.dns_mgmt_nameservers | length }} configured
-              • DNS nameservers: {{ config_context.dns_name_servers | length }} configured
-              • Search domains: {{ config_context.dns_domain_list | length }} configured
-              • Host mappings: {{ config_context.dns_host_v4_address_mapping | length }} configured
-              • VRF: {{ config_context.dns_vrf }}
+              • Domain name: {{ dns_domain_name }}
+              • Management nameservers: {{ dns_mgmt_nameservers | length }} configured
+              • DNS nameservers: {{ dns_name_servers | length }} configured
+              • Search domains: {{ dns_domain_list | length }} configured
+              • Host mappings: {{ dns_host_v4_address_mapping | length }} configured
+              • VRF: {{ dns_vrf }}
 
     - name: DNS configuration test completed
       ansible.builtin.debug:

@@ -2,42 +2,39 @@
 ---
 # Banner configuration for Aruba CX switches
 #
-# This task configures banner based on config_context.motd in NetBox
+# This task configures banner based on motd in NetBox
 # The banner is displayed when users log in to the switch
 #
-# Required variable: config_context.motd
+# Required variable: motd
 # Optional variables:
-#   - config_context.banner_exec (for exec banner)
+#   - banner_exec (for exec banner)
 
 - name: configure_banner | Display banner configuration debug info
   ansible.builtin.debug:
     msg:
       - "Configuring banner on {{ inventory_hostname }}"
-      - "MOTD: {{ config_context.motd | default('Not configured') }}"
+      - "MOTD: {{ motd | default('Not configured') }}"
   when: aoscx_debug | bool
 
 - name: configure_banner | Add or Update Login Banner
   arubanetworks.aoscx.aoscx_banner:
     banner_type: banner
-    banner: "{{ config_context.motd }}"
+    banner: "{{ motd }}"
   when:
-    - config_context is defined
-    - config_context.motd is defined
-    - config_context.motd | length > 0
+    - motd is defined
+    - motd | length > 0
 
 - name: configure_banner | Add or Update Exec Banner
   arubanetworks.aoscx.aoscx_banner:
     banner_type: exec
-    banner: "{{ config_context.banner_exec }}"
+    banner: "{{ banner_exec }}"
   when:
-    - config_context is defined
-    - config_context.banner_exec is defined
-    - config_context.banner_exec | length > 0
+    - banner_exec is defined
+    - banner_exec | length > 0
 
 - name: configure_banner | Remove banner if not configured
   arubanetworks.aoscx.aoscx_banner:
     banner_type: banner
     state: delete
   when:
-    - config_context is defined
-    - config_context.motd is not defined or config_context.motd | length == 0
+    - motd is not defined or motd | length == 0

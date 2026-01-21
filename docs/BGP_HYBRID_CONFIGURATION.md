@@ -83,7 +83,7 @@ aoscx_debug: true
 
 ### Strategy 1: Gradual Migration (Recommended)
 
-**Phase 1: Parallel Operation**
+#### Phase 1: Parallel Operation
 
 - Keep config_context data
 - Install netbox-bgp plugin
@@ -96,7 +96,7 @@ aoscx_debug: true
 - Verify each device works with plugin
 - Remove config_context BGP data after verification
 
-**Phase 3: Complete Migration**
+#### Phase 3: Complete Migration
 
 - All devices using netbox-bgp plugin
 - Remove config_context BGP data
@@ -115,25 +115,25 @@ ansible-playbook configure_aoscx.yml -l fabric -t bgp
 
 ### Strategy 2: Per-Site Migration
 
-**Site A: netbox-bgp plugin**
+#### Site A: netbox-bgp plugin
 
 - All devices have BGP sessions in plugin
 - config_context has no BGP data
 
-**Site B: config_context**
+#### Site B: config_context
 
 - Devices use config_context
 - Will migrate later
 
 ### Strategy 3: Role-Based Migration
 
-**Spines: netbox-bgp plugin first**
+#### Spines: netbox-bgp plugin first
 
 - Critical infrastructure
 - More complex BGP configuration
 - Better tracking with plugin
 
-**Leafs: config_context initially**
+#### Leafs: config_context initially
 
 - Simpler configuration
 - Migrate after spines are stable
@@ -143,11 +143,13 @@ ansible-playbook configure_aoscx.yml -l fabric -t bgp
 ### netbox-bgp Plugin Data
 
 **Query:**
+
 ```yaml
 GET /api/plugins/bgp/session/?device=leaf-1&status=active
 ```
 
 **Response Structure:**
+
 ```json
 {
   "results": [
@@ -182,6 +184,7 @@ GET /api/plugins/bgp/session/?device=leaf-1&status=active
 ```
 
 **Ansible Access:**
+
 ```yaml
 device_bgp_sessions[0].local_as.asn
 device_bgp_sessions[0].remote_address.address.split('/')[0]
@@ -190,6 +193,7 @@ device_bgp_sessions[0].remote_address.address.split('/')[0]
 ### config_context Data
 
 **NetBox Config Context:**
+
 ```json
 {
   "bgp_as": 65000,
@@ -204,15 +208,17 @@ device_bgp_sessions[0].remote_address.address.split('/')[0]
 ```
 
 **Custom Fields:**
+
 ```yaml
 device_bgp: true
 device_bgp_routerid: "10.255.255.11"
 ```
 
 **Ansible Access:**
+
 ```yaml
-config_context.bgp_as
-config_context.bgp_peers[0].peer
+bgp_as
+bgp_peers[0].peer
 custom_fields.device_bgp_routerid
 ```
 
@@ -262,7 +268,7 @@ ansible-playbook configure_aoscx.yml -l leaf-3 -t bgp \
 ## Feature Matrix
 
 | Feature | netbox-bgp Plugin | config_context |
-|---------|------------------|----------------|
+| ------- | ----------------- | -------------- |
 | **Basic BGP Router** | ✅ | ✅ |
 | **EVPN Neighbors** | ✅ | ✅ |
 | **IPv4 Unicast** | ⏳ Future | ✅ |
@@ -357,7 +363,8 @@ device_bgp: true  # Still used for enable/disable
 
 ### Example 2: Fabric Migration
 
-**Week 1: Install Plugin**
+#### Week 1: Install Plugin
+
 ```bash
 # On NetBox server
 pip install netbox-bgp
@@ -375,21 +382,22 @@ systemctl restart netbox
 ansible-playbook configure_aoscx.yml -l spine-1,spine-2 -t bgp --check
 ```
 
-**Week 3: Activate Spine Sessions**
+#### Week 3: Activate Spine Sessions
 ```bash
 # In NetBox: Change status to Active
 # Deploy
 ansible-playbook configure_aoscx.yml -l spine-1,spine-2 -t bgp
 ```
 
-**Week 4+: Migrate Leafs**
+#### Week 4+: Migrate Leafs
 ```bash
 # Create sessions for 2 leafs per week
 # Test each batch before proceeding
 ansible-playbook configure_aoscx.yml -l leaf-1,leaf-2 -t bgp
 ```
 
-**Week 8: Cleanup**
+#### Week 8: Cleanup
+
 ```bash
 # All devices using plugin
 # Remove BGP data from config_context
@@ -401,11 +409,13 @@ ansible-playbook configure_aoscx.yml -l leaf-1,leaf-2 -t bgp
 ### Plugin Not Detected
 
 **Symptom:**
+
 ```
 "NetBox BGP plugin: Not available, using config_context fallback"
 ```
 
 **Check:**
+
 ```bash
 # 1. Verify plugin installed
 curl -H "Authorization: Token YOUR_TOKEN" \
@@ -420,6 +430,7 @@ grep netbox_bgp /opt/netbox/netbox/netbox/configuration.py
 ```
 
 **Solution:**
+
 ```bash
 pip install netbox-bgp
 # Add to configuration.py: PLUGINS = ['netbox_bgp']
@@ -429,6 +440,7 @@ systemctl restart netbox
 ### Device Uses config_context Despite Plugin
 
 **Symptom:**
+
 ```
 "BGP Configuration Source: config_context"
 "Plugin Sessions: 0"
@@ -437,6 +449,7 @@ systemctl restart netbox
 **Reason:** Device has no BGP sessions in plugin
 
 **Solution:**
+
 ```bash
 # Create sessions in NetBox BGP plugin for the device
 ```
@@ -452,6 +465,7 @@ systemctl restart netbox
 **This is expected during migration!**
 
 **Check which source each device uses:**
+
 ```bash
 ansible-playbook configure_aoscx.yml -t bgp \
   -e aoscx_debug=true \

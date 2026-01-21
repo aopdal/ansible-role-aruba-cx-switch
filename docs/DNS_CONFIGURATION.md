@@ -5,6 +5,7 @@
 Here's the JSON structure you can use in NetBox config_context for DNS configuration:
 
 ### Full Example with All Options
+
 ```json
 {
   "dns_domain_name": "hpe.com",
@@ -34,6 +35,7 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
 ```
 
 ### Simple Example (Minimum Configuration)
+
 ```json
 {
   "dns_domain_name": "opdal.net",
@@ -45,6 +47,7 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
 ```
 
 ### Management Network Example
+
 ```json
 {
   "dns_domain_name": "mgmt.opdal.net",
@@ -67,6 +70,7 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
 ```
 
 ### Enterprise Example with Host Mappings
+
 ```json
 {
   "dns_domain_name": "company.local",
@@ -99,7 +103,7 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
 ## Field Descriptions
 
 | Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
+| ----- | ---- | -------- | ----------- | ------- |
 | `dns_domain_name` | String | No | Primary domain name | `"opdal.net"` |
 | `dns_mgmt_nameservers` | Object | No | Management nameservers | `{"Primary": "10.1.1.1"}` |
 | `dns_name_servers` | Object | No | DNS nameservers with numeric keys | `{"0": "8.8.8.8"}` |
@@ -110,7 +114,9 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
 ## Key Points
 
 ### Numeric Keys for Lists
+
 The `dns_name_servers` and `dns_domain_list` fields use numeric keys as strings:
+
 ```json
 {
   "dns_name_servers": {
@@ -122,11 +128,14 @@ The `dns_name_servers` and `dns_domain_list` fields use numeric keys as strings:
 ```
 
 ### Management vs Regular Nameservers
+
 - **`dns_mgmt_nameservers`**: Used for management traffic, keys can be descriptive
 - **`dns_name_servers`**: Used for general DNS queries, keys must be numeric strings
 
 ### VRF Context
+
 If not specified, DNS will use the default VRF. For management networks, typically use:
+
 ```json
 {
   "dns_vrf": "mgmt"
@@ -134,7 +143,9 @@ If not specified, DNS will use the default VRF. For management networks, typical
 ```
 
 ### Host Mappings
+
 Static host mappings create local DNS entries:
+
 ```json
 {
   "dns_host_v4_address_mapping": {

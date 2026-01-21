@@ -22,25 +22,25 @@
       - "=== VSX Configuration ==="
       - "Device: {{ inventory_hostname }}"
       - "VSX Enabled: {{ vsx_enabled }}"
-      - "VSX Role: {{ config_context.vsx_role | default('not set') }}"
-      - "VSX System MAC: {{ config_context.vsx_system_mac | default('not set') }}"
+      - "VSX Role: {{ vsx_role | default('not set') }}"
+      - "VSX System MAC: {{ vsx_system_mac | default('not set') }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Configure VSX
   when:
     - vsx_enabled | bool
-    - config_context.vsx_system_mac is defined
-    - config_context.vsx_role is defined
+    - vsx_system_mac is defined
+    - vsx_role is defined
   block:
     - name: Configure VSX
       arubanetworks.aoscx.aoscx_vsx:
-        system_mac: "{{ config_context.vsx_system_mac }}"
-        keepalive_vrf: "{{ config_context.vsx_keepalive_vrf | default('mgmt') }}"
-        keepalive_src_ip: "{{ config_context.vsx_keepalive_src | default('mgmt') }}"
-        keepalive_peer_ip: "{{ config_context.vsx_keepalive_peer | default('not set') }}"
-        device_role: "{{ config_context.vsx_role | default('not set') }}"
+        system_mac: "{{ vsx_system_mac }}"
+        keepalive_vrf: "{{ vsx_keepalive_vrf | default('mgmt') }}"
+        keepalive_src_ip: "{{ vsx_keepalive_src | default('mgmt') }}"
+        keepalive_peer_ip: "{{ vsx_keepalive_peer | default('not set') }}"
+        device_role: "{{ vsx_role | default('not set') }}"
         split_recovery_disable: true
-        isl_port: "{{ config_context.vsx_isl_port | default('lag256') }}"
+        isl_port: "{{ vsx_isl_port | default('lag256') }}"
         config_sync_disable: false
         config_sync_features:
           - vsx-global
@@ -51,10 +51,10 @@
         msg:
           - "=== VSX Configuration Complete ==="
           - "Device: {{ inventory_hostname }}"
-          - "System MAC: {{ config_context.vsx_system_mac }}"
-          - "Role: {{ config_context.vsx_role }}"
-          - "ISL LAG: {{ config_context.vsx_isl_lag | default('lag256') }}"
-          - "Keepalive Peer: {{ config_context.vsx_keepalive_peer | default('not configured') }}"
+          - "System MAC: {{ vsx_system_mac }}"
+          - "Role: {{ vsx_role }}"
+          - "ISL LAG: {{ vsx_isl_lag | default('lag256') }}"
+          - "Keepalive Peer: {{ vsx_keepalive_peer | default('not configured') }}"
       when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Skip VSX configuration
@@ -63,5 +63,5 @@
       - "VSX configuration skipped for {{ inventory_hostname }}"
       - "Reason: {{ 'VSX not enabled' if not vsx_enabled else 'Missing required configuration' }}"
   when:
-    - not vsx_enabled or config_context.vsx_system_mac is not defined or config_context.vsx_role is not defined
+    - not vsx_enabled or vsx_system_mac is not defined or vsx_role is not defined
     - aoscx_debug | bool or ansible_verbosity >= 1

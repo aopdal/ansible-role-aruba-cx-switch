@@ -4,12 +4,12 @@
   hosts: localhost
   gather_facts: false
   vars:
-    config_context:
-      motd: "Test banner message"
-      timezone: "europe/oslo"
-      ntp_vrf: "mgmt"
-      ntp_servers:
-        - server: "pool.ntp.org"
+    # Test configuration - flattened (simulating NetBox inventory with plurals: true)
+    motd: "Test banner message"
+    timezone: "europe/oslo"
+    ntp_vrf: "mgmt"
+    ntp_servers:
+      - server: "pool.ntp.org"
 
     aoscx_configure_banner: true
     aoscx_configure_timezone: true
@@ -18,12 +18,12 @@
     aoscx_debug: true
 
   tasks:
-    - name: Show what config_context contains
+    - name: Show what variables are available
       ansible.builtin.debug:
         msg:
-          - "config_context.motd: {{ config_context.motd | default('NOT DEFINED') }}"
-          - "config_context.timezone: {{ config_context.timezone | default('NOT DEFINED') }}"
-          - "config_context.ntp_vrf: {{ config_context.ntp_vrf | default('NOT DEFINED') }}"
+          - "motd: {{ motd | default('NOT DEFINED') }}"
+          - "timezone: {{ timezone | default('NOT DEFINED') }}"
+          - "ntp_vrf: {{ ntp_vrf | default('NOT DEFINED') }}"
 
     - name: Include banner configuration (with proper tag inheritance)
       ansible.builtin.include_tasks:

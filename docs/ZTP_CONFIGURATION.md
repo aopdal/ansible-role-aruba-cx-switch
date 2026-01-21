@@ -154,7 +154,7 @@ interface mgmt
     ip static 192.168.1.10/24
     default-gateway 192.168.1.1
 ```
-Gateway is taken from `config_context.mgmt_defaultgateway`.
+Gateway is taken from `mgmt_defaultgateway`.
 
 #### VLAN Interface (SVI)
 
@@ -326,9 +326,9 @@ ansible-playbook site.yml --tags ztp,config_generation
 The template uses these variables from NetBox integration:
 
 - `mgmt_interfaces` - Management interfaces (filtered from NetBox)
-- `config_context.mgmt_defaultgateway` - Default gateway IP
-- `config_context.mgmt_nameserver` - Primary DNS server
-- `config_context.dns_servers` - List of DNS servers
+- `mgmt_defaultgateway` - Default gateway IP
+- `mgmt_nameserver` - Primary DNS server
+- `dns_servers` - List of DNS servers
 
 ## File Output
 

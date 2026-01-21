@@ -7,38 +7,37 @@
   vars:
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
 
-    # Test configuration context
-    config_context:
-      timezone: "europe/oslo"
-      motd: |
-        =============================================
-        Welcome to Test Switch {{ inventory_hostname }}
-        Managed by Ansible - DO NOT MODIFY MANUALLY
-        For support contact: netops@company.com
-        =============================================
-      ntp_vrf: "mgmt"
-      ntp_servers:
-        - server: "pool.ntp.org"
-          prefer: true
-        - server: "time.google.com"
-        - server: "time.cloudflare.com"
-      dns_domain_name: "company.local"
-      dns_mgmt_nameservers:
-        Primary: "10.0.1.10"
-        Secondary: "10.0.1.11"
-      dns_name_servers:
-        "0": "10.0.1.10"
-        "1": "10.0.1.11"
-        "2": "8.8.8.8"
-      dns_domain_list:
-        "0": "company.local"
-        "1": "company.com"
-        "2": "local"
-      dns_host_v4_address_mapping:
-        ntp1: "10.0.1.100"
-        syslog: "10.0.1.200"
-        jumphost: "10.0.2.100"
-      dns_vrf: "mgmt"
+    # Test configuration - flattened (simulating NetBox inventory with plurals: true)
+    timezone: "europe/oslo"
+    motd: |
+      =============================================
+      Welcome to Test Switch {{ inventory_hostname }}
+      Managed by Ansible - DO NOT MODIFY MANUALLY
+      For support contact: netops@company.com
+      =============================================
+    ntp_vrf: "mgmt"
+    ntp_servers:
+      - server: "pool.ntp.org"
+        prefer: true
+      - server: "time.google.com"
+      - server: "time.cloudflare.com"
+    dns_domain_name: "company.local"
+    dns_mgmt_nameservers:
+      Primary: "10.0.1.10"
+      Secondary: "10.0.1.11"
+    dns_name_servers:
+      "0": "10.0.1.10"
+      "1": "10.0.1.11"
+      "2": "8.8.8.8"
+    dns_domain_list:
+      "0": "company.local"
+      "1": "company.com"
+      "2": "local"
+    dns_host_v4_address_mapping:
+      ntp1: "10.0.1.100"
+      syslog: "10.0.1.200"
+      jumphost: "10.0.2.100"
+    dns_vrf: "mgmt"
 
     # Enable debug output
     aoscx_debug: true
@@ -68,25 +67,25 @@
           Testing Base Configuration Tasks:
 
           🕐 Timezone Configuration:
-          - Timezone: {{ config_context.timezone }}
+          - Timezone: {{ timezone }}
 
           📢 Banner Configuration:
-          - MOTD configured: {{ 'Yes' if config_context.motd is defined else 'No' }}
-          - Banner length: {{ config_context.motd | length if config_context.motd is defined else 0 }} characters
+          - MOTD configured: {{ 'Yes' if motd is defined else 'No' }}
+          - Banner length: {{ motd | length if motd is defined else 0 }} characters
 
           🕒 NTP Configuration:
-          - NTP VRF: {{ config_context.ntp_vrf }}
-          - NTP servers: {{ config_context.ntp_servers | length }} configured
-          - Preferred servers: {{ config_context.ntp_servers | selectattr('prefer', 'defined') | list | length }}
-          - Regular servers: {{ config_context.ntp_servers | rejectattr('prefer', 'defined') | list | length }}
+          - NTP VRF: {{ ntp_vrf }}
+          - NTP servers: {{ ntp_servers | length }} configured
+          - Preferred servers: {{ ntp_servers | selectattr('prefer', 'defined') | list | length }}
+          - Regular servers: {{ ntp_servers | rejectattr('prefer', 'defined') | list | length }}
 
           🌐 DNS Configuration:
-          - Domain name: {{ config_context.dns_domain_name }}
-          - DNS VRF: {{ config_context.dns_vrf }}
-          - Management nameservers: {{ config_context.dns_mgmt_nameservers | length }} configured
-          - DNS nameservers: {{ config_context.dns_name_servers | length }} configured
-          - Search domains: {{ config_context.dns_domain_list | length }} configured
-          - Host mappings: {{ config_context.dns_host_v4_address_mapping | length }} entries
+          - Domain name: {{ dns_domain_name }}
+          - DNS VRF: {{ dns_vrf }}
+          - Management nameservers: {{ dns_mgmt_nameservers | length }} configured
+          - DNS nameservers: {{ dns_name_servers | length }} configured
+          - Search domains: {{ dns_domain_list | length }} configured
+          - Host mappings: {{ dns_host_v4_address_mapping | length }} entries
 
     - name: Test banner configuration tasks
       block:

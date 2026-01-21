@@ -11,7 +11,8 @@
     device_type: "arubaos-cx_ova"
     dns_name: "z13-cx3.ao-test.net"
     platform: "aoscx"
-    role: "leaf"
+    device_roles:
+      - "leaf"
     site: "reference"
 
     # Real NetBox VRFs (extracted from actual interfaces and config_context)
@@ -258,7 +259,8 @@
           - address: "172.20.99.3/24"
             family: 4
 
-    # Real NetBox device configuration context
+    # Real NetBox device configuration
+    # Flattened config_context (simulating NetBox inventory with plurals: true)
     device:
       custom_fields:
         device_ospf: true
@@ -270,56 +272,57 @@
         device_vxlan_source_ip: "172.20.1.33"
         device_evpn: true
         device_anycast_gateway: false
-      config_context:
-        ospf_process_id: 1
-        ospf_vrfs:
-          - vrf: "default"
-            areas:
-              - area: "0.0.0.0"
-              - area: "0.0.0.1"
-          - vrf: "z13-cust_2"
-            areas:
-              - area: "0.0.0.0"
-              - area: "0.0.0.1"
-        bgp_as: "65005"
-        bgp_peers:
-          - peer: "172.20.1.1"
-          - peer: "172.20.1.2"
-        interswitchlink: "lag256"
-        keepalivevrf: "z13-ka-vsx"
-        keepalivepeer: "172.20.2.1"
-        keepalivesource: "172.20.2.0"
-        role: "primary"
-        systemmac: "02:01:00:00:01:00"
-        timezone: "europe/oslo"
-        motd: |
-          ========================================
-          Welcome to {{ inventory_hostname }}
-          Managed by Ansible - Unauthorized access prohibited
-          ========================================
-        mgmt_defaultgateway: "172.20.0.254"
-        mgmt_nameserver: "91.90.45.8"
-        ntp_vrf: "mgmt"
-        ntp_servers:
-          - server: "klokke.opdal.net"
-            prefer: true
-          - server: "h1-rpi1.opdal.net"
-        dns_domain_name: "ao-test.net"
-        dns_mgmt_nameservers:
-          Primary: "91.90.45.8"
-          Secondary: "1.1.1.1"
-        dns_name_servers:
-          "0": "91.90.45.8"
-          "1": "1.1.1.1"
-          "2": "8.8.8.8"
-        dns_domain_list:
-          "0": "ao-test.net"
-          "1": "opdal.net"
-          "2": "local"
-        dns_host_v4_address_mapping:
-          klokke: "91.90.45.8"
-          jumphost: "172.20.0.100"
-        dns_vrf: "mgmt"
+
+    # Flattened configuration variables (from config_context)
+    ospf_process_id: 1
+    ospf_vrfs:
+      - vrf: "default"
+        areas:
+          - area: "0.0.0.0"
+          - area: "0.0.0.1"
+      - vrf: "z13-cust_2"
+        areas:
+          - area: "0.0.0.0"
+          - area: "0.0.0.1"
+    bgp_as: "65005"
+    bgp_peers:
+      - peer: "172.20.1.1"
+      - peer: "172.20.1.2"
+    interswitchlink: "lag256"
+    keepalivevrf: "z13-ka-vsx"
+    keepalivepeer: "172.20.2.1"
+    keepalivesource: "172.20.2.0"
+    vsx_role: "primary"
+    systemmac: "02:01:00:00:01:00"
+    timezone: "europe/oslo"
+    motd: |
+      ========================================
+      Welcome to {{ inventory_hostname }}
+      Managed by Ansible - Unauthorized access prohibited
+      ========================================
+    mgmt_defaultgateway: "172.20.0.254"
+    mgmt_nameserver: "91.90.45.8"
+    ntp_vrf: "mgmt"
+    ntp_servers:
+      - server: "klokke.opdal.net"
+        prefer: true
+      - server: "h1-rpi1.opdal.net"
+    dns_domain_name: "ao-test.net"
+    dns_mgmt_nameservers:
+      Primary: "91.90.45.8"
+      Secondary: "1.1.1.1"
+    dns_name_servers:
+      "0": "91.90.45.8"
+      "1": "1.1.1.1"
+      "2": "8.8.8.8"
+    dns_domain_list:
+      "0": "ao-test.net"
+      "1": "opdal.net"
+      "2": "local"
+    dns_host_v4_address_mapping:
+      klokke: "91.90.45.8"
+      jumphost: "172.20.0.100"
+    dns_vrf: "mgmt"
 
     # Role configuration
     aoscx_configure_vrfs: true
@@ -339,7 +342,7 @@
         msg: |
           Testing Aruba CX Switch Role with REAL NetBox Data (z13-cx3):
           - Device: {{ dns_name }} (ID: {{ device_id }})
-          - Platform: {{ platform }} | Role: {{ role }} | Site: {{ site }}
+          - Platform: {{ platform }} | Role: {{ device_roles | first }} | Site: {{ site }}
           - VRFs: {{ netbox_vrfs | length }} ({{ netbox_vrfs | map(attribute='name') | list | join(', ') }})
           - VLANs: {{ netbox_vlans | length }} VLANs (VIDs: {{ netbox_vlans | map(attribute='vid') | list | sort | join(', ') }})
           - Interfaces: {{ interfaces | length }} total
@@ -348,8 +351,8 @@
             * Virtual: {{ interfaces | selectattr('type', 'equalto', 'virtual') | list | length }}
             * L3 with IPs: {{ interfaces | selectattr('ip_addresses', 'defined') | list | length }}
             * OSPF enabled: {{ interfaces | selectattr('custom_fields.if_ip_ospf_1_area', 'defined') | list | length }}
-          - OSPF: Process {{ device.config_context.ospf_process_id }} | Router-ID: {{ device.custom_fields.device_ospf_1_routerid }}
-          - BGP: AS {{ device.config_context.bgp_as }} | Router-ID: {{ device.custom_fields.device_bgp_routerid }}
+          - OSPF: Process {{ device.ospf_process_id }} | Router-ID: {{ device.custom_fields.device_ospf_1_routerid }}
+          - BGP: AS {{ device.bgp_as }} | Router-ID: {{ device.custom_fields.device_bgp_routerid }}
           - Features: VSX={{ device.custom_fields.device_vsx }}, VXLAN={{ device.custom_fields.device_vxlan }}, EVPN={{ device.custom_fields.device_evpn }}
 
     - name: Test role execution with real data

@@ -10,7 +10,7 @@
 # Route Reflector Configuration:
 # - When using netbox-bgp plugin: Automatically configured if device role is
 #   'spine', 'route-reflector', or 'rr'. All BGP neighbors become RR clients.
-# - When using config_context: Configured via config_context.bgp_rr_clients list
+# - When using config_context: Configured via bgp_rr_clients list
 
 - name: Get BGP sessions from NetBox BGP plugin
   when: aoscx_use_netbox_bgp_plugin | default(true) | bool
@@ -57,8 +57,8 @@
       - "BGP Configuration Source: {{ 'netbox-bgp plugin' if (device_bgp_sessions | default([]) | length > 0) else 'config_context' }}"
       - "Device: {{ inventory_hostname }}"
       - "Plugin Sessions: {{ device_bgp_sessions | default([]) | length }}"
-      - "Config Context BGP AS: {{ config_context.bgp_as | default('not set') }}"
-      - "Config Context Peers: {{ config_context.bgp_peers | default([]) | length }}"
+      - "Config Context BGP AS: {{ bgp_as | default('not set') }}"
+      - "Config Context Peers: {{ bgp_peers | default([]) | length }}"
       - "Custom Field BGP Enabled: {{ custom_fields.device_bgp | default(false) }}"
       - "Custom Field Router ID: {{ custom_fields.device_bgp_routerid | default('not set') }}"
   when: aoscx_debug | default(false) | bool
@@ -83,13 +83,13 @@
 - name: Configure BGP router process from config_context (fallback)
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - router bgp {{ config_context.bgp_as }}
+      - router bgp {{ bgp_as }}
       - bgp router-id {{ custom_fields.device_bgp_routerid }}
     match: line
   when:
     - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)
     - custom_fields.device_bgp | default(false) | bool
-    - config_context.bgp_as is defined
+    - bgp_as is defined
     - custom_fields.device_bgp_routerid is defined
   vars:
     ansible_connection: network_cli
@@ -123,20 +123,20 @@
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
-      - router bgp {{ config_context.bgp_as }}
-      - neighbor {{ item.peer }} remote-as {{ item.remote_as | default(config_context.bgp_as) }}
+      - router bgp {{ bgp_as }}
+      - neighbor {{ item.peer }} remote-as {{ item.remote_as | default(bgp_as) }}
       - neighbor {{ item.peer }} update-source {{ item.update_source | default('loopback 0') }}
       - address-family l2vpn evpn
       - neighbor {{ item.peer }} send-community extended
       - neighbor {{ item.peer }} activate
       - exit-address-family
-  loop: "{{ config_context.bgp_peers | default([]) }}"
+  loop: "{{ bgp_peers | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} Peer: {{ item.peer }}"
   when:
     - custom_fields.device_bgp | default(false) | bool
-    - config_context.bgp_peers is defined
-    - config_context.bgp_peers | length > 0
+    - bgp_peers is defined
+    - bgp_peers | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -161,7 +161,7 @@
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
-    - config_context.bgp_ipv4_enabled | default(false) | bool
+    - bgp_ipv4_enabled | default(false) | bool
   vars:
     ansible_connection: network_cli
 
@@ -169,19 +169,19 @@
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
-      - router bgp {{ config_context.bgp_as }}
-      - neighbor {{ item.peer }} remote-as {{ item.remote_as | default(config_context.bgp_as) }}
+      - router bgp {{ bgp_as }}
+      - neighbor {{ item.peer }} remote-as {{ item.remote_as | default(bgp_as) }}
       - neighbor {{ item.peer }} update-source {{ item.update_source | default('loopback 0') }}
       - address-family ipv4 unicast
       - neighbor {{ item.peer }} activate
       - exit-address-family
-  loop: "{{ config_context.bgp_ipv4_peers | default([]) }}"
+  loop: "{{ bgp_ipv4_peers | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} IPv4 Peer: {{ item.peer }}"
   when:
     - custom_fields.device_bgp | default(false) | bool
-    - config_context.bgp_ipv4_peers is defined
-    - config_context.bgp_ipv4_peers | length > 0
+    - bgp_ipv4_peers is defined
+    - bgp_ipv4_peers | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -200,15 +200,15 @@
       - address-family ipv6 unicast
       - redistribute connected
       - exit-address-family
-    parents: router bgp {{ config_context.bgp_as }}
+    parents: router bgp {{ bgp_as }}
     match: line
-  loop: "{{ config_context.bgp_vrfs | default([]) }}"
+  loop: "{{ bgp_vrfs | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} VRF: {{ item.name }}"
   when:
     - custom_fields.device_bgp | default(false) | bool
-    - config_context.bgp_vrfs is defined
-    - config_context.bgp_vrfs | length > 0
+    - bgp_vrfs is defined
+    - bgp_vrfs | length > 0
     - item.rd is defined
     - item.rd != none
   vars:
@@ -243,18 +243,18 @@
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
-      - router bgp {{ config_context.bgp_as }}
+      - router bgp {{ bgp_as }}
       - address-family l2vpn evpn
       - neighbor {{ item.peer }} route-reflector-client
       - exit-address-family
-  loop: "{{ config_context.bgp_rr_clients | default([]) }}"
+  loop: "{{ bgp_rr_clients | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} RR Client: {{ item.peer }}"
   when:
     - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)
     - custom_fields.device_bgp | default(false) | bool
-    - config_context.bgp_rr_clients is defined
-    - config_context.bgp_rr_clients | length > 0
+    - bgp_rr_clients is defined
+    - bgp_rr_clients | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -274,7 +274,7 @@
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
     - role | default('') | lower in ['spine', 'route-reflector', 'rr']
-    - config_context.bgp_ipv4_enabled | default(false) | bool
+    - bgp_ipv4_enabled | default(false) | bool
   vars:
     ansible_connection: network_cli
 
@@ -282,19 +282,19 @@
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
-      - router bgp {{ config_context.bgp_as }}
+      - router bgp {{ bgp_as }}
       - address-family ipv4 unicast
       - neighbor {{ item.peer }} route-reflector-client
       - exit-address-family
-  loop: "{{ config_context.bgp_ipv4_peers | default([]) }}"
+  loop: "{{ bgp_ipv4_peers | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} RR Client: {{ item.peer }}"
   when:
     - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)
     - custom_fields.device_bgp | default(false) | bool
     - role | default('') | lower in ['spine', 'route-reflector', 'rr']
-    - config_context.bgp_ipv4_peers is defined
-    - config_context.bgp_ipv4_peers | length > 0
+    - bgp_ipv4_peers is defined
+    - bgp_ipv4_peers | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -304,13 +304,13 @@
 
 - name: Configure BGP additional settings from config_context
   arubanetworks.aoscx.aoscx_config:
-    lines: "{{ config_context.bgp_additional_config }}"
-    parents: router bgp {{ config_context.bgp_as }}
+    lines: "{{ bgp_additional_config }}"
+    parents: router bgp {{ bgp_as }}
     match: line
   when:
     - custom_fields.device_bgp | default(false) | bool
-    - config_context.bgp_additional_config is defined
-    - config_context.bgp_additional_config | length > 0
+    - bgp_additional_config is defined
+    - bgp_additional_config | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -341,12 +341,12 @@
     msg:
       - "=== BGP Configuration (config_context) ==="
       - "Device: {{ inventory_hostname }}"
-      - "BGP AS: {{ config_context.bgp_as }}"
+      - "BGP AS: {{ bgp_as }}"
       - "Router ID: {{ custom_fields.device_bgp_routerid }}"
-      - "EVPN Peers: {{ config_context.bgp_peers | default([]) | length }}"
-      - "IPv4 Peers: {{ config_context.bgp_ipv4_peers | default([]) | length }}"
-      - "VRF Instances: {{ config_context.bgp_vrfs | default([]) | length }}"
-      - "Route Reflector Clients: {{ config_context.bgp_rr_clients | default([]) | length }}"
+      - "EVPN Peers: {{ bgp_peers | default([]) | length }}"
+      - "IPv4 Peers: {{ bgp_ipv4_peers | default([]) | length }}"
+      - "VRF Instances: {{ bgp_vrfs | default([]) | length }}"
+      - "Route Reflector Clients: {{ bgp_rr_clients | default([]) | length }}"
   when:
     - aoscx_debug | default(false) | bool
     - not (netbox_bgp_plugin_available | default(false)) or (device_bgp_sessions | default([]) | length == 0)

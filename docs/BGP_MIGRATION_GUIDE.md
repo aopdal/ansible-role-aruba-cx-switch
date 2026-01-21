@@ -60,6 +60,7 @@ curl -X POST "$NETBOX_API/api/plugins/bgp/session/" \
 ```
 
 **Field IDs:**
+
 - `device`: Device object ID (get from `/api/dcim/devices/`)
 - `local_as`: ASN object ID (get from `/api/plugins/bgp/asn/`)
 - `local_address`: IP Address ID (get from `/api/ipam/ip-addresses/`)
@@ -278,11 +279,13 @@ ok: [leaf-1] => (item=10.255.255.2)
 ### After (netbox-bgp plugin)
 
 **NetBox BGP Plugin:**
+
 - 2 BGP Session objects
 - Status: Active
 - Full relationship tracking
 
 **Ansible Output:**
+
 ```
 TASK [Configure BGP EVPN neighbors from netbox-bgp plugin]
 ok: [leaf-1] => (item=leaf-1-to-spine-1-evpn)
@@ -292,7 +295,7 @@ ok: [leaf-1] => (item=leaf-1-to-spine-2-evpn)
 ## Migration Timeline Example
 
 | Week | Action | Devices |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | 1 | Install plugin, create AS | - |
 | 2 | Create sessions for spines (status: planned) | spine-1, spine-2 |
 | 3 | Test & activate spine sessions | spine-1, spine-2 |
@@ -307,11 +310,13 @@ ok: [leaf-1] => (item=leaf-1-to-spine-2-evpn)
 ### Issue 1: IP Address Not Found
 
 **Error:**
+
 ```
 "local_address": null
 ```
 
 **Solution:** Create loopback IP in NetBox IPAM first
+
 ```bash
 curl -X POST "$NETBOX_API/api/ipam/ip-addresses/" \
   -H "Authorization: Token $NETBOX_TOKEN" \
@@ -327,6 +332,7 @@ curl -X POST "$NETBOX_API/api/ipam/ip-addresses/" \
 ### Issue 2: Device ID Unknown
 
 **Solution:** Query device ID
+
 ```bash
 curl -H "Authorization: Token $NETBOX_TOKEN" \
   "$NETBOX_API/api/dcim/devices/?name=leaf-1" | jq '.results[0].id'
@@ -335,6 +341,7 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 ### Issue 3: Session Not Appearing
 
 **Solution:** Check status filter
+
 ```yaml
 # Task filters for 'active' and 'planned'
 selectattr('status.value', 'in', ['active', 'planned'])

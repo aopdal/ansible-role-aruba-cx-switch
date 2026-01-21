@@ -16,27 +16,26 @@
   ansible.builtin.debug:
     msg:
       - "Configuring DNS on {{ inventory_hostname }}"
-      - "Domain name: {{ config_context.dns_domain_name | default('Not configured') }}"
-      - "DNS VRF: {{ config_context.dns_vrf | default('default') }}"
-      - "Management nameservers: {{ config_context.dns_mgmt_nameservers | default({}) | length }} configured"
-      - "DNS nameservers: {{ config_context.dns_name_servers | default({}) | length }} configured"
-      - "Domain list: {{ config_context.dns_domain_list | default({}) | length }} domains"
-      - "Host mappings: {{ config_context.dns_host_v4_address_mapping | default({}) | length }} entries"
+      - "Domain name: {{ dns_domain_name | default('Not configured') }}"
+      - "DNS VRF: {{ dns_vrf | default('default') }}"
+      - "Management nameservers: {{ dns_mgmt_nameservers | default({}) | length }} configured"
+      - "DNS nameservers: {{ dns_name_servers | default({}) | length }} configured"
+      - "Domain list: {{ dns_domain_list | default({}) | length }} domains"
+      - "Host mappings: {{ dns_host_v4_address_mapping | default({}) | length }} entries"
   when: aoscx_debug | bool
 
 - name: configure_dns | Configure DNS settings
   arubanetworks.aoscx.aoscx_dns:
-    mgmt_nameservers: "{{ config_context.dns_mgmt_nameservers | default(omit) }}"
-    domain_name: "{{ config_context.dns_domain_name | default(omit) }}"
-    domain_list: "{{ config_context.dns_domain_list | default(omit) }}"
-    name_servers: "{{ config_context.dns_name_servers | default(omit) }}"
-    host_v4_address_mapping: "{{ config_context.dns_host_v4_address_mapping | default(omit) }}"
-    vrf: "{{ config_context.dns_vrf | default(omit) }}"
+    mgmt_nameservers: "{{ dns_mgmt_nameservers | default(omit) }}"
+    domain_name: "{{ dns_domain_name | default(omit) }}"
+    domain_list: "{{ dns_domain_list | default(omit) }}"
+    name_servers: "{{ dns_name_servers | default(omit) }}"
+    host_v4_address_mapping: "{{ dns_host_v4_address_mapping | default(omit) }}"
+    vrf: "{{ dns_vrf | default(omit) }}"
   when:
-    - config_context is defined
     - >
-      config_context.dns_domain_name is defined or
-      config_context.dns_mgmt_nameservers is defined or
-      config_context.dns_name_servers is defined or
-      config_context.dns_domain_list is defined or
-      config_context.dns_host_v4_address_mapping is defined
+      dns_domain_name is defined or
+      dns_mgmt_nameservers is defined or
+      dns_name_servers is defined or
+      dns_domain_list is defined or
+      dns_host_v4_address_mapping is defined

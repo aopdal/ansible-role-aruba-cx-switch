@@ -59,7 +59,7 @@ curl -H "Authorization: Token YOUR_TOKEN" \
 ### Key Fields
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ----- | ---- | ----------- |
 | `name` | String | Session identifier |
 | `device` | ForeignKey | Device this session belongs to |
 | `local_as` | ForeignKey | Local AS number |
@@ -173,6 +173,7 @@ If NetBox inventory plugin includes BGP data:
 ## Advantages Over config_context
 
 ### config_context Approach (Previous)
+
 ```json
 {
   "bgp_as": 65000,
@@ -229,20 +230,20 @@ If NetBox inventory plugin includes BGP data:
 
 ### NetBox Setup
 
-**1. Create AS Objects**
+#### 1. Create AS Objects
 
 ```
 AS 65000 (Private)
 ```
 
-**2. Create Peer Group (Optional)**
+#### 2. Create Peer Group (Optional)
 
 ```
 Name: EVPN-OVERLAY
 Description: EVPN overlay peers
 ```
 
-**3. Create BGP Sessions**
+#### 3. Create BGP Sessions**
 
 **Leaf-1 → Spine-1:**
 
@@ -255,7 +256,7 @@ Description: EVPN overlay peers
 - Peer Group: EVPN-OVERLAY
 - Status: Active
 
-**Leaf-1 → Spine-2:**
+##### Leaf-1 → Spine-2
 
 - Device: leaf-1
 - Name: leaf-1-to-spine-2
@@ -266,7 +267,7 @@ Description: EVPN overlay peers
 - Peer Group: EVPN-OVERLAY
 - Status: Active
 
-*(Repeat for all leaf-spine pairs)*
+#### *(Repeat for all leaf-spine pairs)*
 
 ### Ansible Integration
 
@@ -342,7 +343,7 @@ The role could support **both** approaches:
     use_config_context_bgp: true
   when:
     - not (aoscx_use_bgp_plugin | default(false) | bool)
-    - config_context.bgp_as is defined
+    - bgp_as is defined
 ```
 
 ## Recommendation
@@ -388,11 +389,13 @@ The role could support **both** approaches:
 The role automatically configures route reflector settings based on the device's role in NetBox:
 
 **Supported Roles:**
+
 - `spine`
 - `route-reflector`
 - `rr`
 
 **Behavior:**
+
 - ✅ All BGP neighbors are automatically configured as route-reflector clients
 - ✅ No need to manually specify RR clients in config_context
 - ✅ Consistent with spine-leaf EVPN architecture best practices
@@ -406,6 +409,7 @@ The role automatically configures route reflector settings based on the device's
 3. **BGP Sessions**: 4 sessions to leaf switches
 
 **Result:**
+
 ```bash
 router bgp 65000
   neighbor 10.255.255.11 route-reflector-client
@@ -416,7 +420,7 @@ router bgp 65000
 
 ### Fallback to config_context
 
-If netbox-bgp plugin is not available or not in use, the role falls back to `config_context.bgp_rr_clients`:
+If netbox-bgp plugin is not available or not in use, the role falls back to `bgp_rr_clients`:
 
 ```json
 {
@@ -430,6 +434,7 @@ If netbox-bgp plugin is not available or not in use, the role falls back to `con
 ### Customization
 
 To disable automatic RR configuration:
+
 - Set device role to something other than spine/route-reflector/rr
 - Or use config_context fallback for granular control
 

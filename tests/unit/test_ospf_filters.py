@@ -231,3 +231,40 @@ class TestValidateOspfConfig:
         }
         result = validate_ospf_config(device_config, [])
         assert result["valid"] is True
+
+    def test_validate_ospf_config_flattened_valid(self):
+        """Test validation with flattened config_context (plurals: true)"""
+        device_config = {
+            "custom_fields": {"device_ospf_1_routerid": "10.255.255.1"},
+            "ospf_areas": [
+                {"ospf_1_area": "0.0.0.0"},
+            ],
+        }
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "custom_fields": {
+                    "if_ip_ospf_1_area": "0.0.0.0",
+                },
+            },
+        ]
+        result = validate_ospf_config(device_config, interfaces)
+        assert result["valid"] is True
+        assert len(result["errors"]) == 0
+
+    def test_validate_ospf_config_flattened_missing_area(self):
+        """Test validation with flattened config when area is missing"""
+        device_config = {
+            "custom_fields": {"device_ospf_1_routerid": "10.255.255.1"},
+            "ospf_areas": [{"ospf_1_area": "0.0.0.0"}],
+        }
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "custom_fields": {
+                    "if_ip_ospf_1_area": "0.0.0.99",  # Area not in config
+                },
+            },
+        ]
+        result = validate_ospf_config(device_config, interfaces)
+        assert len(result["warnings"]) > 0

@@ -16,17 +16,16 @@
   ansible.builtin.debug:
     msg:
       - "Configuring timezone on {{ inventory_hostname }}"
-      - "Timezone: {{ config_context.timezone | default('Not configured') }}"
+      - "Timezone: {{ timezone | default('Not configured') }}"
   when: aoscx_debug | bool
 
 - name: configure_timezone | Configure timezone
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - clock timezone {{ config_context.timezone }}
+      - clock timezone {{ timezone }}
     match: line
   when:
-    - config_context is defined
-    - config_context.timezone is defined
-    - config_context.timezone | length > 0
+    - timezone is defined
+    - timezone | length > 0
   vars:
     ansible_connection: network_cli

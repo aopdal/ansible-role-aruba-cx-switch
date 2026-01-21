@@ -15,16 +15,16 @@
 - name: Get OSPF configuration from config_context
   ansible.builtin.set_fact:
     ospf_config:
-      process_id: "{{ config_context.ospf_process_id | default(1) }}"
+      process_id: "{{ ospf_process_id | default(1) }}"
       router_id: "{{ custom_fields.device_ospf_1_routerid | default('') }}"
       # Support both old single-VRF format and new multi-VRF format
       vrfs: >-
-        {%- if config_context.ospf_vrfs is defined -%}
-          {{ config_context.ospf_vrfs }}
-        {%- elif config_context.ospf_1_vrf is defined or config_context.ospf_areas is defined -%}
+        {%- if ospf_vrfs is defined -%}
+          {{ ospf_vrfs }}
+        {%- elif ospf_1_vrf is defined or ospf_areas is defined -%}
           [{
-            'vrf': '{{ config_context.ospf_1_vrf | default("default") }}',
-            'areas': {{ config_context.ospf_areas | default([]) | to_json }}
+            'vrf': '{{ ospf_1_vrf | default("default") }}',
+            'areas': {{ ospf_areas | default([]) | to_json }}
           }]
         {%- else -%}
           []

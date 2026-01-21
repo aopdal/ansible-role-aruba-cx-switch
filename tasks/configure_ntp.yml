@@ -26,8 +26,8 @@
   ansible.builtin.debug:
     msg:
       - "Configuring NTP on {{ inventory_hostname }}"
-      - "NTP VRF: {{ config_context.ntp_vrf | default('Not configured') }}"
-      - "NTP servers: {{ config_context.ntp_servers | default([]) | length }} configured"
+      - "NTP VRF: {{ ntp_vrf | default('Not configured') }}"
+      - "NTP servers: {{ ntp_servers | default([]) | length }} configured"
   when: aoscx_debug | bool
 
 - name: configure_ntp | Configure preferred NTP servers
@@ -35,10 +35,9 @@
     lines:
       - ntp server {{ item.server }} iburst prefer
     match: line
-  loop: "{{ config_context.ntp_servers }}"
+  loop: "{{ ntp_servers }}"
   when:
-    - config_context is defined
-    - config_context.ntp_servers is defined
+    - ntp_servers is defined
     - item.prefer is defined
     - item.prefer | bool
   vars:
@@ -49,10 +48,9 @@
     lines:
       - ntp server {{ item.server }} iburst
     match: line
-  loop: "{{ config_context.ntp_servers }}"
+  loop: "{{ ntp_servers }}"
   when:
-    - config_context is defined
-    - config_context.ntp_servers is defined
+    - ntp_servers is defined
     - item.prefer is not defined or not (item.prefer | bool)
   vars:
     ansible_connection: network_cli
@@ -61,10 +59,9 @@
   arubanetworks.aoscx.aoscx_config:
     lines:
       - ntp enable
-      - ntp vrf {{ config_context.ntp_vrf }}
+      - ntp vrf {{ ntp_vrf }}
     match: line
   when:
-    - config_context is defined
-    - config_context.ntp_vrf is defined
+    - ntp_vrf is defined
   vars:
     ansible_connection: network_cli

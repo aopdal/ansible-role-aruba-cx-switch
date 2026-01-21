@@ -220,8 +220,8 @@ device_bgp_sessions[0].remote_address.address
 
 **Ansible Access:**
 ```yaml
-config_context.bgp_as
-config_context.bgp_peers[0].peer
+bgp_as
+bgp_peers[0].peer
 ```
 
 ## Advantages of netbox-bgp Plugin

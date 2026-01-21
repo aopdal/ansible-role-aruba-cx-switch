@@ -27,6 +27,7 @@ aoscx_configure_dns: true
 ### Required NetBox config_context Variables
 
 #### Banner Configuration
+
 ```yaml
 config_context:
   motd: |
@@ -39,12 +40,14 @@ config_context:
 ```
 
 #### Timezone Configuration
+
 ```yaml
 config_context:
   timezone: "europe/oslo"  # Timezone string
 ```
 
 #### NTP Configuration
+
 ```yaml
 config_context:
   ntp_vrf: "mgmt"          # VRF for NTP traffic
@@ -65,9 +68,9 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 4. **NTP configuration** ← Base config
 5. **DNS configuration** ← Base config
 6. VRF configuration
-6. VLAN configuration
-7. Physical interfaces
-8. ... (rest of configuration)
+7. VLAN configuration
+8. Physical interfaces
+9. ... (rest of configuration)
 
 ## Features
 
@@ -77,7 +80,7 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 - **Exec Banner**: Optional post-login banner
 - **Template Support**: Supports Ansible variables in banner text (e.g., `{{ inventory_hostname }}`)
 - **Cleanup**: Removes banner if not configured in NetBox
-- **Conditional**: Only runs if `config_context.motd` is defined and non-empty
+- **Conditional**: Only runs if `motd` is defined and non-empty
 
 ### Timezone Configuration (`tasks/configure_timezone.yml`)
 
