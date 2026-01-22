@@ -26,7 +26,7 @@
 
 - name: configure_banner | Add or Update Exec Banner
   arubanetworks.aoscx.aoscx_banner:
-    banner_type: exec
+    banner_type: banner_exec
     banner: "{{ banner_exec }}"
   when:
     - banner_exec is defined
