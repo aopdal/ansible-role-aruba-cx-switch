@@ -217,6 +217,7 @@
     aoscx_evpn_facts: "{{ _rest_evpn.json | default({}) }}"
     aoscx_evpn_vlans_facts: "{{ _rest_evpn_vlans.json | default({}) }}"
   when:
+    - custom_fields.device_vxlan | default(false) | bool
     - aoscx_configure_evpn | default(false) | bool
     - _rest_evpn is defined
     - _rest_evpn.status == 200
@@ -228,6 +229,7 @@
   ansible.builtin.set_fact:
     aoscx_vni_facts: "{{ _rest_vnis.json | default({}) }}"
   when:
+    - custom_fields.device_vxlan | default(false) | bool
     - aoscx_configure_vxlan | default(false) | bool
     - _rest_vnis is defined
     - _rest_vnis.status == 200
