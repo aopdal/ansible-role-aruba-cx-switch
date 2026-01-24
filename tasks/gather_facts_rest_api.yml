@@ -140,7 +140,9 @@
     return_content: true
   register: _rest_evpn
   delegate_to: localhost
-  when: aoscx_configure_evpn | default(false) | bool
+  when:
+    - aoscx_configure_evpn | default(false) | bool
+    - custom_fields.device_vxlan | default(false) | bool
   tags:
     - always
 
@@ -156,7 +158,9 @@
     return_content: true
   register: _rest_evpn_vlans
   delegate_to: localhost
-  when: aoscx_configure_evpn | default(false) | bool
+  when:
+    - aoscx_configure_evpn | default(false) | bool
+    - custom_fields.device_vxlan | default(false) | bool
   tags:
     - always
 
@@ -172,7 +176,9 @@
     return_content: true
   register: _rest_vnis
   delegate_to: localhost
-  when: aoscx_configure_vxlan | default(false) | bool
+  when:
+    - aoscx_configure_vxlan | default(false) | bool
+    - custom_fields.device_vxlan | default(false) | bool
   tags:
     - always
 

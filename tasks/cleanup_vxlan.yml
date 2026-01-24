@@ -44,6 +44,7 @@
   when:
     - vlans_to_remove_from_vxlan is defined
     - vlans_to_remove_from_vxlan | length > 0
+    - custom_fields.device_vxlan | default(false) | bool
 
 # Step 1: Remove VLAN from VNI
 # This removes the VLAN-to-VNI mapping under the VNI configuration
@@ -60,6 +61,7 @@
   when:
     - vlans_to_remove_from_vxlan is defined
     - vlans_to_remove_from_vxlan | length > 0
+    - custom_fields.device_vxlan | default(false) | bool
   vars:
     ansible_connection: network_cli
   register: vxlan_vlan_removal_result
@@ -91,3 +93,4 @@
   when:
     - vxlan_vlan_removal_result is defined
     - vxlan_vni_removal_result is defined
+    - custom_fields.device_vxlan | default(false) | bool

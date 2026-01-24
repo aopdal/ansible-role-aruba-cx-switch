@@ -41,6 +41,7 @@
   when:
     - vlans_to_remove_from_evpn is defined
     - vlans_to_remove_from_evpn | length > 0
+    - custom_fields.device_evpn | default(false) | bool
 
 - name: Remove EVPN configuration for deleted VLANs
   arubanetworks.aoscx.aoscx_config:
@@ -54,6 +55,7 @@
   when:
     - vlans_to_remove_from_evpn is defined
     - vlans_to_remove_from_evpn | length > 0
+    - custom_fields.device_evpn | default(false) | bool
   vars:
     ansible_connection: network_cli
   register: evpn_cleanup_result
