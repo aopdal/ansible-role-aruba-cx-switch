@@ -728,6 +728,125 @@ def get_interfaces_needing_config_changes(
                         nb_intf["_ip_changes"] = {}
                     nb_intf["_ip_changes"]["ipv4_to_add"] = list(ipv4_to_add)
 
+            # Anycast gateway comparison (active-gateway configuration)
+            # Extract anycast IPs from NetBox (these were excluded from regular IP comparison)
+            nb_anycast_ipv4 = set()
+            nb_anycast_ipv6 = set()
+
+            for ip_obj in nb_intf.get("ip_addresses", []):
+                if isinstance(ip_obj, dict):
+                    ip_addr = ip_obj.get("address")
+                    role_obj = ip_obj.get("role")
+                    if ip_addr and role_obj:
+                        role_value = (
+                            role_obj.get("value")
+                            if isinstance(role_obj, dict)
+                            else role_obj
+                        )
+                        if role_value == "anycast":
+                            # Remove /prefix for comparison
+                            # (active-gateway uses address without prefix)
+                            addr_without_prefix = (
+                                ip_addr.split("/")[0] if "/" in ip_addr else ip_addr
+                            )
+                            if ":" in addr_without_prefix:
+                                nb_anycast_ipv6.add(addr_without_prefix)
+                            else:
+                                nb_anycast_ipv4.add(addr_without_prefix)
+
+            # Compare anycast IPs with device VSX virtual IPs (when enhanced facts available)
+            anycast_ipv4_to_add = set()
+            anycast_ipv6_to_add = set()
+
+            if enhanced_intf and (nb_anycast_ipv4 or nb_anycast_ipv6):
+                # Enhanced facts available - compare with device VSX virtual IPs
+                anycast_ipv4_to_add = nb_anycast_ipv4 - device_vsx_virtual_ip4
+                anycast_ipv6_to_add = nb_anycast_ipv6 - device_vsx_virtual_ip6
+
+                if anycast_ipv4_to_add or anycast_ipv6_to_add:
+                    needs_change = True
+                    if anycast_ipv4_to_add:
+                        change_reasons.append(
+                            f"Anycast gateway IPv4 to add: {anycast_ipv4_to_add}"
+                        )
+                    if anycast_ipv6_to_add:
+                        change_reasons.append(
+                            f"Anycast gateway IPv6 to add: {anycast_ipv6_to_add}"
+                        )
+
+                _debug(
+                    f"Anycast comparison for {intf_name}: "
+                    f"NetBox anycast IPv4={nb_anycast_ipv4}, "
+                    f"device VSX virtual IPv4={device_vsx_virtual_ip4}, "
+                    f"to_add={anycast_ipv4_to_add}; "
+                    f"NetBox anycast IPv6={nb_anycast_ipv6}, "
+                    f"device VSX virtual IPv6={device_vsx_virtual_ip6}, "
+                    f"to_add={anycast_ipv6_to_add}"
+                )
+            elif nb_anycast_ipv4 or nb_anycast_ipv6:
+                # No enhanced facts but anycast IPs configured - mark for configuration
+                # We can't compare without enhanced facts, so configure all anycast IPs
+                anycast_ipv4_to_add = nb_anycast_ipv4
+                anycast_ipv6_to_add = nb_anycast_ipv6
+                needs_change = True
+                change_reasons.append(
+                    "Anycast gateway configuration needed "
+                    "(no enhanced facts for comparison)"
+                )
+                _debug(
+                    f"No enhanced facts for {intf_name}, "
+                    f"marking all anycast IPs for config: "
+                    f"IPv4={nb_anycast_ipv4}, IPv6={nb_anycast_ipv6}"
+                )
+
+            # Store anycast IPs that need to be added
+            # (restored to ip_addresses field with anycast info)
+            # This allows configure_l3_interfaces.yml to process them
+            if anycast_ipv4_to_add or anycast_ipv6_to_add:
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+
+                # Add anycast IPs back to the lists with their full
+                # address (including prefix)
+                anycast_ips_to_add = []
+                for ip_obj in nb_intf.get("ip_addresses", []):
+                    if isinstance(ip_obj, dict):
+                        ip_addr = ip_obj.get("address")
+                        role_obj = ip_obj.get("role")
+                        if ip_addr and role_obj:
+                            role_value = (
+                                role_obj.get("value")
+                                if isinstance(role_obj, dict)
+                                else role_obj
+                            )
+                            if role_value == "anycast":
+                                addr_without_prefix = (
+                                    ip_addr.split("/")[0] if "/" in ip_addr else ip_addr
+                                )
+                                if (
+                                    ":" not in addr_without_prefix
+                                    and addr_without_prefix in anycast_ipv4_to_add
+                                ) or (
+                                    ":" in addr_without_prefix
+                                    and addr_without_prefix in anycast_ipv6_to_add
+                                ):
+                                    anycast_ips_to_add.append(ip_addr)
+
+                # Merge with existing ipv4_to_add/ipv6_to_add
+                for anycast_ip in anycast_ips_to_add:
+                    if ":" in anycast_ip:
+                        # IPv6
+                        if "ipv6_to_add" not in nb_intf["_ip_changes"]:
+                            nb_intf["_ip_changes"]["ipv6_to_add"] = []
+                        if anycast_ip not in nb_intf["_ip_changes"]["ipv6_to_add"]:
+                            nb_intf["_ip_changes"]["ipv6_to_add"].append(anycast_ip)
+                    else:
+                        # IPv4
+                        if "ipv4_to_add" not in nb_intf["_ip_changes"]:
+                            nb_intf["_ip_changes"]["ipv4_to_add"] = []
+                        if anycast_ip not in nb_intf["_ip_changes"]["ipv4_to_add"]:
+                            nb_intf["_ip_changes"]["ipv4_to_add"].append(anycast_ip)
+
             # ALWAYS store IPv6 change info when enhanced facts available
             # This allows task-level filtering even when interface needs changes
             # for other reasons (description, MTU, etc.) but IPv6 is already configured
