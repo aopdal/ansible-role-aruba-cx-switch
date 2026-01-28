@@ -23,8 +23,17 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 ## Getting Started
 
-- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide for using the role
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide for development of the role
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference for common tasks
+
+## Examples (Recommended Starting Point)
+
+- **[examples/](../examples/)** - Complete, runnable examples
+    - **[minimal-deployment/](../examples/minimal-deployment/)** - Simple single-switch deployment for getting started
+    - **[bgp-evpn-fabric/](../examples/bgp-evpn-fabric/)** - Production BGP/EVPN fabric with spine-leaf topology
+    - **[ztp-generation.yml](../examples/ztp-generation.yml)** - Zero Touch Provisioning configuration generation
+    - Each example includes inventory, playbooks, group_vars, and sample NetBox data
+    - **Best way to understand how all the pieces fit together**
 
 ## Filter Plugins (Essential Reading)
 

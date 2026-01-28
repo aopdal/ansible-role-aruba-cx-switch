@@ -1,0 +1,40 @@
+---
+# Spine Switch Configuration
+# BGP route reflectors for EVPN control plane
+
+# ============================================================================
+# Spine Role Configuration
+# ============================================================================
+
+# Spines are BGP route reflectors
+bgp_route_reflector: true
+bgp_route_reflector_cluster_id: "{{ loopback_ip }}"
+
+# Spines do not need VXLAN (no local endpoints)
+aoscx_configure_vxlan: false
+aoscx_configure_evpn: true  # But still participate in EVPN
+
+# Spines typically don't have access ports
+aoscx_configure_l2_interfaces: false
+
+# ============================================================================
+# BGP Configuration for Spines
+# ============================================================================
+
+# BGP peering with all leafs
+# Note: Specific peer configuration should come from NetBox BGP plugin
+
+# Address families enabled on spines
+bgp_address_families:
+  - ipv4_unicast
+  - l2vpn_evpn
+
+# ============================================================================
+# Interface Configuration
+# ============================================================================
+
+# Spines use physical interfaces for spine-leaf connectivity
+# and loopback for router ID
+aoscx_configure_physical_interfaces: true
+aoscx_configure_loopback: true
+aoscx_configure_l3_interfaces: true

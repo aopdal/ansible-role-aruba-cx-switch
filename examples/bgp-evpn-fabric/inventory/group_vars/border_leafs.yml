@@ -1,0 +1,53 @@
+---
+# Border Leaf Configuration
+# External connectivity and inter-VRF routing
+
+# ============================================================================
+# Border Leaf Role Configuration
+# ============================================================================
+
+# Border leafs inherit leaf configuration
+# Plus additional external connectivity features
+
+# BGP configuration
+bgp_route_reflector: false
+bgp_route_reflector_client: true
+
+# External BGP peering
+bgp_external_peering_enabled: true
+
+# ============================================================================
+# EVPN/VXLAN Configuration
+# ============================================================================
+
+# Full EVPN/VXLAN support like regular leafs
+aoscx_configure_vxlan: true
+aoscx_configure_evpn: true
+
+# ============================================================================
+# VRF Configuration
+# ============================================================================
+
+# Border leafs handle inter-VRF routing and external routes
+aoscx_configure_vrfs: true
+aoscx_vrf_route_leaking_enabled: true
+
+# ============================================================================
+# External Connectivity
+# ============================================================================
+
+# Border leafs may have additional L3 interfaces for external connectivity
+aoscx_configure_l3_interfaces: true
+
+# External routing configuration (if needed)
+# Specific configuration from NetBox
+
+# ============================================================================
+# BGP Route Advertisement
+# ============================================================================
+
+# Border leafs may advertise fabric routes externally
+bgp_advertise_fabric_routes: true
+
+# Route filtering and policies
+# Configured via NetBox BGP plugin routing policies

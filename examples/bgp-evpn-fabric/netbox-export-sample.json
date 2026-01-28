@@ -1,0 +1,359 @@
+{
+    "description": "Sample NetBox data structure for BGP EVPN fabric deployment",
+    "note": "This shows the required NetBox configuration including BGP plugin data for a complete EVPN/VXLAN fabric",
+    "fabric_overview": {
+        "topology": "spine-leaf",
+        "underlay": "eBGP",
+        "overlay": "EVPN",
+        "encapsulation": "VXLAN",
+        "route_reflectors": [
+            "spine01",
+            "spine02"
+        ]
+    },
+    "devices": [
+        {
+            "name": "spine01",
+            "device_type": "Aruba CX 8360-32Y",
+            "device_role": "spine",
+            "site": "DataCenter1",
+            "rack": "Core-01",
+            "status": "active",
+            "primary_ip4": "10.0.0.1/32",
+            "config_context": {
+                "bgp": {
+                    "asn": 65000,
+                    "router_id": "10.255.255.1",
+                    "route_reflector": true,
+                    "route_reflector_cluster_id": "10.255.255.1"
+                },
+                "evpn": {
+                    "enabled": true
+                }
+            }
+        },
+        {
+            "name": "leaf01",
+            "device_type": "Aruba CX 6300-48G",
+            "device_role": "leaf",
+            "site": "DataCenter1",
+            "rack": "Pod-01",
+            "status": "active",
+            "primary_ip4": "10.0.0.11/32",
+            "config_context": {
+                "bgp": {
+                    "asn": 65001,
+                    "router_id": "10.255.255.11",
+                    "route_reflector_client": true
+                },
+                "evpn": {
+                    "enabled": true,
+                    "anycast_gateway_enabled": true,
+                    "anycast_gateway_mac": "00:00:5e:00:01:01"
+                },
+                "vxlan": {
+                    "enabled": true,
+                    "source_interface": "loopback0",
+                    "udp_port": 4789
+                }
+            }
+        }
+    ],
+    "interfaces": [
+        {
+            "device": "spine01",
+            "name": "loopback0",
+            "type": "virtual",
+            "enabled": true,
+            "description": "Loopback - Router ID and EVPN source",
+            "ip_addresses": [
+                {
+                    "address": "10.255.255.1/32",
+                    "status": "active"
+                }
+            ]
+        },
+        {
+            "device": "spine01",
+            "name": "1/1/1",
+            "type": "100gbase-x-qsfp28",
+            "enabled": true,
+            "description": "Downlink to leaf01",
+            "mode": "routed",
+            "ip_addresses": [
+                {
+                    "address": "10.1.1.0/31",
+                    "status": "active"
+                }
+            ]
+        },
+        {
+            "device": "leaf01",
+            "name": "loopback0",
+            "type": "virtual",
+            "enabled": true,
+            "description": "Loopback - Router ID and VXLAN source",
+            "ip_addresses": [
+                {
+                    "address": "10.255.255.11/32",
+                    "status": "active"
+                }
+            ]
+        },
+        {
+            "device": "leaf01",
+            "name": "1/1/49",
+            "type": "10gbase-x-sfpp",
+            "enabled": true,
+            "description": "Uplink to spine01",
+            "mode": "routed",
+            "ip_addresses": [
+                {
+                    "address": "10.1.1.1/31",
+                    "status": "active"
+                }
+            ]
+        },
+        {
+            "device": "leaf01",
+            "name": "1/1/1",
+            "type": "1000base-t",
+            "enabled": true,
+            "description": "Server - Web01",
+            "mode": "access",
+            "untagged_vlan": {
+                "vid": 100,
+                "name": "WEB"
+            }
+        }
+    ],
+    "vrfs": [
+        {
+            "name": "TENANT-A",
+            "rd": "10.255.255.11:100",
+            "import_targets": [
+                "65000:100"
+            ],
+            "export_targets": [
+                "65000:100"
+            ],
+            "description": "Tenant A VRF",
+            "l3_vni": 10100
+        },
+        {
+            "name": "TENANT-B",
+            "rd": "10.255.255.11:200",
+            "import_targets": [
+                "65000:200"
+            ],
+            "export_targets": [
+                "65000:200"
+            ],
+            "description": "Tenant B VRF",
+            "l3_vni": 10200
+        }
+    ],
+    "vlans": [
+        {
+            "vid": 100,
+            "name": "WEB",
+            "description": "Web Servers - Tenant A",
+            "status": "active",
+            "site": "DataCenter1",
+            "vrf": "TENANT-A",
+            "vxlan_vni": 10100,
+            "anycast_gateway": "10.100.0.1/24"
+        },
+        {
+            "vid": 101,
+            "name": "APP",
+            "description": "Application Servers - Tenant A",
+            "status": "active",
+            "site": "DataCenter1",
+            "vrf": "TENANT-A",
+            "vxlan_vni": 10101,
+            "anycast_gateway": "10.101.0.1/24"
+        },
+        {
+            "vid": 102,
+            "name": "DB",
+            "description": "Database Servers - Tenant A",
+            "status": "active",
+            "site": "DataCenter1",
+            "vrf": "TENANT-A",
+            "vxlan_vni": 10102,
+            "anycast_gateway": "10.102.0.1/24"
+        },
+        {
+            "vid": 200,
+            "name": "TENANT-B-WEB",
+            "description": "Tenant B Web Tier",
+            "status": "active",
+            "site": "DataCenter1",
+            "vrf": "TENANT-B",
+            "vxlan_vni": 10200,
+            "anycast_gateway": "10.200.0.1/24"
+        }
+    ],
+    "bgp_configuration": {
+        "note": "This section shows data from netbox-bgp-plugin",
+        "autonomous_systems": [
+            {
+                "asn": 65000,
+                "description": "Spine ASN - Fabric Core"
+            },
+            {
+                "asn": 65001,
+                "description": "Leaf01 ASN"
+            },
+            {
+                "asn": 65002,
+                "description": "Leaf02 ASN"
+            }
+        ],
+        "bgp_sessions": [
+            {
+                "device": "leaf01",
+                "local_address": "10.1.1.1",
+                "remote_address": "10.1.1.0",
+                "peer_device": "spine01",
+                "peer_asn": 65000,
+                "local_asn": 65001,
+                "status": "active",
+                "description": "Underlay to spine01",
+                "address_families": [
+                    {
+                        "afi_safi": "ipv4_unicast",
+                        "enabled": true
+                    }
+                ]
+            },
+            {
+                "device": "leaf01",
+                "local_address": "10.255.255.11",
+                "remote_address": "10.255.255.1",
+                "peer_device": "spine01",
+                "peer_asn": 65000,
+                "local_asn": 65001,
+                "status": "active",
+                "description": "EVPN overlay to spine01 RR",
+                "address_families": [
+                    {
+                        "afi_safi": "l2vpn_evpn",
+                        "enabled": true
+                    }
+                ],
+                "route_reflector_client": false,
+                "update_source": "loopback0"
+            }
+        ],
+        "routing_policies": [
+            {
+                "name": "PERMIT-LOOPBACK",
+                "type": "prefix-list",
+                "entries": [
+                    {
+                        "sequence": 10,
+                        "action": "permit",
+                        "prefix": "10.255.255.0/24",
+                        "le": 32
+                    }
+                ]
+            },
+            {
+                "name": "EXPORT-CONNECTED",
+                "type": "route-map",
+                "entries": [
+                    {
+                        "sequence": 10,
+                        "action": "permit",
+                        "match": "ip address prefix-list PERMIT-LOOPBACK"
+                    }
+                ]
+            }
+        ]
+    },
+    "config_context_examples": {
+        "spine_config_context": {
+            "bgp": {
+                "asn": 65000,
+                "router_id": "{{ loopback_ip }}",
+                "route_reflector": true,
+                "route_reflector_cluster_id": "{{ loopback_ip }}",
+                "address_families": {
+                    "ipv4_unicast": {
+                        "enabled": true,
+                        "redistribute": [
+                            "connected"
+                        ]
+                    },
+                    "l2vpn_evpn": {
+                        "enabled": true
+                    }
+                }
+            },
+            "evpn": {
+                "enabled": true
+            }
+        },
+        "leaf_config_context": {
+            "bgp": {
+                "asn": "{{ bgp_asn }}",
+                "router_id": "{{ loopback_ip }}",
+                "route_reflector_client": true,
+                "address_families": {
+                    "ipv4_unicast": {
+                        "enabled": true,
+                        "redistribute": [
+                            "connected"
+                        ]
+                    },
+                    "l2vpn_evpn": {
+                        "enabled": true,
+                        "advertise_all_vni": true
+                    }
+                }
+            },
+            "evpn": {
+                "enabled": true,
+                "anycast_gateway_enabled": true,
+                "anycast_gateway_mac": "00:00:5e:00:01:01"
+            },
+            "vxlan": {
+                "enabled": true,
+                "source_interface": "loopback0",
+                "udp_port": 4789
+            }
+        }
+    },
+    "setup_checklist": {
+        "netbox_base": [
+            "✓ Create site (DataCenter1)",
+            "✓ Create device roles (spine, leaf, border-leaf)",
+            "✓ Create device types for your hardware",
+            "✓ Add devices with management IPs"
+        ],
+        "netbox_networking": [
+            "✓ Create VRFs with RD and RT",
+            "✓ Create VLANs with VNI assignments",
+            "✓ Associate VLANs with VRFs",
+            "✓ Create loopback interfaces on all devices",
+            "✓ Create physical interfaces with IP addresses",
+            "✓ Configure anycast gateway IPs in VLAN config_context"
+        ],
+        "netbox_bgp_plugin": [
+            "✓ Install netbox-bgp-plugin",
+            "✓ Create autonomous systems",
+            "✓ Create BGP sessions between devices",
+            "✓ Configure address families per session",
+            "✓ Set route reflector configuration",
+            "✓ Create routing policies (optional)"
+        ],
+        "netbox_config_context": [
+            "✓ Add BGP settings to device config_context",
+            "✓ Add EVPN settings to leaf devices",
+            "✓ Add VXLAN settings to leaf devices",
+            "✓ Configure anycast gateway per VLAN"
+        ]
+    }
+}
