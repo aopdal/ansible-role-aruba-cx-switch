@@ -732,6 +732,7 @@ def get_interfaces_needing_config_changes(
             # Extract anycast IPs from NetBox (these were excluded from regular IP comparison)
             nb_anycast_ipv4 = set()
             nb_anycast_ipv6 = set()
+            nb_anycast_ipv6_normalized = {}  # Map: normalized -> original
 
             for ip_obj in nb_intf.get("ip_addresses", []):
                 if isinstance(ip_obj, dict):
@@ -750,7 +751,12 @@ def get_interfaces_needing_config_changes(
                                 ip_addr.split("/")[0] if "/" in ip_addr else ip_addr
                             )
                             if ":" in addr_without_prefix:
+                                # IPv6 - normalize for comparison
+                                normalized, _ = _normalize_ipv6(addr_without_prefix)
                                 nb_anycast_ipv6.add(addr_without_prefix)
+                                nb_anycast_ipv6_normalized[
+                                    normalized
+                                ] = addr_without_prefix
                             else:
                                 nb_anycast_ipv4.add(addr_without_prefix)
 
@@ -761,7 +767,17 @@ def get_interfaces_needing_config_changes(
             if enhanced_intf and (nb_anycast_ipv4 or nb_anycast_ipv6):
                 # Enhanced facts available - compare with device VSX virtual IPs
                 anycast_ipv4_to_add = nb_anycast_ipv4 - device_vsx_virtual_ip4
-                anycast_ipv6_to_add = nb_anycast_ipv6 - device_vsx_virtual_ip6
+
+                # IPv6 anycast - normalize both sides for comparison
+                device_vsx_virtual_ip6_normalized = set()
+                for addr in device_vsx_virtual_ip6:
+                    normalized, _ = _normalize_ipv6(addr)
+                    device_vsx_virtual_ip6_normalized.add(normalized)
+
+                # Find which normalized NetBox anycast IPv6 are not on device
+                for normalized, original in nb_anycast_ipv6_normalized.items():
+                    if normalized not in device_vsx_virtual_ip6_normalized:
+                        anycast_ipv6_to_add.add(original)
 
                 if anycast_ipv4_to_add or anycast_ipv6_to_add:
                     needs_change = True
@@ -856,7 +872,12 @@ def get_interfaces_needing_config_changes(
                 if enhanced_intf:
                     # Enhanced facts available - store addresses that need adding
                     # (might be empty if all are already configured)
-                    nb_intf["_ip_changes"]["ipv6_to_add"] = list(ipv6_to_add)
+                    # Merge regular IPv6 with anycast IPv6 (don't overwrite!)
+                    existing_ipv6_to_add = nb_intf["_ip_changes"].get("ipv6_to_add", [])
+                    new_ipv6_to_add = list(ipv6_to_add)
+                    # Combine and deduplicate
+                    all_ipv6_to_add = list(set(existing_ipv6_to_add + new_ipv6_to_add))
+                    nb_intf["_ip_changes"]["ipv6_to_add"] = all_ipv6_to_add
                     nb_intf["_ip_changes"]["ipv6_addresses"] = list(nb_ipv6)
                 else:
                     # No enhanced facts - store all addresses for reference
