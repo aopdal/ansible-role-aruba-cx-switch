@@ -137,8 +137,7 @@
             "export_targets": [
                 "65000:100"
             ],
-            "description": "Tenant A VRF",
-            "l3_vni": 10100
+            "description": "Tenant A VRF"
         },
         {
             "name": "TENANT-B",
@@ -149,8 +148,7 @@
             "export_targets": [
                 "65000:200"
             ],
-            "description": "Tenant B VRF",
-            "l3_vni": 10200
+            "description": "Tenant B VRF"
         }
     ],
     "vlans": [

@@ -5,11 +5,10 @@
 - name: Configure Aruba CX Switches - Minimal Deployment
   hosts: aruba_switches
   gather_facts: no
-  connection: ansible.netcommon.network_cli
 
   tasks:
     - name: Apply base configuration to switches
       ansible.builtin.include_role:
-        name: ansible-role-aruba-cx-switch
+        name: aopdal.aruba_cx_switch
       tags:
         - always

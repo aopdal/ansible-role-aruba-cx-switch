@@ -1,0 +1,53 @@
+---
+# NetBox Dynamic Inventory Configuration for BGP EVPN Fabric
+# Uses NetBox as the source of truth for all fabric switches
+
+plugin: netbox.netbox.nb_inventory
+
+# API connection (use environment variables for security)
+# export NETBOX_API=https://netbox.example.com
+# export NETBOX_TOKEN=your_api_token_here
+
+# SSL certificate validation
+validate_certs: false  # Set to true in production with valid certs
+
+# Inventory options
+plurals: true              # Use plural group names (device_roles vs device_role)
+config_context: true       # Include NetBox config_context data
+flatten_config_context: true  # Flatten config_context to top-level variables
+prefixes: false            # Don't include prefix data
+interfaces: true           # Include interface data (required for this role)
+use_extra_vars: true       # Allow extra variables from NetBox
+group_names_raw: true      # Use raw group names from NetBox
+
+# Compose variables from NetBox data
+compose:
+  device_id: id
+  ansible_network_os: "'arubanetworks.aoscx.aoscx'"
+  ansible_connection: "'arubanetworks.aoscx.aoscx'"
+
+# Group devices by NetBox attributes
+group_by:
+  - device_roles      # Creates groups: spines, leafs, border_leafs
+  - sites             # Creates groups per site
+  - platforms         # Creates groups per platform
+  - device_types      # Creates groups per device type
+
+# Custom groups based on device types
+groups:
+  aruba_switches: "platform.slug == 'aoscx'"
+  hpe_aruba_6300: "device_type.slug | regex_search('^hpe-aruba-6300')"
+  hpe_aruba_8360: "device_type.slug | regex_search('^hpe-aruba-8360')"
+
+# Device query filters - what devices to include
+device_query_filters:
+  - platform: aoscx           # Only Aruba CX switches
+  - has_primary_ip: true      # Must have management IP
+  - status: active            # Include active devices
+  - status: staged            # Include staged devices (for testing)
+
+# Additional query filters (optional)
+query_filters:
+  - site: datacenter1         # Limit to specific site
+#  - tenant: production        # Limit to specific tenant
+#  - tag: evpn-fabric          # Limit to tagged devices

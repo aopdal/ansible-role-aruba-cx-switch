@@ -5,18 +5,10 @@
 - name: Configure Aruba CX BGP EVPN Fabric
   hosts: aruba_switches
   gather_facts: no
-  connection: ansible.netcommon.network_cli
 
   tasks:
     - name: Apply configuration to all fabric switches
       ansible.builtin.include_role:
-        name: ansible-role-aruba-cx-switch
+        name: aopdal.aruba_cx_switch
       tags:
         - always
-
-  handlers:
-    - name: Save configuration
-      arubanetworks.aoscx.aoscx_command:
-        commands:
-          - write memory
-      listen: "save config"

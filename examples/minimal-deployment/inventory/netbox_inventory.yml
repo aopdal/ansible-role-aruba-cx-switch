@@ -1,0 +1,43 @@
+---
+# NetBox Dynamic Inventory Configuration
+# This uses NetBox as the source of truth for inventory
+
+plugin: netbox.netbox.nb_inventory
+
+# API connection (can also use environment variables)
+# api_endpoint: using environment variable NETBOX_API
+# token: using environment variable NETBOX_TOKEN
+
+# SSL certificate validation
+validate_certs: false  # Set to true in production with valid certs
+
+# Inventory options
+plurals: true
+config_context: true
+flatten_config_context: true
+interfaces: true
+use_extra_vars: true
+group_names_raw: true
+
+# Compose variables from NetBox data
+compose:
+  device_id: id
+  ansible_network_os: "'arubanetworks.aoscx.aoscx'"
+  ansible_connection: "'arubanetworks.aoscx.aoscx'"
+
+# Group devices by NetBox attributes
+group_by:
+  - device_roles
+  - sites
+  - platforms
+
+# Device filters
+device_query_filters:
+  - platform: aoscx
+  - has_primary_ip: true
+  - status: active
+
+# Additional filters (uncomment if needed)
+# query_filters:
+#   - tenant: production
+#   - site: datacenter1

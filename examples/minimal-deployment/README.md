@@ -13,18 +13,25 @@ This example demonstrates the simplest possible deployment of the `ansible-role-
 
 ## Prerequisites
 
-1. **Ansible 2.10+** with AOS-CX collection:
+1. **Ansible 2.10+** with required collections:
    ```bash
    ansible-galaxy collection install arubanetworks.aoscx
+   ansible-galaxy collection install netbox.netbox
    ```
 
-2. **NetBox** (optional but recommended):
+2. **NetBox** (recommended for production):
    - NetBox instance accessible via API
    - Switch device created in NetBox
    - VLANs configured in NetBox
    - Interfaces documented in NetBox
+   - API token with read permissions
 
-3. **Network Access**:
+3. **Python dependencies**:
+   ```bash
+   pip install pynetbox
+   ```
+
+4. **Network Access**:
    - SSH connectivity to your switch
    - Management IP configured on the switch
 
@@ -39,7 +46,24 @@ cd ~/my-switch-config
 
 ### 2. Configure Your Inventory
 
-Edit `inventory/hosts.yml` with your switch details:
+**Option A: NetBox Dynamic Inventory (Recommended)**
+
+Use NetBox as your source of truth:
+
+```bash
+# Set NetBox credentials as environment variables
+export NETBOX_API=https://netbox.example.com
+export NETBOX_TOKEN=your_api_token_here
+
+# Test inventory
+ansible-inventory -i inventory/netbox_inventory.yml --list
+```
+
+Edit `inventory/netbox_inventory.yml` to customize filters for your environment.
+
+**Option B: Static Inventory File**
+
+For quick testing without NetBox, edit `inventory/hosts.yml`:
 
 ```yaml
 all:
@@ -91,12 +115,20 @@ Check `inventory/group_vars/aruba_switches.yml` and customize as needed:
 Test without making changes:
 
 ```bash
+# With NetBox inventory
+ansible-playbook -i inventory/netbox_inventory.yml playbook.yml --check
+
+# Or with static inventory
 ansible-playbook -i inventory/hosts.yml playbook.yml --check
 ```
 
 ### 7. Apply Configuration
 
 ```bash
+# With NetBox inventory (recommended)
+ansible-playbook -i inventory/netbox_inventory.yml playbook.yml
+
+# Or with static inventory
 ansible-playbook -i inventory/hosts.yml playbook.yml
 ```
 
