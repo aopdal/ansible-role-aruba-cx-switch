@@ -40,3 +40,4 @@
     - vlan_changes is defined
     - vlan_changes.vlans_to_delete | length > 0
     - item != 1  # Never delete VLAN 1
+    - item >= 1 and item <= 4094  # Only delete valid VLAN IDs

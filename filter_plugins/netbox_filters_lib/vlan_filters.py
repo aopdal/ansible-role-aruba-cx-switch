@@ -270,7 +270,15 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
                 # AOS-CX stores VLANs as dict keyed by VID
                 for vid_str in vlans_dict.keys():
                     try:
-                        device_vids.add(int(vid_str))
+                        vid = int(vid_str)
+                        # Validate VLAN ID is in valid range (1-4094)
+                        if 1 <= vid <= 4094:
+                            device_vids.add(vid)
+                        else:
+                            _debug(
+                                f"WARNING: Invalid VLAN ID {vid} found in device facts "
+                                f"(out of range 1-4094)"
+                            )
                     except (ValueError, TypeError):
                         pass
                 _debug(
@@ -290,7 +298,14 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
         if vlan and isinstance(vlan, dict):
             vid = vlan.get("vid")
             if vid is not None:
-                available_vlans[vid] = vlan
+                # Validate VLAN ID is in valid range (1-4094)
+                if 1 <= vid <= 4094:
+                    available_vlans[vid] = vlan
+                else:
+                    _debug(
+                        f"WARNING: Invalid VLAN ID {vid} from NetBox "
+                        f"(out of range 1-4094), skipping"
+                    )
 
     _debug(f"Available VLANs from NetBox: {sorted(list(available_vlans.keys()))}")
     _debug(f"VLANs in use on interfaces: {sorted(list(vids_in_use))}")
@@ -321,6 +336,13 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
         for vid in device_vids:
             # Skip VLAN 1 - never delete the default VLAN
             if vid == 1:
+                continue
+
+            # Validate VLAN ID is in valid range (1-4094)
+            if not 1 <= vid <= 4094:
+                _debug(
+                    f"WARNING: Skipping invalid VLAN ID {vid} for deletion (out of range 1-4094)"
+                )
                 continue
 
             # Delete if: on device AND not in use

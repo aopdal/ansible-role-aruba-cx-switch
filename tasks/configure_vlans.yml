@@ -39,7 +39,9 @@
   loop: "{{ vlan_changes.vlans_to_create }}"
   loop_control:
     label: "VLAN {{ item.vid }} - {{ item.name }}"
-  when: vlan_changes.vlans_to_create | length > 0
+  when:
+    - vlan_changes.vlans_to_create | length > 0
+    - item.vid >= 1 and item.vid <= 4094  # Only create valid VLAN IDs
 
 # NOTE: VLAN deletion is handled in cleanup_vlans.yml task
 # This runs AFTER interface cleanup to ensure VLANs are not in use
