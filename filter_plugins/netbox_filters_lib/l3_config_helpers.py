@@ -17,10 +17,11 @@ def format_interface_name(interface_name, interface_type):
     - Physical: "1/1/1" stays as "1/1/1"
     - LAG: "lag1" becomes "lag 1" (space added)
     - VLAN: "vlan10" stays as "vlan10"
+    - Sub-interface: "1/1/3.2000" stays as "1/1/3.2000"
 
     Args:
         interface_name: Raw interface name from NetBox
-        interface_type: Type of interface ('physical', 'lag', 'vlan')
+        interface_type: Type of interface ('physical', 'lag', 'vlan', 'subinterface')
 
     Returns:
         Formatted interface name for use in configuration
@@ -28,7 +29,7 @@ def format_interface_name(interface_name, interface_type):
     if interface_type == "lag":
         # LAG interfaces need a space: "lag1" -> "lag 1"
         return interface_name.replace("lag", "lag ")
-    # Physical and VLAN interfaces use the name as-is
+    # Physical, VLAN, and sub-interfaces use the name as-is
     return interface_name
 
 
@@ -97,8 +98,7 @@ def build_l3_config_lines(
             - address: IP address to configure
             - ip_role: Role of IP (e.g., 'anycast')
             - anycast_mac: MAC address for anycast gateway (optional)
-        interface_type: Type of interface ('physical', 'lag', 'vlan')
-                       Note: Currently not used in logic but kept for API consistency
+        interface_type: Type of interface ('physical', 'lag', 'vlan', 'subinterface')
         ip_version: IP version ('ipv4' or 'ipv6')
         vrf_type: VRF type ('default' or 'custom')
         l3_counters_enable: Whether to enable L3 counters (default: True)
@@ -106,8 +106,6 @@ def build_l3_config_lines(
     Returns:
         List of configuration command strings
     """
-    # Note: interface_type parameter kept for API consistency and potential future use
-    _ = interface_type  # Suppress unused argument warning
     lines = []
 
     interface_name = item.get("interface_name", "unknown")
@@ -115,8 +113,24 @@ def build_l3_config_lines(
 
     _debug(
         f"Building L3 config for {interface_name}: "
-        f"ip_version={ip_version}, vrf_type={vrf_type}"
+        f"ip_version={ip_version}, vrf_type={vrf_type}, interface_type={interface_type}"
     )
+
+    # Encapsulation for sub-interfaces
+    if interface_type == "subinterface":
+        interface_obj = item.get("interface", {})
+        if isinstance(interface_obj, dict):
+            # Get the VLAN ID from tagged_vlans (for encapsulation)
+            tagged_vlans = interface_obj.get("tagged_vlans", [])
+            if (
+                tagged_vlans
+                and isinstance(tagged_vlans, list)
+                and len(tagged_vlans) > 0
+            ):
+                vlan_id = tagged_vlans[0].get("vid")
+                if vlan_id:
+                    lines.append(f"encapsulation dot1q {vlan_id}")
+                    _debug(f"  Adding encapsulation: dot1q {vlan_id}")
 
     # VRF attachment (only for custom VRFs)
     if vrf_type == "custom":

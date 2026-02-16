@@ -163,6 +163,8 @@ def categorize_l3_interfaces(interfaces):
         - vlan_custom_vrf: VLAN interfaces in custom VRFs
         - lag_default_vrf: LAG interfaces in default/Global/mgmt VRF
         - lag_custom_vrf: LAG interfaces in custom VRFs
+        - subinterface_default_vrf: Sub-interfaces in default/Global/mgmt VRF
+        - subinterface_custom_vrf: Sub-interfaces in custom VRFs
         - loopback: Loopback interfaces
     """
     result = {
@@ -172,6 +174,8 @@ def categorize_l3_interfaces(interfaces):
         "vlan_custom_vrf": [],
         "lag_default_vrf": [],
         "lag_custom_vrf": [],
+        "subinterface_default_vrf": [],
+        "subinterface_custom_vrf": [],
         "loopback": [],
     }
 
@@ -237,6 +241,15 @@ def categorize_l3_interfaces(interfaces):
         # Get interface name for logging
         interface_name = intf.get("interface_name") or intf.get("name", "unknown")
 
+        # Check if this is a sub-interface (virtual with parent interface)
+        has_parent = False
+        if "interface" in intf and isinstance(intf["interface"], dict):
+            # Processed format from interface_ips
+            has_parent = intf["interface"].get("parent") is not None
+        elif "parent" in intf:
+            # Original NetBox format
+            has_parent = intf.get("parent") is not None
+
         # Categorize by type and VRF
         if type_value == "virtual" and "loopback" in name:
             result["loopback"].append(intf)
@@ -252,6 +265,20 @@ def categorize_l3_interfaces(interfaces):
                 result["vlan_custom_vrf"].append(intf)
                 _debug(
                     f"Categorized {interface_name} as VLAN interface "
+                    f"(Interface VRF: {vrf_name})"
+                )
+        elif type_value == "virtual" and has_parent:
+            # Sub-interface (e.g., 1/1/3.2000)
+            if is_builtin_vrf:
+                result["subinterface_default_vrf"].append(intf)
+                _debug(
+                    f"Categorized {interface_name} as sub-interface "
+                    f"(Interface built-in VRF: {vrf_name})"
+                )
+            else:
+                result["subinterface_custom_vrf"].append(intf)
+                _debug(
+                    f"Categorized {interface_name} as sub-interface "
                     f"(Interface VRF: {vrf_name})"
                 )
         elif type_value == "lag":
@@ -289,6 +316,8 @@ def categorize_l3_interfaces(interfaces):
     _debug(f"  VLAN (custom VRF): {len(result['vlan_custom_vrf'])}")
     _debug(f"  LAG (built-in VRF): {len(result['lag_default_vrf'])}")
     _debug(f"  LAG (custom VRF): {len(result['lag_custom_vrf'])}")
+    _debug(f"  Sub-interface (built-in VRF): {len(result['subinterface_default_vrf'])}")
+    _debug(f"  Sub-interface (custom VRF): {len(result['subinterface_custom_vrf'])}")
     _debug(f"  Loopback: {len(result['loopback'])}")
 
     return result

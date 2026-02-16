@@ -145,12 +145,18 @@
       - "VLAN (custom VRF): {{ l3_interfaces.vlan_custom_vrf | length }}"
       - "LAG (default VRF): {{ l3_interfaces.lag_default_vrf | length }}"
       - "LAG (custom VRF): {{ l3_interfaces.lag_custom_vrf | length }}"
+      - "Sub-interface (default VRF): {{ l3_interfaces.subinterface_default_vrf | length }}"
+      - "Sub-interface (custom VRF): {{ l3_interfaces.subinterface_custom_vrf | length }}"
       - "Loopback: {{ l3_interfaces.loopback | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # Configure physical interfaces
 - name: Include physical L3 interface configuration
   ansible.builtin.include_tasks: configure_l3_physical.yml
+
+# Configure sub-interfaces
+- name: Include sub-interface L3 configuration
+  ansible.builtin.include_tasks: configure_l3_subinterface.yml
 
 # Configure VLAN interfaces
 - name: Include VLAN L3 interface configuration
