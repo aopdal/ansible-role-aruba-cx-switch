@@ -13,6 +13,50 @@
   tags:
     - always
 
+# Identify parent interfaces of sub-interfaces that need to be enabled
+# These are physical interfaces that may have no L2/L3 config but need "no shutdown" for sub-interfaces to work
+- name: Identify parent interfaces from sub-interfaces
+  ansible.builtin.set_fact:
+    subinterface_parents: >-
+      {{
+        interfaces
+        | selectattr('type', 'defined')
+        | selectattr('type.value', 'equalto', 'virtual')
+        | selectattr('parent', 'defined')
+        | map(attribute='parent')
+        | selectattr('name', 'defined')
+        | unique
+        | list
+      }}
+
+- name: Build list of parent interfaces to enable (enabled in NetBox, not already in change list)
+  ansible.builtin.set_fact:
+    parents_to_enable: >-
+      {{
+        subinterface_parents
+        | selectattr('enabled', 'equalto', true)
+        | rejectattr('name', 'in', interface_changes.physical | default([]) | map(attribute='name') | list)
+        | list
+      }}
+
+- name: Debug - Show parent interfaces to enable
+  ansible.builtin.debug:
+    msg:
+      - "Sub-interface parent interfaces found: {{ subinterface_parents | map(attribute='name') | list }}"
+      - "Parent interfaces needing enable (not in change list): {{ parents_to_enable | map(attribute='name') | list }}"
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Enable parent physical interfaces for sub-interfaces
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: true
+    description: "{{ item.description | default('') }}"
+  loop: "{{ parents_to_enable }}"
+  loop_control:
+    label: "Parent interface: {{ item.name }}"
+  when: parents_to_enable | length > 0
+
 - name: Enable or disable physical interfaces (only those needing changes)
   arubanetworks.aoscx.aoscx_interface:
     name: "{{ item.name }}"
@@ -53,6 +97,7 @@
       - "Total physical interfaces from NetBox: {{ interfaces | selectattr('type', 'defined') | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length }}"
       - "Physical interfaces NEEDING changes: {{ interface_changes.physical | default([]) | length }}"
       - "Physical interfaces NOT needing changes: {{ (interfaces | selectattr('type', 'defined') | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length) - (interface_changes.physical | default([]) | length) }}"
+      - "Parent interfaces enabled for sub-interfaces: {{ parents_to_enable | default([]) | length }}"
       - "AP_Aruba interfaces changed: {{ interface_changes.physical | default([]) | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
       - >-
         Interfaces with custom MTU changed:
@@ -60,6 +105,9 @@
       - >-
         Changed interfaces:
         {{ interface_changes.physical | default([]) | map(attribute='name') | list }}
+      - >-
+        Parent interfaces enabled:
+        {{ parents_to_enable | default([]) | map(attribute='name') | list }}
   when:
     - interface_changes is defined
     - aoscx_debug | bool or ansible_verbosity >= 1

@@ -2,6 +2,7 @@
 # Configure sub-interface L3 interfaces (e.g., 1/1/3.2000)
 # Sub-interfaces are virtual interfaces with a parent physical interface
 # They require encapsulation dot1q configuration and can have VRFs and IP addresses
+# Note: Parent interfaces are enabled in configure_physical_interfaces.yml
 
 # Configure IPv4 addresses - default VRF
 - ansible.builtin.include_tasks:
