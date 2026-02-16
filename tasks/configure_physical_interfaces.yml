@@ -1,6 +1,11 @@
 ---
 # Configure basic physical interface settings (enable/disable, description)
 # This must be done before L2/L3 configuration or LAG membership
+#
+# Performance optimized:
+# - Uses change detection to only configure interfaces that need changes
+# - Additionally checks and enables parent interfaces for sub-interfaces
+# - Parent interfaces need "no shutdown" even if they have no L2/L3 config
 
 # Verify that interface analysis has been performed
 - name: configure_physical_interfaces | Verify interface analysis has been performed
@@ -8,86 +13,186 @@
     that:
       - interface_changes is defined
       - interface_changes.physical is defined
+      - ansible_facts is defined
     fail_msg: "ERROR: identify_interface_changes.yml must run before configure_physical_interfaces.yml"
     success_msg: "Interface analysis completed - proceeding with physical interface configuration"
   tags:
     - always
 
 # Identify parent interfaces of sub-interfaces that need to be enabled
-# These are physical interfaces that may have no L2/L3 config but need "no shutdown" for sub-interfaces to work
-- name: Identify parent interfaces from sub-interfaces
+# Parent interfaces exist in NetBox (enabled=true) but may not be in the change list
+# They need "no shutdown" for sub-interfaces to work
+- name: Get parent interface names from sub-interfaces
   ansible.builtin.set_fact:
-    subinterface_parents: >-
+    subinterface_parent_names: >-
       {{
         interfaces
         | selectattr('type', 'defined')
         | selectattr('type.value', 'equalto', 'virtual')
         | selectattr('parent', 'defined')
+        | selectattr('parent')
         | map(attribute='parent')
-        | selectattr('name', 'defined')
+        | map(attribute='name', default='')
+        | select
         | unique
         | list
       }}
 
-- name: Build list of parent interfaces to enable (enabled in NetBox, not already in change list)
+- name: Build list of interface names that are already enabled on device (admin=up)
   ansible.builtin.set_fact:
-    parents_to_enable: >-
+    already_enabled_via_admin: >-
       {{
-        subinterface_parents
-        | selectattr('enabled', 'equalto', true)
-        | rejectattr('name', 'in', interface_changes.physical | default([]) | map(attribute='name') | list)
+        ansible_facts.network_resources.interfaces | default({})
+        | dict2items
+        | selectattr('value.admin', 'defined')
+        | selectattr('value.admin', 'equalto', 'up')
+        | map(attribute='key')
         | list
       }}
+  when:
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
 
-- name: Debug - Show parent interfaces to enable
+- name: Build list of LAG member interfaces that are already enabled (bond_status.state=up)
+  ansible.builtin.set_fact:
+    already_enabled_via_bond: >-
+      {{
+        ansible_facts.network_resources.interfaces | default({})
+        | dict2items
+        | selectattr('value.bond_status', 'defined')
+        | selectattr('value.bond_status.state', 'defined')
+        | selectattr('value.bond_status.state', 'equalto', 'up')
+        | map(attribute='key')
+        | list
+      }}
+  when:
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+
+- name: Combine both lists to get all already enabled interfaces
+  ansible.builtin.set_fact:
+    already_enabled_interfaces: >-
+      {{
+        (already_enabled_via_admin | default([]) + already_enabled_via_bond | default([]))
+        | unique
+        | list
+      }}
+  when:
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+
+- name: Set empty already_enabled list if no device facts
+  ansible.builtin.set_fact:
+    already_enabled_interfaces: []
+  when:
+    - ansible_facts.network_resources is not defined or
+      ansible_facts.network_resources.interfaces is not defined
+
+- name: Debug - Show already enabled interfaces detected on device
   ansible.builtin.debug:
     msg:
-      - "Sub-interface parent interfaces found: {{ subinterface_parents | map(attribute='name') | list }}"
-      - "Parent interfaces needing enable (not in change list): {{ parents_to_enable | map(attribute='name') | list }}"
+      - "Interfaces already enabled on device (will be skipped): {{ already_enabled_interfaces | default([]) }}"
+      - "Count of already enabled: {{ already_enabled_interfaces | default([]) | length }}"
+      - "Device facts available: {{ ansible_facts.network_resources.interfaces is defined }}"
+      - "Sample LAG member 1/1/1 from facts: {{ ansible_facts.network_resources.interfaces['1/1/1'] | default('NOT FOUND') }}"
+      - "Sample parent interface 1/1/3 from facts: {{ ansible_facts.network_resources.interfaces['1/1/3'] | default('NOT FOUND') }}"
+      - "Interface 1/1/3 admin field: {{ ansible_facts.network_resources.interfaces['1/1/3'].admin | default('NOT FOUND') }}"
   when:
     - aoscx_debug | bool or ansible_verbosity >= 1
 
-- name: Enable parent physical interfaces for sub-interfaces
+- name: Get parent interfaces that are NOT already enabled on device
+  ansible.builtin.set_fact:
+    parents_needing_enable: >-
+      {{
+        interfaces
+        | selectattr('name', 'in', subinterface_parent_names | default([]))
+        | selectattr('enabled', 'equalto', true)
+        | rejectattr('name', 'in', already_enabled_interfaces)
+        | list
+      }}
+  when:
+    - subinterface_parent_names | default([]) | length > 0
+
+- name: Set empty parent list if conditions not met
+  ansible.builtin.set_fact:
+    parents_needing_enable: []
+  when: >
+    (subinterface_parent_names | default([]) | length == 0) or
+    (ansible_facts.network_resources is not defined) or
+    (ansible_facts.network_resources.interfaces is not defined)
+
+# Combine interfaces from change list with parent interfaces needing enable
+# Only include interfaces where enabled state needs to change OR parent interfaces
+- name: Build list of physical interfaces needing enable (state change needed)
+  ansible.builtin.set_fact:
+    physical_interfaces_to_enable: >-
+      {{
+        (
+          (interface_changes.physical | default([])
+            | selectattr('enabled', 'equalto', true)
+            | rejectattr('name', 'in', already_enabled_interfaces | default([]))
+            | list
+          )
+          + (parents_needing_enable | default([]))
+        )
+        | unique(attribute='name')
+        | list
+      }}
+
+- name: Debug - Show physical interfaces to enable
+  ansible.builtin.debug:
+    msg:
+      - "Physical interfaces from change list (before filter): {{ interface_changes.physical | default([]) | selectattr('enabled', 'equalto', true) | map(attribute='name') | list }}"
+      - "Physical interfaces from change list (AFTER filtering already enabled): {{ interface_changes.physical | default([]) | selectattr('enabled', 'equalto', true) | rejectattr('name', 'in', already_enabled_interfaces | default([])) | map(attribute='name') | list }}"
+      - "Parent interfaces needing enable: {{ parents_needing_enable | default([]) | map(attribute='name') | list }}"
+      - "Total interfaces to enable (final): {{ physical_interfaces_to_enable | map(attribute='name') | list }}"
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Enable physical interfaces (all with enabled=true in NetBox)
   arubanetworks.aoscx.aoscx_interface:
     name: "{{ item.name }}"
     enabled: true
     description: "{{ item.description | default('') }}"
-  loop: "{{ parents_to_enable }}"
-  loop_control:
-    label: "Parent interface: {{ item.name }}"
-  when: parents_to_enable | length > 0
-
-- name: Enable or disable physical interfaces (only those needing changes)
-  arubanetworks.aoscx.aoscx_interface:
-    name: "{{ item.name }}"
-    enabled: "{{ item.enabled | default(true) }}"
-    description: "{{ item.description | default('') }}"
     mtu: "{{ item.mtu if (item.mtu is defined and item.mtu is not none) else omit }}"
-  loop: "{{ interface_changes.physical | default([]) }}"
+  loop: "{{ physical_interfaces_to_enable }}"
   loop_control:
-    label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
+    label: "Interface: {{ item.name }}"
   when:
-    - item.mgmt_only is not defined or not item.mgmt_only
-    - item.type is defined
-    - (item.type.value is defined and item.type.value not in ["virtual", "lag"]) or
-      (item.type.value is not defined and item.type not in ["virtual", "lag"])
+    - physical_interfaces_to_enable | length > 0
     - item.description is not defined or item.description != "AP_Aruba"
 
-- name: Enable or disable physical interfaces AP_Aruba (special case for Aruba Central, only those needing changes)
+- name: Enable physical interfaces AP_Aruba (special case for Aruba Central)
   arubanetworks.aoscx.aoscx_interface:
     name: "{{ item.name }}"
-    enabled: "{{ item.enabled | default(true) }}"
+    enabled: true
     description: "{{ item.name }} {{ item.description }}"
     mtu: "{{ item.mtu if (item.mtu is defined and item.mtu is not none) else omit }}"
-  loop: "{{ interface_changes.physical | default([]) }}"
+  loop: "{{ physical_interfaces_to_enable }}"
   loop_control:
-    label: "Device: {{ inventory_hostname }} Interface: {{ item.name }} Enabled: {{ item.enabled | default(true) }}"
+    label: "Interface: {{ item.name }}"
   when:
-    - item.mgmt_only is not defined or not item.mgmt_only
-    - item.type is defined
-    - (item.type.value is defined and item.type.value not in ["virtual", "lag"]) or
-      (item.type.value is not defined and item.type not in ["virtual", "lag"])
+    - physical_interfaces_to_enable | length > 0
     - item.description is defined and item.description == "AP_Aruba"
+
+- name: Disable physical interfaces (only those currently enabled on device)
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: false
+    description: "{{ item.description | default('') }}"
+    mtu: "{{ item.mtu if (item.mtu is defined and item.mtu is not none) else omit }}"
+  loop: >-
+    {{
+      interface_changes.physical | default([])
+      | selectattr('enabled', 'defined')
+      | selectattr('enabled', 'equalto', false)
+      | selectattr('name', 'in', already_enabled_interfaces | default([]))
+      | list
+    }}
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when:
+    - already_enabled_interfaces | default([]) | length > 0
 
 - name: Debug - Physical interface configuration summary
   ansible.builtin.debug:
@@ -95,19 +200,17 @@
       - "=== Physical Interface Configuration Summary ==="
       - "Device: {{ inventory_hostname }}"
       - "Total physical interfaces from NetBox: {{ interfaces | selectattr('type', 'defined') | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length }}"
-      - "Physical interfaces NEEDING changes: {{ interface_changes.physical | default([]) | length }}"
-      - "Physical interfaces NOT needing changes: {{ (interfaces | selectattr('type', 'defined') | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length) - (interface_changes.physical | default([]) | length) }}"
-      - "Parent interfaces enabled for sub-interfaces: {{ parents_to_enable | default([]) | length }}"
-      - "AP_Aruba interfaces changed: {{ interface_changes.physical | default([]) | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
+      - "Physical interfaces from CHANGE LIST: {{ interface_changes.physical | default([]) | length }}"
+      - "Parent interfaces identified: {{ subinterface_parent_names | default([]) | length }}"
+      - "Parent interfaces already up (skipped): {{ (subinterface_parent_names | default([]) | length) - (parents_needing_enable | default([]) | length) }}"
+      - "Physical interfaces WILL BE ENABLED (not already up): {{ physical_interfaces_to_enable | default([]) | length }}"
+      - "Physical interfaces WILL BE DISABLED (currently up, need down): {{ interface_changes.physical | default([]) | selectattr('enabled', 'equalto', false) | selectattr('name', 'in', already_enabled_interfaces | default([])) | list | length }}"
+      - "AP_Aruba interfaces in enable list: {{ physical_interfaces_to_enable | default([]) | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
       - >-
-        Interfaces with custom MTU changed:
-        {{ interface_changes.physical | default([]) | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}
+        Interfaces with custom MTU in enable list:
+        {{ physical_interfaces_to_enable | default([]) | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}
       - >-
-        Changed interfaces:
-        {{ interface_changes.physical | default([]) | map(attribute='name') | list }}
-      - >-
-        Parent interfaces enabled:
-        {{ parents_to_enable | default([]) | map(attribute='name') | list }}
+        Interfaces to enable:
+        {{ physical_interfaces_to_enable | default([]) | map(attribute='name') | list }}
   when:
-    - interface_changes is defined
     - aoscx_debug | bool or ansible_verbosity >= 1
