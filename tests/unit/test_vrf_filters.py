@@ -7,6 +7,8 @@ from netbox_filters_lib.vrf_filters import (
     filter_vrfs_in_use,
     get_vrfs_in_use,
     filter_configurable_vrfs,
+    get_all_rt_names,
+    build_vrf_rt_config,
 )
 from .fixtures import get_sample_interfaces, get_sample_ip_addresses, get_sample_vrfs
 
@@ -178,3 +180,138 @@ class TestFilterConfigurableVrfs:
         vrfs = ["customer_a", "customer_b", "customer_c"]
         result = filter_configurable_vrfs(vrfs)
         assert sorted(result) == ["customer_a", "customer_b", "customer_c"]
+
+
+class TestGetAllRtNames:
+    """Tests for get_all_rt_names function"""
+
+    VRF_DETAILS = {
+        "lab-blue": {
+            "export_targets": [{"id": 1, "name": "65015:10"}, {"id": 2, "name": "65015:11"}],
+            "import_targets": [{"id": 1, "name": "65015:10"}],
+        },
+        "lab-green": {
+            "export_targets": [{"id": 3, "name": "65015:20"}],
+            "import_targets": [{"id": 3, "name": "65015:20"}, {"id": 2, "name": "65015:11"}],
+        },
+    }
+
+    def test_returns_unique_sorted_names(self):
+        result = get_all_rt_names(self.VRF_DETAILS)
+        assert result == ["65015:10", "65015:11", "65015:20"]
+
+    def test_empty_vrf_details(self):
+        assert get_all_rt_names({}) == []
+
+    def test_no_targets(self):
+        vrf_details = {"lab-blue": {"export_targets": [], "import_targets": []}}
+        assert get_all_rt_names(vrf_details) == []
+
+    def test_missing_targets_key(self):
+        vrf_details = {"lab-blue": {}}
+        assert get_all_rt_names(vrf_details) == []
+
+    def test_deduplicates_across_vrfs(self):
+        vrf_details = {
+            "vrf-a": {"export_targets": [{"name": "65000:1"}], "import_targets": []},
+            "vrf-b": {"export_targets": [{"name": "65000:1"}], "import_targets": []},
+        }
+        assert get_all_rt_names(vrf_details) == ["65000:1"]
+
+    def test_vrf_as_json_string(self):
+        """Ansible nb_lookup can return VRF objects as AnsibleUnsafeText (JSON strings)."""
+        import json
+        vrf_details = {
+            "lab-blue": json.dumps({
+                "export_targets": [{"id": 1, "name": "65015:10"}],
+                "import_targets": [],
+            })
+        }
+        assert get_all_rt_names(vrf_details) == ["65015:10"]
+
+
+class TestBuildVrfRtConfig:
+    """Tests for build_vrf_rt_config function.
+
+    AF is read directly from the RT objects embedded in export/import_targets
+    (nb_lookup returns full RT objects including custom_fields there).
+    """
+
+    VRF_DETAILS = {
+        "lab-blue": {
+            "export_targets": [
+                {"id": 1, "name": "65015:10", "custom_fields": {"address_family": "ipv4"}},
+                {"id": 2, "name": "65015:11", "custom_fields": {"address_family": "ipv6"}},
+            ],
+            "import_targets": [
+                {"id": 1, "name": "65015:10", "custom_fields": {"address_family": "ipv4"}},
+                {"id": 2, "name": "65015:11", "custom_fields": {"address_family": "ipv6"}},
+            ],
+        },
+    }
+
+    def test_groups_by_address_family(self):
+        result = build_vrf_rt_config(self.VRF_DETAILS)
+        assert result["lab-blue"]["ipv4"]["export"] == ["65015:10"]
+        assert result["lab-blue"]["ipv4"]["import"] == ["65015:10"]
+        assert result["lab-blue"]["ipv6"]["export"] == ["65015:11"]
+        assert result["lab-blue"]["ipv6"]["import"] == ["65015:11"]
+
+    def test_defaults_to_ipv4_when_no_custom_field(self):
+        vrf_details = {
+            "vrf-a": {
+                "export_targets": [{"name": "65015:10", "custom_fields": {}}],
+                "import_targets": [],
+            }
+        }
+        result = build_vrf_rt_config(vrf_details)
+        assert result["vrf-a"]["ipv4"]["export"] == ["65015:10"]
+        assert result["vrf-a"]["ipv6"]["export"] == []
+
+    def test_defaults_to_ipv4_when_unknown_af(self):
+        vrf_details = {
+            "vrf-a": {
+                "export_targets": [{"name": "65015:10", "custom_fields": {"address_family": "both"}}],
+                "import_targets": [],
+            }
+        }
+        result = build_vrf_rt_config(vrf_details)
+        assert result["vrf-a"]["ipv4"]["export"] == ["65015:10"]
+
+    def test_defaults_to_ipv4_when_no_custom_fields_key(self):
+        """RT object with no custom_fields key at all defaults to ipv4."""
+        vrf_details = {
+            "vrf-a": {"export_targets": [{"name": "99:99"}], "import_targets": []}
+        }
+        result = build_vrf_rt_config(vrf_details)
+        assert result["vrf-a"]["ipv4"]["export"] == ["99:99"]
+
+    def test_empty_vrf_details(self):
+        assert build_vrf_rt_config({}) == {}
+
+    def test_multiple_vrfs(self):
+        vrf_details = {
+            "vrf-a": {
+                "export_targets": [{"name": "65015:10", "custom_fields": {"address_family": "ipv4"}}],
+                "import_targets": [],
+            },
+            "vrf-b": {
+                "export_targets": [{"name": "65015:11", "custom_fields": {"address_family": "ipv6"}}],
+                "import_targets": [],
+            },
+        }
+        result = build_vrf_rt_config(vrf_details)
+        assert result["vrf-a"]["ipv4"]["export"] == ["65015:10"]
+        assert result["vrf-b"]["ipv6"]["export"] == ["65015:11"]
+
+    def test_vrf_as_json_string(self):
+        """VRF object stored as JSON string (AnsibleUnsafeText) is handled."""
+        import json
+        vrf_details = {
+            "lab-blue": json.dumps({
+                "export_targets": [{"name": "65015:10", "custom_fields": {"address_family": "ipv4"}}],
+                "import_targets": [],
+            })
+        }
+        result = build_vrf_rt_config(vrf_details)
+        assert result["lab-blue"]["ipv4"]["export"] == ["65015:10"]

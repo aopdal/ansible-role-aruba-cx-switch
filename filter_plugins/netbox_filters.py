@@ -33,6 +33,8 @@ from netbox_filters_lib.vrf_filters import (
     filter_vrfs_in_use,
     get_vrfs_in_use,
     filter_configurable_vrfs,
+    get_all_rt_names,
+    build_vrf_rt_config,
 )
 from netbox_filters_lib.interface_categorization import (
     categorize_l2_interfaces,
@@ -85,6 +87,8 @@ class FilterModule:
             "filter_vrfs_in_use": filter_vrfs_in_use,
             "get_vrfs_in_use": get_vrfs_in_use,
             "filter_configurable_vrfs": filter_configurable_vrfs,
+            "get_all_rt_names": get_all_rt_names,
+            "build_vrf_rt_config": build_vrf_rt_config,
             "categorize_l2_interfaces": categorize_l2_interfaces,
             "categorize_l3_interfaces": categorize_l3_interfaces,
             "get_interface_ip_addresses": get_interface_ip_addresses,

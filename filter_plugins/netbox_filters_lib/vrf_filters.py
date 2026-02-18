@@ -3,8 +3,28 @@
 VRF-related filters for NetBox data transformation
 """
 
+import json
 import os
 from .utils import _debug
+
+
+def _to_dict(obj):
+    """
+    Coerce a value to a dict.
+
+    Ansible's fact system sometimes stores nested objects from nb_lookup as
+    AnsibleUnsafeText (JSON-encoded strings) rather than parsed dicts.  This
+    helper transparently handles both cases.
+    """
+    if isinstance(obj, dict):
+        return obj
+    try:
+        parsed = json.loads(str(obj))
+        if isinstance(parsed, dict):
+            return parsed
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return {}
 
 
 def extract_interface_vrfs(interfaces):
@@ -153,6 +173,87 @@ def get_vrfs_in_use(interfaces, ip_addresses=None):
         f"{result['vrf_names']}"
     )
     _debug(f"Built-in VRFs filtered out: {builtin_vrfs}")
+
+    return result
+
+
+def get_all_rt_names(vrf_details):
+    """
+    Extract all unique route target names from VRF export/import targets.
+
+    Args:
+        vrf_details: Dict of VRF name -> VRF object (from NetBox nb_lookup),
+                     each containing 'export_targets' and 'import_targets' lists.
+
+    Returns:
+        Sorted list of unique RT name strings.
+    """
+    rt_names = set()
+    for vrf in vrf_details.values():
+        vrf = _to_dict(vrf)
+        for rt in vrf.get("export_targets") or []:
+            rt = _to_dict(rt) if not isinstance(rt, str) else {"name": rt}
+            name = rt.get("name")
+            if name:
+                rt_names.add(name)
+        for rt in vrf.get("import_targets") or []:
+            rt = _to_dict(rt) if not isinstance(rt, str) else {"name": rt}
+            name = rt.get("name")
+            if name:
+                rt_names.add(name)
+    return sorted(rt_names)
+
+
+def build_vrf_rt_config(vrf_details):
+    """
+    Build address-family-aware route target config grouped per VRF.
+
+    Reads the 'address_family' custom field directly from the RT objects
+    embedded in each VRF's export_targets / import_targets (values: 'ipv4'
+    or 'ipv6').  Defaults to 'ipv4' if the custom field is absent or
+    unrecognised.
+
+    nb_lookup for VRFs already returns full RT objects (including
+    custom_fields) nested inside export_targets and import_targets, so no
+    separate RT lookup is needed.
+
+    Args:
+        vrf_details: Dict of VRF name -> VRF object (from nb_lookup .value)
+                     with export/import_targets containing full RT objects.
+
+    Returns:
+        Dict keyed by VRF name, each value being::
+
+            {
+                'ipv4': {'export': [...rt_names...], 'import': [...rt_names...]},
+                'ipv6': {'export': [...rt_names...], 'import': [...rt_names...]},
+            }
+    """
+    result = {}
+    valid_afs = ("ipv4", "ipv6")
+
+    for vrf_name, vrf in vrf_details.items():
+        entry = {
+            "ipv4": {"export": [], "import": []},
+            "ipv6": {"export": [], "import": []},
+        }
+
+        vrf = _to_dict(vrf)
+        for direction in ("export_targets", "import_targets"):
+            dir_key = direction.replace("_targets", "")  # 'export' or 'import'
+            for rt in vrf.get(direction) or []:
+                rt = _to_dict(rt)
+                rt_name = rt.get("name")
+                if not rt_name:
+                    continue
+                af = _to_dict(rt.get("custom_fields") or {}).get(
+                    "address_family", "ipv4"
+                )
+                if af not in valid_afs:
+                    af = "ipv4"
+                entry[af][dir_key].append(rt_name)
+
+        result[vrf_name] = entry
 
     return result
 

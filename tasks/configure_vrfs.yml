@@ -49,7 +49,7 @@
     vrf_details: >-
       {{
         vrf_details | default({}) | combine({
-          item.item: item.ansible_facts.netbox_vrfs | first
+          item.item: item.ansible_facts.netbox_vrfs.value
         })
       }}
   loop: "{{ vrf_details_raw.results }}"
@@ -82,52 +82,77 @@
 - name: Configure VRF Route Distinguisher (RD)
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - rd {{ vrf_details[item].rd }}
+      - rd {{ vrfs_in_use.vrfs[item].rd }}
     parents: vrf {{ item }}
     match: line
   loop: "{{ vrfs_in_use.vrf_names }}"
   loop_control:
-    label: "VRF: {{ item }} RD: {{ vrf_details[item].rd | default('none') }}"
+    label: "VRF: {{ item }} RD: {{ vrfs_in_use.vrfs[item].rd | default('none') }}"
   when:
     - vrfs_in_use.vrf_names | length > 0
-    - vrf_details is defined
-    - vrf_details[item] is defined
-    - vrf_details[item].rd is defined
-    - vrf_details[item].rd != none
-    - vrf_details[item].rd != ''
+    - vrfs_in_use.vrfs[item] is defined
+    - vrfs_in_use.vrfs[item].rd is defined
+    - vrfs_in_use.vrfs[item].rd != none
+    - vrfs_in_use.vrfs[item].rd != ''
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
 
-- name: Configure VRF Route Target Export
+- name: Build VRF route target config grouped by address family
+  ansible.builtin.set_fact:
+    vrf_rt_config: "{{ vrf_details | build_vrf_rt_config }}"
+  when: vrf_details is defined
+
+- name: Debug - Show VRF route target config by address family
+  ansible.builtin.debug:
+    var: vrf_rt_config
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 2
+    - vrf_rt_config is defined
+
+- name: Configure VRF Route Targets IPv4 Unicast
   arubanetworks.aoscx.aoscx_config:
-    lines: "{{ vrf_details[item].export_targets | map('regex_replace', '^(.*)$', 'route-target export \\1') | list }}"
-    parents: vrf {{ item }}
+    lines: >-
+      {{
+        (vrf_rt_config[item].ipv4.export | map('regex_replace', '^(.*)$', 'route-target export \1') | list)
+        + (vrf_rt_config[item].ipv4.import | map('regex_replace', '^(.*)$', 'route-target import \1') | list)
+      }}
+    parents:
+      - "vrf {{ item }}"
+      - "address-family ipv4 unicast"
     match: line
   loop: "{{ vrfs_in_use.vrf_names }}"
   loop_control:
-    label: "VRF: {{ item }} Export Targets: {{ vrf_details[item].export_targets | default([]) | length }}"
+    label: >-
+      VRF: {{ item }} IPv4 export={{ vrf_rt_config[item].ipv4.export | length }}
+      import={{ vrf_rt_config[item].ipv4.import | length }}
   when:
     - vrfs_in_use.vrf_names | length > 0
-    - vrf_details is defined
-    - vrf_details[item] is defined
-    - vrf_details[item].export_targets is defined
-    - vrf_details[item].export_targets | length > 0
+    - vrf_rt_config is defined
+    - vrf_rt_config[item] is defined
+    - (vrf_rt_config[item].ipv4.export | length > 0) or (vrf_rt_config[item].ipv4.import | length > 0)
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
 
-- name: Configure VRF Route Target Import
+- name: Configure VRF Route Targets IPv6 Unicast
   arubanetworks.aoscx.aoscx_config:
-    lines: "{{ vrf_details[item].import_targets | map('regex_replace', '^(.*)$', 'route-target import \\1') | list }}"
-    parents: vrf {{ item }}
+    lines: >-
+      {{
+        (vrf_rt_config[item].ipv6.export | map('regex_replace', '^(.*)$', 'route-target export \1') | list)
+        + (vrf_rt_config[item].ipv6.import | map('regex_replace', '^(.*)$', 'route-target import \1') | list)
+      }}
+    parents:
+      - "vrf {{ item }}"
+      - "address-family ipv6 unicast"
     match: line
   loop: "{{ vrfs_in_use.vrf_names }}"
   loop_control:
-    label: "VRF: {{ item }} Import Targets: {{ vrf_details[item].import_targets | default([]) | length }}"
+    label: >-
+      VRF: {{ item }} IPv6 export={{ vrf_rt_config[item].ipv6.export | length }}
+      import={{ vrf_rt_config[item].ipv6.import | length }}
   when:
     - vrfs_in_use.vrf_names | length > 0
-    - vrf_details is defined
-    - vrf_details[item] is defined
-    - vrf_details[item].import_targets is defined
-    - vrf_details[item].import_targets | length > 0
+    - vrf_rt_config is defined
+    - vrf_rt_config[item] is defined
+    - (vrf_rt_config[item].ipv6.export | length > 0) or (vrf_rt_config[item].ipv6.import | length > 0)
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
