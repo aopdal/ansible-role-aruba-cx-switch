@@ -51,6 +51,43 @@
     - netbox_bgp_plugin_available | default(false)
     - netbox_bgp_sessions_all is defined
 
+# Derive VRF and address-family for each session by looking up the local IP
+# on the device's interfaces (provided by the NetBox inventory plugin).
+# Sessions on a non-default VRF interface are placed under 'bgp_vrf_sessions';
+# all other sessions (loopbacks / default VRF) go to 'bgp_global_sessions'.
+- name: Enrich BGP sessions with VRF and address-family info
+  ansible.builtin.set_fact:
+    device_bgp_sessions_enriched: >-
+      {{ device_bgp_sessions | get_bgp_session_vrf_info(interfaces | default([])) }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+
+- name: Split BGP sessions into global and VRF-specific groups
+  ansible.builtin.set_fact:
+    bgp_global_sessions: >-
+      {{ device_bgp_sessions_enriched | selectattr('_vrf', 'equalto', 'default') | list }}
+    bgp_vrf_sessions: >-
+      {{ device_bgp_sessions_enriched | rejectattr('_vrf', 'equalto', 'default') | list }}
+  when:
+    - device_bgp_sessions_enriched is defined
+    - device_bgp_sessions_enriched | length > 0
+
+- name: Debug BGP session VRF split
+  ansible.builtin.debug:
+    msg:
+      - "Global BGP sessions (default VRF): {{ bgp_global_sessions | default([]) | length }}"
+      - "VRF BGP sessions: {{ bgp_vrf_sessions | default([]) | length }}"
+      - >-
+        VRF sessions detail: {{
+          bgp_vrf_sessions | default([]) |
+          map('dict2items') |
+          map('selectattr', 'key', 'in', ['name', '_vrf', '_af']) |
+          list
+        }}
+  when: aoscx_debug | default(false) | bool
+
 - name: Debug BGP configuration source
   ansible.builtin.debug:
     msg:
@@ -109,7 +146,7 @@
       - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
       - neighbor {{ item.remote_address.address.split('/')[0] }} activate
       - exit-address-family
-  loop: "{{ device_bgp_sessions | default([]) }}"
+  loop: "{{ bgp_global_sessions | default(device_bgp_sessions) | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }})"
   when:
@@ -154,7 +191,7 @@
       - address-family ipv4 unicast
       - neighbor {{ item.remote_address.address.split('/')[0] }} activate
       - exit-address-family
-  loop: "{{ device_bgp_sessions | default([]) }}"
+  loop: "{{ bgp_global_sessions | default(device_bgp_sessions) | default([]) }}"
   loop_control:
     label: "Device: {{ inventory_hostname }} → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }})"
   when:
@@ -182,6 +219,42 @@
     - custom_fields.device_bgp | default(false) | bool
     - bgp_ipv4_peers is defined
     - bgp_ipv4_peers | length > 0
+  vars:
+    ansible_connection: network_cli
+
+# ============================================================================
+# BGP VRF Neighbors (from netbox-bgp plugin)
+# ============================================================================
+# Sessions whose local_address is assigned to an interface in a non-default VRF
+# are configured here under the matching VRF context inside 'router bgp'.
+#
+# The VRF and address-family are derived automatically:
+#   local_address IP → interface in NetBox → interface VRF
+#   IPv4 address → address-family ipv4 unicast
+#   IPv6 address → address-family ipv6 unicast
+
+- name: Configure BGP VRF neighbors from netbox-bgp plugin
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - neighbor {{ item.remote_address.address.split('/')[0] }} remote-as {{ item.remote_as.asn }}
+      - address-family {{ item._af }} unicast
+      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
+      - neighbor {{ item.remote_address.address.split('/')[0] }} activate
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }} ({{ item._af }})
+      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }})
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -327,6 +400,8 @@
       - "Local AS: {{ device_bgp_sessions[0].local_as.asn }}"
       - "Router ID: {{ device_bgp_sessions[0].local_address.address.split('/')[0] }}"
       - "Total Sessions: {{ device_bgp_sessions | length }}"
+      - "Global Sessions (EVPN/default VRF): {{ bgp_global_sessions | default([]) | length }}"
+      - "VRF Sessions: {{ bgp_vrf_sessions | default([]) | length }}"
       - "Active Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'active') | list | length }}"
       - "Planned Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'planned') | list | length }}"
       - "Route Reflector: {{ 'Yes (all neighbors are RR clients)' if (role | default('') | lower in ['spine', 'route-reflector', 'rr']) else 'No' }}"
