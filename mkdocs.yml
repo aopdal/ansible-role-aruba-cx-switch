@@ -83,7 +83,9 @@ nav:
           - Interface Filters: filter_plugins/interface_filters.md
           - Comparison Module: filter_plugins/comparison.md
           - OSPF Filters: filter_plugins/ospf_filters.md
+          - BGP Filters: filter_plugins/bgp_filters.md
           - L3 Config Helpers: filter_plugins/l3_config_helpers.md
+          - REST API Transforms: filter_plugins/rest_api_transforms.md
   - Configuration:
       - Base System:
           - Overview: BASE_CONFIGURATION.md
