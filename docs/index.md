@@ -243,7 +243,7 @@ roles:
     - Troubleshooting NetBox integration issues
 
 - **[docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md)** - NetBox data transformation
-    - 22 custom filters for VLAN, VRF, interface, and OSPF operations
+    - 36 custom filters for VLAN, VRF, interface, OSPF, BGP, and REST API operations
     - Critical for understanding how the role processes NetBox data
 
 ### Configuration Guides

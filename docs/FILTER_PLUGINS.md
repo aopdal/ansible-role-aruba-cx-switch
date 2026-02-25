@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **29 custom filters** organized into 9 focused modules totaling ~2,700 lines of code. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, and state comparison between NetBox (source of truth) and device facts.
+This library provides **36 custom filters** organized into 11 modules across 2 plugin files. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, BGP session enrichment, REST API data normalization, and state comparison between NetBox (source of truth) and device facts.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
