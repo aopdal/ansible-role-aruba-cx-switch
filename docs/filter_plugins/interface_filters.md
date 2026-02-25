@@ -2,6 +2,19 @@
 
 Part of the NetBox Filters Library for Aruba AOS-CX switches.
 
+## What These Modules Do (Plain English)
+
+A network switch can have dozens or hundreds of interfaces, each with different jobs. Some carry VLANs (Layer 2), some have IP addresses (Layer 3), some are physical ports, some are virtual (like VLAN SVIs or LAGs), and some are loopbacks.
+
+When configuring a switch from NetBox data, you need to sort interfaces into groups so each group gets the right Ansible module and parameters. That's what these filters do:
+
+- **L2 categorization**: Sorts interfaces by VLAN mode (access, trunk, trunk-all) and interface type (physical, LAG, MCLAG) into 15 groups
+- **L3 categorization**: Sorts interfaces by type (physical, VLAN, LAG, sub-interface, loopback) and VRF (default vs. custom) into 9 groups
+- **IP matching**: Pairs each IP address from NetBox with its correct interface
+- **Change detection**: Compares what NetBox says the config should be vs. what the switch currently has, so you only push changes for what's actually different (idempotent mode)
+
+---
+
 ## Overview
 
 Interface processing functionality is split into three focused modules that handle categorization, IP address matching, and change detection.
@@ -194,13 +207,15 @@ L3 interfaces need different configuration based on type and VRF. This filter ca
 
 #### Returns
 
-- **dict**: Dictionary with 7 categorized interface lists:
+- **dict**: Dictionary with 9 categorized interface lists:
   - `physical_default_vrf` - Physical interfaces in default/Global/mgmt VRF
   - `physical_custom_vrf` - Physical interfaces in custom VRFs
   - `vlan_default_vrf` - VLAN interfaces (SVIs) in default VRF
   - `vlan_custom_vrf` - VLAN interfaces in custom VRFs
   - `lag_default_vrf` - LAG interfaces in default VRF
   - `lag_custom_vrf` - LAG interfaces in custom VRFs
+  - `subinterface_default_vrf` - Sub-interfaces (e.g., `1/1/3.2000`) in default VRF
+  - `subinterface_custom_vrf` - Sub-interfaces in custom VRFs
   - `loopback` - Loopback interfaces
 
 #### Built-in VRFs
@@ -213,13 +228,14 @@ The following are considered built-in (default) VRFs:
 
 #### Algorithm
 
-1. Initialize 7 empty category lists
+1. Initialize 9 empty category lists
 2. For each interface:
    - Skip if None or management interface
-   - Determine interface type (physical/LAG/virtual)
+   - Determine interface type (physical/LAG/virtual/sub-interface)
    - Get VRF name from interface object
    - Check if VRF is built-in
    - Categorize based on type + VRF category
+   - Sub-interfaces are detected as virtual interfaces with a parent interface
 3. Return categorized dict
 
 #### VRF Determination
@@ -243,6 +259,10 @@ The following are considered built-in (default) VRFs:
       Physical (custom VRF): {{ l3_interfaces.physical_custom_vrf | length }}
       VLAN SVIs (default VRF): {{ l3_interfaces.vlan_default_vrf | length }}
       VLAN SVIs (custom VRF): {{ l3_interfaces.vlan_custom_vrf | length }}
+      LAG (default VRF): {{ l3_interfaces.lag_default_vrf | length }}
+      LAG (custom VRF): {{ l3_interfaces.lag_custom_vrf | length }}
+      Sub-interfaces (default VRF): {{ l3_interfaces.subinterface_default_vrf | length }}
+      Sub-interfaces (custom VRF): {{ l3_interfaces.subinterface_custom_vrf | length }}
       Loopbacks: {{ l3_interfaces.loopback | length }}
 ```
 
@@ -284,6 +304,22 @@ The following are considered built-in (default) VRFs:
     vrf: "{{ item.interface.vrf.name }}"
     ipv4: "{{ item.address }}"
   loop: "{{ l3.vlan_custom_vrf }}"
+```
+
+**Configure Sub-interfaces:**
+```yaml
+- name: Configure sub-interfaces (default VRF)
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ item.interface_name }}"
+    ipv4: "{{ item.address }}"
+  loop: "{{ l3.subinterface_default_vrf }}"
+
+- name: Configure sub-interfaces (custom VRF)
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ item.interface_name }}"
+    vrf: "{{ item.interface.vrf.name }}"
+    ipv4: "{{ item.address }}"
+  loop: "{{ l3.subinterface_custom_vrf }}"
 ```
 
 **Configure Loopbacks:**

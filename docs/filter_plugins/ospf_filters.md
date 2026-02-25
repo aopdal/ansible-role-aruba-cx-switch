@@ -2,6 +2,19 @@
 
 Part of the NetBox Filters Library for Aruba AOS-CX switches.
 
+## What This Module Does (Plain English)
+
+**OSPF** (Open Shortest Path First) is a routing protocol that lets switches and routers automatically discover and share network routes with each other. It organizes the network into "areas" - think of areas as neighborhoods in a city. Each interface on a switch can be assigned to one OSPF area.
+
+In NetBox, OSPF configuration is stored as **custom fields** on interfaces (e.g., `if_ip_ospf_1_area = "0.0.0.0"` means "this interface is in OSPF area 0"). This module provides filters to:
+
+- **Find which interfaces have OSPF configured** in NetBox
+- **Extract the list of OSPF areas** in use
+- **Group interfaces by area** for targeted configuration
+- **Validate the OSPF setup** before deploying (e.g., check that the router has a router-id defined)
+
+---
+
 ## Overview
 
 The `ospf_filters.py` module provides OSPF (Open Shortest Path First) interface selection and validation functionality. It extracts OSPF configuration from NetBox custom fields and validates OSPF area consistency.

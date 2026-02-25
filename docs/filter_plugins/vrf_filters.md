@@ -2,17 +2,28 @@
 
 Part of the NetBox Filters Library for Aruba AOS-CX switches.
 
+## What This Module Does (Plain English)
+
+A **VRF** (Virtual Routing and Forwarding) is like having separate, isolated routing tables on a single switch. Think of it as virtual routers running inside one physical device. Each tenant or department can have its own VRF so their traffic stays separate.
+
+This module helps you figure out:
+- **Which VRFs are actually being used** on a device (not every VRF in NetBox is relevant to every switch)
+- **Which VRFs are safe to configure** (built-in system VRFs like `mgmt` should never be touched by automation)
+- **Which route targets belong to each VRF** (for L3VPN/MPLS/EVPN configurations)
+
+Every Aruba AOS-CX switch has some built-in VRFs (`mgmt`, `default`, `Global`) that the switch creates automatically. This module's filters know about these and automatically skip them so your automation doesn't accidentally try to create or delete system VRFs.
+
+---
+
 ## Overview
 
-The `vrf_filters.py` module provides VRF (Virtual Routing and Forwarding) extraction and filtering functionality. It handles VRF identification, filtering by usage and tenant, and automatic exclusion of built-in system VRFs.
+The `vrf_filters.py` module provides VRF (Virtual Routing and Forwarding) extraction and filtering functionality. It handles VRF identification, filtering by usage and tenant, route target extraction, and automatic exclusion of built-in system VRFs.
 
 **File Location**: [filter_plugins/netbox_filters_lib/vrf_filters.py](../../filter_plugins/netbox_filters_lib/vrf_filters.py)
 
-**Lines of Code**: 192 lines
-
 **Dependencies**: [utils.py](utils.md) (`_debug`)
 
-**Filter Count**: 4 filters
+**Filter Count**: 6 filters
 
 ## Built-in VRF Handling
 
@@ -437,6 +448,150 @@ def filter_configurable_vrfs(vrfs):
     name: "{{ item.name }}"
     state: present
   loop: "{{ safe_vrfs }}"
+```
+
+---
+
+### 5. `get_all_rt_names(vrf_details)`
+
+Extracts all unique route target names from VRF export and import target lists.
+
+#### How It Works (Plain English)
+
+**Route targets (RTs)** tell the switch which VRF routes to share and with whom. Each VRF can export routes (advertise them) and import routes (accept them from other VRFs). This filter collects all the unique RT names from all your VRFs into a single flat list.
+
+This is useful when you need to create the route target objects on the switch *before* assigning them to VRFs.
+
+#### Parameters
+
+- **vrf_details** (dict): Dict of VRF name to VRF object, as returned by a NetBox `nb_lookup` for VRFs. Each VRF object should contain `export_targets` and `import_targets` lists, where each target has a `name` field.
+
+#### Returns
+
+- **list**: Sorted list of unique route target name strings (e.g., `["65000:100", "65000:200"]`)
+
+#### Usage Examples
+
+**Get All Route Targets:**
+```yaml
+- name: Look up VRF details from NetBox
+  set_fact:
+    vrf_details: "{{ query('netbox.netbox.nb_lookup', 'vrfs',
+                      api_filter='name__in=' + vrfs_in_use.vrf_names | join(',')) }}"
+
+- name: Extract all route target names
+  set_fact:
+    all_rt_names: "{{ vrf_details | get_all_rt_names }}"
+  # Result: ["65000:100", "65000:200", "65000:300"]
+
+- name: Create route targets on switch
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "route-target {{ item }}"
+  loop: "{{ all_rt_names }}"
+```
+
+---
+
+### 6. `build_vrf_rt_config(vrf_details)`
+
+Builds an address-family-aware route target configuration grouped per VRF.
+
+#### How It Works (Plain English)
+
+In modern networks with both IPv4 and IPv6, route targets can be specific to an address family. For example, a VRF might export IPv4 routes with one RT and IPv6 routes with a different RT.
+
+This filter reads the `address_family` custom field from each route target object in NetBox and organizes them into a nested structure: VRF → address family (ipv4/ipv6) → direction (export/import) → list of RT names.
+
+If a route target doesn't have an `address_family` custom field, it defaults to `ipv4`.
+
+#### Parameters
+
+- **vrf_details** (dict): Dict of VRF name to VRF object from NetBox `nb_lookup`. Each VRF should have `export_targets` and `import_targets` lists containing full RT objects (including `custom_fields` with optional `address_family` field).
+
+#### Returns
+
+- **dict**: Nested dict keyed by VRF name:
+
+```yaml
+customer-a:
+  ipv4:
+    export: ["65000:100"]
+    import: ["65000:100"]
+  ipv6:
+    export: ["65000:600"]
+    import: ["65000:600"]
+customer-b:
+  ipv4:
+    export: ["65000:200"]
+    import: ["65000:200"]
+  ipv6:
+    export: []
+    import: []
+```
+
+#### Usage Examples
+
+**Build and Apply RT Config:**
+```yaml
+- name: Look up VRF details from NetBox
+  set_fact:
+    vrf_details: "{{ query('netbox.netbox.nb_lookup', 'vrfs',
+                      api_filter='name__in=' + vrfs_in_use.vrf_names | join(',')) }}"
+
+- name: Build address-family RT config
+  set_fact:
+    vrf_rt_config: "{{ vrf_details | build_vrf_rt_config }}"
+
+- name: Configure VRF route targets
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "vrf {{ item.key }}"
+      - "  address-family ipv4 unicast"
+      - "    route-target export {{ rt }}"
+  loop: "{{ vrf_rt_config | dict2items }}"
+  vars:
+    rt: "{{ item.value.ipv4.export | first }}"
+  when: item.value.ipv4.export | length > 0
+```
+
+**Complete RT Workflow:**
+```yaml
+---
+- name: Configure VRF route targets from NetBox
+  hosts: pe_routers
+  tasks:
+    # Get VRFs in use
+    - name: Extract VRFs
+      set_fact:
+        vrfs_in_use: "{{ netbox_interfaces | get_vrfs_in_use(ip_addresses) }}"
+
+    # Look up full VRF details (including RT objects)
+    - name: Get VRF details from NetBox
+      set_fact:
+        vrf_lookup: "{{ query('netbox.netbox.nb_lookup', 'vrfs',
+                         api_filter='name__in=' + vrfs_in_use.vrf_names | join(',')) }}"
+
+    # Build RT config
+    - name: Build RT config
+      set_fact:
+        vrf_rt_config: "{{ vrf_lookup | build_vrf_rt_config }}"
+
+    # First create all route targets
+    - name: Get unique RT names
+      set_fact:
+        all_rts: "{{ vrf_lookup | get_all_rt_names }}"
+
+    # Then apply per-VRF
+    - name: Configure IPv4 export RTs
+      arubanetworks.aoscx.aoscx_config:
+        lines: >-
+          vrf {{ item.0.key }}
+            address-family ipv4 unicast
+              route-target export {{ item.1 }}
+      with_subelements:
+        - "{{ vrf_rt_config | dict2items }}"
+        - value.ipv4.export
 ```
 
 ---

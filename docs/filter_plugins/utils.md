@@ -2,15 +2,27 @@
 
 Part of the NetBox Filters Library for Aruba AOS-CX switches.
 
+## What This Module Does (Plain English)
+
+This is the "toolbox" module that all other filter modules rely on. It provides small, reusable helper functions for common tasks:
+
+- **Debugging**: Print diagnostic messages when troubleshooting (controlled by an environment variable, so there's zero overhead in production)
+- **VLAN formatting**: Turn a list of VLAN numbers like `[10, 11, 12, 20, 21, 30]` into a compact range string `"10-12,20-21,30"` that switches understand
+- **Interface selection**: Choose which interfaces to configure based on whether you're running in standard mode (configure everything) or idempotent mode (only configure what changed)
+- **IP address extraction**: Pull IPv4 and IPv6 addresses from NetBox interface data and categorize them
+- **IP change tracking**: Tag interfaces with which IP addresses need to be added, so downstream tasks know what to configure
+
+---
+
 ## Overview
 
-The `utils.py` module provides core utility functions used across all filter modules. These helpers enable debugging, VLAN list formatting, and interface selection logic.
+The `utils.py` module provides core utility functions used across all filter modules. These helpers enable debugging, VLAN list formatting, interface selection logic, and IP address processing.
 
 **File Location**: [filter_plugins/netbox_filters_lib/utils.py](../../filter_plugins/netbox_filters_lib/utils.py)
 
-**Lines of Code**: 100 lines
-
 **Dependencies**: None (base module)
+
+**Function Count**: 5 (2 exposed as Ansible filters, 3 internal helpers used by other modules)
 
 ## Functions
 
@@ -397,6 +409,90 @@ DEBUG: Standard mode: selecting all 48 interfaces for configuration
 
 ```
 DEBUG: Idempotent mode: selecting 3 interfaces that need configuration changes
+```
+
+---
+
+### `extract_ip_addresses(nb_intf, exclude_anycast=False)`
+
+Extracts and categorizes IPv4 and IPv6 addresses from a single NetBox interface object.
+
+#### How It Works (Plain English)
+
+NetBox stores all IP addresses on an interface in a single list, but switches need IPv4 and IPv6 configured separately. This function splits the IP addresses into two lists based on a simple rule: if the address contains a colon (`:`), it's IPv6; otherwise it's IPv4.
+
+It can also optionally skip "anycast" IPs. Anycast IPs are special addresses shared across multiple switches (common in EVPN fabrics with active-gateway). These are configured via a different switch command (`active-gateway`), not the normal `ip address` command, so you sometimes want to exclude them.
+
+#### Parameters
+
+- **nb_intf** (dict): A single NetBox interface object containing an `ip_addresses` list. Each IP address is a dict with an `address` field (in CIDR notation like `"192.168.1.1/24"`) and an optional `role` field.
+- **exclude_anycast** (bool, optional): If `True`, skip IP addresses that have `role: "anycast"`. Default: `False`.
+
+#### Returns
+
+- **tuple**: A pair of `(ipv4_list, ipv6_list)` where:
+  - `ipv4_list`: List of IPv4 address strings (e.g., `["192.168.1.1/24", "10.0.0.1/30"]`)
+  - `ipv6_list`: List of IPv6 address strings (e.g., `["2001:db8::1/64"]`)
+
+#### Usage Example (In Python Filter Code)
+
+This function is **not exposed as an Ansible filter** - it's an internal helper used by other filter modules (particularly `interface_change_detection.py`):
+
+```python
+from .utils import extract_ip_addresses
+
+# Get all IPs
+ipv4, ipv6 = extract_ip_addresses(interface)
+
+# Get IPs excluding anycast (for comparison with device facts)
+ipv4, ipv6 = extract_ip_addresses(interface, exclude_anycast=True)
+```
+
+---
+
+### `populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6)`
+
+Tags a NetBox interface object with IP addresses that need to be configured on the device.
+
+#### How It Works (Plain English)
+
+After comparing what IPs NetBox says should be on an interface versus what the device currently has, you end up with lists of IPs to add. This function stamps those lists onto the interface object itself (in a field called `_ip_changes`) so that downstream Ansible tasks can loop over the interface and know exactly which IPs to configure.
+
+The underscore prefix in `_ip_changes` indicates it's a field added by the filter system, not something from NetBox itself.
+
+#### Parameters
+
+- **nb_intf** (dict): NetBox interface object to modify (modified in place).
+- **nb_ipv4** (list): List of IPv4 addresses that need to be added.
+- **nb_ipv6** (list): List of IPv6 addresses that need to be added.
+
+#### Returns
+
+- None (modifies `nb_intf` in place by adding/updating `_ip_changes` dict)
+
+#### Side Effects
+
+Adds `_ip_changes` to the interface dict:
+```yaml
+_ip_changes:
+  ipv4_to_add: ["192.168.1.1/24"]     # Only present if there are IPv4 changes
+  ipv6_addresses: ["2001:db8::1/64"]   # Only present if there are IPv6 changes
+```
+
+#### Usage Example (In Python Filter Code)
+
+This function is **not exposed as an Ansible filter** - it's an internal helper used by `interface_change_detection.py`:
+
+```python
+from .utils import extract_ip_addresses, populate_ip_changes
+
+# Extract IPs from NetBox interface
+ipv4, ipv6 = extract_ip_addresses(nb_interface, exclude_anycast=True)
+
+# After comparing with device facts, populate changes
+populate_ip_changes(nb_interface, ipv4_to_add, ipv6_to_add)
+
+# Now nb_interface['_ip_changes'] contains the IPs to configure
 ```
 
 ---
