@@ -1,110 +1,41 @@
-# Ansible Role vs Collection - Release System
+# Ansible Role vs Collection — Release System
 
-Explanation of the release system for Ansible Roles (not Collections).
+Explanation of why this project uses a Role-based release system instead of a Collection-based one.
 
-## Issue Discovered
+## This Project is an Ansible Role
 
-When running `pre-commit`, a `galaxy.yml` file was created (for Ansible Collections), but this project is an Ansible **Role**, not a Collection. This caused confusion because:
+This project is an Ansible **Role**, not a Collection. This distinction affects how versioning, metadata, and publishing work.
 
-1. **Ansible Collections** use `galaxy.yml` for metadata and versioning
-2. **Ansible Roles** use `meta/main.yml` for metadata
+### Key Differences
 
-The `.ansible/collections/ansible_collections` directory was created by the build process, which is normal when testing with collections installed.
-
-## Solution
-
-Updated the release system to work correctly for Ansible Roles:
-
-### ❌ Before (Incorrect - Collection Approach)
-
-```
-galaxy.yml                  # Collections use this
-  namespace: aopdal
-  name: aruba_cx_switch
-  version: 0.1.0
-  ...
-```
-
-### ✅ After (Correct - Role Approach)
-
-```
-VERSION                     # Simple version file
-0.1.0
-
-meta/main.yml              # Role metadata (existing)
-galaxy_info:
-  role_name: aruba_cx_switch
-  namespace: aopdal
-  ...
-```
-
----
-
-## Key Differences
-
-### Ansible Collections
-
-**Purpose**: Package multiple plugins, modules, roles together
-
-**Structure**:
-
-```
-namespace/
-  collection_name/
-    galaxy.yml              ← Version here
-    plugins/
-    roles/
-    playbooks/
-```
-
-**Galaxy Metadata**: `galaxy.yml`
-
-**Publishing**: `ansible-galaxy collection publish`
-
-**Example**: `arubanetworks.aoscx` (Collection)
-
-### Ansible Roles (This Project)
-
-**Purpose**: Reusable task automation for specific purpose
-
-**Structure**:
-
-```
-ansible-role-name/
-  meta/main.yml            ← Galaxy metadata here
-  tasks/
-  handlers/
-  defaults/
-  vars/
-```
-
-**Galaxy Metadata**: `meta/main.yml`
-
-**Version Storage**: Custom (we use `VERSION` file)
-
-**Publishing**: `ansible-galaxy role import`
-
-**Example**: `aopdal.aruba_cx_switch` (Role)
+| Feature | Collection | Role (This Project) |
+|---------|-----------|---------------------|
+| **Metadata file** | `galaxy.yml` | `meta/main.yml` |
+| **Version storage** | `galaxy.yml` | `VERSION` file |
+| **Structure** | `namespace.collection_name` | `author.role_name` |
+| **Publish command** | `collection publish` | `role import` |
+| **Install command** | `collection install` | `role install` |
+| **Can contain roles** | Yes (multiple) | Is a single role |
 
 ---
 
 ## Release System Components
 
-### 1. VERSION File (New)
+### 1. VERSION File
 
-**Purpose**: Single source of truth for version
+**Purpose**: Single source of truth for current version
 
 **Location**: `/VERSION`
 
 **Format**: Plain text, single line
 
 ```
-0.1.0
+0.5.0
 ```
 
-**Why**: Simple, clear, works for roles
+**Updated by**: Developer in a pull request before merging to `main`.
 
-### 2. meta/main.yml (Existing)
+### 2. meta/main.yml
 
 **Purpose**: Ansible Galaxy role metadata
 
@@ -122,48 +53,46 @@ galaxy_info:
   ...
 ```
 
-**Note**: Does NOT contain version (handled by `VERSION` file)
+**Note**: Does NOT contain version — that's handled by the `VERSION` file and Git tags.
 
-### 3. CHANGELOG.md (Existing)
+### 3. CHANGELOG.md
 
 **Purpose**: Human-readable change history
 
 **Location**: `/CHANGELOG.md`
 
-**Format**: Keep a Changelog
+**Format**: [Keep a Changelog](https://keepachangelog.com/)
 
-### 4. Release Workflow (Updated)
+### 4. Release Workflow
 
 **File**: `.github/workflows/release.yml`
 
-**Changes**:
-
-- ✅ Reads from `VERSION` file (not `galaxy.yml`)
-- ✅ Updates `VERSION` file (not `galaxy.yml`)
-- ✅ Creates Git tags and GitHub releases
-- ❌ Does NOT create `galaxy.yml`
+**What it does**:
+- Reads `VERSION` file (does not modify it)
+- Extracts release notes from `CHANGELOG.md`
+- Creates Git tag and GitHub Release
+- Does **not** commit or push to `main`
 
 ---
 
-## How Release Works for Roles
+## How a Release Works
 
 ```
-1. Developer updates CHANGELOG.md
+1. Developer updates CHANGELOG.md and VERSION in a PR
          ↓
-2. Merge to main
+2. PR is reviewed, CI passes, merged to main
          ↓
-3. Release workflow:
-   - Read VERSION: 0.1.0
-   - Increment: 0.1.0 → 0.1.1
-   - Update VERSION file
-   - Update CHANGELOG.md
-   - Create tag: v0.1.1
+3. Release workflow triggers (VERSION file changed):
+   - Read VERSION: 0.6.0
+   - Check tag v0.6.0 does not exist
+   - Extract release notes from CHANGELOG.md
+   - Create tag: v0.6.0
    - Create GitHub Release
          ↓
-4. When ready for Galaxy:
-   - Use meta/main.yml for role metadata
-   - VERSION is for internal tracking only
-   - Import with: ansible-galaxy role import
+4. Release is available:
+   - GitHub Release with notes
+   - Git tag v0.6.0
+   - No files modified on main
 ```
 
 ---
@@ -182,145 +111,60 @@ galaxy_info:
   # ... other metadata
 ```
 
-### Step 2: Enable Galaxy Publishing
+### Step 2: Add Galaxy API Key
 
-In `.github/workflows/ci.yml`, uncomment:
+1. Generate key at https://galaxy.ansible.com/me/preferences
+2. Add to GitHub: Settings → Secrets → Actions → `GALAXY_API_KEY`
+
+### Step 3: Add Publishing Step to Workflow
 
 ```yaml
-release:
-  name: Release to Ansible Galaxy
-  ...
-  - name: Trigger a new import on Ansible Galaxy
-    run: >-
-      ansible-galaxy role import
-      --api-key ${{ secrets.GALAXY_API_KEY }}
-      $(echo ${{ github.repository }} | cut -d/ -f1)
-      $(echo ${{ github.repository }} | cut -d/ -f2)
+- name: Import role to Ansible Galaxy
+  run: >-
+    ansible-galaxy role import
+    --api-key ${{ secrets.GALAXY_API_KEY }}
+    aopdal ansible-role-aruba-cx-switch
 ```
 
-**Note**: Uses `role import`, NOT `collection publish`
+**Note**: Uses `role import`, NOT `collection publish`.
 
-### Step 3: Manual Publishing
+### Installing the Role
 
 ```bash
-# Login to Galaxy
-ansible-galaxy login
-
-# Import role (NOT publish collection)
-ansible-galaxy role import aopdal ansible-role-aruba-cx-switch
-
-# Install role
+# Install from Galaxy
 ansible-galaxy role install aopdal.aruba_cx_switch
-```
 
----
+# Install specific version
+ansible-galaxy role install aopdal.aruba_cx_switch,v0.6.0
 
-## Comparison Table
-
-| Feature | Collection | Role (This Project) |
-|---------|-----------|---------------------|
-| **Metadata File** | `galaxy.yml` | `meta/main.yml` |
-| **Version Storage** | `galaxy.yml` | `VERSION` file |
-| **Structure** | namespace/name | author.role_name |
-| **Publish Command** | `collection publish` | `role import` |
-| **Install Command** | `collection install` | `role install` |
-| **Can Contain Roles** | Yes (multiple) | Is a single role |
-| **This Project** | ❌ No | ✅ Yes |
-
----
-
-## What Gets Published to Galaxy
-
-### For Ansible Roles (This Project)
-
-**Metadata from**: `meta/main.yml`
-
-**Version from**: Git tags (e.g., `v0.1.1`)
-
-**Content**: Entire repository
-
-**Galaxy URL**: `https://galaxy.ansible.com/aopdal/aruba_cx_switch`
-
-**Install**: `ansible-galaxy role install aopdal.aruba_cx_switch`
-
-**Requirements.yml**:
-
-```yaml
+# In requirements.yml
 roles:
   - name: aopdal.aruba_cx_switch
-    version: 0.1.1
+    version: 0.6.0
 ```
 
 ---
 
 ## Why .ansible/ Directory Exists
 
-The `.ansible/` directory is created by:
-
-1. **Pre-commit** - When running `ansible-lint`
-2. **Testing** - When installing collection dependencies
-3. **Development** - Normal Ansible behavior
-
-**Structure**:
-
-```
-.ansible/
-├── collections/
-│   └── ansible_collections/    # Installed collections
-│       ├── arubanetworks/
-│       │   └── aoscx/
-│       └── netbox/
-│           └── netbox/
-├── modules/                     # Cached modules
-└── roles/                       # Cached roles
-```
-
-**Note**: This is normal and should be in `.gitignore`
+The `.ansible/` directory is created by normal Ansible operations (running `ansible-lint`, installing collection dependencies, testing). It should be in `.gitignore`.
 
 ---
 
 ## Verification
 
-### Check Project Type
-
 ```bash
-# Ansible Role indicators:
+# Confirm this is a Role (not a Collection)
 ls meta/main.yml              # ✅ Role metadata exists
-ls galaxy.yml 2>/dev/null     # ❌ Should NOT exist (we removed it)
-ls VERSION                    # ✅ Our version file exists
+ls galaxy.yml 2>/dev/null     # ❌ Should NOT exist
+ls VERSION                    # ✅ Version file exists
 
-# Ansible Collection indicators:
-ls galaxy.yml 2>/dev/null     # ❌ Should NOT exist for roles
-ls plugins/ 2>/dev/null       # ❌ Collections have this
+# Check version
+cat VERSION
+
+# Check latest tag
+git describe --tags --abbrev=0
 ```
-
-### Verify Release System
-
-```bash
-# Check version storage
-cat VERSION                   # Should show: 0.1.0
-
-# Check workflow
-grep "VERSION" .github/workflows/release.yml  # ✅ Should reference VERSION
-grep "galaxy.yml" .github/workflows/release.yml  # ❌ Should NOT exist
-
-# Check documentation
-grep -r "galaxy.yml" docs/ || echo "Correctly uses VERSION file"
-```
-
----
-
-## Summary
-
-| Component | Collections | Roles (This Project) |
-|-----------|------------|----------------------|
-| **galaxy.yml** | ✅ Required | ❌ Removed |
-| **meta/main.yml** | Optional | ✅ Required |
-| **VERSION file** | Not used | ✅ Used for versioning |
-| **Release workflow** | Updates galaxy.yml | ✅ Updates VERSION |
-| **Publishing** | `collection publish` | `role import` |
-
-**Conclusion**: This project is an Ansible **Role**, using `VERSION` file for version tracking and `meta/main.yml` for Galaxy metadata. The `galaxy.yml` file was incorrectly created and has been removed.
 
 ---
 
