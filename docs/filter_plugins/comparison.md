@@ -2,6 +2,16 @@
 
 Part of the NetBox Filters Library for Aruba AOS-CX switches.
 
+## What This Module Does (Plain English)
+
+Imagine you have a blueprint of how a switch should be configured (that's NetBox) and you also know how the switch is currently configured (that's device facts). This module compares the two and tells you what's different.
+
+**Why does this matter?** Without comparison, your playbook would push *all* configuration to the switch every time it runs, even if nothing changed. That's slow and potentially disruptive. With comparison, the playbook only touches interfaces that actually need changes - this is called **idempotent** operation (running it twice produces the same result).
+
+The module specifically compares VLAN assignments: which VLANs are on each interface in NetBox vs. on the switch. It tells you which VLANs need to be added, which need to be removed, and which interfaces need changes.
+
+---
+
 ## Overview
 
 The `comparison.py` module provides state comparison logic for determining configuration changes between NetBox (source of truth) and device facts (current state). This enables idempotent playbook execution by only making necessary changes.

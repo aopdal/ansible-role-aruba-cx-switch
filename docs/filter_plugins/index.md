@@ -1,14 +1,34 @@
 # Filter Plugins - Detailed Reference
 
-Comprehensive documentation for the NetBox Filters Library used with Aruba AOS-CX switches.
+Comprehensive documentation for the filter plugins used with Aruba AOS-CX switches.
+
+## What Are Filter Plugins? (For Non-Python Experts)
+
+In Ansible, a **filter** is a small function that transforms data. You use it in your playbook with the pipe (`|`) symbol, like this:
+
+```yaml
+# Take a list of interfaces, pipe it through a filter, get categorized results
+- set_fact:
+    l2: "{{ my_interfaces | categorize_l2_interfaces }}"
+```
+
+Think of filters like functions in a spreadsheet: data goes in, transformed data comes out. The filters in this role take raw data from NetBox (your network source of truth) and transform it into structures that Ansible can use to configure Aruba AOS-CX switches.
+
+**You don't need to know Python to use these filters.** You just need to know:
+1. What data to pass in (the input)
+2. What you get back (the output)
+3. Where to use the filter in your playbook
+
+Each filter's documentation below tells you exactly that.
+
+---
 
 ## Overview
 
-The filter plugins library provides 29 custom Ansible filters organized into 9 specialized modules. These filters transform NetBox data for use in switch configuration playbooks, handle state comparison for idempotent operations, and categorize interfaces for targeted configuration.
+The filter plugins library provides **36 custom Ansible filters** organized across **11 modules** in two filter plugin files.
 
-**Total Filters**: 29
-**Total Lines of Code**: ~2,700
-**Modules**: 8 feature modules + 1 utility module
+- **`netbox_filters.py`** - Main plugin with 32 filters (NetBox data transformation)
+- **`rest_api_transforms.py`** - Separate plugin with 4 filters (REST API format conversion)
 
 ---
 
@@ -17,8 +37,7 @@ The filter plugins library provides 29 custom Ansible filters organized into 9 s
 ### Core Utilities
 
 **[Utils Module](utils.md)** - Helper functions and debugging
-**Functions**: 5 (2 exposed as filters)
-**Lines**: 176
+**Functions**: 5 (2 exposed as Ansible filters, 3 internal helpers)
 
 Foundation module providing:
 - Debug message printing with environment variable control
@@ -33,14 +52,13 @@ Foundation module providing:
 
 **[L3 Config Helpers](l3_config_helpers.md)** - L3 interface configuration optimization
 **Filters**: 5
-**Lines**: 181
 
 Configuration building and helper functions:
 - Interface name formatting for AOS-CX
 - IP version detection (IPv4/IPv6)
 - VRF extraction with safe fallback
 - Complete L3 config line generation
-- Supports physical, LAG, and VLAN interfaces
+- Supports physical, LAG, VLAN, and sub-interfaces
 
 **Key Filters:**
 - `format_interface_name()` - Format interface names
@@ -54,7 +72,6 @@ Configuration building and helper functions:
 
 **[VLAN Filters](vlan_filters.md)** - Complete VLAN lifecycle management
 **Filters**: 8
-**Lines**: 454
 
 Most comprehensive module handling:
 - VLAN ID extraction from interfaces
@@ -75,21 +92,23 @@ Most comprehensive module handling:
 
 ### VRF Operations
 
-**[VRF Filters](vrf_filters.md)** - VRF extraction and filtering
-**Filters**: 4
-**Lines**: 191
+**[VRF Filters](vrf_filters.md)** - VRF extraction, filtering, and route target management
+**Filters**: 6
 
 Manages VRF identification and filtering:
 - VRF extraction from interfaces and IP addresses
 - Automatic exclusion of built-in VRFs (mgmt, Global, default)
 - Multi-tenant VRF filtering
-- VRF validation and safety checks
+- Route target name extraction
+- Address-family-aware route target configuration building
 
 **Key Filters:**
 - `extract_interface_vrfs()` - Get VRF names from interfaces
 - `filter_vrfs_in_use()` - Filter with tenant support
 - `get_vrfs_in_use()` - Comprehensive VRF details
 - `filter_configurable_vrfs()` - Safety filter for built-in VRFs
+- `get_all_rt_names()` - Extract all route target names
+- `build_vrf_rt_config()` - Build per-VRF, per-address-family RT config
 
 ---
 
@@ -98,20 +117,20 @@ Manages VRF identification and filtering:
 Interface processing is split into three focused modules:
 
 **Interface Categorization** (`interface_categorization.py`)
-**Filters**: 2 | **Lines**: 294
+**Filters**: 2
 
 - L2 interface categorization (15 categories)
-- L3 interface categorization (7 categories)
+- L3 interface categorization (9 categories)
 - Key filters: `categorize_l2_interfaces()`, `categorize_l3_interfaces()`
 
 **IP Address Processing** (`interface_ip_processing.py`)
-**Filters**: 1 | **Lines**: 106
+**Filters**: 1
 
 - Interface/IP address matching with anycast gateway support
 - Key filter: `get_interface_ip_addresses()`
 
 **Change Detection** (`interface_change_detection.py`)
-**Filters**: 1 | **Lines**: 814
+**Filters**: 1
 
 - Idempotent change detection for interfaces
 - Key filter: `get_interfaces_needing_config_changes()`
@@ -124,7 +143,6 @@ See **[Interface Filters](interface_filters.md)** for detailed documentation.
 
 **[Comparison Module](comparison.md)** - NetBox vs device state comparison
 **Filters**: 2
-**Lines**: 295
 
 Enables idempotent operations:
 - VLAN configuration comparison
@@ -142,7 +160,6 @@ Enables idempotent operations:
 
 **[OSPF Filters](ospf_filters.md)** - OSPF interface selection and validation
 **Filters**: 4
-**Lines**: 138
 
 OSPF-specific operations:
 - OSPF interface identification from custom fields
@@ -155,6 +172,40 @@ OSPF-specific operations:
 - `extract_ospf_areas()` - List all areas in use
 - `get_ospf_interfaces_by_area()` - Filter by area
 - `validate_ospf_config()` - Pre-deployment validation
+
+---
+
+### BGP Session Enrichment
+
+**[BGP Filters](bgp_filters.md)** - BGP session VRF and address-family resolution
+**Filters**: 1
+
+Enriches BGP session data from the NetBox BGP plugin:
+- Cross-references BGP session local addresses with interface IPs
+- Determines VRF membership (global vs. per-tenant)
+- Identifies address family (IPv4 vs. IPv6)
+
+**Key Filter:**
+- `get_bgp_session_vrf_info()` - Enrich sessions with VRF and AF metadata
+
+---
+
+### REST API Transforms
+
+**[REST API Transforms](rest_api_transforms.md)** - REST API response normalization
+**Filters**: 4 *(separate plugin file: `rest_api_transforms.py`)*
+
+Converts raw Aruba AOS-CX REST API responses into the format expected by `aoscx_facts`-based logic:
+- Interface data normalization (admin state, IPv6 URL-decoding)
+- VLAN data normalization
+- EVPN VLAN data extraction
+- VNI data extraction
+
+**Key Filters:**
+- `rest_api_to_aoscx_interfaces()` - Normalize interface data
+- `rest_api_to_aoscx_vlans()` - Normalize VLAN data
+- `rest_api_to_aoscx_evpn_vlans()` - Extract EVPN VLAN config
+- `rest_api_to_aoscx_vnis()` - Extract VNI config
 
 ---
 
@@ -230,6 +281,20 @@ OSPF-specific operations:
   loop: "{{ l3.physical_custom_vrf }}"
 ```
 
+#### BGP Configuration
+```yaml
+# Enrich BGP sessions with VRF info
+- set_fact:
+    bgp_sessions: "{{ nb_bgp_sessions | get_bgp_session_vrf_info(netbox_interfaces) }}"
+
+# Configure global sessions (underlay/EVPN)
+- arubanetworks.aoscx.aoscx_bgp_neighbor:
+    vrf: default
+    neighbor: "{{ item.remote_address.address | ansible.utils.ipaddr('address') }}"
+    remote_as: "{{ item.remote_as.asn }}"
+  loop: "{{ bgp_sessions | selectattr('_vrf', 'equalto', 'default') | list }}"
+```
+
 #### Idempotent Updates
 ```yaml
 # Detect changes
@@ -289,21 +354,23 @@ OSPF-specific operations:
 - `get_vlan_interfaces(interfaces)` - Extract SVIs
 - `parse_evpn_evi_output(output)` - Parse show command
 
-#### VRF Filters (4)
+#### VRF Filters (6)
 - `extract_interface_vrfs(interfaces)` - Extract VRF names
 - `filter_vrfs_in_use(vrfs, interfaces, tenant)` - Filter VRFs
 - `get_vrfs_in_use(interfaces, ip_addresses)` - Comprehensive VRF data
 - `filter_configurable_vrfs(vrfs)` - Remove built-in VRFs
+- `get_all_rt_names(vrf_details)` - Extract all route target names
+- `build_vrf_rt_config(vrf_details)` - Build address-family RT config per VRF
 
 #### Interface Categorization (2 filters)
 - `categorize_l2_interfaces(interfaces)` - 15 L2 categories
-- `categorize_l3_interfaces(interfaces)` - 7 L3 categories
+- `categorize_l3_interfaces(interfaces)` - 9 L3 categories
 
 #### Interface IP Processing (1 filter)
 - `get_interface_ip_addresses(interfaces, ip_addresses)` - Match IPs to interfaces
 
 #### Interface Change Detection (1 filter)
-- `get_interfaces_needing_config_changes(interfaces, facts)` - Change detection
+- `get_interfaces_needing_config_changes(interfaces, facts, enhanced_facts)` - Change detection
 
 #### Comparison (2 filters)
 - `compare_interface_vlans(nb_intf, device_intf)` - Single interface comparison
@@ -315,6 +382,15 @@ OSPF-specific operations:
 - `get_ospf_interfaces_by_area(interfaces, area)` - Filter by area
 - `validate_ospf_config(device, interfaces)` - Validate configuration
 
+#### BGP Filters (1)
+- `get_bgp_session_vrf_info(sessions, interfaces)` - Enrich BGP sessions with VRF/AF info
+
+#### REST API Transforms (4) *(separate plugin)*
+- `rest_api_to_aoscx_interfaces(rest_data)` - Normalize interface data
+- `rest_api_to_aoscx_vlans(rest_data)` - Normalize VLAN data
+- `rest_api_to_aoscx_evpn_vlans(rest_data)` - Extract EVPN VLAN config
+- `rest_api_to_aoscx_vnis(rest_data)` - Extract VNI config
+
 ---
 
 ## By Use Case
@@ -322,6 +398,7 @@ OSPF-specific operations:
 ### Idempotent Operations
 - `get_vlans_needing_changes()` - VLAN idempotency
 - `get_interfaces_needing_changes()` - Interface idempotency
+- `get_interfaces_needing_config_changes()` - Granular interface change detection
 - `compare_interface_vlans()` - VLAN comparison
 - `select_interfaces_to_configure()` - Interface selection
 
@@ -330,6 +407,7 @@ OSPF-specific operations:
 - `extract_interface_vrfs()` - VRF names
 - `extract_ospf_areas()` - OSPF areas
 - `get_interface_ip_addresses()` - Interface/IP matching
+- `get_all_rt_names()` - Route target names
 
 ### Filtering
 - `filter_vlans_in_use()` - Active VLANs
@@ -339,13 +417,26 @@ OSPF-specific operations:
 - `get_ospf_interfaces_by_area()` - Area filtering
 
 ### Categorization
-- `categorize_l2_interfaces()` - L2 by mode/type
-- `categorize_l3_interfaces()` - L3 by type/VRF
+- `categorize_l2_interfaces()` - L2 by mode/type (15 categories)
+- `categorize_l3_interfaces()` - L3 by type/VRF (9 categories)
+
+### BGP
+- `get_bgp_session_vrf_info()` - Enrich sessions with VRF and address family
 
 ### EVPN/VXLAN
 - `extract_evpn_vlans()` - EVPN VLANs
 - `extract_vxlan_mappings()` - VNI mappings
 - `parse_evpn_evi_output()` - Parse show output
+
+### Route Target Management
+- `get_all_rt_names()` - Collect all RT names
+- `build_vrf_rt_config()` - Build per-VRF, per-AF RT structure
+
+### REST API Normalization
+- `rest_api_to_aoscx_interfaces()` - Interface data
+- `rest_api_to_aoscx_vlans()` - VLAN data
+- `rest_api_to_aoscx_evpn_vlans()` - EVPN data
+- `rest_api_to_aoscx_vnis()` - VNI data
 
 ### Validation
 - `validate_ospf_config()` - OSPF validation
@@ -380,8 +471,8 @@ OSPF-specific operations:
 2. Write function with proper docstring
 3. Use `_debug()` for troubleshooting output
 4. Export in `__init__.py`
-5. Register in `netbox_filters.py`
-6. Document in this guide
+5. Register in `netbox_filters.py` (or create own `FilterModule` for separate plugin)
+6. Document in this guide and create/update module doc
 
 ### Testing
 
@@ -396,7 +487,11 @@ ansible-playbook site.yml
 python3 << 'EOF'
 from filter_plugins.netbox_filters import FilterModule
 fm = FilterModule()
-print(f'Loaded {len(fm.filters())} filters')
+print(f'Loaded {len(fm.filters())} filters from netbox_filters')
+
+from filter_plugins.rest_api_transforms import FilterModule as RestFM
+rfm = RestFM()
+print(f'Loaded {len(rfm.filters())} filters from rest_api_transforms')
 EOF
 ```
 
@@ -414,18 +509,20 @@ EOF
 
 ## Statistics
 
-| Module | Filters | Lines | Description |
-|--------|---------|-------|-------------|
-| **interface_change_detection.py** | 1 | 814 | Change detection & idempotency |
-| **vlan_filters.py** | 8 | 454 | VLAN lifecycle management |
-| **comparison.py** | 2 | 295 | State comparison logic |
-| **interface_categorization.py** | 2 | 294 | Interface categorization |
-| **vrf_filters.py** | 4 | 191 | VRF operations |
-| **l3_config_helpers.py** | 5 | 181 | L3 configuration optimization |
-| **utils.py** | 2 | 176 | Helper functions and utilities |
-| **ospf_filters.py** | 4 | 138 | OSPF configuration |
-| **interface_ip_processing.py** | 1 | 106 | IP address matching |
-| **Total** | **29** | **~2,700** | 9 modules |
+| Module | Filters | Description |
+|--------|---------|-------------|
+| **vlan_filters.py** | 8 | VLAN lifecycle management |
+| **vrf_filters.py** | 6 | VRF operations and route targets |
+| **l3_config_helpers.py** | 5 | L3 configuration optimization |
+| **ospf_filters.py** | 4 | OSPF configuration |
+| **rest_api_transforms.py** | 4 | REST API data normalization |
+| **interface_categorization.py** | 2 | Interface categorization |
+| **comparison.py** | 2 | State comparison logic |
+| **utils.py** | 2 | Helper functions and utilities |
+| **interface_change_detection.py** | 1 | Change detection and idempotency |
+| **interface_ip_processing.py** | 1 | IP address matching |
+| **bgp_filters.py** | 1 | BGP session enrichment |
+| **Total** | **36** | 11 modules across 2 plugin files |
 
 ---
 

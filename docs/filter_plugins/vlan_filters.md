@@ -2,6 +2,19 @@
 
 Part of the NetBox Filters Library for Aruba AOS-CX switches.
 
+## What This Module Does (Plain English)
+
+A **VLAN** (Virtual LAN) is a way to split a physical switch into multiple isolated networks. For example, VLAN 10 might be for office PCs and VLAN 20 for printers - even though they're plugged into the same switch, they can't talk to each other without a router.
+
+This module handles everything VLAN-related when configuring a switch from NetBox:
+
+- **Finding which VLANs are in use**: Not every VLAN defined in NetBox is needed on every switch. These filters figure out which VLANs are actually assigned to interfaces on a specific device.
+- **Creating and removing VLANs**: Compares what VLANs should exist (from NetBox) with what VLANs currently exist (from device facts) and tells you which ones to create or delete.
+- **EVPN/VXLAN support**: In overlay networks, VLANs are extended across data centers using EVPN and VXLAN. These filters extract which VLANs need EVPN configuration and what VNI (Virtual Network Identifier) maps to which VLAN.
+- **Parsing show commands**: Can read the output of `show evpn evi` from the switch and extract structured data from it.
+
+---
+
 ## Overview
 
 The `vlan_filters.py` module provides comprehensive VLAN lifecycle management functionality. It handles extraction, filtering, EVPN/VXLAN configuration, and state comparison for VLANs across NetBox and device facts.

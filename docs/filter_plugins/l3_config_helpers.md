@@ -5,6 +5,19 @@
 **Lines**: 162
 **Purpose**: L3 interface configuration optimization and code reuse
 
+## What This Module Does (Plain English)
+
+When you assign an IP address to a switch interface, you need to run several configuration commands: set the IP, maybe attach a VRF, enable L3 counters, configure the MTU, etc. The exact commands vary slightly depending on whether it's a physical port, a LAG, a VLAN interface, or a sub-interface.
+
+Without this module, you'd need to repeat nearly identical Ansible task blocks for each interface type, with only minor differences. This module provides a single `build_l3_config_lines()` filter that generates the correct configuration commands for **any** interface type. You pass in the interface details and get back a list of ready-to-use configuration lines.
+
+It also provides small helper filters for common L3 tasks:
+- Formatting interface names (e.g., `lag1` needs to become `lag 1` on AOS-CX)
+- Checking whether an IP address is IPv4 or IPv6
+- Extracting the VRF name from interface data with a safe fallback
+
+---
+
 ## Overview
 
 The L3 Configuration Helpers module provides specialized filter functions for building Layer 3 interface configurations. This module was created to eliminate code duplication across physical, LAG, and VLAN interface configuration tasks while providing a clean, testable API for L3 operations.
