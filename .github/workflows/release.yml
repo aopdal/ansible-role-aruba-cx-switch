@@ -5,21 +5,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - VERSION
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., 1.0.0) - leave empty for auto-increment'
-        required: false
-        type: string
-      release_type:
-        description: 'Release type (major, minor, patch)'
-        required: false
-        default: 'patch'
-        type: choice
-        options:
-          - major
-          - minor
-          - patch
 
 jobs:
   # Run tests before releasing
@@ -31,225 +19,69 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: test  # Wait for tests to pass
-    # Only run on push to main (automatic) or manual workflow dispatch
+    needs: test
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
-      pull-requests: write
 
     steps:
       - name: Check out the codebase
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for changelog generation
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyyaml semver
-
-      - name: Analyze commits to determine version bump
-        id: analyze_commits
-        run: |
-          python3 << 'EOF'
-          import os
-          import subprocess
-          import re
-
-          # Get commits since last tag
-          try:
-              last_tag = subprocess.check_output(
-                  ["git", "describe", "--tags", "--abbrev=0"],
-                  stderr=subprocess.DEVNULL
-              ).decode().strip()
-              commit_range = f"{last_tag}..HEAD"
-          except subprocess.CalledProcessError:
-              # No tags yet, check all commits
-              commit_range = "HEAD"
-
-          # Get commit messages
-          commits = subprocess.check_output(
-              ["git", "log", commit_range, "--pretty=format:%s"],
-              stderr=subprocess.DEVNULL
-          ).decode().strip().split("\n")
-
-          print(f"Analyzing {len(commits)} commits since {commit_range}")
-
-          # Determine release type based on conventional commits
-          has_breaking = False
-          has_feat = False
-          has_fix = False
-
-          for commit in commits:
-              if not commit:
-                  continue
-              print(f"  - {commit}")
-
-              # Check for breaking changes
-              if re.search(r'^(.*!):|BREAKING CHANGE:', commit, re.IGNORECASE):
-                  has_breaking = True
-                  print(f"    → BREAKING CHANGE detected")
-              # Check for features
-              elif commit.startswith("feat:") or commit.startswith("feat("):
-                  has_feat = True
-                  print(f"    → feature detected")
-              # Check for fixes
-              elif commit.startswith("fix:") or commit.startswith("fix("):
-                  has_fix = True
-                  print(f"    → fix detected")
-
-          # Determine release type
-          if has_breaking:
-              release_type = "major"
-              print(f"\n→ Version bump: MAJOR (breaking changes detected)")
-          elif has_feat:
-              release_type = "minor"
-              print(f"\n→ Version bump: MINOR (features detected)")
-          elif has_fix:
-              release_type = "patch"
-              print(f"\n→ Version bump: PATCH (fixes detected)")
-          else:
-              release_type = "patch"
-              print(f"\n→ Version bump: PATCH (default)")
-
-          # Write to GitHub output
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"release_type={release_type}\n")
-          EOF
-
-      - name: Determine version
+      - name: Read version
         id: version
         run: |
-          python3 << 'EOF'
-          import os
-          from pathlib import Path
+          version=$(cat VERSION | tr -d '[:space:]')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Current VERSION file: ${version}"
 
-          # Get manual version if provided
-          manual_version = "${{ github.event.inputs.version }}"
-          manual_release_type = "${{ github.event.inputs.release_type }}"
-          auto_release_type = "${{ steps.analyze_commits.outputs.release_type }}"
-
-          # Use manual release type if provided, otherwise use auto-detected
-          release_type = manual_release_type if manual_release_type else auto_release_type
-
-          # Read current version from VERSION file
-          version_file = Path("VERSION")
-          if version_file.exists():
-              current_version = version_file.read_text().strip()
-          else:
-              current_version = "0.0.0"
-
-          print(f"Current version: {current_version}")
-          print(f"Release type: {release_type}")
-
-          if manual_version:
-              new_version = manual_version
-              print(f"Using manual version: {new_version}")
-          else:
-              # Auto-increment based on release type
-              parts = current_version.split(".")
-              major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
-
-              if release_type == "major":
-                  major += 1
-                  minor = 0
-                  patch = 0
-              elif release_type == "minor":
-                  minor += 1
-                  patch = 0
-              else:  # patch
-                  patch += 1
-
-              new_version = f"{major}.{minor}.{patch}"
-              print(f"Auto-incremented to: {new_version}")
-
-          # Write to GitHub output
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"version={new_version}\n")
-              f.write(f"current_version={current_version}\n")
-              f.write(f"release_type={release_type}\n")
-          EOF
-
-      - name: Update VERSION file
+      - name: Check if tag already exists
+        id: check_tag
         run: |
-          echo "${{ steps.version.outputs.version }}" > VERSION
-          echo "Updated VERSION file to ${{ steps.version.outputs.version }}"
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v${{ steps.version.outputs.version }} already exists — skipping release"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag v${{ steps.version.outputs.version }} does not exist — proceeding with release"
+          fi
 
-      - name: Update CHANGELOG.md
+      - name: Extract release notes from CHANGELOG
+        if: steps.check_tag.outputs.exists == 'false'
         id: changelog
         run: |
-          python3 << 'EOF'
-          import os
+          python3 << 'PYEOF'
           import re
-          from datetime import datetime
           from pathlib import Path
 
-          new_version = "${{ steps.version.outputs.version }}"
-          today = datetime.now().strftime("%Y-%m-%d")
+          version = "${{ steps.version.outputs.version }}"
+          changelog = Path("CHANGELOG.md").read_text()
 
-          changelog_file = Path("CHANGELOG.md")
+          # Extract content between this version header and the next version header
+          pattern = rf"## \[{re.escape(version)}\].*?\n(.*?)(?=\n## \[|$)"
+          match = re.search(pattern, changelog, re.DOTALL)
 
-          if changelog_file.exists():
-              content = changelog_file.read_text()
+          if match:
+              notes = match.group(1).strip()
+          else:
+              notes = f"Release {version}"
 
-              # Replace [Unreleased] with version and date
-              # Keep the Unreleased section header
-              unreleased_pattern = r"## \[Unreleased\]"
+          Path("RELEASE_NOTES.md").write_text(f"# Release {version}\n\n{notes}\n")
+          print(f"Extracted release notes ({len(notes)} chars)")
+          PYEOF
 
-              # Add new version section after Unreleased
-              replacement = f"## [Unreleased]\n\n## [{new_version}] - {today}"
-
-              content = re.sub(unreleased_pattern, replacement, content, count=1)
-
-              changelog_file.write_text(content)
-              print(f"Updated CHANGELOG.md with version {new_version}")
-
-              # Extract release notes for this version
-              # Find content between the new version header and the next version header
-              version_pattern = rf"## \[{re.escape(new_version)}\] - {today}\n\n(.*?)(?=\n## \[|$)"
-              match = re.search(version_pattern, content, re.DOTALL)
-
-              if match:
-                  release_notes = match.group(1).strip()
-                  # Write release notes to file for GitHub release
-                  with open("RELEASE_NOTES.md", "w") as f:
-                      f.write(f"# Release {new_version}\n\n")
-                      f.write(release_notes)
-
-                  # Also output for GitHub
-                  with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                      # Escape multiline content
-                      notes = release_notes.replace("%", "%25").replace("\n", "%0A").replace("\r", "%0D")
-                      f.write(f"notes={notes}\n")
-
-                  print("Extracted release notes")
-              else:
-                  print("No release notes found")
-                  with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                      f.write(f"notes=Release {new_version}\n")
-          EOF
-
-      - name: Commit version changes
+      - name: Create Git tag
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add VERSION CHANGELOG.md
-          git commit -m "chore: release version ${{ steps.version.outputs.version }}"
-          git push
-
-      - name: Create Git tag
-        run: |
           git tag -a "v${{ steps.version.outputs.version }}" -m "Release version ${{ steps.version.outputs.version }}"
           git push origin "v${{ steps.version.outputs.version }}"
 
       - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -261,12 +93,11 @@ jobs:
           prerelease: false
 
       - name: Summary
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Previous Version:** ${{ steps.version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Release Type:** ${{ steps.version.outputs.release_type }}" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
