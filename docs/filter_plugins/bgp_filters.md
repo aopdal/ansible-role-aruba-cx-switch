@@ -52,8 +52,9 @@ Think of this filter as doing a "lookup" for each BGP session:
 1. **Build a lookup table**: Go through every interface on the device. For each IP address on each interface, record which VRF that interface belongs to. This creates a map like: `"10.0.0.1/31" → "customer-a"`.
 
 2. **Enrich each BGP session**: For each session, take its `local_address` field, look it up in the map, and add two new fields:
-   - `_vrf`: The VRF name (or `'default'` if it's a global/built-in VRF)
-   - `_af`: `'ipv4'` or `'ipv6'` based on the address format
+
+    - `_vrf`: The VRF name (or `'default'` if it's a global/built-in VRF)
+    - `_af`: `'ipv4'` or `'ipv6'` based on the address format
 
 3. **Return the enriched sessions**: Each session dict now has the extra fields your playbook can use for conditional logic.
 
@@ -65,8 +66,8 @@ Think of this filter as doing a "lookup" for each BGP session:
 #### Returns
 
 - **list**: The same session dicts, each with two added fields:
-  - `_vrf` (str): VRF name, or `'default'` for global/built-in VRFs
-  - `_af` (str): `'ipv4'` or `'ipv6'`
+    - `_vrf` (str): VRF name, or `'default'` for global/built-in VRFs
+    - `_af` (str): `'ipv4'` or `'ipv6'`
 
 #### Usage Examples
 

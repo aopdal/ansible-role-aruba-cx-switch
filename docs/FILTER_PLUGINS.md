@@ -13,6 +13,7 @@ This library provides **36 custom filters** organized into 11 modules across 2 p
 These filters implement **intelligent interpretation** of NetBox data to handle common configuration patterns and edge cases. While this improves usability, it introduces a layer of logic between NetBox (the source of truth) and device configuration.
 
 **Trade-off**: The filters compensate for certain NetBox configuration patterns, which means:
+
 - ✅ **Benefit**: More forgiving of NetBox data modeling variations
 - ⚠️ **Risk**: May mask incorrect NetBox configurations
 - 📋 **Recommendation**: Maintain strict NetBox data hygiene to preserve true "source of truth" integrity
@@ -25,30 +26,51 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 
 **Problem**: NetBox uses `mode: tagged` for both trunk ports and access ports with only a native VLAN.
 
-**Filter Behavior**:
+These two filters handle this case differently:
+
+**`interface_categorization.py` behavior** (used for L2 configuration):
+
+```python
+# mode: "access"  → access category (if untagged VLAN present)
+# mode: "tagged"  + untagged + tagged VLANs → tagged_with_untagged
+# mode: "tagged"  + tagged VLANs only       → tagged_no_untagged
+# mode: "tagged"  + untagged VLAN only      → SKIPPED (not configured)
+# mode: "tagged"  + no VLANs               → SKIPPED (not configured)
+# mode: "tagged-all" + untagged VLAN        → tagged_all_with_untagged
+# mode: "tagged-all" + no untagged VLAN     → tagged_all_no_untagged
+```
+
+Interfaces with `mode: tagged` but no tagged VLANs are silently skipped and will not be configured. Use NetBox `mode: access` explicitly for access ports.
+
+**`interface_change_detection.py` behavior** (used for comparing against device state):
+
 ```python
 # If NetBox has:
 #   - mode: "tagged" (not "tagged-all")
 #   - untagged_vlan: <vlan_id>
 #   - tagged_vlans: [] (empty or missing)
 #
-# Filter interprets as: mode: "access"
+# Effective mode for comparison is: "access"
 #
 # Note: mode: "tagged-all" is always treated as trunk,
 # even with empty tagged_vlans list (allows all VLANs)
 ```
 
-**Rationale**:
+**Rationale for change detection**:
+
 - A `mode: tagged` port with no tagged VLANs and only an untagged VLAN is functionally an access port
-- A `mode: tagged-all` port allows all VLANs and is always a trunk, even if `tagged_vlans` list is empty
+- Treating it as access prevents false positives when comparing against a device already configured as `vlan_mode: access`
+- `mode: tagged-all` always stays as trunk (allows all VLANs), even if `tagged_vlans` is empty
 
 **Impact**:
-- Prevents false positives when comparing NetBox `mode: tagged` (empty list) against device `vlan_mode: access`
-- Correctly handles `mode: tagged-all` as trunk configuration
+
+- Prevents false positives in change detection when NetBox has `mode: tagged` (empty list) and device has `vlan_mode: access`
+- Interfaces with `mode: tagged` and only an untagged VLAN are **skipped during configuration** (not pushed to device) but **correctly compared** during change detection
 - Masks potential NetBox misconfiguration where user intended trunk but used `mode: tagged` with no VLANs
 
 **Best Practice**:
-- Use NetBox `mode: access` explicitly for access ports
+
+- Use NetBox `mode: access` explicitly for access ports — `mode: tagged` with only an untagged VLAN will be skipped during configuration
 - Use NetBox `mode: tagged` only when `tagged_vlans` list is populated
 - Use NetBox `mode: tagged-all` for trunk ports that allow all VLANs (with or without native VLAN)
 - Document your organization's NetBox modeling standards
@@ -58,11 +80,13 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 **Filter**: `interface_change_detection.py`
 
 **Problem**: AOS-CX devices expose multiple admin state fields with different meanings:
+
 - `admin_state`: May show "down" for ports without physical link
 - `forwarding_state.enablement`: Shows operational forwarding state
 - `user_config.admin`: Shows configured admin intent (most reliable)
 
 **Filter Behavior**:
+
 ```python
 # Priority order:
 # 1. user_config.admin (if exists)
@@ -71,10 +95,12 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 ```
 
 **Impact**:
+
 - Correctly handles ports configured as "up" but without physical link
 - Prevents false positives where `admin_state: down` (no link) is compared against NetBox `enabled: true`
 
 **Best Practice**:
+
 - Trust that filter uses the most reliable state field
 - Use `DEBUG_ANSIBLE=true` to see which state fields are being compared
 
@@ -92,11 +118,12 @@ These filters implement **intelligent interpretation** of NetBox data to handle 
 
 1. **Initial Gather** (`gather_facts.yml`): Collects interfaces + VLANs once at the start
 2. **Analysis Phase**: Filters use existing facts from step 1 (no re-gathering)
-   - `identify_vlan_changes.yml`: Uses existing `ansible_facts.network_resources`
-   - `identify_interface_changes.yml`: Uses existing `ansible_facts.network_resources`
+    - `identify_vlan_changes.yml`: Uses existing `ansible_facts.network_resources`
+    - `identify_interface_changes.yml`: Uses existing `ansible_facts.network_resources`
 3. **Cleanup Phase** (idempotent mode only): Re-gathers facts after configuration to detect what needs cleanup
 
 **Why This Matters**:
+
 - Gathering facts makes REST API calls to the device (slow, especially for large configs)
 - Original implementation gathered facts twice before any configuration (wasteful)
 - Optimized version gathers once initially, then only re-gathers before cleanup when state has changed
@@ -114,12 +141,14 @@ The role implements intelligent comparison of L3 interface IP addresses to minim
 **Implementation**: Full comparison and granular change tracking
 
 IPv4 addresses are compared between NetBox and device facts:
+
 - Only IP addresses that **actually need to be added** are marked for configuration
 - Tasks filter interfaces using `selectattr('_needs_add', 'equalto', true)`
 - Significantly reduces configuration time by skipping unnecessary device connections
 - IP version filtering uses simple colon check: IPv6 has `:`, IPv4 doesn't
 
 **Example**:
+
 ```yaml
 # Filter IPv4 addresses that need configuration
 filtered_interfaces: >-
@@ -132,6 +161,7 @@ filtered_interfaces: >-
 ```
 
 **Performance Impact**:
+
 - Typical environment: 50+ interfaces with 2-5 IPs each
 - Without filtering: 100-250 unnecessary configuration tasks
 - With filtering: Only tasks for actual changes
@@ -139,9 +169,10 @@ filtered_interfaces: >-
 
 ### IPv6 Address Performance Trade-off
 
-**Implementation**: Always configure, suppress false positives
+**Default implementation**: Always configure, suppress false positives
 
 IPv6 addresses in AOS-CX device facts are returned as REST API URL references:
+
 ```json
 {
   "ip6_addresses": "/rest/v10.09/system/interfaces/vlan11/ip6_addresses"
@@ -150,22 +181,40 @@ IPv6 addresses in AOS-CX device facts are returned as REST API URL references:
 
 **Challenge**: The actual IPv6 addresses are not available in facts, only URL references to where they can be fetched.
 
-**Why Not Fetch IPv6 Data?**
+**Solution — Enhanced Facts** (`aoscx_gather_enhanced_facts: true`):
 
-Testing confirmed that fetching IPv6 addresses for comparison is **slower** than just applying configuration:
+`tasks/gather_enhanced_facts.yml` queries the REST API at `depth=2`, which returns actual IPv6 addresses (and VSX virtual IPs) instead of URL references. The result is stored in `aoscx_enhanced_interface_facts` and passed to `get_interfaces_needing_config_changes()` as the `enhanced_facts` argument. When present, the filter performs full IPv6 comparison and only configures addresses that are missing.
+
+```yaml
+# Enable in host_vars or group_vars:
+aoscx_gather_enhanced_facts: true
+```
+
+**Why Not Always Fetch IPv6 Data Without Enhanced Facts?**
+
+Testing confirmed that fetching IPv6 addresses via CLI for comparison is **slower** than just applying configuration:
 
 | Approach | Time Cost | Benefit |
 |----------|-----------|---------|
 | Fetch IPv6 via CLI | ~2-3s per interface | Skip config only if no changes |
 | Apply idempotent config | ~0.5s per interface | Always correct, no overhead |
+| Enhanced facts (REST depth=2) | ~2-3s total (one call) | Full comparison for all interfaces |
 
-**Decision**: For 20+ interfaces, checking would take 40-60 seconds, while applying takes 10-15 seconds.
+**Decision without enhanced facts**: For 20+ interfaces, CLI checking would take 40-60 seconds, while applying takes 10-15 seconds.
 
-**Current Implementation**:
+**Default implementation (enhanced facts disabled)**:
+
 - IPv6 tasks **always execute** (no pre-comparison performed)
 - Configuration remains idempotent at CLI level (duplicate commands have no effect)
 
+**With enhanced facts enabled**:
+
+- One REST API call retrieves actual IPv6 addresses for all interfaces
+- Filter compares and only configures missing addresses
+- Also enables proper VSX virtual IP comparison for anycast/active-gateway
+
 **Example**:
+
 ```yaml
 - name: Configure IPv6 address on VLAN interface
   arubanetworks.aoscx.aoscx_config:
@@ -181,6 +230,7 @@ Testing confirmed that fetching IPv6 addresses for comparison is **slower** than
 ### Filter Implementation Details
 
 The `get_interfaces_needing_config_changes()` filter returns:
+
 ```python
 {
     '_ip_changes': {
@@ -191,6 +241,7 @@ The `get_interfaces_needing_config_changes()` filter returns:
 ```
 
 Tasks in `configure_l3_*.yml` files then:
+
 1. Filter by IP version using colon check: `rejectattr('address', 'search', ':')` for IPv4
 2. Use `aoscx_config` module which is inherently idempotent
 3. Loopback tasks still use `_needs_add` with `aoscx_l3_interface` module
@@ -198,15 +249,18 @@ Tasks in `configure_l3_*.yml` files then:
 ### Best Practices
 
 **IPv4 Configuration**:
+
 - ✅ Filter ensures only necessary changes are applied
 - ✅ Dramatically reduces configuration time in large environments
 - ✅ Maintains accurate "changed" status in Ansible output
 
 **IPv6 Configuration**:
-- ✅ Fastest approach: Apply idempotent configuration without pre-checking
-- ⚠️ Accept that IPv6 tasks always run (performance-optimal trade-off)
+
+- ✅ Default: Apply idempotent configuration without pre-checking (fastest for most environments)
+- ✅ With `aoscx_gather_enhanced_facts: true`: Full IPv6 comparison via one REST API call — worth enabling when IPv6 changes are infrequent and skipping unchanged interfaces matters
 
 **Debugging**:
+
 ```bash
 # See which IPs are marked for addition
 export DEBUG_ANSIBLE=true
@@ -220,19 +274,21 @@ ansible-playbook your-playbook.yml
 ### Technical Background
 
 **Why IPv6 is a URL Reference**:
+
 - AOS-CX REST API structure: IPv6 addresses stored in separate endpoint
 - Device facts use httpapi connection: Only returns URL references
 - Retrieving actual data requires:
-  - Switching to network_cli connection (SSH)
-  - Executing CLI commands (`show ipv6 interface`)
-  - Parsing unstructured output
-  - Connection overhead: 2-3 seconds per interface
+    - Switching to network_cli connection (SSH)
+    - Executing CLI commands (`show ipv6 interface`)
+    - Parsing unstructured output
+    - Connection overhead: 2-3 seconds per interface
 
 **Architecture Decision**:
 - Primary connection: `arubanetworks.aoscx.aoscx` (REST API) for facts
 - CLI tasks: Temporary switch to `network_cli` for configuration
-- Performance: Checking would require connection switching for every interface
-- Conclusion: Direct configuration is faster than check + configure
+- Performance: Per-interface CLI checking requires connection switching (~2-3s each)
+- Default conclusion: Direct idempotent configuration is faster than check + configure
+- With `aoscx_gather_enhanced_facts: true`: `tasks/gather_enhanced_facts.yml` queries REST API once at `depth=2` to get actual IPv6 addresses for all interfaces, enabling comparison without any CLI connection switching
 
 ## Structure
 
@@ -420,13 +476,17 @@ IP address to interface matching and anycast gateway processing (1 filter, 106 l
 
 NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
 
-- **`get_interfaces_needing_config_changes(interfaces, device_facts)`**
+- **`get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts={})`**
     - Compare NetBox interface configuration with device state
     - Implements granular change detection for:
       - Physical properties (enabled/disabled, description, MTU)
       - LAG membership
       - L2 VLAN configuration
-      - L3 IP addresses (IPv4 with specific address tracking, IPv6 reference only)
+      - L3 IP addresses (IPv4 with specific address tracking; IPv6 with full comparison when `enhanced_facts` is provided, otherwise reference only)
+    - Parameters:
+      - `interfaces`: List of NetBox interface objects
+      - `device_facts`: Device facts dict (from `aoscx_facts` / `ansible_facts`)
+      - `enhanced_facts`: Optional dict of enhanced interface data from `aoscx_enhanced_interface_facts` (populated by `tasks/gather_enhanced_facts.yml` when `aoscx_gather_enhanced_facts: true`). Provides actual IPv6 addresses and VSX virtual IPs for accurate comparison instead of URL references.
     - Returns: Dict with categorized interfaces:
       - `physical`: Physical interfaces needing changes
       - `lag`: LAG interfaces needing changes
@@ -437,7 +497,7 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
       - `no_changes`: Interfaces that don't need any changes
     - Adds `_ip_changes` dict to L3 interfaces containing:
       - `ipv4_to_add`: List of specific IPv4 addresses needing configuration
-      - `ipv6_addresses`: List of all IPv6 addresses (for reference, not filtered)
+      - `ipv6_addresses`: List of IPv6 addresses needing configuration (all addresses when enhanced facts are absent; only addresses needing addition when enhanced facts are available)
     - See "L3 Interface IP Address Idempotency" section for performance details
 
 - **`_categorize_interface_for_changes(intf, result_dict, needs_change=True)`**
