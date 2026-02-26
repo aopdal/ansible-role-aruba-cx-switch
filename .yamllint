@@ -12,6 +12,7 @@ ignore: |
   .molecule/
   .venv/
   tests/output/
+  mkdocs.yml
 
 rules:
   # Line length - network configs can be long
