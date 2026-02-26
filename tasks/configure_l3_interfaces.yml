@@ -21,7 +21,11 @@
     msg:
       - "Total L3 interfaces from NetBox: {{ interfaces | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list | length }}"
       - "L3 interfaces needing configuration changes: {{ interfaces_with_ips | length }}"
-      - "L3 interfaces NOT needing changes (skipped): {{ (interfaces | selectattr('ip_addresses', 'defined') | selectattr('ip_addresses', '!=', []) | list | length) - (interfaces_with_ips | length) }}"
+      - >-
+        L3 interfaces NOT needing changes (skipped):
+        {{ (interfaces | selectattr('ip_addresses', 'defined')
+        | selectattr('ip_addresses', '!=', []) | list | length)
+        - (interfaces_with_ips | length) }}
       - "Sample interfaces with changes: {{ interfaces_with_ips[:3] | map(attribute='name') | list }}"
   when:
     - aoscx_debug | bool or ansible_verbosity >= 1
@@ -59,7 +63,11 @@
       # IP address role (e.g., "anycast")
       ip_role: "{{ item.1.role.value if item.1.role is defined and item.1.role.value is defined else none }}"
       # Anycast gateway MAC from interface custom fields
-      anycast_mac: "{{ item.0.custom_fields.if_anycast_gateway_mac if item.0.custom_fields is defined and item.0.custom_fields.if_anycast_gateway_mac is defined else none }}"
+      anycast_mac: "{{
+        item.0.custom_fields.if_anycast_gateway_mac
+        if item.0.custom_fields is defined
+        and item.0.custom_fields.if_anycast_gateway_mac is defined
+        else none }}"
       # Track if this specific IP needs to be added (for performance optimization)
       # IPv4 Logic:
       #   1. If ipv4_to_add exists: Check if address is in list
@@ -101,9 +109,19 @@
       - "=== IPv6 Change Detection Debug ==="
       - "Enhanced facts enabled: {{ aoscx_gather_enhanced_facts | default(false) }}"
       - "IPv6 addresses in list: {{ interface_ips | selectattr('address', 'search', ':') | list | length }}"
-      - "IPv6 addresses with _needs_add=true: {{ interface_ips | selectattr('address', 'search', ':') | selectattr('_needs_add', 'equalto', true) | list | length }}"
-      - "IPv6 addresses with _needs_add=false: {{ interface_ips | selectattr('address', 'search', ':') | selectattr('_needs_add', 'equalto', false) | list | length }}"
-      - "Sample IPv6 with _needs_add=true: {{ (interface_ips | selectattr('address', 'search', ':') | selectattr('_needs_add', 'equalto', true) | list)[:3] | map(attribute='address') | list }}"
+      - >-
+        IPv6 addresses with _needs_add=true:
+        {{ interface_ips | selectattr('address', 'search', ':')
+        | selectattr('_needs_add', 'equalto', true) | list | length }}
+      - >-
+        IPv6 addresses with _needs_add=false:
+        {{ interface_ips | selectattr('address', 'search', ':')
+        | selectattr('_needs_add', 'equalto', false) | list | length }}
+      - >-
+        Sample IPv6 with _needs_add=true:
+        {{ (interface_ips | selectattr('address', 'search', ':')
+        | selectattr('_needs_add', 'equalto', true) | list)[:3]
+        | map(attribute='address') | list }}
       - "Sample IPv6 _ip_changes: {{ (interfaces_with_ips | selectattr('_ip_changes', 'defined') | list)[:1] | map(attribute='_ip_changes') | list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 

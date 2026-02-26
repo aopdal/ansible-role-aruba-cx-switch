@@ -156,7 +156,10 @@
     msg:
       - "=== Enhanced Interface Facts (REST API depth=2) ==="
       - "Total interfaces: {{ aoscx_enhanced_interface_facts | length }}"
-      - "Sample interface keys: {{ (aoscx_enhanced_interface_facts | dict2items | first).value.keys() | list if aoscx_enhanced_interface_facts | length > 0 else 'N/A' }}"
+      - >-
+        Sample interface keys:
+        {{ (aoscx_enhanced_interface_facts | dict2items | first).value.keys() | list
+        if aoscx_enhanced_interface_facts | length > 0 else 'N/A' }}
   when:
     - aoscx_debug | default(false) | bool
   tags:

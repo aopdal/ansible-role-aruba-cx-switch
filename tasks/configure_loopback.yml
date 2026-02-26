@@ -7,7 +7,10 @@
 
 - name: Extract loopback interfaces
   ansible.builtin.set_fact:
-    loopback_interfaces: "{{ interfaces | selectattr('type.value', 'defined') | selectattr('type.value', 'equalto', 'virtual') | selectattr('name', 'match', '^loopback') | list }}"
+    loopback_interfaces: "{{
+      interfaces | selectattr('type.value', 'defined')
+      | selectattr('type.value', 'equalto', 'virtual')
+      | selectattr('name', 'match', '^loopback') | list }}"
   when: interfaces is defined
 
 - name: Debug - Show loopback interfaces found

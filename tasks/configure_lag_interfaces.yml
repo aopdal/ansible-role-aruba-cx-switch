@@ -17,7 +17,15 @@
   ansible.builtin.debug:
     msg:
       - "Configuring LAG interfaces (excluding MCLAG)"
-      - "Total LAGs from NetBox: {{ interfaces | selectattr('type', 'defined') | selectattr('type', 'match', '.*lag.*') | rejectattr('custom_fields.if_mclag', 'defined') | list | length + interfaces | selectattr('type', 'defined') | selectattr('type', 'match', '.*lag.*') | selectattr('custom_fields.if_mclag', 'defined') | rejectattr('custom_fields.if_mclag') | list | length }}"
+      - >-
+        Total LAGs from NetBox:
+        {{ interfaces | selectattr('type', 'defined')
+        | selectattr('type', 'match', '.*lag.*')
+        | rejectattr('custom_fields.if_mclag', 'defined') | list | length
+        + interfaces | selectattr('type', 'defined')
+        | selectattr('type', 'match', '.*lag.*')
+        | selectattr('custom_fields.if_mclag', 'defined')
+        | rejectattr('custom_fields.if_mclag') | list | length }}
       - "LAGs needing changes: {{ interface_changes.lag | default([]) | length }}"
       - "LAGs needing changes: {{ interface_changes.lag | default([]) | map(attribute='name') | list }}"
   when: aoscx_debug | bool

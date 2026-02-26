@@ -28,7 +28,7 @@ repos:
     rev: v1.33.0
     hooks:
       - id: yamllint
-        args: ['-c', '.yamllint']
+        args: ['-c', '.yamllint', '--strict']
         files: \.(yaml|yml)$
 
   # Using local ansible-lint instead of remote repo to avoid dependency issues

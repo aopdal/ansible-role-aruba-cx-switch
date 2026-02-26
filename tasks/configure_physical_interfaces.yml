@@ -142,8 +142,16 @@
 - name: Debug - Show physical interfaces to enable
   ansible.builtin.debug:
     msg:
-      - "Physical interfaces from change list (before filter): {{ interface_changes.physical | default([]) | selectattr('enabled', 'equalto', true) | map(attribute='name') | list }}"
-      - "Physical interfaces from change list (AFTER filtering already enabled): {{ interface_changes.physical | default([]) | selectattr('enabled', 'equalto', true) | rejectattr('name', 'in', already_enabled_interfaces | default([])) | map(attribute='name') | list }}"
+      - >-
+        Physical interfaces from change list (before filter):
+        {{ interface_changes.physical | default([])
+        | selectattr('enabled', 'equalto', true) | map(attribute='name') | list }}
+      - >-
+        Physical interfaces from change list (AFTER filtering already enabled):
+        {{ interface_changes.physical | default([])
+        | selectattr('enabled', 'equalto', true)
+        | rejectattr('name', 'in', already_enabled_interfaces | default([]))
+        | map(attribute='name') | list }}
       - "Parent interfaces needing enable: {{ parents_needing_enable | default([]) | map(attribute='name') | list }}"
       - "Total interfaces to enable (final): {{ physical_interfaces_to_enable | map(attribute='name') | list }}"
   when:
@@ -199,16 +207,30 @@
     msg:
       - "=== Physical Interface Configuration Summary ==="
       - "Device: {{ inventory_hostname }}"
-      - "Total physical interfaces from NetBox: {{ interfaces | selectattr('type', 'defined') | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length }}"
+      - >-
+        Total physical interfaces from NetBox:
+        {{ interfaces | selectattr('type', 'defined')
+        | rejectattr('type.value', 'in', ['virtual', 'lag']) | list | length }}
       - "Physical interfaces from CHANGE LIST: {{ interface_changes.physical | default([]) | length }}"
       - "Parent interfaces identified: {{ subinterface_parent_names | default([]) | length }}"
       - "Parent interfaces already up (skipped): {{ (subinterface_parent_names | default([]) | length) - (parents_needing_enable | default([]) | length) }}"
       - "Physical interfaces WILL BE ENABLED (not already up): {{ physical_interfaces_to_enable | default([]) | length }}"
-      - "Physical interfaces WILL BE DISABLED (currently up, need down): {{ interface_changes.physical | default([]) | selectattr('enabled', 'equalto', false) | selectattr('name', 'in', already_enabled_interfaces | default([])) | list | length }}"
-      - "AP_Aruba interfaces in enable list: {{ physical_interfaces_to_enable | default([]) | selectattr('description', 'defined') | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}"
+      - >-
+        Physical interfaces WILL BE DISABLED (currently up, need down):
+        {{ interface_changes.physical | default([])
+        | selectattr('enabled', 'equalto', false)
+        | selectattr('name', 'in', already_enabled_interfaces | default([]))
+        | list | length }}
+      - >-
+        AP_Aruba interfaces in enable list:
+        {{ physical_interfaces_to_enable | default([])
+        | selectattr('description', 'defined')
+        | selectattr('description', 'equalto', 'AP_Aruba') | list | length }}
       - >-
         Interfaces with custom MTU in enable list:
-        {{ physical_interfaces_to_enable | default([]) | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none) | selectattr('mtu', '!=', '') | list | length }}
+        {{ physical_interfaces_to_enable | default([])
+        | selectattr('mtu', 'defined') | selectattr('mtu', '!=', none)
+        | selectattr('mtu', '!=', '') | list | length }}
       - >-
         Interfaces to enable:
         {{ physical_interfaces_to_enable | default([]) | map(attribute='name') | list }}

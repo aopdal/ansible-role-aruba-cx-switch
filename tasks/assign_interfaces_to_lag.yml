@@ -16,7 +16,10 @@
 - name: assign_interfaces_to_lag | Debug physical interfaces to assign to LAGs (only those needing changes)
   ansible.builtin.debug:
     msg:
-      - "Total physical interfaces with LAG membership from NetBox: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
+      - >-
+        Total physical interfaces with LAG membership from NetBox:
+        {{ interfaces | selectattr('lag', 'defined')
+        | selectattr('lag', '!=', none) | list | length }}
       - "Physical interfaces needing LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
       - "Assignments: {{ interface_changes.lag_members | default([]) | map(attribute='name') | list | join(', ') }}"
   when: aoscx_debug | bool
@@ -39,6 +42,9 @@
   ansible.builtin.debug:
     msg:
       - "Physical Interface LAG Assignment Summary:"
-      - "Total physical interfaces with LAG membership from NetBox: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
+      - >-
+        Total physical interfaces with LAG membership from NetBox:
+        {{ interfaces | selectattr('lag', 'defined')
+        | selectattr('lag', '!=', none) | list | length }}
       - "Physical interfaces that received LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
   when: aoscx_debug | bool
