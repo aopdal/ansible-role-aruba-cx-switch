@@ -32,7 +32,7 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Run yamllint
-        run: yamllint .
+        run: yamllint --strict .
 
       - name: Run ansible-lint
         run: ansible-lint

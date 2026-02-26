@@ -44,7 +44,10 @@
 # CX 6000 and some other models don't support ip4_address_secondary or vsx_virtual_* fields
 - name: Set interface attributes to query
   ansible.builtin.set_fact:
-    _rest_interface_base_attrs: "name,admin,description,mtu,type,ip4_address,ip6_addresses,vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,other_config,routing,vrf"
+    _rest_interface_base_attrs: "{{
+      'name,admin,description,mtu,type,ip4_address,ip6_addresses,'
+      ~ 'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,'
+      ~ 'other_config,routing,vrf' }}"
     _rest_interface_vsx_attrs: "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_ip6,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6"
   tags:
     - always

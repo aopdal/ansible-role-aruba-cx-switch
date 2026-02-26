@@ -41,7 +41,11 @@
       - "=== Raw output from 'show evpn evi' ==="
       - "Output type: {{ evpn_config_output.stdout | type_debug }}"
       - "Output length: {{ evpn_config_output.stdout | length }}"
-      - "First 500 chars: {{ evpn_config_output.stdout[0][:500] if evpn_config_output.stdout is defined and evpn_config_output.stdout | length > 0 else 'No output' }}"
+      - >-
+        First 500 chars:
+        {{ evpn_config_output.stdout[0][:500]
+        if evpn_config_output.stdout is defined
+        and evpn_config_output.stdout | length > 0 else 'No output' }}
   when:
     - aoscx_debug | default(false) | bool
     - custom_fields.device_evpn | default(false) | bool

@@ -47,7 +47,10 @@
       - "Force mode enabled: {{ aoscx_force_l2_config | default(false) | bool }}"
       - "Total L2 interfaces in NetBox: {{ interfaces | selectattr('mode', 'defined') | list | length }}"
       - "L2 interfaces needing configuration changes: {{ interface_changes.l2 | default([]) | length }}"
-      - "L2 interfaces NOT needing changes (skipped): {{ (interfaces | selectattr('mode', 'defined') | list | length) - (interface_changes.l2 | default([]) | length) }}"
+      - >-
+        L2 interfaces NOT needing changes (skipped):
+        {{ (interfaces | selectattr('mode', 'defined') | list | length)
+        - (interface_changes.l2 | default([]) | length) }}
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # ============================================================================
@@ -61,7 +64,10 @@
           - "ansible_facts keys (first 20): {{ ansible_facts.keys() | list | sort | batch(20) | first }}"
           - "Has ansible_network_resources: {{ 'ansible_network_resources' in ansible_facts }}"
           - "Has net_interfaces: {{ 'net_interfaces' in ansible_facts }}"
-          - "ansible_network_resources keys: {{ ansible_facts.ansible_network_resources.keys() | list if 'ansible_network_resources' in ansible_facts else 'N/A' }}"
+          - >-
+            ansible_network_resources keys:
+            {{ ansible_facts.ansible_network_resources.keys() | list
+            if 'ansible_network_resources' in ansible_facts else 'N/A' }}
           - "net_interfaces type: {{ ansible_facts.net_interfaces | type_debug if 'net_interfaces' in ansible_facts else 'N/A' }}"
       when:
         - interface_changes.l2 is defined
@@ -180,5 +186,7 @@
       - "=== L2 Interface Configuration Complete ==="
       - "Mode: {{ l2_config_mode }}"
       - "Interfaces configured: {{ interfaces_to_configure | length }}"
-      - "{{ 'Interfaces cleaned up: ' + (interfaces_needing_changes.cleanup | length | string) if (aoscx_idempotent_mode | bool) else 'Cleanup skipped (standard mode)' }}"
+      - >-
+        {{ 'Interfaces cleaned up: ' + (interfaces_needing_changes.cleanup | length | string)
+        if (aoscx_idempotent_mode | bool) else 'Cleanup skipped (standard mode)' }}
   when: aoscx_debug | bool or ansible_verbosity >= 1

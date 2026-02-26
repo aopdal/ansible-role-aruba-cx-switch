@@ -380,3 +380,147 @@ class TestGetInterfacesNeedingConfigChanges:
         result = get_interfaces_needing_config_changes(interfaces, device_facts)
         assert len(result["l3"]) == 1
         assert result["l3"][0]["name"] == "loopback0"
+
+
+class TestEnhancedFacts:
+    """Tests for get_interfaces_needing_config_changes with enhanced_facts parameter"""
+
+    def _vlan_interface(self, ipv6_address):
+        """Helper: NetBox VLAN interface with one IPv6 address"""
+        return {
+            "name": "vlan10",
+            "type": {"value": "virtual"},
+            "ip_addresses": [
+                {
+                    "address": ipv6_address,
+                    "vrf": {"name": "default"},
+                }
+            ],
+        }
+
+    def _device_facts_with_url_ref(self):
+        """Helper: device facts where ip6_addresses is a URL reference (standard aoscx_facts)"""
+        return {
+            "network_resources": {
+                "interfaces": {
+                    "vlan10": {
+                        "admin": "up",
+                        "ip6_addresses": (
+                            "/rest/v10.09/system/interfaces/vlan10/ip6_addresses"
+                        ),
+                    }
+                }
+            }
+        }
+
+    def test_enhanced_facts_ipv6_already_configured_no_change(self):
+        """IPv6 already on device via enhanced facts → no change needed"""
+        interfaces = [self._vlan_interface("2001:db8::1/64")]
+        device_facts = self._device_facts_with_url_ref()
+        enhanced_facts = {
+            "vlan10": {
+                "ip6_addresses": {"2001:db8::1/64": {}}
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+
+        assert len(result["l3"]) == 0
+        assert len(result["no_changes"]) == 1
+
+    def test_enhanced_facts_ipv6_missing_needs_adding(self):
+        """IPv6 not on device via enhanced facts → interface needs change"""
+        interfaces = [self._vlan_interface("2001:db8::1/64")]
+        device_facts = self._device_facts_with_url_ref()
+        enhanced_facts = {
+            "vlan10": {
+                "ip6_addresses": {}  # Empty — address not configured
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["name"] == "vlan10"
+
+    def test_enhanced_facts_ipv6_url_encoded_key(self):
+        """Enhanced facts with URL-encoded IPv6 key is decoded and matched correctly"""
+        interfaces = [self._vlan_interface("2001:db8::1/64")]
+        device_facts = self._device_facts_with_url_ref()
+        # REST API returns URL-encoded colons and slashes
+        enhanced_facts = {
+            "vlan10": {
+                "ip6_addresses": {
+                    "2001%3Adb8%3A%3A1%2F64": {}  # URL-encoded "2001:db8::1/64"
+                }
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+
+        assert len(result["l3"]) == 0
+        assert len(result["no_changes"]) == 1
+
+    def test_no_enhanced_facts_ipv6_always_marks_for_config(self):
+        """Without enhanced facts, any IPv6 address triggers a change (fallback behaviour)"""
+        interfaces = [self._vlan_interface("2001:db8::1/64")]
+        device_facts = self._device_facts_with_url_ref()
+
+        # No enhanced facts passed
+        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+
+        assert len(result["l3"]) == 1
+
+    def test_enhanced_facts_interface_not_in_enhanced_data(self):
+        """Interface missing from enhanced_facts falls back to URL-reference behaviour"""
+        interfaces = [self._vlan_interface("2001:db8::1/64")]
+        device_facts = self._device_facts_with_url_ref()
+        enhanced_facts = {}  # vlan10 not present
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+
+        # Falls back: IPv6 present in NetBox → marks as needing config
+        assert len(result["l3"]) == 1
+
+    def test_enhanced_facts_vsx_virtual_ip_already_configured(self):
+        """VSX virtual IP in enhanced facts does not trigger spurious change"""
+        interfaces = [
+            {
+                "name": "vlan10",
+                "type": {"value": "virtual"},
+                "ip_addresses": [
+                    {"address": "10.1.1.1/24", "vrf": {"name": "default"}}
+                ],
+                "custom_fields": {"if_anycast_gateway_mac": "02:01:00:00:01:00"},
+            }
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan10": {
+                        "admin": "up",
+                        "ip4_address": "10.1.1.1/24",
+                    }
+                }
+            }
+        }
+        enhanced_facts = {
+            "vlan10": {
+                "vsx_virtual_ip4": "10.1.1.1",
+                "ip6_addresses": {},
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+        # IPv4 already on device — no changes expected
+        assert len(result["l3"]) == 0
