@@ -7,6 +7,14 @@
 
 Comprehensive Ansible role for configuring Aruba AOS-CX switches with **NetBox as the source of truth**.
 
+> **WARNING**
+>
+> This role is developed as a personal project in my free time. It is provided as-is with **no support, no warranty, and no guarantee of fitness for any particular purpose**.
+>
+> - **Do not use in production without thorough testing in a lab environment first.** The role manages switch configuration at a low level and misconfiguration can cause network outages.
+> - **No support is available.** Issues and PRs are welcome but there is no commitment to respond or resolve them.
+> - **Breaking changes may occur.** This is not a stable, versioned product with a support lifecycle.
+
 ## Table of Contents
 
 - [NetBox Integration Requirement](#netbox-integration-requirement)
