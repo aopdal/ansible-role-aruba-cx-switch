@@ -849,18 +849,6 @@ Contributions are welcome! Please:
 3. Make your changes
 4. Submit a pull request
 
-## Changelog
-
-### Version 1.0.0 (2025-10-14)
-
-- Initial release
-- VRF configuration support
-- VLAN management with idempotent mode
-- L2 interface configuration (access/trunk/LAG)
-- L3 interface configuration (physical/VLAN/LAG/loopback)
-- Virtual chassis support
-- NetBox integration
-
 ## Support
 
 For issues and questions:
