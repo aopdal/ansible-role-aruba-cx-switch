@@ -411,3 +411,87 @@ class TestGetInterfaceIpAddresses:
         ]
         result = get_interface_ip_addresses(interfaces, ip_addresses)
         assert result == []
+
+    def test_anycast_mac_from_custom_fields(self):
+        """Test that anycast MAC is extracted from interface custom_fields"""
+        interfaces = [
+            {
+                "id": 1,
+                "name": "vlan10",
+                "type": {"value": "virtual"},
+                "custom_fields": {"if_anycast_gateway_mac": "02:01:00:00:01:00"},
+            }
+        ]
+        ip_addresses = [
+            {
+                "address": "10.1.1.1/24",
+                "vrf": {"name": "default"},
+                "assigned_object": {"id": 1},
+                "role": {"value": "anycast"},
+            }
+        ]
+        result = get_interface_ip_addresses(interfaces, ip_addresses)
+        assert len(result) == 1
+        assert result[0]["anycast_mac"] == "02:01:00:00:01:00"
+        assert result[0]["ip_role"] == "anycast"
+
+    def test_no_anycast_mac_returns_none(self):
+        """Test that anycast_mac is None when no custom_fields"""
+        interfaces = [
+            {
+                "id": 1,
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+            }
+        ]
+        ip_addresses = [
+            {
+                "address": "10.1.1.1/30",
+                "vrf": {"name": "default"},
+                "assigned_object": {"id": 1},
+            }
+        ]
+        result = get_interface_ip_addresses(interfaces, ip_addresses)
+        assert len(result) == 1
+        assert result[0]["anycast_mac"] is None
+
+    def test_ip_role_string_value(self):
+        """Test that ip_role is extracted when role is a plain string"""
+        interfaces = [
+            {
+                "id": 1,
+                "name": "vlan10",
+                "type": {"value": "virtual"},
+            }
+        ]
+        ip_addresses = [
+            {
+                "address": "10.1.1.1/24",
+                "vrf": {"name": "default"},
+                "assigned_object": {"id": 1},
+                "role": "anycast",  # Plain string, not dict
+            }
+        ]
+        result = get_interface_ip_addresses(interfaces, ip_addresses)
+        assert len(result) == 1
+        assert result[0]["ip_role"] == "anycast"
+
+    def test_skip_mgmt_only_interface(self):
+        """Test that mgmt_only interfaces are skipped"""
+        interfaces = [
+            {
+                "id": 1,
+                "name": "mgmt",
+                "type": {"value": "1000base-t"},
+                "mgmt_only": True,
+            }
+        ]
+        ip_addresses = [
+            {
+                "address": "192.168.1.1/24",
+                "vrf": {"name": "default"},
+                "assigned_object": {"id": 1},
+            }
+        ]
+        result = get_interface_ip_addresses(interfaces, ip_addresses)
+        assert result == []

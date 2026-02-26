@@ -35,6 +35,11 @@ class TestFormatInterfaceName:
         assert format_interface_name("loopback0", "loopback") == "loopback0"
         assert format_interface_name("loopback1", "loopback") == "loopback1"
 
+    def test_subinterface(self):
+        """Test sub-interface name formatting (passed through unchanged)"""
+        assert format_interface_name("1/1/3.2000", "subinterface") == "1/1/3.2000"
+        assert format_interface_name("1/1/1.100", "subinterface") == "1/1/1.100"
+
 
 class TestIsIPv4Address:
     """Tests for is_ipv4_address function"""
@@ -268,3 +273,97 @@ class TestBuildL3ConfigLines:
         assert lines.index("ip address 10.0.0.1/24") < lines.index("ip mtu 9000")
         # L3 counters should be last
         assert lines[-1] == "l3-counters"
+
+    def test_subinterface_with_encapsulation(self):
+        """Test sub-interface with tagged VLANs generates dot1q encapsulation"""
+        item = {
+            "interface": {"tagged_vlans": [{"vid": 100}], "mtu": None},
+            "interface_name": "1/1/3.100",
+            "address": "10.0.0.1/30",
+            "ip_role": None,
+        }
+        lines = build_l3_config_lines(item, "subinterface", "ipv4", "default", True)
+
+        assert "encapsulation dot1q 100" in lines
+        assert "ip address 10.0.0.1/30" in lines
+        # encapsulation must come before the IP address
+        assert lines.index("encapsulation dot1q 100") < lines.index("ip address 10.0.0.1/30")
+
+    def test_subinterface_without_tagged_vlans(self):
+        """Test sub-interface without tagged VLANs generates no encapsulation"""
+        item = {
+            "interface": {"tagged_vlans": [], "mtu": None},
+            "interface_name": "1/1/3.100",
+            "address": "10.0.0.1/30",
+            "ip_role": None,
+        }
+        lines = build_l3_config_lines(item, "subinterface", "ipv4", "default", True)
+
+        assert not any("encapsulation" in line for line in lines)
+        assert "ip address 10.0.0.1/30" in lines
+
+    def test_subinterface_tagged_vlan_without_vid(self):
+        """Test sub-interface with tagged VLAN entry missing vid generates no encapsulation"""
+        item = {
+            "interface": {"tagged_vlans": [{}], "mtu": None},  # No vid key
+            "interface_name": "1/1/3.100",
+            "address": "10.0.0.1/30",
+            "ip_role": None,
+        }
+        lines = build_l3_config_lines(item, "subinterface", "ipv4", "default", True)
+
+        assert not any("encapsulation" in line for line in lines)
+        assert "ip address 10.0.0.1/30" in lines
+
+    def test_subinterface_with_custom_vrf(self):
+        """Test sub-interface with encapsulation and custom VRF"""
+        item = {
+            "interface": {
+                "tagged_vlans": [{"vid": 200}],
+                "vrf": {"name": "CUST-A"},
+                "mtu": None,
+            },
+            "interface_name": "1/1/1.200",
+            "address": "192.168.1.1/30",
+            "ip_role": None,
+        }
+        lines = build_l3_config_lines(item, "subinterface", "ipv4", "custom", False)
+
+        assert "encapsulation dot1q 200" in lines
+        assert "vrf attach CUST-A" in lines
+        assert "ip address 192.168.1.1/30" in lines
+        # encapsulation before vrf
+        assert lines.index("encapsulation dot1q 200") < lines.index("vrf attach CUST-A")
+
+    def test_vlan_ipv6_anycast_gateway(self):
+        """Test VLAN interface with IPv6 anycast gateway"""
+        item = {
+            "interface": {"mtu": 9000},
+            "interface_name": "vlan100",
+            "address": "2001:db8::1/64",
+            "ip_role": "anycast",
+            "anycast_mac": "02:01:00:00:01:00",
+        }
+        lines = build_l3_config_lines(item, "vlan", "ipv6", "default", True)
+
+        assert "active-gateway ipv6 mac 02:01:00:00:01:00" in lines
+        # Address without prefix length
+        assert "active-gateway ipv6 2001:db8::1" in lines
+        # Should not have a plain ipv6 address command
+        assert not any("ipv6 address" in line for line in lines)
+        assert not any("ip address" in line for line in lines)
+
+    def test_vlan_ipv6_anycast_no_prefix(self):
+        """Test IPv6 anycast gateway strips prefix from address"""
+        item = {
+            "interface": {},
+            "interface_name": "vlan200",
+            "address": "2001:db8:cafe::1/128",
+            "ip_role": "anycast",
+            "anycast_mac": "02:01:00:00:02:00",
+        }
+        lines = build_l3_config_lines(item, "vlan", "ipv6", "default", False)
+
+        assert "active-gateway ipv6 mac 02:01:00:00:02:00" in lines
+        assert "active-gateway ipv6 2001:db8:cafe::1" in lines
+        assert not any("/128" in line for line in lines)
