@@ -995,5 +995,6 @@ See repository root for license information.
 
 - **[Detailed Filter Reference](filter_plugins/index.md)** - Complete module and filter documentation
 - **[L3 Config Helpers](filter_plugins/l3_config_helpers.md)** - L3 configuration optimization details
+- **[Filter Plugin Reuse Guide](FILTER_PLUGINS_REUSE.md)** - Which filters work with other vendor devices
 - **[Development Guide](DEVELOPMENT.md)** - Contributing guidelines
 - **[NetBox Integration](NETBOX_INTEGRATION.md)** - NetBox setup and configuration
