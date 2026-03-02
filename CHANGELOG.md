@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-03-02
+
+### Fixed
+
+- Filter out mgmt interface when not compare existing and new config.
+
 ## [0.5.0] - 2026-02-25
 
 First public release. See the [documentation](https://aopdal.github.io/ansible-role-aruba-cx-switch/) for full details on all features.
