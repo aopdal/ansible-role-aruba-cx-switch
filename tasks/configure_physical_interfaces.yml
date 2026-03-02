@@ -169,6 +169,7 @@
   when:
     - physical_interfaces_to_enable | length > 0
     - item.description is not defined or item.description != "AP_Aruba"
+    - item.name != "mgmt"
 
 - name: Enable physical interfaces AP_Aruba (special case for Aruba Central)
   arubanetworks.aoscx.aoscx_interface:
@@ -201,6 +202,7 @@
     label: "Interface: {{ item.name }}"
   when:
     - already_enabled_interfaces | default([]) | length > 0
+    - item.name is not "mgmt"
 
 - name: Debug - Physical interface configuration summary
   ansible.builtin.debug:
