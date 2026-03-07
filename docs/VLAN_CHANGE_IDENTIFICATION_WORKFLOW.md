@@ -2,21 +2,6 @@
 
 ## Overview
 
-The VLAN change identification workflow has been refactored to provide **consistent and centralized** VLAN analysis across all configuration and cleanup tasks. This eliminates duplicate logic and ensures all tasks work from the same source of truth.
-
-## Problem Statement
-
-Previously, VLAN change identification logic was duplicated across multiple task files:
-
-- `configure_vlans.yml` - Calculated `vlans_in_use` and `vlan_changes`
-- `configure_evpn.yml` - Recalculated `vlans_in_use` if not defined
-- `configure_vxlan.yml` - Recalculated `vlans_in_use` if not defined
-- `identify_vlan_changes.yml` - Recalculated everything before cleanup
-
-This led to **inconsistent behavior** and potential race conditions where different tasks might have different views of what VLANs needed to be changed.
-
-## Solution
-
 ### Single Source of Truth: `identify_vlan_changes.yml`
 
 The `identify_vlan_changes.yml` task file is now the **single source of truth** for all VLAN change calculations. It:

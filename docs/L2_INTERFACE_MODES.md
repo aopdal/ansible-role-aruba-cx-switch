@@ -151,31 +151,6 @@ The role uses custom filter plugins for data transformation:
 | `get_vlans_in_use` | Identifies VLANs referenced by interfaces | Both modes |
 | `compare_interface_vlans` | Compares device vs NetBox state | Idempotent mode only |
 
-## Migration Guide
-
-### From Old Structure
-
-**Before (v1.0.0):**
-
-```yaml
-# Unified task file
-tasks/
-  configure_l2_interfaces.yml         # Handles both modes automatically
-```
-
-### Updating Your Playbooks
-
-**No changes required!** The role automatically detects the mode:
-
-```yaml
-- name: Configure switches
-  hosts: switches
-  roles:
-    - role: aopdal.aruba_cx_switch
-      vars:
-        aoscx_idempotent_mode: true  # or false
-```
-
 ## Performance Comparison
 
 ### Standard Mode

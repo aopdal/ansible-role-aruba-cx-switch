@@ -74,6 +74,78 @@
     - device_bgp_sessions_enriched is defined
     - device_bgp_sessions_enriched | length > 0
 
+- name: Get BGP routing policy rules and prefix list rules from NetBox BGP plugin
+  when:
+    - aoscx_use_netbox_bgp_plugin | default(true) | bool
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+  delegate_to: localhost
+  run_once: true
+  block:
+    - name: Query NetBox BGP plugin for routing policy rules
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/routing-policy-rule/"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: netbox_policy_rules_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query NetBox BGP plugin for prefix list rules
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/prefix-list-rule/"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: netbox_prefix_list_rules_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Set routing policy and prefix list facts
+      ansible.builtin.set_fact:
+        netbox_policy_rules_all: "{{ netbox_policy_rules_raw.json.results | default([]) }}"
+        netbox_prefix_list_rules_all: "{{ netbox_prefix_list_rules_raw.json.results | default([]) }}"
+      run_once: true
+
+- name: Debug raw routing policy and prefix list rule data
+  ansible.builtin.debug:
+    msg:
+      - "Policy rules count: {{ netbox_policy_rules_all | default([]) | length }}"
+      - "Prefix list rules count: {{ netbox_prefix_list_rules_all | default([]) | length }}"
+      - >-
+        First policy rule keys: {{
+          (netbox_policy_rules_all | default([]) | first).keys() | list
+          if netbox_policy_rules_all | default([]) | length > 0
+          else 'no rules'
+        }}
+      - "First policy rule: {{ netbox_policy_rules_all | default([]) | first | default('none') }}"
+      - "First prefix list rule: {{ netbox_prefix_list_rules_all | default([]) | first | default('none') }}"
+  when:
+    - aoscx_debug | default(false) | bool
+    - netbox_bgp_plugin_available | default(false)
+    - netbox_policy_rules_all is defined or netbox_prefix_list_rules_all is defined
+
+- name: Collect routing policy config data for eBGP VRF sessions
+  ansible.builtin.set_fact:
+    bgp_ebgp_policy_data: >-
+      {{ bgp_vrf_sessions | default([]) |
+         collect_ebgp_vrf_policy_config(
+           netbox_policy_rules_all | default([]),
+           netbox_prefix_list_rules_all | default([])
+         ) }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+
 - name: Debug BGP session VRF split
   ansible.builtin.debug:
     msg:
@@ -223,6 +295,50 @@
     ansible_connection: network_cli
 
 # ============================================================================
+# BGP Routing Policies and Prefix Lists (from netbox-bgp plugin, IPv4 only)
+# ============================================================================
+# Prefix lists and route-maps are global (not VRF-scoped) on AOS-CX.
+# They must be configured before any BGP neighbor or VRF statements
+# that reference them.
+
+- name: Configure IPv4 prefix lists for eBGP VRF sessions
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - >-
+        ip prefix-list {{ item.0.name }}
+        seq {{ item.1.index }}
+        {{ item.1.action }}
+        {{ item.1.prefix }}
+      - end
+  loop: "{{ bgp_ebgp_policy_data.prefix_lists | default([]) | subelements('rules') }}"
+  loop_control:
+    label: >-
+      {{ item.0.name }} seq {{ item.1.index }}
+      {{ item.1.action }} {{ item.1.prefix }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_ebgp_policy_data is defined
+    - bgp_ebgp_policy_data.prefix_lists | default([]) | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure route-map rules for eBGP VRF sessions
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item.commands[1:] }}"
+    parents: "{{ item.commands[0] }}"
+    match: line
+  loop: "{{ bgp_ebgp_policy_data.route_map_rules | default([]) }}"
+  loop_control:
+    label: "route-map {{ item.name }} {{ item.action }} seq {{ item.index }}"
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_ebgp_policy_data is defined
+    - bgp_ebgp_policy_data.route_map_rules | default([]) | length > 0
+  vars:
+    ansible_connection: network_cli
+
+# ============================================================================
 # BGP VRF Neighbors (from netbox-bgp plugin)
 # ============================================================================
 # Sessions whose local_address is assigned to an interface in a non-default VRF
@@ -233,7 +349,34 @@
 #   IPv4 address → address-family ipv4 unicast
 #   IPv6 address → address-family ipv6 unicast
 
-- name: Configure BGP VRF neighbors from netbox-bgp plugin
+- name: Configure BGP VRF iBGP neighbors from netbox-bgp plugin (with next-hop-self)
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - neighbor {{ item.remote_address.address.split('/')[0] }} remote-as {{ item.remote_as.asn }}
+      - address-family {{ item._af }} unicast
+      - neighbor {{ item.remote_address.address.split('/')[0] }} next-hop-self
+      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
+      - neighbor {{ item.remote_address.address.split('/')[0] }} activate
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }} ({{ item._af }})
+      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [iBGP]
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+    - item.local_as.asn == item.remote_as.asn
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure BGP VRF eBGP neighbors from netbox-bgp plugin
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -250,11 +393,70 @@
     label: >-
       Device: {{ inventory_hostname }}
       VRF: {{ item._vrf }} ({{ item._af }})
-      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }})
+      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [eBGP]
   when:
     - netbox_bgp_plugin_available | default(false)
     - bgp_vrf_sessions is defined
     - bgp_vrf_sessions | length > 0
+    - item.local_as.asn != item.remote_as.asn
+  vars:
+    ansible_connection: network_cli
+
+- name: Apply export route-maps to eBGP VRF IPv4 neighbors
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - address-family ipv4 unicast
+      - >-
+        neighbor {{ item.remote_address.address.split('/')[0] }}
+        route-map {{ item.export_policies[0].name }} out
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }}
+      → {{ item.remote_address.address.split('/')[0] }}
+      export: {{ (item.export_policies | default([]))[0].name if item.export_policies | default([]) | length > 0 else 'n/a' }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+    - item.local_as.asn != item.remote_as.asn
+    - item._af == 'ipv4'
+    - item.export_policies | default([]) | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Apply import route-maps to eBGP VRF IPv4 neighbors
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - address-family ipv4 unicast
+      - >-
+        neighbor {{ item.remote_address.address.split('/')[0] }}
+        route-map {{ item.import_policies[0].name }} in
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }}
+      → {{ item.remote_address.address.split('/')[0] }}
+      import: {{ (item.import_policies | default([]))[0].name if item.import_policies | default([]) | length > 0 else 'n/a' }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+    - item.local_as.asn != item.remote_as.asn
+    - item._af == 'ipv4'
+    - item.import_policies | default([]) | length > 0
   vars:
     ansible_connection: network_cli
 

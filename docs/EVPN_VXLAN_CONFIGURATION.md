@@ -378,16 +378,7 @@ ansible-playbook configure_aoscx.yml -l fabric
 ssh admin@leaf-1
 
 # Show EVPN VLANs
-show evpn
-
-# Show specific EVPN VLAN
-show evpn vlan 100
-
-# Should show:
-# EVPN Instance: VLAN 100
-#   RD: auto
-#   Route Target Export: auto
-#   Route Target Import: auto
+show evpn <tab>
 ```
 
 ### Check VXLAN Configuration
@@ -396,36 +387,14 @@ show evpn vlan 100
 # Show VXLAN interface
 show interface vxlan 1
 
-# Show VNI summary
-show vxlan
-
-# Show VLAN to VNI mapping
-show vxlan vni
-
-# Expected output:
-# VNI    VLAN   Type
-# 10100  100    Access
-# 10200  200    Access
-```
-
-### Check VXLAN Tunnel Status
-
-```bash
-# Show VXLAN tunnels
-show vxlan tunnel
-
-# Should show tunnels to other VTEPs
-# Source: Loopback 0 (e.g., 10.255.255.11)
-# Destination: Other leaf loopbacks
 ```
 
 ### Check MAC Learning
 
 ```bash
 # Show MAC addresses learned via VXLAN
-show mac-address-table vxlan
+show mac-address-table interface vxlan1
 
-# Should show remote MACs learned from other VTEPs
 ```
 
 ## Troubleshooting

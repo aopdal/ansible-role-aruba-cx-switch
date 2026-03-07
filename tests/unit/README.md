@@ -4,7 +4,7 @@ Comprehensive unit tests for all custom Ansible filter plugins in this role.
 
 ## Test Coverage
 
-The test suite covers **21 filter functions** across **6 modules**:
+The test suite covers **23 filter functions** across **7 modules**:
 
 ### 1. Utility Functions (`test_utils.py`)
 - ✅ `collapse_vlan_list` - VLAN range collapsing (10 tests)
@@ -38,6 +38,10 @@ The test suite covers **21 filter functions** across **6 modules**:
 - ✅ `extract_ospf_areas` - Extract OSPF areas
 - ✅ `get_ospf_interfaces_by_area` - Group interfaces by area
 - ✅ `validate_ospf_config` - Validate OSPF configuration
+
+### 7. BGP Filters (`test_bgp_filters.py`)
+- ✅ `get_bgp_session_vrf_info` - Enrich BGP sessions with VRF and address-family
+- ✅ `collect_ebgp_vrf_policy_config` - Collect routing policies and prefix lists for eBGP VRF sessions
 
 ## Running Tests
 
@@ -102,7 +106,8 @@ tests/unit/
 ├── test_vrf_filters.py      # VRF filter tests
 ├── test_interface_filters.py # Interface filter tests
 ├── test_comparison.py       # Comparison function tests
-└── test_ospf_filters.py     # OSPF filter tests
+├── test_ospf_filters.py     # OSPF filter tests
+└── test_bgp_filters.py      # BGP filter tests
 ```
 
 ## Test Fixtures

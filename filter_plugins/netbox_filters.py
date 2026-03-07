@@ -65,6 +65,7 @@ from netbox_filters_lib.l3_config_helpers import (
 )
 from netbox_filters_lib.bgp_filters import (
     get_bgp_session_vrf_info,
+    collect_ebgp_vrf_policy_config,
 )
 
 # fmt: on
@@ -110,4 +111,5 @@ class FilterModule:
             "build_l3_config_lines": build_l3_config_lines,
             # BGP helpers
             "get_bgp_session_vrf_info": get_bgp_session_vrf_info,
+            "collect_ebgp_vrf_policy_config": collect_ebgp_vrf_policy_config,
         }
