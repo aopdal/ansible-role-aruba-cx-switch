@@ -28,16 +28,6 @@ A complete EVPN/VXLAN fabric example showing:
 
 **Use this to:** Deploy a full data center fabric with EVPN/VXLAN.
 
-### 3. [ztp-generation.yml](ztp-generation.yml) (Existing)
-**Best for:** Zero Touch Provisioning
-
-A playbook demonstrating:
-- ZTP configuration generation
-- Pre-deployment switch configurations
-- Management interface setup for new switches
-
-**Use this to:** Generate configurations for brand new switches before deployment.
-
 ## Prerequisites
 
 All examples assume you have:

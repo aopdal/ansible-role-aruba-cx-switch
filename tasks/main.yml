@@ -1,19 +1,6 @@
 ---
 # Main task file for aruba_cx_switch role
 
-# ZTP configuration generation (for initial deployment)
-- name: Include ZTP configuration generation tasks
-  ansible.builtin.include_tasks:
-    file: generate_ztp_config.yml
-    apply:
-      tags:
-        - ztp
-        - config_generation
-  when: aoscx_generate_ztp_config | default(false) | bool
-  tags:
-    - ztp
-    - config_generation
-
 - name: Include fact gathering tasks
   ansible.builtin.include_tasks: gather_facts.yml
   when:
