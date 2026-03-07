@@ -50,7 +50,7 @@ aoscx_force_l2_config: false
 aoscx_fast_mode: false
 
 # NetBox BGP plugin settings
-aoscx_use_netbox_bgp_plugin: true  # Try to use netbox-bgp plugin, fallback to config_context
+aoscx_use_netbox_bgp_plugin: true  # Query the netbox-bgp plugin for BGP sessions; set false to disable BGP configuration
 aoscx_netbox_validate_certs: true  # Validate SSL certificates when querying NetBox API
 aoscx_no_log: false  # Set to true to hide sensitive data in logs
 
@@ -108,10 +108,3 @@ aoscx_builtin_vrfs:
   - mgmt
   - MGMT
   - ""  # Empty string is also treated as default VRF
-
-# ZTP (Zero Touch Provisioning) configuration generation
-aoscx_generate_ztp_config: false  # Generate ZTP base configuration file
-aoscx_ztp_output_dir: "./ztp_configs"  # Directory to store ZTP config files
-aoscx_ztp_backup_configs: true  # Backup existing config files
-aoscx_ztp_admin_user: "admin"  # Default admin username for ZTP
-# aoscx_ztp_admin_password: "admin"  # Admin password (define in vault or host vars)

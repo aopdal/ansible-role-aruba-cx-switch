@@ -7,7 +7,6 @@
   vars:
     # Disable ALL configuration to only load filter plugins
     aoscx_gather_facts: false
-    aoscx_generate_ztp_config: false
     aoscx_configure_banner: false
     aoscx_configure_ntp: false
     aoscx_configure_timezone: false

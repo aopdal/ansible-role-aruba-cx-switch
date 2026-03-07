@@ -72,7 +72,6 @@
     aoscx_gather_facts: false  # Skip fact gathering in tests
     aoscx_use_rest_api_facts: false  # REST API fact gathering disabled in tests
     aoscx_gather_enhanced_facts: false  # Enhanced facts disabled in tests
-    aoscx_generate_ztp_config: false  # No ZTP generation
 
     # REST API version settings (for reference, not used in tests)
     ansible_aoscx_rest_version: 10.09  # pyaoscx max version

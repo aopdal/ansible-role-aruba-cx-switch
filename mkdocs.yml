@@ -91,7 +91,6 @@ nav:
               - Base System:
                       - Overview: BASE_CONFIGURATION.md
                       - DNS: DNS_CONFIGURATION.md
-              - ZTP (Zero Touch Provisioning): ZTP_CONFIGURATION.md
               - VLAN Management:
                       - Workflow Overview: VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
                       - Visual Diagrams: VLAN_WORKFLOW_DIAGRAMS.md
@@ -103,9 +102,7 @@ nav:
                       - Configuration Modes: EVPN_VXLAN_MODES.md
               - BGP:
                       - Configuration Guide: BGP_CONFIGURATION.md
-                      - Hybrid Mode (Plugin + Config Context): BGP_HYBRID_CONFIGURATION.md
                       - NetBox BGP Plugin: NETBOX_BGP_PLUGIN.md
-                      - Migration Guide: BGP_MIGRATION_GUIDE.md
                       - EVPN Fabric Example: BGP_EVPN_FABRIC_EXAMPLE.md
               - Tag-Dependent Tasks:
                       - Overview: TAG_DEPENDENT_INCLUDES.md
