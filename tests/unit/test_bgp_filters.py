@@ -2,7 +2,10 @@
 Unit tests for BGP filter functions
 """
 import pytest
-from netbox_filters_lib.bgp_filters import get_bgp_session_vrf_info
+from netbox_filters_lib.bgp_filters import (
+    get_bgp_session_vrf_info,
+    collect_ebgp_vrf_policy_config,
+)
 
 
 def _session(name, local_address):
@@ -202,3 +205,273 @@ class TestGetBgpSessionVrfInfo:
         result = get_bgp_session_vrf_info(sessions, interfaces)
         # String IPs are indexed as-is; session matches
         assert result[0]["_vrf"] == "default"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for collect_ebgp_vrf_policy_config
+# ---------------------------------------------------------------------------
+
+def _ebgp_session(name, import_policies=None, export_policies=None):
+    """Build a minimal eBGP VRF session with optional routing policies."""
+    return {
+        "name": name,
+        "local_as": {"asn": 65015},
+        "remote_as": {"asn": 65020},
+        "local_address": {"address": "172.27.4.1/30"},
+        "remote_address": {"address": "172.27.250.32/30"},
+        "_vrf": "lab-blue",
+        "_af": "ipv4",
+        "import_policies": import_policies or [],
+        "export_policies": export_policies or [],
+    }
+
+
+def _policy_rule(
+    policy_id,
+    policy_name,
+    index,
+    action="permit",
+    match_pfx_id=None,
+    match_pfx_name=None,
+    set_local_pref=None,
+    set_prepend_asn=None,
+):
+    """Build a routing policy rule matching the real netbox-bgp API structure."""
+    set_actions = {}
+    if set_local_pref is not None:
+        set_actions["local-preference"] = set_local_pref
+    if set_prepend_asn is not None:
+        set_actions["as-path prepend"] = [set_prepend_asn]
+
+    rule = {
+        "routing_policy": {"id": policy_id, "name": policy_name},
+        "index": index,
+        "action": action,  # plain string, not a dict
+        "match_ip_address": (
+            [{"id": match_pfx_id, "name": match_pfx_name}]
+            if match_pfx_id is not None
+            else []
+        ),
+        "set_actions": set_actions,
+    }
+    return rule
+
+
+def _prefix_list_rule(pl_id, pl_name, index, action, network):
+    """Build a prefix list rule matching the real netbox-bgp API structure."""
+    return {
+        "prefix_list": {"id": pl_id, "name": pl_name},
+        "index": index,
+        "action": action,  # plain string
+        "prefix": {"id": pl_id * 100, "prefix": network, "display": network},
+    }
+
+
+class TestCollectEbgpVrfPolicyConfig:
+    """Tests for collect_ebgp_vrf_policy_config function"""
+
+    def test_empty_sessions_returns_empty(self):
+        result = collect_ebgp_vrf_policy_config([], [], [])
+        assert result == {"prefix_lists": [], "route_map_rules": []}
+
+    def test_none_inputs_returns_empty(self):
+        result = collect_ebgp_vrf_policy_config(None, None, None)
+        assert result == {"prefix_lists": [], "route_map_rules": []}
+
+    def test_session_without_policies_returns_empty(self):
+        session = _ebgp_session("s1")
+        result = collect_ebgp_vrf_policy_config([session], [], [])
+        assert result == {"prefix_lists": [], "route_map_rules": []}
+
+    def test_export_policy_with_prefix_list(self):
+        """Route-map rule with match prefix-list and set as-path prepend."""
+        session = _ebgp_session(
+            "s1",
+            export_policies=[{"id": 1, "name": "LAB-BLUE-IPV4-OUT-01"}],
+        )
+        policy_rules = [
+            _policy_rule(
+                policy_id=1,
+                policy_name="LAB-BLUE-IPV4-OUT-01",
+                index=10,
+                action="permit",
+                match_pfx_id=10,
+                match_pfx_name="LAB-BLUE-IPV4",
+                set_prepend_asn=65015,
+            )
+        ]
+        prefix_list_rules = [
+            _prefix_list_rule(10, "LAB-BLUE-IPV4", 10, "permit", "172.27.4.0/24")
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        assert len(result["route_map_rules"]) == 1
+        rm = result["route_map_rules"][0]
+        assert rm["name"] == "LAB-BLUE-IPV4-OUT-01"
+        assert rm["index"] == 10
+        assert rm["action"] == "permit"
+        assert "route-map LAB-BLUE-IPV4-OUT-01 permit seq 10" in rm["commands"]
+        assert "match ip address prefix-list LAB-BLUE-IPV4" in rm["commands"]
+        assert "set as-path prepend 65015" in rm["commands"]
+
+        assert len(result["prefix_lists"]) == 1
+        pl = result["prefix_lists"][0]
+        assert pl["name"] == "LAB-BLUE-IPV4"
+        assert len(pl["rules"]) == 1
+        assert pl["rules"][0] == {"index": 10, "action": "permit", "prefix": "172.27.4.0/24"}
+
+    def test_import_policy_with_local_preference(self):
+        """Route-map rule with match prefix-list and set local-preference."""
+        session = _ebgp_session(
+            "s1",
+            import_policies=[{"id": 2, "name": "LAB-GW-IPV4-IN-01"}],
+        )
+        policy_rules = [
+            _policy_rule(
+                policy_id=2,
+                policy_name="LAB-GW-IPV4-IN-01",
+                index=10,
+                action="permit",
+                match_pfx_id=20,
+                match_pfx_name="LAB-GW-IPV4",
+                set_local_pref=300,
+            )
+        ]
+        prefix_list_rules = [
+            _prefix_list_rule(20, "LAB-GW-IPV4", 10, "permit", "0.0.0.0/0")
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        rm = result["route_map_rules"][0]
+        assert rm["name"] == "LAB-GW-IPV4-IN-01"
+        assert "set local-preference 300" in rm["commands"]
+        assert "match ip address prefix-list LAB-GW-IPV4" in rm["commands"]
+
+        pl = result["prefix_lists"][0]
+        assert pl["name"] == "LAB-GW-IPV4"
+        assert pl["rules"][0]["prefix"] == "0.0.0.0/0"
+
+    def test_multiple_sessions_deduplicate_policies(self):
+        """Two sessions referencing the same export policy produce one route-map rule."""
+        sessions = [
+            _ebgp_session("s1", export_policies=[{"id": 1, "name": "OUT-01"}]),
+            _ebgp_session("s2", export_policies=[{"id": 1, "name": "OUT-01"}]),
+        ]
+        policy_rules = [
+            _policy_rule(1, "OUT-01", 10, match_pfx_id=10, match_pfx_name="PFX-A")
+        ]
+        prefix_list_rules = [
+            _prefix_list_rule(10, "PFX-A", 10, "permit", "10.0.0.0/8")
+        ]
+
+        result = collect_ebgp_vrf_policy_config(sessions, policy_rules, prefix_list_rules)
+
+        assert len(result["route_map_rules"]) == 1
+        assert len(result["prefix_lists"]) == 1
+
+    def test_route_map_without_match_or_set(self):
+        """A rule with no match/set produces only the route-map entry line."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "PLAIN"}])
+        policy_rules = [_policy_rule(1, "PLAIN", 10)]
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, [])
+
+        rm = result["route_map_rules"][0]
+        assert rm["commands"] == ["route-map PLAIN permit seq 10"]
+        assert result["prefix_lists"] == []
+
+    def test_prefix_list_rules_sorted_by_index(self):
+        """Prefix list rules are returned sorted by sequence number."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "P"}])
+        policy_rules = [
+            _policy_rule(1, "P", 10, match_pfx_id=5, match_pfx_name="PFX")
+        ]
+        prefix_list_rules = [
+            _prefix_list_rule(5, "PFX", 30, "permit", "10.3.0.0/24"),
+            _prefix_list_rule(5, "PFX", 10, "permit", "10.1.0.0/24"),
+            _prefix_list_rule(5, "PFX", 20, "permit", "10.2.0.0/24"),
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        indexes = [r["index"] for r in result["prefix_lists"][0]["rules"]]
+        assert indexes == [10, 20, 30]
+
+    def test_action_as_plain_string(self):
+        """action field as plain string (the real API format) is handled correctly."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "P"}])
+        policy_rules = [
+            {
+                "routing_policy": {"id": 1, "name": "P"},
+                "index": 10,
+                "action": "deny",
+                "match_ip_address": [],
+                "set_actions": {},
+            }
+        ]
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, [])
+        assert result["route_map_rules"][0]["action"] == "deny"
+
+    def test_prefix_as_ipam_object(self):
+        """prefix field as IPAM FK object (the real API format) is handled correctly."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "P"}])
+        policy_rules = [
+            _policy_rule(1, "P", 10, match_pfx_id=5, match_pfx_name="PFX")
+        ]
+        prefix_list_rules = [
+            {
+                "prefix_list": {"id": 5, "name": "PFX"},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 999, "prefix": "192.168.0.0/16", "display": "192.168.0.0/16"},
+            }
+        ]
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+        assert result["prefix_lists"][0]["rules"][0]["prefix"] == "192.168.0.0/16"
+
+    def test_unreferenced_policy_rules_are_ignored(self):
+        """Rules for policies not referenced by any session are not included."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "MINE"}])
+        policy_rules = [
+            _policy_rule(1, "MINE", 10),
+            _policy_rule(99, "OTHER", 10),  # not referenced
+        ]
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, [])
+        names = [rm["name"] for rm in result["route_map_rules"]]
+        assert "MINE" in names
+        assert "OTHER" not in names
+
+    def test_set_actions_as_path_prepend_list(self):
+        """set_actions with as-path prepend list is handled correctly."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "P"}])
+        policy_rules = [
+            {
+                "routing_policy": {"id": 1, "name": "P"},
+                "index": 10,
+                "action": "permit",
+                "match_ip_address": [],
+                "set_actions": {"as-path prepend": [65100]},
+            }
+        ]
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, [])
+        commands = result["route_map_rules"][0]["commands"]
+        assert "set as-path prepend 65100" in commands
+
+    def test_prefix_custom_field_used_when_ipam_prefix_is_none(self):
+        """prefix_custom plain-string field is used when the IPAM prefix FK is null."""
+        session = _ebgp_session("s1", import_policies=[{"id": 1, "name": "P"}])
+        policy_rules = [
+            _policy_rule(1, "P", 10, match_pfx_id=5, match_pfx_name="PFX")
+        ]
+        prefix_list_rules = [
+            {
+                "prefix_list": {"id": 5, "name": "PFX"},
+                "index": 10,
+                "action": "permit",
+                "prefix": None,          # IPAM FK is null
+                "prefix_custom": "0.0.0.0/0",  # free-text fallback
+            }
+        ]
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+        assert result["prefix_lists"][0]["rules"][0]["prefix"] == "0.0.0.0/0"
