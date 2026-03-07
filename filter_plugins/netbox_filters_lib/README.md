@@ -215,6 +215,29 @@ OSPF interface selection and validation (4 filters):
   Checks router ID and area definitions
   Returns: Dict with `valid` boolean, `warnings`, and `errors` lists
 
+### `bgp_filters.py` - BGP Configuration
+BGP session enrichment and routing policy collection (2 filters):
+
+- **`get_bgp_session_vrf_info(sessions, interfaces)`**
+  Enrich BGP sessions with VRF and address-family by matching each session's
+  `local_address` against device interface IPs in NetBox.
+  Built-in/non-configurable VRF names (`mgmt`, `MGMT`, `Global`, `default`) are
+  normalised to `"default"`. Management-only interfaces are skipped.
+  Returns: List of sessions, each with added `_vrf` (str) and `_af` (`"ipv4"`/`"ipv6"`)
+
+- **`collect_ebgp_vrf_policy_config(sessions, policy_rules, prefix_list_rules)`**
+  Collect routing policies and prefix lists referenced by the sessions'
+  `import_policies` and `export_policies` fields (ManyToMany lists from the
+  netbox-bgp plugin). Builds pre-formatted AOS-CX CLI commands for each
+  route-map rule, using the `route-map NAME permit seq INDEX` syntax required
+  by AOS-CX.
+  Handles:
+  - `match_ip_address` as a ManyToMany list of prefix list FK objects
+  - `set_actions` dict (`{"as-path prepend": [65015], "local-preference": 300}`)
+  - `prefix` as an IPAM FK object (`{"prefix": "172.27.4.0/24"}`) or `null`
+  - `prefix_custom` plain-string fallback when the IPAM FK is null
+  Returns: `{"prefix_lists": [{name, rules}], "route_map_rules": [{name, index, action, commands}]}`
+
 ## Usage in Playbooks
 
 All filters are available through the standard Ansible filter syntax:
@@ -578,22 +601,23 @@ netbox_filters.py (main entry point)
 
 ## Statistics
 
-- **Total Filters**: 22
-- **Total Lines**: ~1,500 (including docstrings and comments)
-- **Modules**: 7 (6 feature modules + 1 utility)
+- **Total Filters**: 24
+- **Total Lines**: ~1,800 (including docstrings and comments)
+- **Modules**: 8 (7 feature modules + 1 utility)
 - **Test Coverage**: Used in production for 100+ switches
 - **Code Quality**: Pylint score 9.30/10
 
 ### Filter Distribution
 
-| Module | Filters | Lines | Description |
-|--------|---------|-------|-------------|
-| `vlan_filters.py` | 7 | 395 | VLAN lifecycle management |
-| `interface_filters.py` | 3 | 373 | Interface categorization |
-| `comparison.py` | 3 | 279 | State comparison logic |
-| `vrf_filters.py` | 4 | 194 | VRF operations |
-| `ospf_filters.py` | 4 | 116 | OSPF configuration |
-| `utils.py` | 2 | 53 | Helper functions |
+| Module | Filters | Description |
+|--------|---------|-------------|
+| `vlan_filters.py` | 7 | VLAN lifecycle management |
+| `interface_filters.py` | 3 | Interface categorization |
+| `comparison.py` | 3 | State comparison logic |
+| `vrf_filters.py` | 4 | VRF operations |
+| `ospf_filters.py` | 4 | OSPF configuration |
+| `bgp_filters.py` | 2 | BGP session enrichment and routing policy collection |
+| `utils.py` | 2 | Helper functions |
 
 ## Migration Guide
 

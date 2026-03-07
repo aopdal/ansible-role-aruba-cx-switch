@@ -68,8 +68,8 @@ curl -H "Authorization: Token YOUR_TOKEN" \
 | `remote_address` | IPAddress | Remote IP (neighbor) |
 | `status` | Choice | Active, Planned, Offline, etc. |
 | `peer_group` | ForeignKey | Optional peer group template |
-| `import_routing_policies` | ManyToMany | Import policies |
-| `export_routing_policies` | ManyToMany | Export policies |
+| `import_policies` | ManyToMany | Import routing policies |
+| `export_policies` | ManyToMany | Export routing policies |
 | `description` | String | Session description |
 
 ## API Usage
@@ -438,20 +438,149 @@ To disable automatic RR configuration:
 - Set device role to something other than spine/route-reflector/rr
 - Or use config_context fallback for granular control
 
-## Next Steps
+## VRF BGP Sessions and Routing Policies
 
-Would you like me to:
+### How VRF Sessions Work
 
-1. **Update the BGP task** to support netbox-bgp plugin data?
-2. **Create a hybrid version** that supports both methods?
-3. **Create migration documentation** from config_context to plugin?
-4. **Add examples** for common netbox-bgp plugin queries?
+Sessions whose `local_address` is assigned to an interface in a **non-default VRF** are
+automatically placed in VRF context on the device. The role uses the
+`get_bgp_session_vrf_info` filter to enrich each session with two extra fields:
+
+| Field | Value | Meaning |
+|-------|-------|---------|
+| `_vrf` | `"lab-blue"` | Interface VRF name (or `"default"`) |
+| `_af`  | `"ipv4"` / `"ipv6"` | Address family derived from local IP syntax |
+
+Sessions in `_vrf == "default"` are configured as EVPN/underlay neighbors.
+Sessions in any other VRF are configured under the matching `vrf` context inside `router bgp`.
+
+### iBGP vs eBGP Detection
+
+The role compares `local_as.asn` and `remote_as.asn` for each VRF session:
+
+| Condition | Type | Extra Config |
+|-----------|------|--------------|
+| `local_as.asn == remote_as.asn` | iBGP | `next-hop-self` added |
+| `local_as.asn != remote_as.asn` | eBGP | Import/export route-maps applied |
+
+### Routing Policies (Import/Export)
+
+Sessions can reference routing policies via `import_policies` and `export_policies`
+(ManyToMany lists). The role:
+
+1. Fetches all routing policy rules from `/api/plugins/bgp/routing-policy-rule/`
+2. Fetches all prefix list rules from `/api/plugins/bgp/prefix-list-rule/`
+3. Filters to rules referenced by this device's eBGP VRF sessions
+4. Configures **prefix lists first**, then **route-maps**, then **BGP neighbors**
+
+#### Routing Policy Rule Fields (real API)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `routing_policy` | FK dict `{id, name}` | The parent policy |
+| `index` | int | Sequence number |
+| `action` | string | `"permit"` or `"deny"` |
+| `match_ip_address` | list of `{id, name}` | Prefix list objects (ManyToMany) |
+| `set_actions` | dict | e.g. `{"as-path prepend": [65015], "local-preference": 300}` |
+
+#### Prefix List Rule Fields (real API)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `prefix_list` | FK dict `{id, name}` | The parent prefix list |
+| `index` | int | Sequence number |
+| `action` | string | `"permit"` or `"deny"` |
+| `prefix` | IPAM FK dict or `null` | `{"prefix": "172.27.4.0/24", ...}` |
+| `prefix_custom` | string or `null` | Plain CIDR fallback when `prefix` is null |
+
+#### AOS-CX Route-Map Syntax
+
+AOS-CX requires `seq` before the sequence number:
+
+```
+route-map LAB-BLUE-IPV4-OUT-01 permit seq 10
+  match ip address prefix-list LAB-BLUE-IPV4
+  set as-path prepend 65015
+```
+
+The `collect_ebgp_vrf_policy_config` filter generates commands using this syntax.
+
+### Custom Filters
+
+Two filters in `filter_plugins/netbox_filters_lib/bgp_filters.py` handle BGP data:
+
+#### `get_bgp_session_vrf_info(sessions, interfaces)`
+
+Enriches each BGP session with `_vrf` and `_af` by looking up the session's
+`local_address` against device interface IPs in NetBox.
+
+```yaml
+- set_fact:
+    enriched_sessions: >-
+      {{ device_bgp_sessions | get_bgp_session_vrf_info(interfaces | default([])) }}
+```
+
+Returns each session with added fields:
+- `_vrf`: VRF name (or `"default"` for loopbacks/default VRF interfaces)
+- `_af`: `"ipv4"` or `"ipv6"`
+
+#### `collect_ebgp_vrf_policy_config(sessions, policy_rules, prefix_list_rules)`
+
+Collects routing policies and prefix lists referenced by the sessions' `import_policies`
+and `export_policies` fields. Returns pre-built AOS-CX CLI command lists.
+
+```yaml
+- set_fact:
+    bgp_policy_data: >-
+      {{ bgp_vrf_sessions |
+         collect_ebgp_vrf_policy_config(
+           netbox_policy_rules_all | default([]),
+           netbox_prefix_list_rules_all | default([])
+         ) }}
+```
+
+Returns:
+
+```python
+{
+  "prefix_lists": [
+    {
+      "name": "LAB-BLUE-IPV4",
+      "rules": [{"index": 10, "action": "permit", "prefix": "172.27.4.0/24"}]
+    }
+  ],
+  "route_map_rules": [
+    {
+      "name": "LAB-BLUE-IPV4-OUT-01",
+      "index": 10,
+      "action": "permit",
+      "commands": [
+        "route-map LAB-BLUE-IPV4-OUT-01 permit seq 10",
+        "match ip address prefix-list LAB-BLUE-IPV4",
+        "set as-path prepend 65015"
+      ]
+    }
+  ]
+}
+```
+
+### NetBox Setup for VRF Routing Policies
+
+1. **Create Prefix Lists** under `/api/plugins/bgp/prefix-list/`
+2. **Create Prefix List Rules** under `/api/plugins/bgp/prefix-list-rule/`
+   - Link to a prefix list and an IPAM prefix object (or use `prefix_custom` for a plain string)
+3. **Create Routing Policies** under `/api/plugins/bgp/routing-policy/`
+4. **Create Routing Policy Rules** under `/api/plugins/bgp/routing-policy-rule/`
+   - Set `match_ip_address` to the prefix list(s) to match
+   - Set `set_actions` dict for set operations
+5. **Assign policies to BGP sessions** via `import_policies` / `export_policies`
 
 ## Related Documentation
 
 - [netbox-bgp Plugin GitHub](https://github.com/netbox-community/netbox-bgp)
 - [NetBox Plugins Documentation](https://docs.netbox.dev/en/stable/plugins/)
-- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - Current config_context approach
+- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - config_context approach
+- [BGP_HYBRID_CONFIGURATION.md](BGP_HYBRID_CONFIGURATION.md) - Hybrid mode details
 - [BGP_EVPN_FABRIC_EXAMPLE.md](BGP_EVPN_FABRIC_EXAMPLE.md) - Fabric examples
 
 ## API Endpoints
@@ -469,9 +598,17 @@ GET /api/plugins/bgp/peer-group/{id}/
 GET /api/plugins/bgp/community/
 GET /api/plugins/bgp/community/{id}/
 
-# Routing Policies
+# Routing Policies and Rules
 GET /api/plugins/bgp/routing-policy/
 GET /api/plugins/bgp/routing-policy/{id}/
+GET /api/plugins/bgp/routing-policy-rule/
+GET /api/plugins/bgp/routing-policy-rule/{id}/
+
+# Prefix Lists and Rules
+GET /api/plugins/bgp/prefix-list/
+GET /api/plugins/bgp/prefix-list/{id}/
+GET /api/plugins/bgp/prefix-list-rule/
+GET /api/plugins/bgp/prefix-list-rule/{id}/
 
 # AS Numbers
 GET /api/plugins/bgp/asn/

@@ -9,9 +9,11 @@ When you configure BGP (Border Gateway Protocol) on a switch, each BGP session n
 1. **Which VRF it belongs to** - Is this a global/underlay session or a per-tenant VRF session?
 2. **Which address family it uses** - Is the session using IPv4 or IPv6?
 
-NetBox stores BGP sessions (via the NetBox BGP plugin) separately from interfaces. This filter bridges that gap: it looks at each BGP session's local IP address, finds which interface has that IP, checks what VRF that interface is in, and tags the session with the VRF name and address family.
+NetBox stores BGP sessions (via the NetBox BGP plugin) separately from interfaces. This module bridges those gaps:
 
-This lets your playbook split sessions into global BGP (for EVPN/underlay) and VRF BGP (for L3VPN/tenant peering) without any manual tagging in NetBox.
+- **`get_bgp_session_vrf_info`** looks at each BGP session's local IP address, finds which interface has that IP, checks what VRF that interface is in, and tags the session with the VRF name and address family. This lets your playbook split sessions into global BGP (for EVPN/underlay) and VRF BGP (for L3VPN/tenant peering) without any manual tagging in NetBox.
+
+- **`collect_ebgp_vrf_policy_config`** reads each eBGP VRF session's `import_policies` and `export_policies`, fetches the matching routing policy rules and prefix list rules from the NetBox BGP plugin API, and returns pre-built AOS-CX CLI commands ready to apply to the device. Prefix lists must be configured before route-maps, and both before BGP neighbor statements.
 
 ---
 
@@ -23,7 +25,7 @@ The `bgp_filters.py` module provides BGP session enrichment functionality. It ta
 
 **Dependencies**: [utils.py](utils.md) (`_debug`)
 
-**Filter Count**: 1 filter
+**Filter Count**: 2 filters
 
 ---
 
@@ -210,6 +212,182 @@ This filter requires:
 - **NetBox BGP plugin** installed and configured in NetBox
 - BGP sessions defined with `local_address` fields
 - Device interfaces with IP addresses assigned in NetBox
+
+---
+
+---
+
+## `collect_ebgp_vrf_policy_config(sessions, policy_rules, prefix_list_rules)`
+
+Collects routing policies and prefix lists referenced by BGP VRF sessions'
+`import_policies` and `export_policies` fields, and returns pre-built AOS-CX
+CLI commands ready to apply to the device.
+
+### How It Works (Step by Step)
+
+1. **Collect referenced policies**: Scan every session's `import_policies` and
+   `export_policies` lists to build a map of `{policy_id → policy_name}`.
+
+2. **Match routing policy rules**: Filter `all_policy_rules` to those whose
+   `routing_policy.id` is in the collected map. For each matched rule, build a
+   list of AOS-CX CLI commands:
+   - Entry command: `route-map NAME permit seq INDEX`
+   - Match commands: `match ip address prefix-list NAME` (from `match_ip_address` list)
+   - Set commands from `set_actions` dict:
+     - `"local-preference": 300` → `set local-preference 300`
+     - `"as-path prepend": [65015]` → `set as-path prepend 65015`
+
+3. **Collect prefix list rules**: For each prefix list referenced in step 2,
+   filter `all_prefix_list_rules` to matching entries. Extract the prefix from
+   the IPAM FK object (`prefix.prefix`) or fall back to `prefix_custom` (plain
+   string) when the FK is null.
+
+4. **Sort and return**: Prefix list rules sorted by `index`; route-map rules
+   sorted by `(name, index)`.
+
+### Parameters
+
+- **sessions** (list): BGP session objects enriched with `_vrf`/`_af` by
+  `get_bgp_session_vrf_info`. Each session must have `import_policies` and
+  `export_policies` as lists of `{id, name}` dicts.
+- **policy_rules** (list): All routing policy rule objects from
+  `/api/plugins/bgp/routing-policy-rule/`.
+- **prefix_list_rules** (list): All prefix list rule objects from
+  `/api/plugins/bgp/prefix-list-rule/`.
+
+### Returns
+
+```python
+{
+  "prefix_lists": [
+    {
+      "name": "LAB-BLUE-IPV4",
+      "rules": [
+        {"index": 10, "action": "permit", "prefix": "172.27.4.0/24"}
+      ]
+    }
+  ],
+  "route_map_rules": [
+    {
+      "name": "LAB-BLUE-IPV4-OUT-01",
+      "index": 10,
+      "action": "permit",
+      "commands": [
+        "route-map LAB-BLUE-IPV4-OUT-01 permit seq 10",
+        "match ip address prefix-list LAB-BLUE-IPV4",
+        "set as-path prepend 65015"
+      ]
+    }
+  ]
+}
+```
+
+### Usage in Playbooks
+
+```yaml
+# 1. Fetch raw rules from NetBox BGP plugin API
+- name: Query routing policy rules
+  ansible.builtin.uri:
+    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/routing-policy-rule/"
+    headers:
+      Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+  register: netbox_policy_rules_raw
+  delegate_to: localhost
+  run_once: true
+
+- name: Query prefix list rules
+  ansible.builtin.uri:
+    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/prefix-list-rule/"
+    headers:
+      Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+  register: netbox_prefix_list_rules_raw
+  delegate_to: localhost
+  run_once: true
+
+# 2. Collect policy config data for this device's eBGP VRF sessions
+- name: Collect routing policy config
+  ansible.builtin.set_fact:
+    bgp_policy_data: >-
+      {{ bgp_vrf_sessions |
+         collect_ebgp_vrf_policy_config(
+           netbox_policy_rules_raw.json.results | default([]),
+           netbox_prefix_list_rules_raw.json.results | default([])
+         ) }}
+
+# 3. Configure prefix lists (must come before route-maps)
+- name: Configure IPv4 prefix lists
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - >-
+        ip prefix-list {{ item.0.name }}
+        seq {{ item.1.index }}
+        {{ item.1.action }}
+        {{ item.1.prefix }}
+      - end
+  loop: "{{ bgp_policy_data.prefix_lists | subelements('rules') }}"
+
+# 4. Configure route-map rules (using aoscx_config for proper sub-mode handling)
+- name: Configure route-map rules
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item.commands[1:] }}"
+    parents: "{{ item.commands[0] }}"
+    match: line
+  loop: "{{ bgp_policy_data.route_map_rules }}"
+```
+
+### Real NetBox BGP API Field Shapes
+
+**Routing policy rule** (`/api/plugins/bgp/routing-policy-rule/`):
+```json
+{
+  "id": 2,
+  "routing_policy": {"id": 2, "name": "LAB-BLUE-IPV4-OUT-01"},
+  "index": 10,
+  "action": "permit",
+  "match_ip_address": [{"id": 2, "name": "LAB-BLUE-IPV4"}],
+  "set_actions": {"as-path prepend": [65015]}
+}
+```
+
+**Prefix list rule** (`/api/plugins/bgp/prefix-list-rule/`):
+```json
+{
+  "id": 2,
+  "prefix_list": {"id": 2, "name": "LAB-BLUE-IPV4"},
+  "index": 10,
+  "action": "permit",
+  "prefix": {"id": 756, "prefix": "172.27.4.0/24", "display": "172.27.4.0/24"},
+  "prefix_custom": null
+}
+```
+
+When `prefix` is `null` (no IPAM object assigned), the filter falls back to the
+`prefix_custom` plain-string field.
+
+### AOS-CX Route-Map Syntax Note
+
+AOS-CX requires `seq` before the sequence number:
+
+```
+route-map LAB-BLUE-IPV4-OUT-01 permit seq 10
+  match ip address prefix-list LAB-BLUE-IPV4
+  set as-path prepend 65015
+```
+
+The route-map configuration task must use `aoscx_config` (not `aoscx_command`)
+because `aoscx_command` does not correctly handle CLI sub-mode entry for
+route-map contexts.
+
+### Edge Cases
+
+| Scenario | Result |
+|----------|--------|
+| No sessions with `import_policies`/`export_policies` | Returns empty lists |
+| Policy referenced by multiple sessions | Deduplicated (one route-map set) |
+| Rule's `prefix` FK is null | Falls back to `prefix_custom` string |
+| `match_ip_address` is empty | Route-map entry generated without match command |
+| `set_actions` dict is empty | Route-map entry generated without set commands |
 
 ---
 
