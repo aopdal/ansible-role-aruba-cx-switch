@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Docs - update to fetch latest tag from repo
+- meta - updates to fields
+- Example - created proper example ffor usage of the role
+
 ## [0.6.1] - 2026-03-07
 
 ### Removed

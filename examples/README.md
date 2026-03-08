@@ -4,22 +4,12 @@ This directory contains complete, runnable examples demonstrating how to use the
 
 ## Available Examples
 
-### 1. [minimal-deployment/](minimal-deployment/)
-**Best for:** Getting started, understanding basic structure
-
-A simple example showing:
-- Basic inventory structure
-- Essential group_vars configuration
-- Simple playbook for base switch configuration
-- Sample NetBox data export
-- Step-by-step setup instructions
-
-**Use this to:** Learn the fundamentals and test your first deployment.
-
 ### 2. [bgp-evpn-fabric/](bgp-evpn-fabric/)
+
 **Best for:** Production BGP/EVPN deployments
 
 A complete EVPN/VXLAN fabric example showing:
+
 - Multi-tier inventory (spines, leafs, border leafs)
 - BGP route reflector configuration
 - EVPN/VXLAN with VRF integration
@@ -33,21 +23,25 @@ A complete EVPN/VXLAN fabric example showing:
 All examples assume you have:
 
 1. **Ansible installed** with required collections:
-   ```bash
-   ansible-galaxy install -r requirements.yml
-   ```
+
+    ```bash
+    ansible-galaxy install -r requirements.yml
+    ```
 
 2. **NetBox access** (or sample data provided):
-   - NetBox URL and API token
-   - NetBox pynetbox Python library
-   ```bash
-   pip install -r requirements.txt
-   ```
+
+    - NetBox URL and API token
+    - NetBox pynetbox Python library
+
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 3. **Network connectivity** to your switches:
-   - Management network access
-   - SSH connectivity
-   - Valid credentials
+
+    - Management network access
+    - SSH connectivity
+    - Valid credentials
 
 ## Quick Start
 
@@ -82,29 +76,14 @@ To adapt these examples:
 
 1. **Inventory:** Update device names and IP addresses
 2. **Credentials:** Use Ansible Vault for passwords/tokens:
+
    ```bash
    ansible-vault create inventory/group_vars/all/vault.yml
    ```
+
 3. **NetBox URL:** Update NetBox connection settings
 4. **Variables:** Customize configuration in group_vars
 5. **Tags:** Use Ansible tags to run specific configuration sections
-
-## Example Structure
-
-Each example follows this pattern:
-
-```
-example-name/
-├── README.md                    # Detailed instructions
-├── playbook.yml                 # Main playbook
-├── inventory/
-│   ├── hosts.yml               # Inventory file
-│   └── group_vars/
-│       ├── all.yml             # Common variables
-│       ├── aruba_switches.yml  # Role-specific variables
-│       └── vault.yml           # Encrypted secrets (gitignored)
-└── netbox-export-sample.json   # Sample NetBox data
-```
 
 ## Documentation
 
