@@ -14,6 +14,8 @@ This example demonstrates a complete production-grade BGP/EVPN fabric deployment
 
 ## Topology
 
+This is an example topology which does not match sample data in json file.
+
 ```mermaid
 %%{init:{'theme':'forest'}}%%
 graph TB
@@ -87,17 +89,15 @@ graph TB
 
 ## Prerequisites
 
-1. **Ansible 2.10+** with required collections:
+1. **Ansible 2.18** with required collections:
 
    ```bash
-   ansible-galaxy collection install arubanetworks.aoscx
-   ansible-galaxy collection install ansible.netcommon
-   ansible-galaxy collection install netbox.netbox
+   ansible-galaxy install -r requirements.yml
    ```
 
 2. **NetBox with BGP Plugin**:
 
-   - NetBox 3.5+
+   - NetBox 4.4+
    - netbox-bgp-plugin installed
    - BGP sessions, peerings, and routing policies configured
    - API token with read permissions
@@ -105,7 +105,7 @@ graph TB
 3. **Python dependencies**:
 
    ```bash
-   pip install pynetbox
+   pip install -r requirements.txt
    ```
 
 4. **Physical Requirements**:
@@ -113,6 +113,7 @@ graph TB
    - Aruba CX switches (6300, 8360, etc.)
    - Underlay IP connectivity between all switches
    - Loopback addressing plan
+   - Or use the OVA Aruba CX simultaor for testing
 
 ## Quick Start
 
@@ -124,8 +125,6 @@ cd ~/my-fabric
 ```
 
 ### 2. Configure Inventory
-
-**Option A: NetBox Dynamic Inventory (Recommended)**
 
 Use NetBox as your source of truth:
 
