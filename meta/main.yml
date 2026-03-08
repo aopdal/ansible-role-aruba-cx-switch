@@ -5,7 +5,7 @@ galaxy_info:
   namespace: aopdal
   author: Arne Opdal
   description: Comprehensive Ansible role for configuring Aruba AOS-CX switches with NetBox as source of truth
-  company: Your Company
+  company: Arne Opdal
 
   license: MIT
 
