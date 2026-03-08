@@ -1,14 +1,17 @@
 ---
-# BGP EVPN Fabric Deployment Playbook
-# This playbook demonstrates a complete EVPN/VXLAN fabric deployment
+- name: Configure Aruba CX Switches
+  hosts: all
+  gather_facts: false
 
-- name: Configure Aruba CX BGP EVPN Fabric
-  hosts: aruba_switches
-  gather_facts: no
-
-  tasks:
-    - name: Apply configuration to all fabric switches
-      ansible.builtin.include_role:
-        name: aopdal.aruba_cx_switch
-      tags:
-        - always
+  roles:
+    - role: aopdal.aruba_cx_switch
+      vars:
+        aoscx_idempotent_mode: true
+        aoscx_configure_evpn: true
+        aoscx_configure_vxlan: true
+        aoscx_configure_ospf: true
+        aoscx_configure_bgp: true
+        aoscx_configure_vsx: true
+        aoscx_rest_api_version: "10.16"
+        aoscx_use_rest_api_facts: true
+        aoscx_gather_enhanced_facts: true

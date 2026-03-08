@@ -36,7 +36,7 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with **NetBox a
 
 **This role requires NetBox** as the authoritative source for all network configuration data. Before using this role, ensure you have:
 
-- **NetBox instance** (v3.0+) installed and accessible
+- **NetBox instance** (v4.4+) installed and accessible
 - **NetBox API token** with appropriate permissions
 - **Network devices** added to NetBox with required custom fields
 - **VLANs, interfaces, and IP addresses** configured in NetBox
@@ -50,7 +50,7 @@ This section covers using the role for network configuration. For development se
 ### Prerequisites
 
 1. **NetBox** - Install and configure NetBox with your network devices
-2. **Ansible** - Version 2.9 or higher
+2. **Ansible** - Version 2.18
 3. **Python libraries** - See [Requirements](#requirements) below
 4. **Network access** - Connectivity to your Aruba switches and NetBox API
 
@@ -80,11 +80,10 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **Loopback Interfaces** - Automatic detection, IPv4/IPv6, with VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
 - ✅ **VSX Configuration** - Active-active redundancy with system MAC, ISL, and keepalive
-- ✅ **BGP/EVPN Configuration** - Hybrid support for NetBox BGP plugin and config context
+- ✅ **BGP/EVPN Configuration** - Require NetBox BGP plugin
 - ✅ **VXLAN Configuration** - Overlay networks with VNI mapping and cleanup
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
-- ✅ **ZTP Configuration Generation** - Creates base configs for Zero Touch Provisioning
 
 ## Advanced L3 Interface Features
 
@@ -115,11 +114,10 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 
 ⚠️ **IPv4 Idempotency**: IPv4 address configuration tasks only execute when changes are needed. The role compares NetBox's intended configuration with device facts to determine which specific IP addresses require addition. This optimization significantly reduces configuration time by avoiding unnecessary device connections.
 
-⚠️ **IPv6 Performance Trade-off**: IPv6 addresses in AOS-CX device facts are returned as REST API URL references (e.g., `/rest/v10.09/system/interfaces/vlan11/ip6_addresses`) rather than actual address values. While it's technically possible to retrieve IPv6 addresses via CLI commands, testing confirmed that the overhead of fetching and comparing IPv6 data exceeds the time it takes to simply apply the idempotent configuration. As a result:
+⚠️ **IPv6 Idempotency**: Standard AOS-CX device facts return IPv6 addresses as REST API URL references rather than actual address values. When `aoscx_gather_enhanced_facts: true` is set (requires AOS-CX 10.15+), the role queries the REST API with `depth=2` to retrieve actual IPv6 address values and uses these for pre-comparison — matching the same idempotency behaviour as IPv4. On older firmware where enhanced facts are unavailable:
 
 - IPv6 configuration tasks always execute (no pre-comparison)
 - IPv6 configuration remains idempotent at the CLI level (duplicate commands have no effect)
-- This approach is faster than checking before applying
 
 ⚠️ **General Note**: Tasks using `aoscx_config` may occasionally show `changed` status due to module state detection limitations, but actual device configuration remains correct and idempotent.
 
@@ -606,7 +604,7 @@ vsx_keepalive_vrf: "mgmt"
 1. **System MAC**: Must be identical on both VSX peers
 2. **Roles**: One switch must be `primary`, the other `secondary`
 3. **Keepalive**: Peer IPs should be reachable (typically over management network)
-4. **ISL**: Configure ISL LAG interfaces separately with `mclag_interfaces` configuration
+4. **ISL**: Configure ISL LAG interfaces
 5. **MCLAG**: Multi-Chassis LAG interfaces require VSX to be configured first
 
 #### Tag-Dependent Execution
@@ -707,7 +705,6 @@ ansible-playbook site.yml -e aoscx_save_config=false
 
 ### Configuration Tags
 
-- `ztp`, `config_generation` - ZTP configuration generation
 - `banner`, `base_config`, `system` - Banner configuration
 - `timezone`, `base_config`, `system` - Timezone configuration
 - `ntp`, `base_config`, `system` - NTP configuration

@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for git-revision-date-localized plugin
+          fetch-tags: true  # Fetch all tags so MkDocs can resolve the latest release tag
 
       - name: Set up Python
         uses: actions/setup-python@v5

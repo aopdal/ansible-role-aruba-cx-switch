@@ -1,0 +1,8 @@
+---
+ansible_user: '{{ lookup("env", "ARUBA_USER") }}'
+ansible_password: '{{ lookup("env", "ARUBA_PASSWORD") }}'
+ansible_connection: arubanetworks.aoscx.aoscx  # REST API via pyaoscx connection method
+ansible_network_os: arubanetworks.aoscx.aoscx
+ansible_aoscx_validate_certs: false
+ansible_aoscx_use_proxy: false
+ansible_acx_no_proxy: true

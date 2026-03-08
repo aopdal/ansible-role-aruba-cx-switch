@@ -31,7 +31,6 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 - **[examples/](../examples/)** - Complete, runnable examples
     - **[minimal-deployment/](../examples/minimal-deployment/)** - Simple single-switch deployment for getting started
     - **[bgp-evpn-fabric/](../examples/bgp-evpn-fabric/)** - Production BGP/EVPN fabric with spine-leaf topology
-    - **[ztp-generation.yml](../examples/ztp-generation.yml)** - Zero Touch Provisioning configuration generation
     - Each example includes inventory, playbooks, group_vars, and sample NetBox data
     - **Best way to understand how all the pieces fit together**
 

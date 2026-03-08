@@ -1,0 +1,25 @@
+---
+plugin: netbox.netbox.nb_inventory
+# api_endpoint: using environment variable NETBOX_API
+# token: using environment variable NETBOX_TOKEN
+validate_certs: false
+plurals: true
+config_context: true
+flatten_config_context: true
+prefixes: false
+interfaces: true
+use_extra_vars: true
+group_names_raw: true
+group_by:
+  - device_roles
+  - device_types
+  - platforms
+compose:
+  device_id: id
+query_filters:
+  - tenant: lab
+  - platform: aoscx
+device_query_filters:
+  - has_primary_ip: true
+  - status: active
+  - status: staged
