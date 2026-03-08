@@ -5,53 +5,58 @@ This example demonstrates a complete production-grade BGP/EVPN fabric deployment
 ## What This Example Demonstrates
 
 - **Multi-tier architecture:** Spine and leaf topology
+- **OSPF routing** Routing to loopbacks for BGP peering
 - **BGP routing:** Underlay and overlay with route reflectors
 - **EVPN/VXLAN:** Layer 2 and Layer 3 VPN services
 - **VRF integration:** Tenant separation with VRF-lite
 - **Structured inventory:** Group-based configuration inheritance
-- **Production features:** Loopbacks, VXLAN tunnels, anycast gateways
+- **Production features:** Loopbacks, VXLAN tunnels, anycast gateways, VSX for leafs HA
 
 ## Topology
 
 ```mermaid
+%%{init:{'theme':'forest'}}%%
 graph TB
-    subgraph "Spine Layer - BGP Route Reflectors"
+    subgraph spines ["Spine Layer - BGP Route Reflectors"]
         spine01["spine01<br/>AS 65000<br/>Route Reflector<br/>10.255.255.1"]
         spine02["spine02<br/>AS 65000<br/>Route Reflector<br/>10.255.255.2"]
     end
 
-    subgraph "Leaf Layer - VXLAN VTEPs"
-        leaf01["leaf01<br/>AS 65001<br/>Access Leaf<br/>10.255.255.11"]
-        leaf02["leaf02<br/>AS 65002<br/>Access Leaf<br/>10.255.255.12"]
-        leaf03["leaf03<br/>AS 65003<br/>Border Leaf<br/>10.255.255.13"]
-        leaf04["leaf04<br/>AS 65004<br/>Border Leaf<br/>10.255.255.14"]
+    subgraph leaflayer ["Leaf Layer - VXLAN VTEPs"]
+        direction LR
+        leaf01["leaf01<br/>AS 65000<br/>Access Leaf<br/>10.255.255.11"]
+        leaf02["leaf02<br/>AS 65000<br/>Access Leaf<br/>10.255.255.12"]
+        leaf03["leaf03<br/>AS 65000<br/>Border Leaf<br/>10.255.255.13"]
+        leaf04["leaf04<br/>AS 65000<br/>Border Leaf<br/>10.255.255.14"]
+        leaf01 ---|"VSX"| leaf02
+        leaf03 ---|"VSX"| leaf04
     end
 
-    subgraph "External Network"
+    subgraph external_net ["External Network"]
         external["External Router<br/>AS 65100"]
     end
 
-    %% Spine to Leaf Connections (Underlay + EVPN Overlay)
-    spine01 ---|"BGP<br/>Underlay"| leaf01
-    spine01 ---|"BGP<br/>Underlay"| leaf02
-    spine01 ---|"BGP<br/>Underlay"| leaf03
-    spine01 ---|"BGP<br/>Underlay"| leaf04
+    %% Spine to Leaf Connections (Underlay — solid lines)
+    spine01 --- leaf01
+    spine01 --- leaf02
+    spine01 --- leaf03
+    spine01 --- leaf04
 
-    spine02 ---|"BGP<br/>Underlay"| leaf01
-    spine02 ---|"BGP<br/>Underlay"| leaf02
-    spine02 ---|"BGP<br/>Underlay"| leaf03
-    spine02 ---|"BGP<br/>Underlay"| leaf04
+    spine02 --- leaf01
+    spine02 --- leaf02
+    spine02 --- leaf03
+    spine02 --- leaf04
 
-    %% EVPN Overlay (shown as dashed)
-    spine01 -.-|"EVPN<br/>Overlay"| leaf01
-    spine01 -.-|"EVPN<br/>Overlay"| leaf02
-    spine01 -.-|"EVPN<br/>Overlay"| leaf03
-    spine01 -.-|"EVPN<br/>Overlay"| leaf04
+    %% EVPN Overlay (dashed lines)
+    spine01 -.- leaf01
+    spine01 -.- leaf02
+    spine01 -.- leaf03
+    spine01 -.- leaf04
 
-    spine02 -.-|"EVPN<br/>Overlay"| leaf01
-    spine02 -.-|"EVPN<br/>Overlay"| leaf02
-    spine02 -.-|"EVPN<br/>Overlay"| leaf03
-    spine02 -.-|"EVPN<br/>Overlay"| leaf04
+    spine02 -.- leaf01
+    spine02 -.- leaf02
+    spine02 -.- leaf03
+    spine02 -.- leaf04
 
     %% External Connectivity
     leaf03 ---|"eBGP"| external
@@ -128,33 +133,31 @@ Use NetBox as your source of truth:
 # Set NetBox credentials as environment variables
 export NETBOX_API=https://netbox.example.com
 export NETBOX_TOKEN=your_api_token_here
+# Set Aruba credentials as environment variables
+export ARUBA_USER=your_user
+export ARUBA_PASSWORD=your_password
 
 # Verify inventory is working
-ansible-inventory -i inventory/netbox_inventory.yml --graph
+ansible-inventory -i netbox_inventory.yml --graph
 
 # Check what variables are set
-ansible-inventory -i inventory/netbox_inventory.yml --host spine01
+ansible-inventory -i netbox_inventory.yml --host spine01
 ```
 
 The NetBox inventory automatically:
 - Groups devices by `device_roles` (spines, leafs, border_leafs)
-- Pulls config_context data (BGP ASN, loopback IPs, EVPN settings)
 - Retrieves interface configurations
 - Filters to only active Aruba CX switches
 
-Edit `inventory/netbox_inventory.yml` to customize query filters.
-
-**Option B: Static Inventory File**
-
-For testing without NetBox, use `inventory/hosts.yml`:
-- Update switch hostnames and management IPs
-- Verify group assignments (spines, leafs, border_leafs)
-- Check underlay IP addressing
+Edit `netbox_inventory.yml` to customize query filters.
 
 ### 3. Set Up Credentials
 
+You may want to use vault to store credentials and not use environment variables.
+Make changes to the group_vars files and create vault files.
+
 ```bash
-ansible-vault create inventory/group_vars/all/vault.yml
+ansible-vault create group_vars/all/vault.yml
 ```
 
 Add credentials:
@@ -182,10 +185,8 @@ See `netbox-export-sample.json` for required data structure.
 
 ```bash
 # With NetBox inventory (recommended)
-ansible-playbook -i inventory/netbox_inventory.yml playbook.yml --check
+ansible-playbook -i netbox_inventory.yml playbook.yml --check
 
-# Or with static inventory
-ansible-playbook -i inventory/hosts.yml playbook.yml --check
 ```
 
 ### 6. Deploy Infrastructure Phase
@@ -218,14 +219,14 @@ ansible-playbook -i inventory/netbox_inventory.yml playbook.yml
 bgp-evpn-fabric/
 ├── README.md                                # This file
 ├── playbook.yml                             # Main playbook
-├── inventory/
-│   ├── hosts.yml                            # All switches inventory
-│   └── group_vars/
-│       ├── all.yml                          # Global settings
-│       ├── aruba_switches.yml               # Common switch config
-│       ├── spines.yml                       # Spine-specific config
-│       ├── leafs.yml                        # Leaf-specific config
-│       └── border_leafs.yml                 # Border leaf-specific config
+├── netbox_inventory.yml                     # Example inventory
+├── ansible.cfg                              # Example Ansible configuration
+├── requirements.txt                         # Python requirements
+├── requirements.yml                         # Ansible requirements
+├── group_vars/
+│   ├── all.yml                              # Global settings
+│   ├── aoscx.yml                            # Common switch config
+│   ├── localhost.yml                        # Variables needed for API access
 └── netbox-export-sample.json                # Sample NetBox structure
 ```
 
