@@ -183,7 +183,7 @@ IPv6 addresses in AOS-CX device facts are returned as REST API URL references:
 
 **Solution — Enhanced Facts** (`aoscx_gather_enhanced_facts: true`):
 
-`tasks/gather_enhanced_facts.yml` queries the REST API at `depth=2`, which returns actual IPv6 addresses (and VSX virtual IPs) instead of URL references. The result is stored in `aoscx_enhanced_interface_facts` and passed to `get_interfaces_needing_config_changes()` as the `enhanced_facts` argument. When present, the filter performs full IPv6 comparison and only configures addresses that are missing.
+`tasks/gather_facts_rest_api.yml` queries the REST API at `depth=2`, which returns actual IPv6 addresses (and VSX virtual IPs) instead of URL references. The result is stored in `aoscx_enhanced_interface_facts` and passed to `get_interfaces_needing_config_changes()` as the `enhanced_facts` argument. When present, the filter performs full IPv6 comparison and only configures addresses that are missing.
 
 ```yaml
 # Enable in host_vars or group_vars:
@@ -288,7 +288,7 @@ ansible-playbook your-playbook.yml
 - CLI tasks: Temporary switch to `network_cli` for configuration
 - Performance: Per-interface CLI checking requires connection switching (~2-3s each)
 - Default conclusion: Direct idempotent configuration is faster than check + configure
-- With `aoscx_gather_enhanced_facts: true`: `tasks/gather_enhanced_facts.yml` queries REST API once at `depth=2` to get actual IPv6 addresses for all interfaces, enabling comparison without any CLI connection switching
+- With `aoscx_gather_enhanced_facts: true`: `tasks/gather_facts_rest_api.yml` queries REST API once at `depth=2` to get actual IPv6 addresses for all interfaces, enabling comparison without any CLI connection switching
 
 ## Structure
 
@@ -486,7 +486,7 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
     - Parameters:
       - `interfaces`: List of NetBox interface objects
       - `device_facts`: Device facts dict (from `aoscx_facts` / `ansible_facts`)
-      - `enhanced_facts`: Optional dict of enhanced interface data from `aoscx_enhanced_interface_facts` (populated by `tasks/gather_enhanced_facts.yml` when `aoscx_gather_enhanced_facts: true`). Provides actual IPv6 addresses and VSX virtual IPs for accurate comparison instead of URL references.
+      - `enhanced_facts`: Optional dict of enhanced interface data from `aoscx_enhanced_interface_facts` (populated by `tasks/gather_facts_rest_api.yml` when `aoscx_gather_enhanced_facts: true`). Provides actual IPv6 addresses and VSX virtual IPs for accurate comparison instead of URL references.
     - Returns: Dict with categorized interfaces:
       - `physical`: Physical interfaces needing changes
       - `lag`: LAG interfaces needing changes

@@ -64,12 +64,14 @@
   tags:
     - always
 
-# Optional: Gather enhanced facts via REST API with depth=2
-# This provides IPv6 addresses (actual values) and VSX virtual IPs
-# NOTE: When using REST API facts, enhanced facts are already included
-- name: Include enhanced fact gathering
+# Optional: Gather enhanced interface facts via REST API (aoscx_facts module mode only).
+# Provides IPv6 addresses (actual values) and VSX virtual IPs not available in aoscx_facts.
+# NOTE: When using REST API facts mode, enhanced facts are already included above.
+- name: Gather enhanced interface facts via REST API
   ansible.builtin.include_tasks:
-    file: gather_enhanced_facts.yml
+    file: gather_facts_rest_api.yml
+  vars:
+    _rest_api_enhanced_only: true
   when:
     - not (aoscx_use_rest_api_facts | default(false) | bool)
     - aoscx_gather_enhanced_facts | default(false) | bool
