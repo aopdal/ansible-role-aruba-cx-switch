@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-03-11
+
+### Changed
+
+- Consolidate gather facts using rest api.
+- Refactor IP Filters
+- Refactor IP config tasks
+- Refactor loopback interfaces
+- Refactor gather enhanced facts using API
+
 ## [0.6.2] - 2026-03-07
 
 ### Fixed
