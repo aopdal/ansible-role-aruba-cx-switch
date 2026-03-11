@@ -114,7 +114,7 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 
 ⚠️ **IPv4 Idempotency**: IPv4 address configuration tasks only execute when changes are needed. The role compares NetBox's intended configuration with device facts to determine which specific IP addresses require addition. This optimization significantly reduces configuration time by avoiding unnecessary device connections.
 
-⚠️ **IPv6 Idempotency**: Standard AOS-CX device facts return IPv6 addresses as REST API URL references rather than actual address values. When `aoscx_gather_enhanced_facts: true` is set (requires AOS-CX 10.15+), the role queries the REST API with `depth=2` to retrieve actual IPv6 address values and uses these for pre-comparison — matching the same idempotency behaviour as IPv4. On older firmware where enhanced facts are unavailable:
+⚠️ **IPv6 Idempotency**: Standard AOS-CX device facts return IPv6 addresses as REST API URL references rather than actual address values. When `aoscx_gather_facts_rest_api: true` is set (requires AOS-CX 10.15+), the role queries the REST API with `depth=2` to retrieve actual IPv6 address values and uses these for pre-comparison — matching the same idempotency behaviour as IPv4. On older firmware where REST API facts are unavailable:
 
 - IPv6 configuration tasks always execute (no pre-comparison)
 - IPv6 configuration remains idempotent at the CLI level (duplicate commands have no effect)
@@ -314,8 +314,7 @@ aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
 aoscx_configure_physical_interfaces: true
 aoscx_configure_l2_interfaces: true
-aoscx_configure_l3_interfaces: true
-aoscx_configure_loopback: true
+aoscx_configure_l3_interfaces: true  # includes loopback interfaces
 aoscx_configure_ospf: true
 
 # Idempotent mode - removes configs not in NetBox

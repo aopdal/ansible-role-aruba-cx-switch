@@ -107,7 +107,7 @@
   ansible.builtin.debug:
     msg:
       - "=== IPv6 Change Detection Debug ==="
-      - "Enhanced facts enabled: {{ aoscx_gather_enhanced_facts | default(false) }}"
+      - "REST API facts enabled: {{ aoscx_gather_facts_rest_api | default(false) }}"
       - "IPv6 addresses in list: {{ interface_ips | selectattr('address', 'search', ':') | list | length }}"
       - >-
         IPv6 addresses with _needs_add=true:

@@ -70,8 +70,7 @@
 
     # Enable features for testing - all disabled for Molecule testing
     aoscx_gather_facts: false  # Skip fact gathering in tests
-    aoscx_use_rest_api_facts: false  # REST API fact gathering disabled in tests
-    aoscx_gather_enhanced_facts: false  # Enhanced facts disabled in tests
+    aoscx_gather_facts_rest_api: false  # REST API fact gathering disabled in tests
 
     # REST API version settings (for reference, not used in tests)
     ansible_aoscx_rest_version: 10.09  # pyaoscx max version
@@ -87,7 +86,6 @@
     aoscx_configure_mclag_interfaces: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_l2_interfaces: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_l3_interfaces: false  # Disabled - no AOS-CX modules in test env
-    aoscx_configure_loopback: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_evpn: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_vxlan: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_ospf: false  # Disabled - no AOS-CX modules in test env

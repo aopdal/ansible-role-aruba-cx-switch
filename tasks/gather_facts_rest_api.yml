@@ -1,20 +1,11 @@
 ---
 # REST API-based fact gathering
 #
-# This task file supports two modes of operation:
-#
-# 1. Full mode (default, _rest_api_enhanced_only: false)
-#    - Used when aoscx_use_rest_api_facts: true
-#    - Gathers interfaces, VLANs, EVPN, and VXLAN data
-#    - Sets ansible_facts.network_resources.{interfaces,vlans}
-#    - Also sets aoscx_enhanced_interface_facts (raw REST response)
-#    - Faster than aoscx_facts (single authenticated session)
-#
-# 2. Enhanced-only mode (_rest_api_enhanced_only: true)
-#    - Used when aoscx_gather_enhanced_facts: true (aoscx_facts module mode)
-#    - Only gathers interface data as a supplement to aoscx_facts
-#    - Sets aoscx_enhanced_interface_facts only, does NOT modify ansible_facts
-#    - Provides complete IPv6 address data and VSX virtual IPs
+# Used when aoscx_gather_facts_rest_api: true
+# - Gathers interfaces, VLANs, EVPN, VXLAN, and OSPF interface data
+# - Sets ansible_facts.network_resources.{interfaces,vlans}
+# - Also sets aoscx_enhanced_interface_facts (raw REST response)
+# - Faster than aoscx_facts (single authenticated session)
 #
 # Note: VSX-specific attributes (ip4_address_secondary, vsx_virtual_ip4, vsx_virtual_ip6,
 # vsx_virtual_gw_mac_v4, vsx_virtual_gw_mac_v6) are only queried when device_vsx is enabled.
@@ -116,7 +107,6 @@
       - "Device OSPF enabled: {{ custom_fields.device_ospf | default(false) }}"
       - "Device VSX enabled: {{ custom_fields.device_vsx | default(false) }}"
       - "Interface attributes to query: {{ _rest_interface_attrs }}"
-      - "Enhanced-only mode: {{ _rest_api_enhanced_only | default(false) }}"
   when:
     - aoscx_debug | default(false) | bool
   tags:
@@ -167,7 +157,6 @@
     return_content: true
   register: _rest_vlans
   delegate_to: localhost
-  when: not (_rest_api_enhanced_only | default(false) | bool)
   tags:
     - always
 
@@ -179,7 +168,6 @@
       - "VLAN response (first 500 chars): {{ _rest_vlans.json | string | truncate(500) }}"
   when:
     - aoscx_debug | default(false) | bool
-    - not (_rest_api_enhanced_only | default(false) | bool)
     - _rest_vlans is defined
   tags:
     - always
@@ -197,7 +185,6 @@
   register: _rest_evpn
   delegate_to: localhost
   when:
-    - not (_rest_api_enhanced_only | default(false) | bool)
     - aoscx_configure_evpn | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
   tags:
@@ -216,7 +203,6 @@
   register: _rest_evpn_vlans
   delegate_to: localhost
   when:
-    - not (_rest_api_enhanced_only | default(false) | bool)
     - aoscx_configure_evpn | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
   tags:
@@ -235,7 +221,6 @@
   register: _rest_vnis
   delegate_to: localhost
   when:
-    - not (_rest_api_enhanced_only | default(false) | bool)
     - aoscx_configure_vxlan | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
   tags:
@@ -343,7 +328,7 @@
   tags:
     - always
 
-# Transform REST API responses to ansible_facts format (full mode only).
+# Transform REST API responses to ansible_facts format.
 # IMPORTANT: Do NOT set ansible_aoscx_rest_version here!
 # pyaoscx modules require ansible_aoscx_rest_version: 10.09 (max supported).
 # We use _rest_api_version separately for direct REST API calls.
@@ -353,17 +338,14 @@
       network_resources:
         interfaces: "{{ _rest_interfaces.json | rest_api_to_aoscx_interfaces }}"
         vlans: "{{ _rest_vlans.json | rest_api_to_aoscx_vlans }}"
-  when: not (_rest_api_enhanced_only | default(false) | bool)
   tags:
     - always
 
-# Set EVPN facts if queried (full mode only)
 - name: Set EVPN facts from REST API response
   ansible.builtin.set_fact:
     aoscx_evpn_facts: "{{ _rest_evpn.json | default({}) }}"
     aoscx_evpn_vlans_facts: "{{ _rest_evpn_vlans.json | default({}) }}"
   when:
-    - not (_rest_api_enhanced_only | default(false) | bool)
     - custom_fields.device_vxlan | default(false) | bool
     - aoscx_configure_evpn | default(false) | bool
     - _rest_evpn is defined
@@ -371,12 +353,10 @@
   tags:
     - always
 
-# Set VNI/VXLAN facts if queried (full mode only)
 - name: Set VNI facts from REST API response
   ansible.builtin.set_fact:
     aoscx_vni_facts: "{{ _rest_vnis.json | default({}) }}"
   when:
-    - not (_rest_api_enhanced_only | default(false) | bool)
     - custom_fields.device_vxlan | default(false) | bool
     - aoscx_configure_vxlan | default(false) | bool
     - _rest_vnis is defined
@@ -387,25 +367,14 @@
 - name: Debug - Show REST API facts summary
   ansible.builtin.debug:
     msg: >-
-      {%- if _rest_api_enhanced_only | default(false) | bool -%}
-        {{ [
-          '=== Enhanced Interface Facts (REST API depth=2) ===',
-          'Total interfaces: ' ~ (aoscx_enhanced_interface_facts | length),
-          'Sample interface keys: ' ~ (
-            (aoscx_enhanced_interface_facts | dict2items | first).value.keys() | list
-            if aoscx_enhanced_interface_facts | length > 0 else 'N/A'
-          )
-        ] }}
-      {%- else -%}
-        {{ [
-          '=== REST API Fact Gathering Complete ===',
-          'Interfaces found: ' ~ (ansible_facts.network_resources.interfaces | length),
-          'VLANs found: ' ~ (ansible_facts.network_resources.vlans | length),
-          'Enhanced interface facts: ' ~ (aoscx_enhanced_interface_facts | length),
-          'EVPN facts available: ' ~ (aoscx_evpn_facts is defined),
-          'VNI facts available: ' ~ (aoscx_vni_facts is defined)
-        ] }}
-      {%- endif -%}
+      {{ [
+        '=== REST API Fact Gathering Complete ===',
+        'Interfaces found: ' ~ (ansible_facts.network_resources.interfaces | length),
+        'VLANs found: ' ~ (ansible_facts.network_resources.vlans | length),
+        'Enhanced interface facts: ' ~ (aoscx_enhanced_interface_facts | length),
+        'EVPN facts available: ' ~ (aoscx_evpn_facts is defined),
+        'VNI facts available: ' ~ (aoscx_vni_facts is defined)
+      ] }}
   when:
     - aoscx_debug | default(false) | bool
   tags:

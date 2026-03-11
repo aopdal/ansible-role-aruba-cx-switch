@@ -180,7 +180,6 @@
     aoscx_configure_physical_interfaces: true
     aoscx_configure_l2_interfaces: true
     aoscx_configure_l3_interfaces: true
-    aoscx_configure_loopback: true
     aoscx_configure_ospf: true
     aoscx_idempotent_mode: false
     aoscx_save_config: false  # Don't save in testing

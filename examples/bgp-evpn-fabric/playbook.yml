@@ -13,5 +13,4 @@
         aoscx_configure_bgp: true
         aoscx_configure_vsx: true
         aoscx_rest_api_version: "10.16"
-        aoscx_use_rest_api_facts: true
-        aoscx_gather_enhanced_facts: true
+        aoscx_gather_facts_rest_api: true

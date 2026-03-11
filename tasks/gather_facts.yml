@@ -3,16 +3,15 @@
 #
 # This task file supports two modes of operation:
 #
-# 1. REST API Mode (aoscx_use_rest_api_facts: true)
-#    - Uses direct REST API calls with a single authenticated session
+# 1. REST API Mode (aoscx_gather_facts_rest_api: true)
+#    - Uses direct REST API calls (gather_facts_rest_api.yml)
 #    - Faster (3-5x improvement over aoscx_facts)
 #    - Requires REST API v10.15+ for full functionality
-#    - Automatically includes enhanced facts (IPv6 addresses, VSX virtual IPs)
+#    - Includes enhanced facts (IPv6 addresses, VSX virtual IPs, OSPF)
 #
-# 2. aoscx_facts Mode (default, aoscx_use_rest_api_facts: false)
+# 2. aoscx_facts Mode (default, aoscx_gather_facts_rest_api: false)
 #    - Uses the arubanetworks.aoscx.aoscx_facts module
 #    - Compatible with older firmware versions
-#    - Optionally enable enhanced facts with aoscx_gather_enhanced_facts: true
 #
 # IMPORTANT: This task gathers ALL network resources needed by the role.
 # When gathering facts elsewhere in the role, ALWAYS include ALL resources
@@ -30,7 +29,7 @@
   ansible.builtin.include_tasks:
     file: gather_facts_rest_api.yml
   when:
-    - aoscx_use_rest_api_facts | default(false) | bool
+    - aoscx_gather_facts_rest_api | default(false) | bool
   tags:
     - always
 
@@ -44,14 +43,14 @@
       - vlans
   register: device_facts_result
   when:
-    - not (aoscx_use_rest_api_facts | default(false) | bool)
+    - not (aoscx_gather_facts_rest_api | default(false) | bool)
   tags:
     - always
 
 - name: Debug - Show device facts structure
   ansible.builtin.debug:
     msg:
-      - "Fact gathering mode: {{ 'REST API' if aoscx_use_rest_api_facts | default(false) | bool else 'aoscx_facts module' }}"
+      - "Fact gathering mode: {{ 'REST API' if aoscx_gather_facts_rest_api | default(false) | bool else 'aoscx_facts module' }}"
       - "ansible_facts keys: {{ ansible_facts.keys() | list if ansible_facts is defined else 'ansible_facts not defined' }}"
       - "Has network_resources: {{ 'network_resources' in ansible_facts if ansible_facts is defined else false }}"
       - >-
@@ -61,19 +60,5 @@
   when:
     - aoscx_debug | bool
     - ansible_verbosity >= 1
-  tags:
-    - always
-
-# Optional: Gather enhanced interface facts via REST API (aoscx_facts module mode only).
-# Provides IPv6 addresses (actual values) and VSX virtual IPs not available in aoscx_facts.
-# NOTE: When using REST API facts mode, enhanced facts are already included above.
-- name: Gather enhanced interface facts via REST API
-  ansible.builtin.include_tasks:
-    file: gather_facts_rest_api.yml
-  vars:
-    _rest_api_enhanced_only: true
-  when:
-    - not (aoscx_use_rest_api_facts | default(false) | bool)
-    - aoscx_gather_enhanced_facts | default(false) | bool
   tags:
     - always
