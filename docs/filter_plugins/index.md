@@ -25,9 +25,9 @@ Each filter's documentation below tells you exactly that.
 
 ## Overview
 
-The filter plugins library provides **36 custom Ansible filters** organized across **11 modules** in two filter plugin files.
+The filter plugins library provides **38 custom Ansible filters** organized across **11 modules** in two filter plugin files.
 
-- **`netbox_filters.py`** - Main plugin with 32 filters (NetBox data transformation)
+- **`netbox_filters.py`** - Main plugin with 34 filters (NetBox data transformation)
 - **`rest_api_transforms.py`** - Separate plugin with 4 filters (REST API format conversion)
 
 ---
@@ -51,20 +51,22 @@ Foundation module providing:
 ### L3 Configuration
 
 **[L3 Config Helpers](l3_config_helpers.md)** - L3 interface configuration optimization
-**Filters**: 5
+**Filters**: 6
 
 Configuration building and helper functions:
+- Interface IP grouping (flat per-IP list → per-interface with all addresses)
 - Interface name formatting for AOS-CX
 - IP version detection (IPv4/IPv6)
 - VRF extraction with safe fallback
-- Complete L3 config line generation
+- Complete L3 config line generation (all IPs, VRF, MTU, OSPF — once per interface)
 - Supports physical, LAG, VLAN, and sub-interfaces
 
 **Key Filters:**
+- `group_interface_ips()` - Group per-IP list into per-interface items
 - `format_interface_name()` - Format interface names
 - `is_ipv4_address()` / `is_ipv6_address()` - IP version detection
 - `get_interface_vrf()` - Extract VRF with fallback
-- `build_l3_config_lines()` - Build configuration commands
+- `build_l3_config_lines()` - Build all config commands for an interface
 
 ---
 
@@ -337,12 +339,13 @@ Converts raw Aruba AOS-CX REST API responses into the format expected by `aoscx_
 - `select_interfaces_to_configure(interfaces, idempotent_mode, changes)` - Idempotent selection
 - *Internal*: `_debug()`, `extract_ip_addresses()`, `populate_ip_changes()`
 
-#### L3 Config Helpers (5 filters)
+#### L3 Config Helpers (6 filters)
+- `group_interface_ips(interface_ip_list)` - Group per-IP list into per-interface items
 - `format_interface_name(name, type)` - Format interface names
 - `is_ipv4_address(address)` - IPv4 detection
 - `is_ipv6_address(address)` - IPv6 detection
 - `get_interface_vrf(interface)` - Extract VRF name
-- `build_l3_config_lines(item, type, ip_version, vrf_type)` - Build config commands
+- `build_l3_config_lines(item, type, vrf_type, l3_counters_enable, ospf_process_id)` - Build all config commands for an interface
 
 #### VLAN Filters (8)
 - `extract_vlan_ids(interfaces)` - Extract VLAN IDs
@@ -513,7 +516,7 @@ EOF
 |--------|---------|-------------|
 | **vlan_filters.py** | 8 | VLAN lifecycle management |
 | **vrf_filters.py** | 6 | VRF operations and route targets |
-| **l3_config_helpers.py** | 5 | L3 configuration optimization |
+| **l3_config_helpers.py** | 6 | L3 configuration optimization |
 | **ospf_filters.py** | 4 | OSPF configuration |
 | **rest_api_transforms.py** | 4 | REST API data normalization |
 | **interface_categorization.py** | 2 | Interface categorization |
@@ -522,7 +525,7 @@ EOF
 | **interface_change_detection.py** | 1 | Change detection and idempotency |
 | **interface_ip_processing.py** | 1 | IP address matching |
 | **bgp_filters.py** | 1 | BGP session enrichment |
-| **Total** | **36** | 11 modules across 2 plugin files |
+| **Total** | **38** | 11 modules across 2 plugin files |
 
 ---
 

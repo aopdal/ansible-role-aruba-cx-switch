@@ -1,90 +1,19 @@
 ---
-# Configure loopback interfaces
+# Configure loopback L3 interfaces
+# NOTE: Loopback interfaces are created in configure_l3_interfaces.yml before this is included.
 
-- name: Create loopback interfaces
-  arubanetworks.aoscx.aoscx_interface:
-    name: "{{ item.interface.name }}"
-    enabled: "{{ item.enabled }}"
-    description: "{{ item.description | default(omit) }}"
-    state: create
-  loop: "{{ l3_interfaces.loopback }}"
-  loop_control:
-    label: "Interface: {{ item.interface_name }}"
-  when:
-    - l3_interfaces.loopback | length > 0
-    - item.interface.name not in (ansible_facts.network_resources.interfaces.keys() | list if ansible_facts.network_resources.interfaces is defined else [])
-
-# Separate loopback into built-in and custom VRF
-# Uses aoscx_builtin_vrfs from defaults/main.yml
-- name: Set loopback interface facts
-  ansible.builtin.set_fact:
-    loopback_default_vrf: "{{ l3_interfaces.loopback | selectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
-    loopback_custom_vrf: "{{ l3_interfaces.loopback | rejectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
-  when: l3_interfaces.loopback | length > 0
-
-- name: Debug - Show loopback categorization
-  ansible.builtin.debug:
-    msg:
-      - "Loopback interfaces (built-in VRF): {{ loopback_default_vrf | length }}"
-      - "Loopback interfaces (custom VRF): {{ loopback_custom_vrf | length }}"
-  when:
-    - aoscx_debug | bool or ansible_verbosity >= 1
-    - l3_interfaces.loopback | length > 0
-
-- name: Configure loopback interfaces (built-in VRF) - IPv4
-  arubanetworks.aoscx.aoscx_l3_interface:
-    interface: "{{ item.interface_name }}"
-    ipv4:
-      - "{{ item.address }}"
-    vrf: default
-  loop: "{{ loopback_default_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
-  loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf | default('default') }}"
-  when:
-    - loopback_default_vrf is defined
-    - loopback_default_vrf | length > 0
-
-- name: Configure loopback interfaces (built-in VRF) - IPv6
-  arubanetworks.aoscx.aoscx_l3_interface:
-    interface: "{{ item.interface_name }}"
-    ipv6:
-      - "{{ item.address }}"
-    vrf: default
-  loop: "{{ loopback_default_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
-  loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf | default('default') }}"
-  when:
-    - loopback_default_vrf is defined
-    - loopback_default_vrf | length > 0
-
-- name: Configure loopback interfaces (custom VRF) - IPv4
-  arubanetworks.aoscx.aoscx_config:
-    lines:
-      - vrf attach {{ item.vrf }}
-      - ip address {{ item.address }}
-    parents: interface {{ item.interface_name }}
-    match: line
-  loop: "{{ loopback_custom_vrf | selectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | selectattr('_needs_add', 'equalto', true) | list }}"
-  loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
-  when:
-    - loopback_custom_vrf is defined
-    - loopback_custom_vrf | length > 0
+- ansible.builtin.include_tasks:
+    file: configure_l3_interface_common.yml
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    interface_list: "{{ l3_interfaces.loopback | selectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
+    interface_type: loopback
+    vrf_type: default
+  when: l3_interfaces.loopback | default([]) | length > 0
 
-- name: Configure loopback interfaces (custom VRF) - IPv6
-  arubanetworks.aoscx.aoscx_config:
-    lines:
-      - vrf attach {{ item.vrf }}
-      - ipv6 address {{ item.address }}
-    parents: interface {{ item.interface_name }}
-    match: line
-  loop: "{{ loopback_custom_vrf | rejectattr('address', 'match', '^\\d+\\.\\d+\\.\\d+\\.\\d+/') | list }}"
-  loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }} VRF: {{ item.vrf }}"
-  when:
-    - loopback_custom_vrf is defined
-    - loopback_custom_vrf | length > 0
+- ansible.builtin.include_tasks:
+    file: configure_l3_interface_common.yml
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    interface_list: "{{ l3_interfaces.loopback | rejectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
+    interface_type: loopback
+    vrf_type: custom
+  when: l3_interfaces.loopback | default([]) | length > 0
