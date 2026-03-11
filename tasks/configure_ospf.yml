@@ -63,39 +63,6 @@
     label: "VRF: {{ item.0.vrf }} Area: {{ item.1.area }}"
   when: ospf_config.vrfs | length > 0
 
-- name: Configure OSPF on interfaces with defined VRF
-  arubanetworks.aoscx.aoscx_ospf_interface:
-    interface_name: "{{ item.name }}"
-    ospf_id: "{{ ospf_config.process_id }}"
-    area_id: "{{ item.custom_fields.if_ip_ospf_1_area }}"
-    type: "{{ item.custom_fields.if_ip_ospf_network | replace('-', '_') }}"
-    vrf: "{{ item.vrf.name if item.vrf and item.vrf.name else 'default' }}"
-    version: v2
-  loop: "{{ ospf_interfaces }}"
-  loop_control:
-    label: "Device: {{ inventory_hostname }} Interface: {{ item.name }}"
-  when:
-    - item.custom_fields.if_ip_ospf_1_area is defined
-    - item.custom_fields.if_ip_ospf_1_area | length > 0
-    - item.vrf is defined
-    - item.vrf is not none
-
-- name: Configure OSPF on interfaces with default VRF (no VRF defined)
-  arubanetworks.aoscx.aoscx_ospf_interface:
-    interface_name: "{{ item.name }}"
-    ospf_id: "{{ ospf_config.process_id }}"
-    area_id: "{{ item.custom_fields.if_ip_ospf_1_area }}"
-    type: "{{ item.custom_fields.if_ip_ospf_network | replace('-', '_') }}"
-    vrf: "default"
-    version: v2
-  loop: "{{ ospf_interfaces }}"
-  loop_control:
-    label: "Device: {{ inventory_hostname }} Interface: {{ item.name }}"
-  when:
-    - item.custom_fields.if_ip_ospf_1_area is defined
-    - item.custom_fields.if_ip_ospf_1_area | length > 0
-    - item.vrf is not defined or item.vrf is none
-
 - name: Debug - OSPF configuration summary
   ansible.builtin.debug:
     msg:

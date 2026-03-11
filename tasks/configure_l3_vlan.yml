@@ -1,43 +1,18 @@
 ---
 # Configure VLAN/SVI L3 interfaces
-# Refactored to use unified configuration task
 
-# Configure IPv4 addresses - default VRF
 - ansible.builtin.include_tasks:
     file: configure_l3_interface_common.yml
   vars:
     interface_list: "{{ l3_interfaces.vlan_default_vrf }}"
     interface_type: vlan
-    ip_version: ipv4
     vrf_type: default
   when: l3_interfaces.vlan_default_vrf | default([]) | length > 0
 
-# Configure IPv6 addresses - default VRF
-- ansible.builtin.include_tasks:
-    file: configure_l3_interface_common.yml
-  vars:
-    interface_list: "{{ l3_interfaces.vlan_default_vrf }}"
-    interface_type: vlan
-    ip_version: ipv6
-    vrf_type: default
-  when: l3_interfaces.vlan_default_vrf | default([]) | length > 0
-
-# Configure IPv4 addresses - custom VRF
 - ansible.builtin.include_tasks:
     file: configure_l3_interface_common.yml
   vars:
     interface_list: "{{ l3_interfaces.vlan_custom_vrf }}"
     interface_type: vlan
-    ip_version: ipv4
-    vrf_type: custom
-  when: l3_interfaces.vlan_custom_vrf | default([]) | length > 0
-
-# Configure IPv6 addresses - custom VRF
-- ansible.builtin.include_tasks:
-    file: configure_l3_interface_common.yml
-  vars:
-    interface_list: "{{ l3_interfaces.vlan_custom_vrf }}"
-    interface_type: vlan
-    ip_version: ipv6
     vrf_type: custom
   when: l3_interfaces.vlan_custom_vrf | default([]) | length > 0

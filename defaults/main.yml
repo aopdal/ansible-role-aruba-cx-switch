@@ -24,7 +24,6 @@ aoscx_configure_lag_interfaces: true
 aoscx_configure_mclag_interfaces: true
 aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true
-aoscx_configure_loopback: true
 aoscx_configure_evpn: false
 aoscx_configure_vxlan: false
 aoscx_configure_ospf: true
@@ -61,7 +60,7 @@ aoscx_save_config: true
 aoscx_connection_type: network_cli  # or httpapi
 
 # REST API-based fact gathering (v10.15+ recommended)
-# When true, uses direct REST API calls instead of aoscx_facts module
+# When true, uses direct REST API calls (gather_facts_rest_api.yml) instead of aoscx_facts module
 # Benefits:
 #   - 3-5x faster fact gathering (single authenticated session)
 #   - IPv6 addresses included (not just URI references)
@@ -70,16 +69,7 @@ aoscx_connection_type: network_cli  # or httpapi
 # Requirements:
 #   - aoscx_rest_api_version: "10.15" or later
 #   - REST API credentials (defaults to ansible_user/ansible_password)
-# Note: When enabled, aoscx_gather_enhanced_facts is automatically included
-aoscx_use_rest_api_facts: false
-
-# Enhanced fact gathering via REST API with depth=2 (legacy option)
-# Only used when aoscx_use_rest_api_facts is false
-# When enabled, gathers additional data not available in standard facts:
-# - IPv6 addresses (actual values, not URI references)
-# - VSX virtual IPs (vsx_virtual_ip4, vsx_virtual_ip6)
-# - Anycast gateway MACs (vsx_virtual_gw_mac_v4, vsx_virtual_gw_mac_v6)
-aoscx_gather_enhanced_facts: false
+aoscx_gather_facts_rest_api: false
 
 # REST API credentials for enhanced fact gathering (delegated to localhost)
 # These default to ansible_host/ansible_user/ansible_password if not set

@@ -245,6 +245,23 @@
     - l2_interfaces
     - layer2
 
+- name: Include OSPF configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_ospf.yml
+    apply:
+      tags:
+        - ospf
+        - routing
+        - layer3
+  when:
+    - aoscx_configure_ospf | bool
+    - custom_fields.device_ospf | default(false) | bool
+    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
+  tags:
+    - ospf
+    - routing
+    - layer3
+
 - name: Include L3 interface configuration tasks
   ansible.builtin.include_tasks:
     file: configure_l3_interfaces.yml
@@ -257,18 +274,6 @@
   tags:
     - interfaces
     - l3_interfaces
-    - layer3
-
-- name: Include loopback configuration tasks
-  ansible.builtin.include_tasks:
-    file: configure_loopback.yml
-    apply:
-      tags:
-        - loopback
-        - layer3
-  when: aoscx_configure_loopback | bool
-  tags:
-    - loopback
     - layer3
 
 - name: Include EVPN configuration tasks
@@ -406,23 +411,6 @@
     - layer2
     - cleanup
     - idempotent
-
-- name: Include OSPF configuration tasks
-  ansible.builtin.include_tasks:
-    file: configure_ospf.yml
-    apply:
-      tags:
-        - ospf
-        - routing
-        - layer3
-  when:
-    - aoscx_configure_ospf | bool
-    - custom_fields.device_ospf | default(false) | bool
-    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
-  tags:
-    - ospf
-    - routing
-    - layer3
 
 - name: Include BGP configuration tasks
   ansible.builtin.include_tasks:

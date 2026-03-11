@@ -505,7 +505,6 @@ BGP EVPN works with VXLAN configuration:
 
 ## Related Tasks
 
-- `configure_loopback.yml` - Configure loopback interface for BGP peering
 - `configure_ospf.yml` - Configure underlay routing
 - `configure_vrfs.yml` - Configure VRF instances before BGP
 - `configure_vxlan.yml` - Configure VXLAN tunnels

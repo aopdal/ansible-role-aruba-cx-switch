@@ -16,7 +16,7 @@ cannot make API calls to retrieve the actual IPv6 data.
 
 ENHANCED FACTS SOLUTION (Optional):
 ===================================
-When `aoscx_gather_enhanced_facts: true` is set, the role gathers interface data
+When `aoscx_gather_facts_rest_api: true` is set, the role gathers interface data
 via REST API with depth=2, which provides actual IPv6 addresses and VSX virtual IPs.
 This enhanced data is passed to the filter and enables:
 - IPv6 address comparison (skip already-configured IPv6 addresses)

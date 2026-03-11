@@ -2,51 +2,34 @@
 # Unified L3 interface configuration task
 #
 # This task file provides a single, reusable implementation for configuring
-# L3 interfaces across all interface types (physical, LAG, VLAN).
+# L3 interfaces across all interface types (physical, LAG, VLAN, sub-interface).
+#
+# interface_list is a flat list of per-IP items (from l3_interfaces.<category>).
+# group_interface_ips() groups them by interface, filters to _needs_add=True,
+# and sorts addresses (anycast-before-regular, IPv4 before IPv6) so that
+# build_l3_config_lines() emits all config for an interface in a single call —
+# including IPv4, IPv6, active-gateway, MTU, l3-counters, and OSPF.
 #
 # Required Parameters:
-#   - interface_list: List of interface/IP combinations to configure
-#   - interface_type: Type of interface ('physical', 'lag', 'vlan')
-#   - ip_version: IP version to configure ('ipv4' or 'ipv6')
+#   - interface_list: List of per-IP interface items from l3_interfaces
+#   - interface_type: Type of interface ('physical', 'lag', 'vlan', 'subinterface')
 #   - vrf_type: VRF type ('default' or 'custom')
 #
 # Optional Parameters:
 #   - l3_counters_enable: Enable L3 counters (default: from aoscx_l3_counters_enable)
+#   - ospf_process_id: OSPF process ID for interface config (default: 1)
 #
-# Usage Example:
-#   - ansible.builtin.include_tasks:
-#       file: configure_l3_interface_common.yml
-#     vars:
-#       interface_list: "{{ l3_interfaces.physical_default_vrf }}"
-#       interface_type: physical
-#       ip_version: ipv4
-#       vrf_type: default
+# Uses aoscx_ospf_interface_facts (gathered in gather_facts_rest_api.yml) when available
+# to skip OSPF-only pushes for interfaces that are already in the correct OSPF area.
 
-- name: "Configure {{ interface_type }} L3 interfaces ({{ vrf_type }} VRF) - {{ ip_version | upper }}"
+- name: "Configure {{ interface_type }} L3 interfaces ({{ vrf_type }} VRF)"
   arubanetworks.aoscx.aoscx_config:
-    lines: "{{ item | build_l3_config_lines(interface_type, ip_version, vrf_type, aoscx_l3_counters_enable | default(true)) }}"
+    lines: "{{ item | build_l3_config_lines(interface_type, vrf_type, aoscx_l3_counters_enable | default(true), ospf_process_id | default(1)) }}"
     parents: "interface {{ item.interface_name | format_interface_name(interface_type) }}"
-  loop: "{{ filtered_interfaces }}"
+  loop: "{{ _grouped_interfaces }}"
   loop_control:
-    label: "Interface: {{ item.interface_name }} IP: {{ item.address }}{{ ' VRF: ' + (item.interface | get_interface_vrf) if vrf_type == 'custom' else '' }}"
-  when: filtered_interfaces | length > 0
+    label: "Interface: {{ item.interface_name }}"
+  when: _grouped_interfaces | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
-    # Filter interfaces based on IP version and change detection
-    # Both IPv4 and IPv6 use _needs_add field set during interface processing
-    # IPv4: Uses ipv4_to_add from change detection
-    # IPv6: Uses ipv6_to_add from enhanced facts when available
-    # IPv6 addresses contain ':', IPv4 addresses don't
-    filtered_interfaces: >-
-      {{
-        interface_list
-        | rejectattr('address', 'search', ':')
-        | selectattr('_needs_add', 'equalto', true)
-        | list
-        if ip_version == 'ipv4'
-        else
-        interface_list
-        | selectattr('address', 'search', ':')
-        | selectattr('_needs_add', 'equalto', true)
-        | list
-      }}
+    _grouped_interfaces: "{{ interface_list | group_interface_ips(aoscx_ospf_interface_facts | default(none), ospf_process_id | default(1)) }}"

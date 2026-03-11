@@ -61,6 +61,7 @@ from netbox_filters_lib.l3_config_helpers import (
     is_ipv4_address,
     is_ipv6_address,
     get_interface_vrf,
+    group_interface_ips,
     build_l3_config_lines,
 )
 from netbox_filters_lib.bgp_filters import (
@@ -108,6 +109,7 @@ class FilterModule:
             "is_ipv4_address": is_ipv4_address,
             "is_ipv6_address": is_ipv6_address,
             "get_interface_vrf": get_interface_vrf,
+            "group_interface_ips": group_interface_ips,
             "build_l3_config_lines": build_l3_config_lines,
             # BGP helpers
             "get_bgp_session_vrf_info": get_bgp_session_vrf_info,

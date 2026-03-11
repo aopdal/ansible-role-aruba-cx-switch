@@ -1,45 +1,21 @@
 ---
 # Configure sub-interface L3 interfaces (e.g., 1/1/3.2000)
-# Sub-interfaces are virtual interfaces with a parent physical interface
-# They require encapsulation dot1q configuration and can have VRFs and IP addresses
+# Sub-interfaces are virtual interfaces with a parent physical interface.
+# They require encapsulation dot1q configuration and can have VRFs and IP addresses.
 # Note: Parent interfaces are enabled in configure_physical_interfaces.yml
 
-# Configure IPv4 addresses - default VRF
 - ansible.builtin.include_tasks:
     file: configure_l3_interface_common.yml
   vars:
     interface_list: "{{ l3_interfaces.subinterface_default_vrf }}"
     interface_type: subinterface
-    ip_version: ipv4
     vrf_type: default
   when: l3_interfaces.subinterface_default_vrf | default([]) | length > 0
 
-# Configure IPv6 addresses - default VRF
-- ansible.builtin.include_tasks:
-    file: configure_l3_interface_common.yml
-  vars:
-    interface_list: "{{ l3_interfaces.subinterface_default_vrf }}"
-    interface_type: subinterface
-    ip_version: ipv6
-    vrf_type: default
-  when: l3_interfaces.subinterface_default_vrf | default([]) | length > 0
-
-# Configure IPv4 addresses - custom VRF
 - ansible.builtin.include_tasks:
     file: configure_l3_interface_common.yml
   vars:
     interface_list: "{{ l3_interfaces.subinterface_custom_vrf }}"
     interface_type: subinterface
-    ip_version: ipv4
-    vrf_type: custom
-  when: l3_interfaces.subinterface_custom_vrf | default([]) | length > 0
-
-# Configure IPv6 addresses - custom VRF
-- ansible.builtin.include_tasks:
-    file: configure_l3_interface_common.yml
-  vars:
-    interface_list: "{{ l3_interfaces.subinterface_custom_vrf }}"
-    interface_type: subinterface
-    ip_version: ipv6
     vrf_type: custom
   when: l3_interfaces.subinterface_custom_vrf | default([]) | length > 0

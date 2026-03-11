@@ -69,7 +69,7 @@
   ansible.builtin.debug:
     msg:
       - "=== Enhanced Facts Status ==="
-      - "Enhanced facts enabled: {{ aoscx_gather_enhanced_facts | default(false) }}"
+      - "REST API facts enabled: {{ aoscx_gather_facts_rest_api | default(false) }}"
       - "Enhanced facts available: {{ aoscx_enhanced_interface_facts is defined and aoscx_enhanced_interface_facts | length > 0 }}"
       - "Enhanced interfaces count: {{ aoscx_enhanced_interface_facts | default({}) | length }}"
   when:

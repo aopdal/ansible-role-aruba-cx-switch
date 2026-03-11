@@ -18,7 +18,6 @@
     aoscx_configure_mclag_interfaces: false
     aoscx_configure_l2_interfaces: false
     aoscx_configure_l3_interfaces: false
-    aoscx_configure_loopback: false
     aoscx_configure_evpn: false
     aoscx_configure_vxlan: false
     aoscx_configure_ospf: false

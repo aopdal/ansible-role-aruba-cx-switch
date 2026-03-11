@@ -53,6 +53,7 @@ from .l3_config_helpers import (
     is_ipv4_address,
     is_ipv6_address,
     get_interface_vrf,
+    group_interface_ips,
     build_l3_config_lines,
 )
 
@@ -97,5 +98,6 @@ __all__ = [
     "is_ipv4_address",
     "is_ipv6_address",
     "get_interface_vrf",
+    "group_interface_ips",
     "build_l3_config_lines",
 ]

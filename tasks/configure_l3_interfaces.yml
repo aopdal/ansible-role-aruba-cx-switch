@@ -107,7 +107,7 @@
   ansible.builtin.debug:
     msg:
       - "=== IPv6 Change Detection Debug ==="
-      - "Enhanced facts enabled: {{ aoscx_gather_enhanced_facts | default(false) }}"
+      - "REST API facts enabled: {{ aoscx_gather_facts_rest_api | default(false) }}"
       - "IPv6 addresses in list: {{ interface_ips | selectattr('address', 'search', ':') | list | length }}"
       - >-
         IPv6 addresses with _needs_add=true:
@@ -166,6 +166,57 @@
       - "Sub-interface (default VRF): {{ l3_interfaces.subinterface_default_vrf | length }}"
       - "Sub-interface (custom VRF): {{ l3_interfaces.subinterface_custom_vrf | length }}"
       - "Loopback: {{ l3_interfaces.loopback | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Create loopback interfaces that need configuration
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item }}"
+    state: create
+  loop: "{{ l3_interfaces.loopback | map(attribute='interface_name') | unique | list }}"
+  loop_control:
+    label: "Interface: {{ item }}"
+  when: l3_interfaces.loopback | length > 0
+
+# Build a preview of config lines per interface before applying changes.
+# Uses group_interface_ips to group per-IP items by interface and filter
+# to _needs_add=true, then calls build_l3_config_lines once per interface.
+- name: Build L3 config lines preview
+  ansible.builtin.set_fact:
+    _l3_config_preview: >-
+      {%- set result = {} -%}
+      {%- set categories = [
+        (l3_interfaces.physical_default_vrf,    'physical',     'default'),
+        (l3_interfaces.physical_custom_vrf,     'physical',     'custom'),
+        (l3_interfaces.vlan_default_vrf,        'vlan',         'default'),
+        (l3_interfaces.vlan_custom_vrf,         'vlan',         'custom'),
+        (l3_interfaces.lag_default_vrf,         'lag',          'default'),
+        (l3_interfaces.lag_custom_vrf,          'lag',          'custom'),
+        (l3_interfaces.subinterface_default_vrf,'subinterface', 'default'),
+        (l3_interfaces.subinterface_custom_vrf, 'subinterface', 'custom'),
+        (l3_interfaces.loopback | selectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list, 'loopback', 'default'),
+        (l3_interfaces.loopback | rejectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list, 'loopback', 'custom')
+      ] -%}
+      {%- for items, itype, vrf in categories -%}
+        {%- for item in items | group_interface_ips -%}
+          {%- set lines = item | build_l3_config_lines(itype, vrf, aoscx_l3_counters_enable | default(true), ospf_process_id | default(1)) -%}
+          {%- set iname = item.interface_name | format_interface_name(itype) -%}
+          {%- set _ = result.update({iname: lines}) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ result }}
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Debug - Show L3 config lines to be applied
+  ansible.builtin.debug:
+    msg: >-
+      {%- set lines = [] -%}
+      {%- for iname, config_lines in (_l3_config_preview | default({})).items() | sort -%}
+        {%- set _ = lines.append('interface ' ~ iname ~ ':') -%}
+        {%- for line in config_lines -%}
+          {%- set _ = lines.append('  ' ~ line) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ ['=== L3 Config Lines Preview ==='] + (lines if lines else ['(no changes needed)']) }}
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # Configure physical interfaces

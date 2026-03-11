@@ -756,9 +756,8 @@ show vlan
 
 1. VLANs created (`configure_vlans.yml`)
 2. Interfaces configured (`configure_*_interfaces.yml`)
-3. Loopback configured (`configure_loopback.yml`)
-4. Underlay routing (`configure_ospf.yml`)
-5. BGP EVPN (`configure_bgp.yml`)
+3. Underlay routing (`configure_ospf.yml`)
+4. BGP EVPN (`configure_bgp.yml`)
 
 **Must run before VLAN deletion (cleanup order):**
 

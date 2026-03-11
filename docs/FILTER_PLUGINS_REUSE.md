@@ -17,7 +17,7 @@ This document describes which filters are portable, which need adaptation, and w
 | `interface_ip_processing.py` | **Mostly portable** | Minor: custom field `if_anycast_gateway_mac` |
 | `ospf_filters.py` | **Mostly portable** | Minor: custom fields `if_ip_ospf_1_*` |
 | `vlan_filters.py` | **Partially portable** | 3 of 7 filters are generic |
-| `l3_config_helpers.py` | **Partially portable** | 3 of 5 filters generic; CLI builders are AOS-CX |
+| `l3_config_helpers.py` | **Partially portable** | 3 of 6 filters generic; CLI builders are AOS-CX |
 | `comparison.py` | **AOS-CX specific** | Reads AOS-CX REST API facts structure |
 | `interface_change_detection.py` | **AOS-CX specific** | Deep coupling to AOS-CX facts + VSX |
 
@@ -124,10 +124,11 @@ The custom field suffix `_1` in `if_ip_ospf_1_area` represents OSPF instance 1. 
 | `is_ipv4_address` | **Yes** | Generic IP version check |
 | `is_ipv6_address` | **Yes** | Generic IP version check |
 | `get_interface_vrf` | **Yes** | Generic NetBox interface VRF extraction |
+| `group_interface_ips` | **No** | Groups per-IP list into per-interface; concept is generic but tightly paired with AOS-CX config flow |
 | `format_interface_name` | **No** | AOS-CX CLI specific: adds space for LAG ("lag1" → "lag 1") |
-| `build_l3_config_lines` | **No** | Generates AOS-CX CLI commands (`vrf attach`, `active-gateway`, `l3-counters`) |
+| `build_l3_config_lines` | **No** | Generates AOS-CX CLI commands (`vrf attach`, `active-gateway`, `l3-counters`, `ip ospf`) |
 
-The three generic helpers (`is_ipv4_address`, `is_ipv6_address`, `get_interface_vrf`) are straightforward utilities. The two CLI builders are purely AOS-CX and would need full replacement for other vendors.
+The three generic helpers (`is_ipv4_address`, `is_ipv6_address`, `get_interface_vrf`) are straightforward utilities. The three AOS-CX specific filters (`group_interface_ips`, `format_interface_name`, `build_l3_config_lines`) would need full replacement for other vendors — though the grouping concept in `group_interface_ips` is reusable as-is if the CLI builder is rewritten for the target vendor.
 
 ---
 
