@@ -300,6 +300,12 @@ def build_l3_config_lines(
     ]:
         address = addr_item.get("address", "")
         addr_without_prefix = address.split("/")[0] if "/" in address else address
+        # HPE Aruba recommendation: use a link-local address as the anycast gateway.
+        # When the anycast IPv6 is link-local, the link-local address must be
+        # explicitly configured before the active-gateway command.
+        if addr_without_prefix.lower().startswith("fe80:"):
+            lines.append(f"ipv6 address link-local {address}")
+            _debug(f"  Adding IPv6 link-local address for anycast gateway: {address}")
         lines.append(f"active-gateway ipv6 mac {addr_item['anycast_mac']}")
         lines.append(f"active-gateway ipv6 {addr_without_prefix}")
         _debug(

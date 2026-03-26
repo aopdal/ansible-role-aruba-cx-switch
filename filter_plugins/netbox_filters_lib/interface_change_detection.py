@@ -732,7 +732,8 @@ def get_interfaces_needing_config_changes(
             # Extract anycast IPs from NetBox (these were excluded from regular IP comparison)
             nb_anycast_ipv4 = set()
             nb_anycast_ipv6 = set()
-            nb_anycast_ipv6_normalized = {}  # Map: normalized -> original
+            nb_anycast_ipv6_normalized = {}  # Map: normalized -> addr_without_prefix
+            nb_anycast_ipv6_full = {}  # Map: normalized -> full addr with prefix
 
             for ip_obj in nb_intf.get("ip_addresses", []):
                 if isinstance(ip_obj, dict):
@@ -757,6 +758,7 @@ def get_interfaces_needing_config_changes(
                                 nb_anycast_ipv6_normalized[
                                     normalized
                                 ] = addr_without_prefix
+                                nb_anycast_ipv6_full[normalized] = ip_addr
                             else:
                                 nb_anycast_ipv4.add(addr_without_prefix)
 
@@ -815,6 +817,76 @@ def get_interfaces_needing_config_changes(
                     f"IPv4={nb_anycast_ipv4}, IPv6={nb_anycast_ipv6}"
                 )
 
+            # Check for stale anycast gateways to remove
+            # (configured on device but no longer present in NetBox)
+            # Conservative: only remove if the address is completely absent from
+            # NetBox ip_addresses (any role), not merely missing the anycast role.
+            # This prevents accidental removal when an IP exists in NetBox without
+            # the anycast role (e.g., role not yet set in NetBox).
+            anycast_ipv4_to_remove = set()
+            anycast_ipv6_to_remove = set()
+
+            if enhanced_intf and (device_vsx_virtual_ip4 or device_vsx_virtual_ip6):
+                # Build set of ALL NetBox addresses regardless of role
+                all_nb_ipv4_addrs = set()
+                all_nb_ipv6_norm = set()
+                for ip_obj in nb_intf.get("ip_addresses", []):
+                    if isinstance(ip_obj, dict):
+                        ip_addr = ip_obj.get("address", "")
+                        addr = ip_addr.split("/")[0] if "/" in ip_addr else ip_addr
+                        if ":" in addr:
+                            norm, _ = _normalize_ipv6(addr)
+                            all_nb_ipv6_norm.add(norm)
+                        elif addr:
+                            all_nb_ipv4_addrs.add(addr)
+
+                # Remove VSX virtual IPs absent from both anycast AND all NetBox IPs
+                anycast_ipv4_to_remove = (
+                    device_vsx_virtual_ip4 - nb_anycast_ipv4 - all_nb_ipv4_addrs
+                )
+
+                # IPv6 removal — normalize both sides for comparison
+                nb_anycast_ipv6_norm_set = set(nb_anycast_ipv6_normalized.keys())
+                for addr in device_vsx_virtual_ip6:
+                    normalized, _ = _normalize_ipv6(addr)
+                    if (
+                        normalized not in nb_anycast_ipv6_norm_set
+                        and normalized not in all_nb_ipv6_norm
+                    ):
+                        anycast_ipv6_to_remove.add(addr)
+
+                if anycast_ipv4_to_remove or anycast_ipv6_to_remove:
+                    needs_change = True
+                    if anycast_ipv4_to_remove:
+                        change_reasons.append(
+                            f"Anycast gateway IPv4 to remove: {anycast_ipv4_to_remove}"
+                        )
+                    if anycast_ipv6_to_remove:
+                        change_reasons.append(
+                            f"Anycast gateway IPv6 to remove: {anycast_ipv6_to_remove}"
+                        )
+
+                _debug(
+                    f"Anycast removal check for {intf_name}: "
+                    f"device IPv4={device_vsx_virtual_ip4}, nb={nb_anycast_ipv4}, "
+                    f"to_remove={anycast_ipv4_to_remove}; "
+                    f"device IPv6={device_vsx_virtual_ip6}, nb={nb_anycast_ipv6}, "
+                    f"to_remove={anycast_ipv6_to_remove}"
+                )
+
+            # Store stale anycast gateways to remove
+            if anycast_ipv4_to_remove or anycast_ipv6_to_remove:
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                if anycast_ipv4_to_remove:
+                    nb_intf["_ip_changes"]["anycast_ipv4_to_remove"] = list(
+                        anycast_ipv4_to_remove
+                    )
+                if anycast_ipv6_to_remove:
+                    nb_intf["_ip_changes"]["anycast_ipv6_to_remove"] = list(
+                        anycast_ipv6_to_remove
+                    )
+
             # Store anycast IPs that need to be added
             # (restored to ip_addresses field with anycast info)
             # This allows configure_l3_interfaces.yml to process them
@@ -862,6 +934,51 @@ def get_interfaces_needing_config_changes(
                             nb_intf["_ip_changes"]["ipv4_to_add"] = []
                         if anycast_ip not in nb_intf["_ip_changes"]["ipv4_to_add"]:
                             nb_intf["_ip_changes"]["ipv4_to_add"].append(anycast_ip)
+
+            # Detect missing 'ipv6 address link-local' for link-local anycast gateways.
+            # HPE Aruba recommends using a link-local address (fe80::) as the active-gateway
+            # IPv6. When doing so, 'ipv6 address link-local <addr>/<prefix>' must be
+            # explicitly configured before the active-gateway command.
+            #
+            # Detection: ip6_address_link_local (depth=2) returns the currently active
+            # link-local address as a dict {addr/prefix: url}. If its key does not match
+            # the expected link-local anycast from NetBox, the explicit command is missing.
+            link_local_ipv6_to_add = set()
+            if enhanced_intf and nb_anycast_ipv6_normalized:
+                device_ip6_ll = enhanced_intf.get("ip6_address_link_local")
+                if isinstance(device_ip6_ll, dict):
+                    device_ll_normalized = {
+                        _normalize_ipv6(addr)[0] for addr in device_ip6_ll.keys()
+                    }
+                else:
+                    device_ll_normalized = set()
+
+                for (
+                    normalized,
+                    addr_without_prefix,
+                ) in nb_anycast_ipv6_normalized.items():
+                    if normalized.startswith("fe80:"):
+                        if normalized not in device_ll_normalized:
+                            full_addr = nb_anycast_ipv6_full.get(
+                                normalized, addr_without_prefix
+                            )
+                            link_local_ipv6_to_add.add(full_addr)
+
+                if link_local_ipv6_to_add:
+                    needs_change = True
+                    change_reasons.append(
+                        f"IPv6 link-local address to configure: {link_local_ipv6_to_add}"
+                    )
+                    _debug(
+                        f"Link-local IPv6 missing for {intf_name}: {link_local_ipv6_to_add}"
+                    )
+
+            if link_local_ipv6_to_add:
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                nb_intf["_ip_changes"]["link_local_ipv6_to_add"] = list(
+                    link_local_ipv6_to_add
+                )
 
             # ALWAYS store IPv6 change info when enhanced facts available
             # This allows task-level filtering even when interface needs changes

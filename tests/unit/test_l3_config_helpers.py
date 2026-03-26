@@ -402,6 +402,44 @@ class TestBuildL3ConfigLines:
         assert lines.index("active-gateway ipv6 2001:db8:1000:17::1") < lines.index("ip mtu 9198")
         assert lines.index("ip mtu 9198") < lines.index("l3-counters")
 
+    def test_vlan_link_local_anycast_gateway(self):
+        """Link-local IPv6 anycast generates 'ipv6 address link-local' before active-gateway"""
+        item = _make_item(
+            {"vrf": {"name": "lab-blue"}},
+            [
+                {"address": "172.27.4.2/27",          "ip_role": None,      "anycast_mac": None},
+                {"address": "172.27.4.1/27",          "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
+                {"address": "2001:db8:1000:10::2/64", "ip_role": None,      "anycast_mac": None},
+                {"address": "fe80::1/64",             "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
+            ],
+        )
+        lines = build_l3_config_lines(item, "vlan", "custom", True)
+
+        # Link-local address must be explicitly configured
+        assert "ipv6 address link-local fe80::1/64" in lines
+        # Active-gateway commands must follow
+        assert "active-gateway ipv6 mac 00:00:00:01:00:01" in lines
+        assert "active-gateway ipv6 fe80::1" in lines
+        # link-local address command must appear before active-gateway commands
+        assert lines.index("ipv6 address link-local fe80::1/64") < lines.index("active-gateway ipv6 mac 00:00:00:01:00:01")
+        # Global-unicast anycast does NOT get an extra 'ipv6 address link-local' line
+        assert "ipv6 address link-local 2001:db8" not in " ".join(lines)
+
+    def test_vlan_global_unicast_anycast_no_link_local_command(self):
+        """Global-unicast IPv6 anycast does NOT add 'ipv6 address link-local'"""
+        item = _make_item(
+            {},
+            [
+                {"address": "2001:db8:1000:17::1",    "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
+                {"address": "2001:db8:1000:17::2/64", "ip_role": None,      "anycast_mac": None},
+            ],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", False)
+
+        assert "active-gateway ipv6 mac 00:00:00:01:00:01" in lines
+        assert "active-gateway ipv6 2001:db8:1000:17::1" in lines
+        assert not any(l.startswith("ipv6 address link-local") for l in lines)
+
     def test_no_redundant_lines_multiple_addresses(self):
         """vrf attach, ip mtu, and l3-counters appear exactly once with multiple IPs"""
         item = _make_item(
