@@ -219,6 +219,56 @@
       {{ ['=== L3 Config Lines Preview ==='] + (lines if lines else ['(no changes needed)']) }}
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
+# Configure missing 'ipv6 address link-local' for link-local anycast gateways.
+# HPE Aruba requires this command when using a link-local address as active-gateway IPv6.
+# This runs before the main L3 config to ensure the link-local is present before
+# active-gateway commands are applied on new interfaces.
+- name: Configure missing IPv6 link-local addresses for anycast gateways
+  arubanetworks.aoscx.aoscx_config:
+    lines: >-
+      {{
+        item._ip_changes.link_local_ipv6_to_add
+        | map('regex_replace', '^(.*)$', 'ipv6 address link-local \1') | list
+      }}
+    parents: >-
+      interface {{ item.name | format_interface_name(
+        'lag' if (item.type is defined and item.type.value is defined and item.type.value == 'lag')
+        else ('loopback' if 'loopback' in item.name.lower() else 'physical')
+      ) }}
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+  loop: "{{ interface_changes.l3 | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.name }} link-local: {{ item._ip_changes.link_local_ipv6_to_add | default([]) }}"
+  when: >-
+    (item._ip_changes is defined) and
+    (item._ip_changes.link_local_ipv6_to_add | default([]) | length > 0)
+
+# Remove stale anycast gateways (configured on device but no longer in NetBox)
+- name: Remove stale anycast gateways
+  arubanetworks.aoscx.aoscx_config:
+    lines: >-
+      {{
+        (item._ip_changes.anycast_ipv4_to_remove | default([])
+          | map('regex_replace', '^(.*)$', 'no active-gateway ip \1') | list)
+        + (item._ip_changes.anycast_ipv6_to_remove | default([])
+          | map('regex_replace', '^(.*)$', 'no active-gateway ipv6 \1') | list)
+      }}
+    parents: >-
+      interface {{ item.name | format_interface_name(
+        'lag' if (item.type is defined and item.type.value is defined and item.type.value == 'lag')
+        else ('loopback' if 'loopback' in item.name.lower() else 'physical')
+      ) }}
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+  loop: "{{ interface_changes.l3 | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: >-
+    (item._ip_changes is defined) and
+    ((item._ip_changes.anycast_ipv4_to_remove | default([]) | length > 0) or
+     (item._ip_changes.anycast_ipv6_to_remove | default([]) | length > 0))
+
 # Configure physical interfaces
 - name: Include physical L3 interface configuration
   ansible.builtin.include_tasks: configure_l3_physical.yml

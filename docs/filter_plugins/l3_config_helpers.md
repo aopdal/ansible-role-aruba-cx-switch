@@ -227,10 +227,16 @@ build_l3_config_lines(
 
 4. **All IPv6 addresses** (anycast first, then regular)
    ```
-   active-gateway ipv6 mac <mac>        # anycast
-   active-gateway ipv6 <address>        # anycast
-   ipv6 address <address>               # regular
+   ipv6 address link-local <addr>/<prefix>  # if anycast addr is link-local (fe80::)
+   active-gateway ipv6 mac <mac>            # anycast
+   active-gateway ipv6 <address>           # anycast
+   ipv6 address <address>                  # regular
    ```
+   > **HPE Aruba recommendation**: Use a link-local address (fe80::) as the IPv6
+   > anycast gateway. When the anycast address is link-local, `ipv6 address link-local`
+   > must be explicitly configured before the `active-gateway ipv6` command.
+   > `build_l3_config_lines` emits this automatically when the anycast address
+   > starts with `fe80:`. Global-unicast anycast addresses are unaffected.
 
 5. **MTU** (if set on interface)
    ```
@@ -264,13 +270,15 @@ build_l3_config_lines(
 **Example Output**:
 
 ```python
-# Dual-stack VLAN interface with anycast gateway and OSPF
+# Dual-stack VLAN interface with link-local anycast gateway (HPE Aruba recommended)
 [
   'active-gateway ip mac 00:00:5e:00:01:01',
   'active-gateway ip 10.0.0.1',
   'ip address 10.0.0.2/24',
+  'ipv6 address link-local fe80::1/64',   # auto-added when anycast is link-local
   'active-gateway ipv6 mac 00:00:5e:00:01:01',
-  'active-gateway ipv6 2001:db8::1',
+  'active-gateway ipv6 fe80::1',
+  'ipv6 address 2001:db8::2/64',
   'ip mtu 9000',
   'l3-counters',
   'ip ospf 1 area 0.0.0.0',
@@ -580,6 +588,9 @@ ansible-playbook site.yml
 
 **Issue**: Anycast gateway not configured
 **Solution**: Check that IP has `role.value: 'anycast'` and interface has `custom_fields.if_anycast_gateway_mac`
+
+**Issue**: `ipv6 address link-local` missing on interfaces that already have `active-gateway ipv6 fe80::1`
+**Solution**: This is detected automatically via the `ip6_address_link_local` REST API field (requires `aoscx_gather_facts_rest_api: true`). The role compares the device's active link-local address against the expected link-local anycast from NetBox and stores any missing address in `_ip_changes.link_local_ipv6_to_add`. A dedicated task in `configure_l3_interfaces.yml` then applies `ipv6 address link-local <addr>` before the regular L3 config runs.
 
 **Issue**: OSPF not configured on interface
 **Solution**: Check that interface has `custom_fields.if_ip_ospf_1_area` set in NetBox

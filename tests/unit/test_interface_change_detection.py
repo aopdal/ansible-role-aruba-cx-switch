@@ -524,3 +524,223 @@ class TestEnhancedFacts:
         )
         # IPv4 already on device — no changes expected
         assert len(result["l3"]) == 0
+
+    def test_stale_anycast_ipv6_removed_from_netbox(self):
+        """Stale active-gateway ipv6 on device (not in NetBox) is detected for removal"""
+        interfaces = [
+            {
+                "name": "vlan101",
+                "type": {"value": "virtual"},
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
+                "ip_addresses": [
+                    {"address": "172.27.4.2/27", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.1/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:10::2/64", "role": None, "vrf": {"name": "lab-blue"}},
+                    # Only fe80::1 in NetBox — 2001:db8:1000:10::1 was replaced with link-local
+                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                ],
+            }
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan101": {
+                        "ip4_address": "172.27.4.2/27",
+                        "ip6_addresses": {},
+                    }
+                }
+            }
+        }
+        enhanced_facts = {
+            "vlan101": {
+                "ip4_address": "172.27.4.2/27",
+                "ip4_address_secondary": [],
+                "ip6_addresses": {"2001:db8:1000:10::2/64": "/rest/..."},
+                # Device still has both active-gateway ipv6 entries
+                "vsx_virtual_ip4": ["172.27.4.1"],
+                "vsx_virtual_ip6": ["2001:db8:1000:10::1", "fe80::1"],
+                "vsx_virtual_gw_mac_v4": "00:00:00:01:00:01",
+                "vsx_virtual_gw_mac_v6": "00:00:00:01:00:01",
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+        # Interface must be flagged for change (stale anycast to remove)
+        assert len(result["l3"]) == 1
+        intf = result["l3"][0]
+        ip_changes = intf.get("_ip_changes", {})
+        # Stale global-unicast anycast must be marked for removal
+        assert "anycast_ipv6_to_remove" in ip_changes
+        assert "2001:db8:1000:10::1" in ip_changes["anycast_ipv6_to_remove"]
+        # fe80::1 is in NetBox — must NOT be in removal list
+        assert "fe80::1" not in ip_changes["anycast_ipv6_to_remove"]
+        # IPv4 anycast matches NetBox — must NOT be in removal list
+        assert ip_changes.get("anycast_ipv4_to_remove", []) == []
+
+    def test_no_stale_anycast_when_device_matches_netbox(self):
+        """No removal triggered when device active-gateway matches NetBox exactly"""
+        interfaces = [
+            {
+                "name": "vlan101",
+                "type": {"value": "virtual"},
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
+                "ip_addresses": [
+                    {"address": "172.27.4.2/27", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.1/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:10::2/64", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                ],
+            }
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan101": {
+                        "ip4_address": "172.27.4.2/27",
+                        "ip6_addresses": {},
+                    }
+                }
+            }
+        }
+        enhanced_facts = {
+            "vlan101": {
+                "ip4_address": "172.27.4.2/27",
+                "ip4_address_secondary": [],
+                "ip6_addresses": {"2001:db8:1000:10::2/64": "/rest/...", "fe80::1/64": "/rest/..."},
+                # Device matches NetBox — only fe80::1 as active-gateway ipv6
+                "vsx_virtual_ip4": ["172.27.4.1"],
+                "vsx_virtual_ip6": ["fe80::1"],
+                "vsx_virtual_gw_mac_v4": "00:00:00:01:00:01",
+                "vsx_virtual_gw_mac_v6": "00:00:00:01:00:01",
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+        # Everything matches — interface must NOT need any IP changes
+        for intf in result.get("l3", []):
+            ip_changes = intf.get("_ip_changes", {})
+            assert ip_changes.get("anycast_ipv6_to_remove", []) == []
+            assert ip_changes.get("anycast_ipv4_to_remove", []) == []
+
+    def test_link_local_anycast_missing_link_local_address_detected(self):
+        """When active-gateway ipv6 fe80::1 is configured but 'ipv6 address link-local'
+        is missing, link_local_ipv6_to_add must contain the full address with prefix"""
+        interfaces = [
+            {
+                "name": "vlan102",
+                "type": {"value": "virtual"},
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
+                "ip_addresses": [
+                    {"address": "172.27.4.34/27", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.33/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:11::2/64", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                ],
+            }
+        ]
+        device_facts = {
+            "network_resources": {"interfaces": {"vlan102": {"ip4_address": "172.27.4.34/27", "ip6_addresses": {}}}}
+        }
+        enhanced_facts = {
+            "vlan102": {
+                "ip4_address": "172.27.4.34/27",
+                "ip4_address_secondary": [],
+                "ip6_addresses": {"2001:db8:1000:11::2/64": "/rest/..."},
+                "vsx_virtual_ip4": ["172.27.4.33"],
+                "vsx_virtual_ip6": ["fe80::1"],
+                "vsx_virtual_gw_mac_v4": "00:00:00:01:00:01",
+                "vsx_virtual_gw_mac_v6": "00:00:00:01:00:01",
+                # Auto-generated link-local (NOT the custom fe80::1)
+                "ip6_address_link_local": {"fe80::3810:f080:668c:f880/64": "/rest/.../ip6_autoconfigured_addresses/..."},
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts)
+        l3_intfs = result.get("l3", [])
+        vlan102 = next((i for i in l3_intfs if i["name"] == "vlan102"), None)
+        assert vlan102 is not None, "vlan102 should need changes"
+        ip_changes = vlan102.get("_ip_changes", {})
+        assert "link_local_ipv6_to_add" in ip_changes
+        assert "fe80::1/64" in ip_changes["link_local_ipv6_to_add"]
+
+    def test_link_local_anycast_already_configured_no_change(self):
+        """When 'ipv6 address link-local fe80::1/64' is correctly configured,
+        link_local_ipv6_to_add must be absent (no change needed)"""
+        interfaces = [
+            {
+                "name": "vlan101",
+                "type": {"value": "virtual"},
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
+                "ip_addresses": [
+                    {"address": "172.27.4.2/27", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.1/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:10::2/64", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                ],
+            }
+        ]
+        device_facts = {
+            "network_resources": {"interfaces": {"vlan101": {"ip4_address": "172.27.4.2/27", "ip6_addresses": {}}}}
+        }
+        enhanced_facts = {
+            "vlan101": {
+                "ip4_address": "172.27.4.2/27",
+                "ip4_address_secondary": [],
+                "ip6_addresses": {"2001:db8:1000:10::2/64": "/rest/..."},
+                "vsx_virtual_ip4": ["172.27.4.1"],
+                "vsx_virtual_ip6": ["fe80::1"],
+                "vsx_virtual_gw_mac_v4": "00:00:00:01:00:01",
+                "vsx_virtual_gw_mac_v6": "00:00:00:01:00:01",
+                # Custom link-local configured correctly
+                "ip6_address_link_local": {"fe80::1/64": "/rest/.../ip6_address_custom_link_local/fe80::1%2F64"},
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts)
+        # Interface may still be in l3 for other reasons, but link_local_ipv6_to_add must be absent
+        for intf in result.get("l3", []) + result.get("no_changes", []):
+            if intf["name"] == "vlan101":
+                ip_changes = intf.get("_ip_changes", {})
+                assert ip_changes.get("link_local_ipv6_to_add", []) == []
+
+    def test_global_unicast_anycast_no_link_local_check(self):
+        """Global-unicast anycast (non-fe80) must never trigger link_local_ipv6_to_add"""
+        interfaces = [
+            {
+                "name": "vlan103",
+                "type": {"value": "virtual"},
+                "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
+                "ip_addresses": [
+                    {"address": "2001:db8:1000:12::2/64", "role": None},
+                    {"address": "2001:db8:1000:12::1/64", "role": {"value": "anycast"}},
+                ],
+            }
+        ]
+        device_facts = {
+            "network_resources": {"interfaces": {"vlan103": {"ip4_address": None, "ip6_addresses": {}}}}
+        }
+        enhanced_facts = {
+            "vlan103": {
+                "ip4_address": None,
+                "ip4_address_secondary": [],
+                "ip6_addresses": {"2001:db8:1000:12::2/64": "/rest/..."},
+                "vsx_virtual_ip4": [],
+                "vsx_virtual_ip6": ["2001:db8:1000:12::1"],
+                "vsx_virtual_gw_mac_v6": "00:00:00:01:00:01",
+                "ip6_address_link_local": {"fe80::abc:def/64": "/rest/.../ip6_autoconfigured_addresses/..."},
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts)
+        for intf in result.get("l3", []) + result.get("no_changes", []):
+            if intf["name"] == "vlan103":
+                ip_changes = intf.get("_ip_changes", {})
+                assert ip_changes.get("link_local_ipv6_to_add", []) == []

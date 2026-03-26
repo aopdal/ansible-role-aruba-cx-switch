@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-03-26
+
+### Changed
+
+- Anycast gateway IPv6 change to configure ipv6 link-local if anycast address in NetBox is link-local address.
+- Filter logic updated for removal of IPv6 addresses not in NetBox.
+- Detect if link-local addres is not configured when anycast gateway is configure using link-local address.
+- Documentation updated with new feature.
+
 ## [0.6.3] - 2026-03-11
 
 ### Changed

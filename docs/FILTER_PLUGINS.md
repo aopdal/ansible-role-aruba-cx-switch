@@ -233,10 +233,16 @@ The `get_interfaces_needing_config_changes()` filter returns:
 {
     '_ip_changes': {
         'ipv4_to_add': ['10.1.1.1/24', '10.1.2.1/24'],  # Only IPs needing addition
-        'ipv6_addresses': ['2001:db8::1/64']  # All IPv6 addresses (for reference)
+        'ipv6_addresses': ['2001:db8::1/64'],             # All IPv6 addresses (for reference)
+        'ipv6_to_add': ['fe80::1/64'],                   # IPv6 anycast/addresses to add
+        'anycast_ipv4_to_remove': ['10.1.3.1'],          # Stale active-gateway IPv4
+        'anycast_ipv6_to_remove': ['2001:db8::1'],        # Stale active-gateway IPv6
+        'link_local_ipv6_to_add': ['fe80::1/64'],        # Missing 'ipv6 address link-local'
     }
 }
 ```
+
+`link_local_ipv6_to_add` is populated when a link-local address (`fe80::`) is used as the IPv6 anycast gateway (HPE Aruba recommendation) but `ipv6 address link-local <addr>` has not been explicitly configured on the device. Detected via the `ip6_address_link_local` REST API field (requires `aoscx_gather_facts_rest_api: true`).
 
 Tasks in `configure_l3_*.yml` files then:
 

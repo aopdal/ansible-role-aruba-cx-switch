@@ -33,7 +33,22 @@ Each interface that will have anycast gateway IPs needs the MAC address configur
 **IP Addresses**:
 
 - `172.20.4.1/27` - Role: `anycast`
-- `2001:db8:a11::1/64` - Role: `anycast`
+- `fe80::1/64` - Role: `anycast` *(link-local — HPE Aruba recommended)*
+
+## HPE Aruba Recommendation: Link-Local IPv6 Anycast
+
+HPE Aruba recommends using a link-local address (`fe80::`) as the IPv6 anycast gateway rather than a global-unicast address. Link-local addresses are not routable beyond the local segment, which is the correct scope for a gateway address shared across VSX peers.
+
+When the IPv6 anycast address is link-local, AOS-CX requires `ipv6 address link-local` to be explicitly configured **before** the `active-gateway ipv6` command:
+
+```
+interface vlan11
+    ipv6 address link-local fe80::1/64
+    active-gateway ipv6 mac 02:01:00:00:01:00
+    active-gateway ipv6 fe80::1
+```
+
+The role handles this automatically — see [Generated Configuration](#generated-configuration) below.
 
 ## Generated Configuration
 
@@ -42,13 +57,17 @@ For the example above, the role will generate:
 ```
 interface vlan11
     vrf attach z13-cust_2
-    ip address 172.20.4.1/27
-    active-gateway ip 172.20.4.1 mac 02:01:00:00:01:00
-    ipv6 address 2001:db8:a11::1/64
-    active-gateway ipv6 2001:db8:a11::1 mac 02:01:00:00:01:00
+    ip address 172.20.4.2/27
+    active-gateway ip mac 02:01:00:00:01:00
+    active-gateway ip 172.20.4.1
+    ipv6 address link-local fe80::1/64
+    active-gateway ipv6 mac 02:01:00:00:01:00
+    active-gateway ipv6 fe80::1
     ip mtu 9198
     l3-counters
 ```
+
+The `ipv6 address link-local fe80::1/64` line is emitted automatically by `build_l3_config_lines` whenever the anycast IPv6 address is a link-local address (`fe80::`). Global-unicast anycast addresses do not get this extra line.
 
 ## How It Works
 
@@ -147,7 +166,9 @@ interface vlan11
 
 The anycast gateway configuration follows the same idempotency patterns as other L3 interface configuration:
 
-- **IPv4**: Only configured when the IP address needs to be added
+- **IPv4**: Only configured when the IP address needs to be added (compares against `vsx_virtual_ip4`)
+- **IPv6**: Only configured when the address is absent from `vsx_virtual_ip6`
+- **`ipv6 address link-local`**: Detected via the `ip6_address_link_local` REST API field (requires `aoscx_gather_facts_rest_api: true`). The role compares the device's currently active link-local address against the expected link-local anycast. If it does not match (e.g., only the auto-generated EUI-64 address is active), the interface is marked with `_ip_changes.link_local_ipv6_to_add` and the command is applied in a dedicated task before the main L3 config runs.
 
 ## Troubleshooting
 
@@ -160,6 +181,14 @@ The anycast gateway configuration follows the same idempotency patterns as other
 1. IP address **role** is not set to `anycast` in NetBox
 2. Interface **if_anycast_gateway_mac** custom field is not set or is null
 3. IP address belongs to default VRF instead of custom VRF (check VRF assignment)
+
+### `ipv6 address link-local` Not Applied
+
+**Issue**: Interface has `active-gateway ipv6 fe80::1` but the `ipv6 address link-local fe80::1/64` command is missing (e.g., after migrating from a global-unicast anycast to a link-local anycast).
+
+**Cause**: The role detects this via `ip6_address_link_local` in the REST API facts. If `aoscx_gather_facts_rest_api: false`, the detection is skipped and the command will not be applied.
+
+**Solution**: Enable `aoscx_gather_facts_rest_api: true` and re-run the playbook. The role will detect the mismatch (device's active link-local is the auto-generated EUI-64 address, not `fe80::1`) and apply `ipv6 address link-local fe80::1/64` automatically.
 
 **Debug**:
 
