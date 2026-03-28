@@ -1,11 +1,20 @@
 ---
 # Main task file for aruba_cx_switch role
 
+- name: "[DEPRECATED] aoscx_fast_mode is deprecated and has no effect"
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: aoscx_fast_mode is deprecated and will be removed in a future version.
+      It caused more API calls (not fewer) due to missing device state for change detection.
+      For faster fact gathering, use: aoscx_gather_facts_rest_api: true
+  when: aoscx_fast_mode | default(false) | bool
+  tags:
+    - always
+
 - name: Include fact gathering tasks
   ansible.builtin.include_tasks: gather_facts.yml
   when:
     - aoscx_gather_facts | bool
-    - not (aoscx_fast_mode | default(false) | bool)
   tags:
     - always
     - facts
@@ -327,7 +336,6 @@
   when:
     - aoscx_configure_vlans | bool
     - aoscx_idempotent_mode | bool
-    - not (aoscx_fast_mode | default(false) | bool)
   tags:
     - vlans
     - layer2
@@ -346,7 +354,6 @@
   when:
     - aoscx_configure_vlans | bool
     - aoscx_idempotent_mode | bool
-    - not (aoscx_fast_mode | default(false) | bool)
   tags:
     - vlans
     - layer2
@@ -366,7 +373,6 @@
     - aoscx_configure_evpn | default(false) | bool
     - custom_fields.device_evpn | default(false) | bool
     - aoscx_idempotent_mode | bool
-    - not (aoscx_fast_mode | default(false) | bool)
   tags:
     - evpn
     - overlay
@@ -386,7 +392,6 @@
     - aoscx_configure_vxlan | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
     - aoscx_idempotent_mode | bool
-    - not (aoscx_fast_mode | default(false) | bool)
   tags:
     - vxlan
     - overlay
@@ -405,7 +410,6 @@
   when:
     - aoscx_configure_vlans | bool
     - aoscx_idempotent_mode | bool
-    - not (aoscx_fast_mode | default(false) | bool)
   tags:
     - vlans
     - layer2

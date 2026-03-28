@@ -101,16 +101,6 @@ The role currently uses a **safety-first, idempotent** approach:
 - name: Gather facts for cleanup
   when:
     - aoscx_idempotent_mode | default(true)
-    - aoscx_cleanup_enabled | default(true)  # NEW
-```
-
-**Add fast mode:**
-```yaml
-# New variable: aoscx_fast_mode
-# When true:
-# - Skip fact re-gathering
-# - Skip cleanup detection
-# - Trust NetBox as source of truth
 ```
 
 **Pros:**
@@ -248,70 +238,25 @@ pipelining = True
 
 ## Recommended Approach
 
-### Phase 1: Quick Wins (Implement Now)
+### Phase 1: Quick Wins (Implemented)
 
-1. **Add Fast Mode Variable**
-   ```yaml
-   # defaults/main.yml
-   aoscx_fast_mode: false
-   aoscx_cleanup_enabled: "{{ not aoscx_fast_mode }}"
-   ```
-
-2. **Optimize Connection Settings**
+1. **Optimize Connection Settings**
    - Document optimal `ansible.cfg` settings
    - Ensure connection persistence is enabled
 
-3. **Skip Unnecessary Re-gathering**
-   - Make cleanup optional
-   - Skip when fast mode enabled
-
-**Expected Result:** 20-30% faster (32 min → 22-25 min)
+2. **Use REST API for Fact Gathering**
+   - `aoscx_gather_facts_rest_api: true` gives 3-5x faster fact gathering
+   - Single authenticated session, more complete data (IPv6, VSX, OSPF)
 
 **Implementation Status:** ✅ **IMPLEMENTED**
 
-The `aoscx_fast_mode` variable has been implemented in the role:
+`aoscx_gather_facts_rest_api: true` is the recommended performance optimization.
+See [REST API-Based Fact Gathering](#rest-api-based-fact-gathering-recommended) below.
 
-```yaml
-# defaults/main.yml
-aoscx_fast_mode: false
-```
-
-When enabled (`aoscx_fast_mode: true`), the following optimizations are applied:
-
-1. **Skips Initial Fact Gathering** - The role will not gather device facts at the start
-2. **Skips Re-Gather Before Cleanup** - No fact re-gathering for cleanup detection
-3. **Skips All Cleanup Operations** - No removal of orphaned VLANs, VRFs, EVPN, VXLAN configs
-4. **Skips L2 Interface Analysis** - No comparison against current device state
-
-**⚠️ IMPORTANT WARNINGS:**
-
-- **Use only for initial deployments or when you're certain no cleanup is needed**
-- NetBox becomes the single source of truth - any config not in NetBox will persist on device
-- No validation that configuration was applied successfully
-- Debugging is harder without fact gathering
-- Not recommended for production use or ongoing configuration management
-
-**When to use fast mode:**
-
-✅ **Good use cases:**
-- Initial switch deployment (ZTP-like scenarios)
-- Lab/testing environments
-- Known-good configurations
-- Time-critical deployments
-
-❌ **Bad use cases:**
-- Production switches with existing config
-- When config drift detection is important
-- When you need cleanup of old configurations
-- Ongoing configuration management
-
-**Usage Example:**
-
-```yaml
-# playbook or group_vars
-aoscx_fast_mode: true
-aoscx_idempotent_mode: false  # Recommended to disable cleanup entirely
-```
+> **⚠️ DEPRECATED:** `aoscx_fast_mode` has been deprecated and removed from this role.
+> Without device state facts, the role treated every VLAN and interface as needing
+> configuration regardless of current state — resulting in **more** API calls, not fewer.
+> Use `aoscx_gather_facts_rest_api: true` instead for genuine performance gains.
 
 ---
 
@@ -509,7 +454,7 @@ time ansible-playbook site.yml -i inventory.yml --limit test_switches
 
 **Key Differences:**
 
-- **Fast Mode (Implemented):** Skips fact gathering/cleanup, keeps modular approach
+- **Fast Mode (Deprecated):** Removed — caused more API calls due to absent device state comparison
 - **Aruba DCN Template:** Complete config generation, single push, different architecture
 - **Hybrid Approach:** Could support both methods via `aoscx_config_method` variable
 
@@ -518,13 +463,10 @@ time ansible-playbook site.yml -i inventory.yml --limit test_switches
 ## Implementation Priority
 
 ### ✅ Completed - Phase 1 (Low Risk, Good Return)
-- [x] Add `aoscx_fast_mode` variable
-- [x] Make cleanup optional when fast mode enabled
-- [x] Skip initial fact gathering in fast mode
-- [x] Skip all idempotent cleanup operations in fast mode
-- [x] Document fast mode usage and trade-offs
+- [x] ~~`aoscx_fast_mode`~~ — deprecated and removed (caused more API calls than it saved)
+- [x] `aoscx_gather_facts_rest_api: true` — 3-5x faster fact gathering via REST API
 
-**Status:** Implemented and documented. Expected 20-30% performance improvement.
+**Status:** `aoscx_fast_mode` deprecated. Use `aoscx_gather_facts_rest_api: true` for performance.
 
 ### Short Term - Phase 2 (Moderate Risk, High Return)
 - [ ] Batch interface configurations
