@@ -309,6 +309,9 @@ See [defaults/main.yml](../defaults/main.yml) for all available variables.
 ### Core Variables
 
 ```yaml
+# Enable/disable fact gathering
+aoscx_gather_facts: true
+
 # Enable/disable features
 aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
@@ -319,11 +322,6 @@ aoscx_configure_ospf: true
 
 # Idempotent mode - removes configs not in NetBox
 aoscx_idempotent_mode: false
-
-# Fast mode - skip fact gathering and cleanup for faster execution
-# WARNING: Only use for initial deployments or when cleanup is not needed
-# See docs/PERFORMANCE_OPTIMIZATION.md for details
-aoscx_fast_mode: false
 
 # Save configuration after changes
 aoscx_save_config: true

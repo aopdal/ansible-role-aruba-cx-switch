@@ -97,7 +97,6 @@
 
   when:
     - aoscx_idempotent_mode | bool
-    - not (aoscx_fast_mode | default(false) | bool)
 
 # ============================================================================
 # ALL MODES: Categorize and configure interfaces
