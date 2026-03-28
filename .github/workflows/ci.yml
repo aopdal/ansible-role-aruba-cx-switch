@@ -22,12 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.x
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install test dependencies
         run: |
@@ -45,12 +45,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.x
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install Ansible
         run: |
@@ -71,12 +71,12 @@ jobs:
     needs: [lint, syntax]
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.x
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install test dependencies
         run: |
@@ -107,12 +107,12 @@ jobs:
           - ubuntu2404
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.x
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install test dependencies
         run: |
@@ -126,8 +126,8 @@ jobs:
       - name: Run Molecule tests
         run: molecule test -- -vvv
         env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
+          PY_COLORS: "1"
+          ANSIBLE_FORCE_COLOR: "1"
           MOLECULE_DISTRO: ${{ matrix.distro }}
 
   integration:
@@ -136,12 +136,12 @@ jobs:
     needs: [lint, syntax, unit-tests]
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.x
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install test dependencies
         run: |
@@ -166,12 +166,12 @@ jobs:
   #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
   #   steps:
   #     - name: Check out the codebase
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@v6
   #
   #     - name: Set up Python 3.x
-  #       uses: actions/setup-python@v5
+  #       uses: actions/setup-python@v6
   #       with:
-  #         python-version: '3.11'
+  #         python-version: "3.11"
   #
   #     - name: Install Ansible
   #       run: |
