@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-28
+
+### Removed
+
+- aoscx_fast_mode variable is deprecated - it slowed things down.
+
+### Fixed
+
+- Don't try to create or update Vlan 1 it exist default
+
 ## [0.6.4] - 2026-03-26
 
 ### Changed
