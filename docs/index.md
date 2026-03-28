@@ -767,10 +767,17 @@ Custom VRFs are:
 
 ## Virtual Chassis Support
 
-This role supports AOS-CX virtual chassis (VSX):
+This role supports AOS-CX virtual chassis (VSF):
 - VLANs are queried using `available_on_device` (shared across chassis)
-- IP addresses are per-chassis-member (from interface objects)
-- Each member is configured independently
+- IP addresses are taken from interface objects
+- Configuration of the VSF menbers is not supported
+
+## VSX clustering
+
+This role supports AOS-CX Virtual Switching Extension (VSX) :
+- Devices in the "stack" is independent devices (not configured using virtual chassis)
+- Devices is configured independently
+- VSX sync configuration is minimal may be tuned
 
 ## Idempotent Mode
 
