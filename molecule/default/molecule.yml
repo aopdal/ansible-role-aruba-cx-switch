@@ -25,7 +25,7 @@ provisioner:
     defaults:
       interpreter_python: auto_silent
       callback_whitelist: profile_tasks, timer
-      stdout_callback: ansible.posix.debug
+      stdout_callback: debug
       roles_path: "${MOLECULE_PROJECT_DIRECTORY}/../..:~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"
     ssh_connection:
       pipelining: false
