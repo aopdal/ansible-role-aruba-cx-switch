@@ -124,7 +124,7 @@ jobs:
           ansible-galaxy collection install -r requirements.yml
 
       - name: Run Molecule tests
-        run: molecule test -- -vvv
+        run: molecule test
         env:
           PY_COLORS: "1"
           ANSIBLE_FORCE_COLOR: "1"
