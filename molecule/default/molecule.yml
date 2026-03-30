@@ -24,8 +24,6 @@ provisioner:
   config_options:
     defaults:
       interpreter_python: auto_silent
-      callbacks_enabled: profile_tasks, timer
-      stdout_callback: yaml
       roles_path: "${MOLECULE_PROJECT_DIRECTORY}/../..:~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"
     ssh_connection:
       pipelining: false
