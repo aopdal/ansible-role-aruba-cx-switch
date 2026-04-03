@@ -444,6 +444,138 @@
     ansible_connection: network_cli
 
 # ============================================================================
+# BGP Stale Neighbor Cleanup (idempotent mode)
+# ============================================================================
+# Removes BGP neighbors present on the device but absent from NetBox.
+# Only runs when aoscx_idempotent_mode is true and the NetBox BGP plugin is
+# available.  Uses the REST API to read the current device neighbor table and
+# compares it per-VRF against the desired set from NetBox.
+
+- name: Remove stale BGP neighbors (idempotent mode)
+  when:
+    - aoscx_idempotent_mode | default(false) | bool
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+    - device_bgp_sessions_enriched is defined
+  block:
+    - name: Set BGP cleanup REST API connection variables
+      ansible.builtin.set_fact:
+        _bgp_rest_host: "{{ aoscx_rest_host | default(ansible_host) }}"
+        _bgp_rest_user: "{{ aoscx_rest_user | default(ansible_user) }}"
+        _bgp_rest_password: "{{ aoscx_rest_password | default(ansible_password) }}"
+        _bgp_rest_validate_certs: "{{ aoscx_rest_validate_certs | default(false) }}"
+        _bgp_rest_api_base: >-
+          https://{{ aoscx_rest_host | default(ansible_host)
+          }}/rest/v{{ _rest_api_version | default('10.15') }}
+      no_log: true
+
+    - name: Login to AOS-CX REST API for BGP cleanup
+      ansible.builtin.uri:
+        url: "{{ _bgp_rest_api_base }}/login"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          username: "{{ _bgp_rest_user }}"
+          password: "{{ _bgp_rest_password }}"
+        validate_certs: "{{ _bgp_rest_validate_certs }}"
+        status_code: [200]
+      register: _bgp_rest_login
+      delegate_to: localhost
+      no_log: "{{ aoscx_no_log | default(true) }}"
+
+    # Build the list of VRFs to check: always include default, plus any custom
+    # VRFs referenced by bgp_vrf_sessions.
+    - name: Build list of BGP VRFs and local ASN for cleanup queries
+      ansible.builtin.set_fact:
+        _bgp_local_asn: "{{ device_bgp_sessions[0].local_as.asn }}"
+        _bgp_vrfs_to_check: >-
+          {{ ['default']
+             + (bgp_vrf_sessions | default([]) | map(attribute='_vrf') | unique | list) }}
+
+    # Query each VRF's BGP neighbor table.  404 means the BGP router / VRF
+    # does not exist on the device for that ASN — those are skipped silently.
+    - name: Query device BGP neighbors per VRF via REST API
+      ansible.builtin.uri:
+        url: >-
+          {{ _bgp_rest_api_base }}/system/vrfs/{{ item
+          }}/bgp_routers/{{ _bgp_local_asn }}/bgp_neighbors?depth=1
+        method: GET
+        headers:
+          Cookie: "{{ _bgp_rest_login.cookies_string }}"
+        validate_certs: "{{ _bgp_rest_validate_certs }}"
+        status_code: [200, 404]
+        return_content: true
+      loop: "{{ _bgp_vrfs_to_check }}"
+      loop_control:
+        label: "VRF: {{ item }}"
+      register: _bgp_device_neighbors_raw
+      delegate_to: localhost
+
+    - name: Logout from AOS-CX REST API after BGP neighbor query
+      ansible.builtin.uri:
+        url: "{{ _bgp_rest_api_base }}/logout"
+        method: POST
+        headers:
+          Cookie: "{{ _bgp_rest_login.cookies_string }}"
+        validate_certs: "{{ _bgp_rest_validate_certs }}"
+        status_code: [200, 204]
+      delegate_to: localhost
+      no_log: true
+
+    # For each VRF, compare device neighbors against NetBox-desired neighbors
+    # (i.e., remote_address IPs from sessions enriched with the same _vrf).
+    # Sessions in the default VRF use _vrf == 'default'.
+    - name: Identify stale BGP neighbors to remove
+      ansible.builtin.set_fact:
+        _bgp_stale_neighbors: >-
+          {%- set stale = [] -%}
+          {%- set enriched = device_bgp_sessions_enriched | default([]) -%}
+          {%- for resp in _bgp_device_neighbors_raw.results | default([]) -%}
+            {%- if resp.status == 200 and resp.json is mapping -%}
+              {%- set vrf = resp.item -%}
+              {%- set desired_ips = enriched
+                  | selectattr('_vrf', 'defined')
+                  | selectattr('_vrf', 'equalto', vrf)
+                  | map(attribute='remote_address')
+                  | map(attribute='address')
+                  | map('regex_replace', '/.*$', '')
+                  | list -%}
+              {%- for neighbor_ip in resp.json.keys() -%}
+                {%- if neighbor_ip not in desired_ips -%}
+                  {%- set _ = stale.append({
+                        'vrf': vrf,
+                        'ip': neighbor_ip,
+                        'asn': _bgp_local_asn | string
+                     }) -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ stale }}
+
+    - name: Debug stale BGP neighbors
+      ansible.builtin.debug:
+        msg:
+          - "VRFs checked: {{ _bgp_vrfs_to_check }}"
+          - "Stale BGP neighbors to remove: {{ _bgp_stale_neighbors }}"
+      when: aoscx_debug | default(false) | bool
+
+    - name: Remove stale BGP neighbors from device
+      arubanetworks.aoscx.aoscx_command:
+        commands: >-
+          {{ ['configure terminal', 'router bgp ' ~ item.asn]
+             + (['vrf ' ~ item.vrf] if item.vrf != 'default' else [])
+             + ['no neighbor ' ~ item.ip]
+             + (['exit-vrf'] if item.vrf != 'default' else []) }}
+      loop: "{{ _bgp_stale_neighbors }}"
+      loop_control:
+        label: "VRF {{ item.vrf }}: no neighbor {{ item.ip }}"
+      when: _bgp_stale_neighbors | length > 0
+      vars:
+        ansible_connection: network_cli
+
+# ============================================================================
 # Configuration Summary
 # ============================================================================
 

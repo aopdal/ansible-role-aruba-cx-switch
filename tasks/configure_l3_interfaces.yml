@@ -244,6 +244,29 @@
     (item._ip_changes is defined) and
     (item._ip_changes.link_local_ipv6_to_add | default([]) | length > 0)
 
+# Remove stale IPv6 addresses (configured on device but no longer in NetBox)
+# Requires enhanced facts (aoscx_gather_facts_rest_api: true) to detect stale addresses.
+- name: Remove stale IPv6 addresses
+  arubanetworks.aoscx.aoscx_config:
+    lines: >-
+      {{
+        item._ip_changes.ipv6_to_remove | default([])
+          | map('regex_replace', '^(.*)$', 'no ipv6 address \1') | list
+      }}
+    parents: >-
+      interface {{ item.name | format_interface_name(
+        'lag' if (item.type is defined and item.type.value is defined and item.type.value == 'lag')
+        else ('loopback' if 'loopback' in item.name.lower() else 'physical')
+      ) }}
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+  loop: "{{ interface_changes.l3 | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.name }} remove: {{ item._ip_changes.ipv6_to_remove | default([]) }}"
+  when: >-
+    (item._ip_changes is defined) and
+    (item._ip_changes.ipv6_to_remove | default([]) | length > 0)
+
 # Remove stale anycast gateways (configured on device but no longer in NetBox)
 - name: Remove stale anycast gateways
   arubanetworks.aoscx.aoscx_config:
