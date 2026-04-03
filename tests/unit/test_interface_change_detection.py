@@ -744,3 +744,83 @@ class TestEnhancedFacts:
             if intf["name"] == "vlan103":
                 ip_changes = intf.get("_ip_changes", {})
                 assert ip_changes.get("link_local_ipv6_to_add", []) == []
+
+    def test_stale_ipv6_address_detected_for_removal(self):
+        """Device has an IPv6 address that was removed from NetBox → ipv6_to_remove populated"""
+        interfaces = [self._vlan_interface("2001:db8::2/64")]
+        device_facts = self._device_facts_with_url_ref()
+        enhanced_facts = {
+            "vlan10": {
+                # Device has the old address (::1) and does NOT have the new one (::2)
+                "ip6_addresses": {"2001:db8::1/64": {}}
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+
+        assert len(result["l3"]) == 1, "Interface should need changes"
+        ip_changes = result["l3"][0].get("_ip_changes", {})
+        assert "2001:db8::1/64" in ip_changes.get("ipv6_to_remove", [])
+        assert "2001:db8::2/64" in ip_changes.get("ipv6_to_add", [])
+
+    def test_stale_ipv6_no_removal_when_address_unchanged(self):
+        """When NetBox and device IPv6 match exactly, ipv6_to_remove is empty"""
+        interfaces = [self._vlan_interface("2001:db8::1/64")]
+        device_facts = self._device_facts_with_url_ref()
+        enhanced_facts = {
+            "vlan10": {
+                "ip6_addresses": {"2001:db8::1/64": {}}
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+
+        assert len(result["no_changes"]) == 1
+        # Interface needs no changes so _ip_changes may not even be set
+        for intf in result.get("l3", []) + result.get("no_changes", []):
+            if intf["name"] == "vlan10":
+                assert intf.get("_ip_changes", {}).get("ipv6_to_remove", []) == []
+
+    def test_stale_ipv6_all_ipv6_removed_interface_still_has_ipv4(self):
+        """All IPv6 removed from NetBox but device still has them; interface retains IPv4.
+        The stale IPv6 address must be marked for removal."""
+        interfaces = [
+            {
+                "name": "vlan10",
+                "type": {"value": "virtual"},
+                "ip_addresses": [
+                    {"address": "10.0.0.1/24", "vrf": {"name": "default"}}
+                ],  # Only IPv4 remains in NetBox
+            }
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan10": {
+                        "admin": "up",
+                        "ip4_address": "10.0.0.1/24",
+                        "ip6_addresses": (
+                            "/rest/v10.09/system/interfaces/vlan10/ip6_addresses"
+                        ),
+                    }
+                }
+            }
+        }
+        enhanced_facts = {
+            "vlan10": {
+                "ip4_address": "10.0.0.1/24",
+                "ip6_addresses": {"2001:db8::1/64": {}}
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+
+        assert len(result["l3"]) == 1, "Interface should need changes (stale IPv6 to remove)"
+        ip_changes = result["l3"][0].get("_ip_changes", {})
+        assert "2001:db8::1/64" in ip_changes.get("ipv6_to_remove", [])

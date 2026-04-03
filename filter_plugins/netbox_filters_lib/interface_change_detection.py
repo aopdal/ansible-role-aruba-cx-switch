@@ -665,6 +665,7 @@ def get_interfaces_needing_config_changes(
 
             # IPv6 comparison - depends on whether enhanced facts are available
             ipv6_to_add = set()
+            ipv6_to_remove = set()
             ipv6_needs_config = False
 
             if enhanced_intf:
@@ -683,22 +684,28 @@ def get_interfaces_needing_config_changes(
                     norm, orig = _normalize_ipv6(addr)
                     nb_ipv6_normalized[norm] = orig
 
-                device_ipv6_normalized = set()
+                device_ipv6_normalized = {}
                 for addr in device_ipv6:
                     norm, _ = _normalize_ipv6(addr)
-                    device_ipv6_normalized.add(norm)
+                    device_ipv6_normalized[norm] = addr
 
                 # Find addresses in NetBox but not on device (comparing normalized)
                 for norm_addr, orig_addr in nb_ipv6_normalized.items():
                     if norm_addr not in device_ipv6_normalized:
                         ipv6_to_add.add(orig_addr)
 
-                ipv6_needs_config = len(ipv6_to_add) > 0
+                # Find addresses on device but not in NetBox (to remove)
+                for norm_addr, orig_addr in device_ipv6_normalized.items():
+                    if norm_addr not in nb_ipv6_normalized:
+                        ipv6_to_remove.add(orig_addr)
+
+                ipv6_needs_config = len(ipv6_to_add) > 0 or len(ipv6_to_remove) > 0
                 _debug(
                     f"IPv6 comparison for {intf_name}: "
                     f"NetBox={nb_ipv6}, device={device_ipv6}, "
                     f"nb_normalized={set(nb_ipv6_normalized.keys())}, "
-                    f"device_normalized={device_ipv6_normalized}, to_add={ipv6_to_add}"
+                    f"device_normalized={set(device_ipv6_normalized.keys())}, "
+                    f"to_add={ipv6_to_add}, to_remove={ipv6_to_remove}"
                 )
             else:
                 # No enhanced facts - fall back to marking all IPv6 as needing config
@@ -716,7 +723,14 @@ def get_interfaces_needing_config_changes(
                     change_reasons.append(f"IPv4 addresses to remove: {ipv4_to_remove}")
                 if ipv6_needs_config:
                     if enhanced_intf:
-                        change_reasons.append(f"IPv6 addresses to add: {ipv6_to_add}")
+                        if ipv6_to_add:
+                            change_reasons.append(
+                                f"IPv6 addresses to add: {ipv6_to_add}"
+                            )
+                        if ipv6_to_remove:
+                            change_reasons.append(
+                                f"IPv6 addresses to remove: {ipv6_to_remove}"
+                            )
                     else:
                         change_reasons.append(
                             f"IPv6 addresses need configuration: {nb_ipv6}"
@@ -980,6 +994,13 @@ def get_interfaces_needing_config_changes(
                     link_local_ipv6_to_add
                 )
 
+            # Store IPv6 addresses to remove even when NetBox has no IPv6
+            # (device has addresses but they were all removed from NetBox)
+            if enhanced_intf and ipv6_to_remove and not nb_ipv6:
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                nb_intf["_ip_changes"]["ipv6_to_remove"] = list(ipv6_to_remove)
+
             # ALWAYS store IPv6 change info when enhanced facts available
             # This allows task-level filtering even when interface needs changes
             # for other reasons (description, MTU, etc.) but IPv6 is already configured
@@ -996,6 +1017,8 @@ def get_interfaces_needing_config_changes(
                     all_ipv6_to_add = list(set(existing_ipv6_to_add + new_ipv6_to_add))
                     nb_intf["_ip_changes"]["ipv6_to_add"] = all_ipv6_to_add
                     nb_intf["_ip_changes"]["ipv6_addresses"] = list(nb_ipv6)
+                    if ipv6_to_remove:
+                        nb_intf["_ip_changes"]["ipv6_to_remove"] = list(ipv6_to_remove)
                 else:
                     # No enhanced facts - store all addresses for reference
                     nb_intf["_ip_changes"]["ipv6_addresses"] = list(nb_ipv6)

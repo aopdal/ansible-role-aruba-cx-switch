@@ -4,6 +4,7 @@ dependency:
   name: galaxy
   options:
     requirements-file: requirements.yml
+  enabled: false
 
 driver:
   name: docker
@@ -23,8 +24,6 @@ provisioner:
   config_options:
     defaults:
       interpreter_python: auto_silent
-      callback_whitelist: profile_tasks, timer
-      stdout_callback: ansible.posix.debug
       roles_path: "${MOLECULE_PROJECT_DIRECTORY}/../..:~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles"
     ssh_connection:
       pipelining: false

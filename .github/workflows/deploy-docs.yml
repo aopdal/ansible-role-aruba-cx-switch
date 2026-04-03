@@ -7,14 +7,17 @@ on:
     branches:
       - main
     paths:
-      - 'docs/**'
-      - 'README.md'
-      - 'CONTRIBUTING.md'
-      - 'CHANGELOG.md'
-      - 'mkdocs.yml'
-      - 'requirements-docs.txt'
-      - '.github/workflows/deploy-docs.yml'
-  workflow_dispatch:  # Allow manual trigger
+      - "docs/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "CHANGELOG.md"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build-and-deploy:
@@ -22,16 +25,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0  # Full history for git-revision-date-localized plugin
-          fetch-tags: true  # Fetch all tags so MkDocs can resolve the latest release tag
+          fetch-depth: 0 # Full history for git-revision-date-localized plugin
+          fetch-tags: true # Fetch all tags so MkDocs can resolve the latest release tag
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
