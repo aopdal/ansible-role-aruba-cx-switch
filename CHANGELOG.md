@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-04-03
+
 ### Fixed
 
 - Documentation updated regarding VSF / VSX
+- Remove IPv6 address from interface if removed / changed in NetBox
 
 ## [0.7.0] - 2026-03-28
 
