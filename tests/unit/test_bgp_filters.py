@@ -475,3 +475,270 @@ class TestCollectEbgpVrfPolicyConfig:
         ]
         result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
         assert result["prefix_lists"][0]["rules"][0]["prefix"] == "0.0.0.0/0"
+
+    def test_ipv4_prefix_list_has_af_ipv4(self):
+        """Prefix lists referenced via match_ip_address carry af='ipv4'."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "P"}])
+        policy_rules = [
+            _policy_rule(1, "P", 10, match_pfx_id=5, match_pfx_name="LAB-IPV4")
+        ]
+        prefix_list_rules = [
+            _prefix_list_rule(5, "LAB-IPV4", 10, "permit", "172.27.4.0/24")
+        ]
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+        assert result["prefix_lists"][0]["af"] == "ipv4"
+
+    def test_ipv6_prefix_list_via_match_ipv6_address(self):
+        """Prefix lists referenced via match_ipv6_address carry af='ipv6'."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "P-V6-OUT"}])
+        policy_rules = [
+            {
+                "routing_policy": {"id": 1, "name": "P-V6-OUT"},
+                "index": 10,
+                "action": "permit",
+                "match_ip_address": [],
+                "match_ipv6_address": [{"id": 6, "name": "LAB-BLUE-IPV6"}],
+                "set_actions": {"as-path prepend": [65015]},
+            }
+        ]
+        prefix_list_rules = [
+            {
+                "prefix_list": {"id": 6, "name": "LAB-BLUE-IPV6"},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 600, "prefix": "2a02:20c8:5921:da10::/60", "display": "2a02:20c8:5921:da10::/60"},
+            }
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        assert len(result["prefix_lists"]) == 1
+        pl = result["prefix_lists"][0]
+        assert pl["name"] == "LAB-BLUE-IPV6"
+        assert pl["af"] == "ipv6"
+        assert pl["rules"][0]["prefix"] == "2a02:20c8:5921:da10::/60"
+
+        rm = result["route_map_rules"][0]
+        assert "match ipv6 address prefix-list LAB-BLUE-IPV6" in rm["commands"]
+        assert "match ip address prefix-list LAB-BLUE-IPV6" not in rm["commands"]
+
+    def test_mixed_ipv4_and_ipv6_prefix_lists_in_same_route_map(self):
+        """A single route-map rule can match both IPv4 and IPv6 prefix lists."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "MIXED-OUT"}])
+        policy_rules = [
+            {
+                "routing_policy": {"id": 1, "name": "MIXED-OUT"},
+                "index": 10,
+                "action": "permit",
+                "match_ip_address": [{"id": 4, "name": "LAB-IPV4"}],
+                "match_ipv6_address": [{"id": 6, "name": "LAB-IPV6"}],
+                "set_actions": {},
+            }
+        ]
+        prefix_list_rules = [
+            _prefix_list_rule(4, "LAB-IPV4", 10, "permit", "172.27.4.0/24"),
+            {
+                "prefix_list": {"id": 6, "name": "LAB-IPV6"},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 600, "prefix": "2a02:20c8:5921:da20::/60", "display": "2a02:20c8:5921:da20::/60"},
+            },
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        af_map = {pl["name"]: pl["af"] for pl in result["prefix_lists"]}
+        assert af_map["LAB-IPV4"] == "ipv4"
+        assert af_map["LAB-IPV6"] == "ipv6"
+
+        commands = result["route_map_rules"][0]["commands"]
+        assert "match ip address prefix-list LAB-IPV4" in commands
+        assert "match ipv6 address prefix-list LAB-IPV6" in commands
+
+    def test_address_family_on_prefix_list_object_overrides_field_detection(self):
+        """address_family on the prefix_list FK object takes precedence."""
+        session = _ebgp_session("s1", export_policies=[{"id": 1, "name": "P"}])
+        # Deliberately reference via match_ip_address but the PL object says ipv6
+        policy_rules = [
+            _policy_rule(1, "P", 10, match_pfx_id=5, match_pfx_name="TRICKY")
+        ]
+        prefix_list_rules = [
+            {
+                "prefix_list": {"id": 5, "name": "TRICKY", "address_family": {"value": "ipv6", "label": "IPv6"}},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 500, "prefix": "2a02:20c8::/32", "display": "2a02:20c8::/32"},
+            }
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+        assert result["prefix_lists"][0]["af"] == "ipv6"
+
+    def test_ipv6_default_route_in_prefix_list(self):
+        """The IPv6 default route ::/0 is stored correctly."""
+        session = _ebgp_session("s1", import_policies=[{"id": 1, "name": "GW-V6-IN"}])
+        policy_rules = [
+            {
+                "routing_policy": {"id": 1, "name": "GW-V6-IN"},
+                "index": 10,
+                "action": "permit",
+                "match_ip_address": [],
+                "match_ipv6_address": [{"id": 7, "name": "LAB-GW-IPV6"}],
+                "set_actions": {"local-preference": 300},
+            }
+        ]
+        prefix_list_rules = [
+            {
+                "prefix_list": {"id": 7, "name": "LAB-GW-IPV6"},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 700, "prefix": "::/0", "display": "::/0"},
+            }
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        pl = result["prefix_lists"][0]
+        assert pl["name"] == "LAB-GW-IPV6"
+        assert pl["af"] == "ipv6"
+        assert pl["rules"][0]["prefix"] == "::/0"
+
+        commands = result["route_map_rules"][0]["commands"]
+        assert "match ipv6 address prefix-list LAB-GW-IPV6" in commands
+        assert "set local-preference 300" in commands
+
+    def test_ipv6_session_export_policy_collected(self):
+        """Policies on an IPv6 BGP session are collected regardless of _af."""
+        session = {
+            "name": "gw-v6",
+            "local_as": {"asn": 65015},
+            "remote_as": {"asn": 65020},
+            "local_address": {"address": "2a02:20c8:5921:da10::1/64"},
+            "remote_address": {"address": "2a02:20c8:5921:da10::2/64"},
+            "_vrf": "lab-blue",
+            "_af": "ipv6",
+            "import_policies": [],
+            "export_policies": [{"id": 1, "name": "LAB-BLUE-IPV6-OUT-01"}],
+        }
+        policy_rules = [
+            {
+                "routing_policy": {"id": 1, "name": "LAB-BLUE-IPV6-OUT-01"},
+                "index": 10,
+                "action": "permit",
+                "match_ip_address": [],
+                "match_ipv6_address": [{"id": 6, "name": "LAB-BLUE-IPV6"}],
+                "set_actions": {"as-path prepend": [65015]},
+            }
+        ]
+        prefix_list_rules = [
+            {
+                "prefix_list": {"id": 6, "name": "LAB-BLUE-IPV6"},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 600, "prefix": "2a02:20c8:5921:da10::/60", "display": "2a02:20c8:5921:da10::/60"},
+            }
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        assert len(result["route_map_rules"]) == 1
+        rm = result["route_map_rules"][0]
+        assert rm["name"] == "LAB-BLUE-IPV6-OUT-01"
+        assert "route-map LAB-BLUE-IPV6-OUT-01 permit seq 10" in rm["commands"]
+        assert "match ipv6 address prefix-list LAB-BLUE-IPV6" in rm["commands"]
+        assert "set as-path prepend 65015" in rm["commands"]
+
+        assert len(result["prefix_lists"]) == 1
+        pl = result["prefix_lists"][0]
+        assert pl["af"] == "ipv6"
+        assert pl["rules"][0]["prefix"] == "2a02:20c8:5921:da10::/60"
+
+    def test_ipv6_session_import_policy_collected(self):
+        """Import policies on an IPv6 session produce correct route-map commands."""
+        session = {
+            "name": "gw-v6",
+            "local_as": {"asn": 65015},
+            "remote_as": {"asn": 65020},
+            "local_address": {"address": "2a02:20c8:5921:da10::1/64"},
+            "remote_address": {"address": "2a02:20c8:5921:da10::2/64"},
+            "_vrf": "lab-blue",
+            "_af": "ipv6",
+            "import_policies": [{"id": 2, "name": "LAB-GW-IPV6-IN-01"}],
+            "export_policies": [],
+        }
+        policy_rules = [
+            {
+                "routing_policy": {"id": 2, "name": "LAB-GW-IPV6-IN-01"},
+                "index": 10,
+                "action": "permit",
+                "match_ip_address": [],
+                "match_ipv6_address": [{"id": 7, "name": "LAB-GW-IPV6"}],
+                "set_actions": {"local-preference": 300},
+            }
+        ]
+        prefix_list_rules = [
+            {
+                "prefix_list": {"id": 7, "name": "LAB-GW-IPV6"},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 700, "prefix": "::/0", "display": "::/0"},
+            }
+        ]
+
+        result = collect_ebgp_vrf_policy_config([session], policy_rules, prefix_list_rules)
+
+        rm = result["route_map_rules"][0]
+        assert rm["name"] == "LAB-GW-IPV6-IN-01"
+        assert "match ipv6 address prefix-list LAB-GW-IPV6" in rm["commands"]
+        assert "set local-preference 300" in rm["commands"]
+
+        pl = result["prefix_lists"][0]
+        assert pl["af"] == "ipv6"
+        assert pl["rules"][0]["prefix"] == "::/0"
+
+    def test_mixed_ipv4_and_ipv6_sessions_collect_all_policies(self):
+        """Both IPv4 and IPv6 sessions have their policies collected in one pass."""
+        sessions = [
+            _ebgp_session("v4-peer", export_policies=[{"id": 1, "name": "V4-OUT"}]),
+            {
+                "name": "v6-peer",
+                "local_as": {"asn": 65015},
+                "remote_as": {"asn": 65020},
+                "local_address": {"address": "2a02:20c8::1/64"},
+                "remote_address": {"address": "2a02:20c8::2/64"},
+                "_vrf": "lab-blue",
+                "_af": "ipv6",
+                "import_policies": [],
+                "export_policies": [{"id": 2, "name": "V6-OUT"}],
+            },
+        ]
+        policy_rules = [
+            _policy_rule(1, "V4-OUT", 10, match_pfx_id=4, match_pfx_name="PFX-V4"),
+            {
+                "routing_policy": {"id": 2, "name": "V6-OUT"},
+                "index": 10,
+                "action": "permit",
+                "match_ip_address": [],
+                "match_ipv6_address": [{"id": 6, "name": "PFX-V6"}],
+                "set_actions": {},
+            },
+        ]
+        prefix_list_rules = [
+            _prefix_list_rule(4, "PFX-V4", 10, "permit", "172.27.4.0/24"),
+            {
+                "prefix_list": {"id": 6, "name": "PFX-V6"},
+                "index": 10,
+                "action": "permit",
+                "prefix": {"id": 600, "prefix": "2a02:20c8::/32", "display": "2a02:20c8::/32"},
+            },
+        ]
+
+        result = collect_ebgp_vrf_policy_config(sessions, policy_rules, prefix_list_rules)
+
+        rm_names = [rm["name"] for rm in result["route_map_rules"]]
+        assert "V4-OUT" in rm_names
+        assert "V6-OUT" in rm_names
+
+        af_map = {pl["name"]: pl["af"] for pl in result["prefix_lists"]}
+        assert af_map["PFX-V4"] == "ipv4"
+        assert af_map["PFX-V6"] == "ipv6"

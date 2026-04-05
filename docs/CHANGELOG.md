@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-05
+
+### Added
+
+- ipv6 prefix-list
+- route map for ipv6
+- bgp ipv6 neighbours iBGP
+- bgp ipv6 neighbours eBGP
+- route maps import and export for ipv6
+
+## [0.7.1] - 2026-04-03
+
+### Fixed
+
+- Documentation updated regarding VSF / VSX
+- Remove IPv6 address from interface if removed / changed in NetBox
+
+## [0.7.0] - 2026-03-28
+
+### Removed
+
+- aoscx_fast_mode variable is deprecated - it slowed things down.
+
+### Fixed
+
+- Don't try to create or update Vlan 1 it exist default
+
+## [0.6.4] - 2026-03-26
+
+### Changed
+
+- Anycast gateway IPv6 change to configure ipv6 link-local if anycast address in NetBox is link-local address.
+- Filter logic updated for removal of IPv6 addresses not in NetBox.
+- Detect if link-local addres is not configured when anycast gateway is configure using link-local address.
+- Documentation updated with new feature.
+
+## [0.6.3] - 2026-03-11
+
+### Changed
+
+- Consolidate gather facts using rest api.
+- Refactor IP Filters
+- Refactor IP config tasks
+- Refactor loopback interfaces
+- Refactor gather enhanced facts using API
+
+## [0.6.2] - 2026-03-07
+
+### Fixed
+
+- Docs - update to fetch latest tag from repo
+- meta - updates to fields
+- Example - created proper example ffor usage of the role
+
+## [0.6.1] - 2026-03-07
+
+### Removed
+
+- ZTP - the fature was incompleat and didn't work good
+- BGP - usage of config-contexts is removed
+
+## [0.6.0] - 2026-03-07
+
+### Added
+
+- IP Prefix Lists from BGP plugin
+- Route-Maps from BGP Plugin
+
+## [0.5.1] - 2026-03-02
+
+### Fixed
+
+- Filter out mgmt interface when not compare existing and new config.
+
 ## [0.5.0] - 2026-02-25
 
 First public release. See the [documentation](https://aopdal.github.io/ansible-role-aruba-cx-switch/) for full details on all features.

@@ -249,7 +249,10 @@
         {{ item.1.action }}
         {{ item.1.prefix }}
       - end
-  loop: "{{ bgp_ebgp_policy_data.prefix_lists | default([]) | subelements('rules') }}"
+  loop: >-
+    {{ bgp_ebgp_policy_data.prefix_lists | default([]) |
+       selectattr('af', 'equalto', 'ipv4') | list |
+       subelements('rules') }}
   loop_control:
     label: >-
       {{ item.0.name }} seq {{ item.1.index }}
@@ -257,7 +260,32 @@
   when:
     - netbox_bgp_plugin_available | default(false)
     - bgp_ebgp_policy_data is defined
-    - bgp_ebgp_policy_data.prefix_lists | default([]) | length > 0
+    - bgp_ebgp_policy_data.prefix_lists | default([]) | selectattr('af', 'equalto', 'ipv4') | list | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure IPv6 prefix lists for eBGP VRF sessions
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - >-
+        ipv6 prefix-list {{ item.0.name }}
+        seq {{ item.1.index }}
+        {{ item.1.action }}
+        {{ item.1.prefix }}
+      - end
+  loop: >-
+    {{ bgp_ebgp_policy_data.prefix_lists | default([]) |
+       selectattr('af', 'equalto', 'ipv6') | list |
+       subelements('rules') }}
+  loop_control:
+    label: >-
+      {{ item.0.name }} seq {{ item.1.index }}
+      {{ item.1.action }} {{ item.1.prefix }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_ebgp_policy_data is defined
+    - bgp_ebgp_policy_data.prefix_lists | default([]) | selectattr('af', 'equalto', 'ipv6') | list | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -296,7 +324,6 @@
       - neighbor {{ item.remote_address.address.split('/')[0] }} remote-as {{ item.remote_as.asn }}
       - address-family {{ item._af }} unicast
       - neighbor {{ item.remote_address.address.split('/')[0] }} next-hop-self
-      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
       - neighbor {{ item.remote_address.address.split('/')[0] }} activate
       - exit-address-family
       - exit-vrf
@@ -322,7 +349,6 @@
       - vrf {{ item._vrf }}
       - neighbor {{ item.remote_address.address.split('/')[0] }} remote-as {{ item.remote_as.asn }}
       - address-family {{ item._af }} unicast
-      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
       - neighbor {{ item.remote_address.address.split('/')[0] }} activate
       - exit-address-family
       - exit-vrf
@@ -337,6 +363,56 @@
     - bgp_vrf_sessions is defined
     - bgp_vrf_sessions | length > 0
     - item.local_as.asn != item.remote_as.asn
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure send-community extended for iBGP VRF IPv6 neighbors
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - address-family ipv6 unicast
+      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }}
+      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [iBGP send-community extended]
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+    - item.local_as.asn == item.remote_as.asn
+    - item._af == 'ipv6'
+  vars:
+    ansible_connection: network_cli
+
+- name: Configure send-community extended for eBGP VRF IPv6 neighbors
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - address-family ipv6 unicast
+      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }}
+      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [eBGP send-community extended]
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+    - item.local_as.asn != item.remote_as.asn
+    - item._af == 'ipv6'
   vars:
     ansible_connection: network_cli
 
@@ -369,6 +445,36 @@
   vars:
     ansible_connection: network_cli
 
+- name: Apply export route-maps to eBGP VRF IPv6 neighbors
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - address-family ipv6 unicast
+      - neighbor {{ item.remote_address.address.split('/')[0] }} activate
+      - >-
+        neighbor {{ item.remote_address.address.split('/')[0] }}
+        route-map {{ item.export_policies[0].name }} out
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }}
+      → {{ item.remote_address.address.split('/')[0] }}
+      export: {{ (item.export_policies | default([]))[0].name if item.export_policies | default([]) | length > 0 else 'n/a' }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+    - item.local_as.asn != item.remote_as.asn
+    - item._af == 'ipv6'
+    - item.export_policies | default([]) | length > 0
+  vars:
+    ansible_connection: network_cli
+
 - name: Apply import route-maps to eBGP VRF IPv4 neighbors
   arubanetworks.aoscx.aoscx_command:
     commands:
@@ -394,6 +500,36 @@
     - bgp_vrf_sessions | length > 0
     - item.local_as.asn != item.remote_as.asn
     - item._af == 'ipv4'
+    - item.import_policies | default([]) | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Apply import route-maps to eBGP VRF IPv6 neighbors
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - configure terminal
+      - router bgp {{ item.local_as.asn }}
+      - vrf {{ item._vrf }}
+      - address-family ipv6 unicast
+      - neighbor {{ item.remote_address.address.split('/')[0] }} activate
+      - >-
+        neighbor {{ item.remote_address.address.split('/')[0] }}
+        route-map {{ item.import_policies[0].name }} in
+      - exit-address-family
+      - exit-vrf
+  loop: "{{ bgp_vrf_sessions | default([]) }}"
+  loop_control:
+    label: >-
+      Device: {{ inventory_hostname }}
+      VRF: {{ item._vrf }}
+      → {{ item.remote_address.address.split('/')[0] }}
+      import: {{ (item.import_policies | default([]))[0].name if item.import_policies | default([]) | length > 0 else 'n/a' }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+    - item.local_as.asn != item.remote_as.asn
+    - item._af == 'ipv6'
     - item.import_policies | default([]) | length > 0
   vars:
     ansible_connection: network_cli

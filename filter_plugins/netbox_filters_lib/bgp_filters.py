@@ -194,7 +194,9 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
     # ------------------------------------------------------------------
     # Find matching routing policy rules and build CLI command lists
     # ------------------------------------------------------------------
-    referenced_prefix_list_ids = {}  # {prefix_list_id: prefix_list_name}
+    # Values are dicts {"name": str, "af": "ipv4"|"ipv6"} so we can emit
+    # the correct CLI keyword when configuring the prefix list itself.
+    referenced_prefix_list_ids = {}  # {prefix_list_id: {"name": str, "af": str}}
     route_map_rules = []
 
     for rule in all_policy_rules or []:
@@ -214,11 +216,16 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
 
         commands = [f"route-map {policy_name} {action} seq {index}"]
 
-        # match ip address prefix-list
-        # netbox-bgp returns match_ip_address as a ManyToMany list;
-        # handle both list and single-object forms
-        match_pfx_raw = rule.get("match_ip_address")
-        if match_pfx_raw:
+        # match ip/ipv6 address prefix-list
+        # netbox-bgp returns match_ip_address (IPv4) and match_ipv6_address (IPv6)
+        # as ManyToMany lists; handle both list and single-object forms.
+        for af_field, af_cmd, af_key in (
+            ("match_ip_address", "match ip address prefix-list", "ipv4"),
+            ("match_ipv6_address", "match ipv6 address prefix-list", "ipv6"),
+        ):
+            match_pfx_raw = rule.get(af_field)
+            if not match_pfx_raw:
+                continue
             if isinstance(match_pfx_raw, dict):
                 match_pfx_raw = [match_pfx_raw]
             for match_pfx in match_pfx_raw if isinstance(match_pfx_raw, list) else []:
@@ -227,9 +234,12 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
                 pfx_id = match_pfx.get("id")
                 pfx_name = match_pfx.get("name") or str(pfx_id)
                 if pfx_name:
-                    commands.append(f"match ip address prefix-list {pfx_name}")
+                    commands.append(f"{af_cmd} {pfx_name}")
                 if pfx_id is not None:
-                    referenced_prefix_list_ids[pfx_id] = pfx_name
+                    referenced_prefix_list_ids[pfx_id] = {
+                        "name": pfx_name,
+                        "af": af_key,
+                    }
 
         # set actions — stored as a dict: {"as-path prepend": [65015], "local-preference": 300, ...}
         set_actions = rule.get("set_actions") or {}
@@ -264,7 +274,7 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
     # ------------------------------------------------------------------
     # Collect prefix list rules for all referenced prefix lists
     # ------------------------------------------------------------------
-    prefix_lists_map = {}  # {prefix_list_name: [rule_dicts]}
+    prefix_lists_map = {}  # {prefix_list_name: {"af": str, "rules": [rule_dicts]}}
 
     for rule in all_prefix_list_rules or []:
         if not isinstance(rule, dict):
@@ -275,7 +285,24 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
         if pl_id not in referenced_prefix_list_ids:
             continue
 
-        pl_name = referenced_prefix_list_ids[pl_id]
+        pl_info = referenced_prefix_list_ids[pl_id]
+        pl_name = pl_info["name"]
+        pl_af = pl_info["af"]
+
+        # If the prefix list object itself carries an address_family field, prefer it.
+        # The netbox-bgp plugin may return e.g. {"value": "ipv6", "label": "IPv6"}
+        if isinstance(pl_obj, dict):
+            af_raw = pl_obj.get("address_family")
+            if af_raw:
+                if isinstance(af_raw, dict):
+                    af_val = str(af_raw.get("value") or "").lower()
+                else:
+                    af_val = str(af_raw).lower()
+                if "6" in af_val:
+                    pl_af = "ipv6"
+                elif af_val:
+                    pl_af = "ipv4"
+
         index = rule.get("index", 0)
         action = _action_str(rule.get("action"))
 
@@ -297,20 +324,21 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
             network = rule.get("prefix_custom") or ""
 
         if pl_name not in prefix_lists_map:
-            prefix_lists_map[pl_name] = []
-        prefix_lists_map[pl_name].append(
+            prefix_lists_map[pl_name] = {"af": pl_af, "rules": []}
+        prefix_lists_map[pl_name]["rules"].append(
             {"index": index, "action": action, "prefix": str(network)}
         )
 
-        _debug(f"prefix-list rule: {pl_name} seq {index} {action} {network}")
+        _debug(f"prefix-list rule: {pl_name} ({pl_af}) seq {index} {action} {network}")
 
     # Sort rules within each prefix list by sequence number
     prefix_lists = [
         {
             "name": name,
-            "rules": sorted(rules, key=lambda r: r["index"]),
+            "af": data["af"],
+            "rules": sorted(data["rules"], key=lambda r: r["index"]),
         }
-        for name, rules in prefix_lists_map.items()
+        for name, data in prefix_lists_map.items()
     ]
 
     # Sort route-map rules by policy name, then sequence number
