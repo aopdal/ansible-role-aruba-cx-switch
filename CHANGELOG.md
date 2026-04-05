@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-05
+
+### Added
+
+- ipv6 prefix-list
+- route map for ipv6
+- bgp ipv6 neighbours iBGP
+- bgp ipv6 neighbours eBGP
+- route maps import and export for ipv6
+
 ## [0.7.1] - 2026-04-03
 
 ### Fixed
