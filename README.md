@@ -80,7 +80,8 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **Loopback Interfaces** - Automatic detection, IPv4/IPv6, with VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
 - ✅ **VSX Configuration** - Active-active redundancy with system MAC, ISL, and keepalive
-- ✅ **BGP/EVPN Configuration** - Require NetBox BGP plugin
+- ✅ **BGP** - iBGP for EVPN/VXLAN fabrics and eBGP for Border Leafs using NetBox BGP Plugin
+- ✅ **EVPN Configuration** - Configured from NetBox VPN / L2VPN
 - ✅ **VXLAN Configuration** - Overlay networks with VNI mapping and cleanup
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
@@ -799,6 +800,7 @@ The role supports two configuration modes controlled by the `aoscx_idempotent_mo
     - Trunk allowed VLANs not matching NetBox
     - EVPN configuration for VLANs being removed
     - VXLAN VNI and VLAN-to-VNI mappings for VLANs being removed
+    - BGP neighbours ot in NetBox
 - ✅ **Intelligent cleanup** - Only removes configs not referenced in NetBox
 - ✅ **Proper cleanup order** - EVPN → VXLAN → VLAN (prevents orphaned configurations)
 - ✅ **Use case**: Ongoing management, drift detection, compliance enforcement
