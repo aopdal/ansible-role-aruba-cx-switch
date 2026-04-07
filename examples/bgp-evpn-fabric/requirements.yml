@@ -2,11 +2,15 @@
 roles:
   - name: aopdal.aruba_cx_switch
     src: git@github.com:aopdal/ansible-role-aruba-cx-switch.git
-    version: "v0.6.1"  # or specify a tag like 'v1.0.0'
+    version: "v0.8.0"  # or specify a tag like 'v1.0.0'
     scm: git
 
 collections:
+  - name: ansible.netcommon
+    version: ">=8.0.0"
+  - name: ansible.utils
+    version: ">=6.0.0"
   - name: arubanetworks.aoscx
-    version: ">=4.0.0"
+    version: ">=4.4.0"
   - name: netbox.netbox
-    version: ">=3.0.0"
+    version: ">=3.22.0"

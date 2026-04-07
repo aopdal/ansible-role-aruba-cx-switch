@@ -8,9 +8,10 @@
 #   - dns_mgmt_nameservers: Management nameservers (dict)
 #   - dns_domain_name: Primary domain name (string)
 #   - dns_domain_list: Additional search domains (dict with numeric keys)
-#   - dns_name_servers: DNS nameservers (dict with numeric keys)
+#   - dns_name_servers: DNS nameservers per VRF (dict of dicts, keyed by VRF name)
+#                       e.g. {"mgmt": {"0": "1.1.1.1"}, "default": {"0": "8.8.8.8"}}
 #   - dns_host_v4_address_mapping: Static host mappings (dict)
-#   - dns_vrf: VRF for DNS traffic (string, optional)
+#   - dns_vrf: VRF for domain/host/mgmt DNS settings (string, optional)
 
 - name: configure_dns | Display DNS configuration debug info
   ansible.builtin.debug:
@@ -19,7 +20,7 @@
       - "Domain name: {{ dns_domain_name | default('Not configured') }}"
       - "DNS VRF: {{ dns_vrf | default('default') }}"
       - "Management nameservers: {{ dns_mgmt_nameservers | default({}) | length }} configured"
-      - "DNS nameservers: {{ dns_name_servers | default({}) | length }} configured"
+      - "DNS nameservers VRFs: {{ dns_name_servers | default({}) | list | join(', ') }}"
       - "Domain list: {{ dns_domain_list | default({}) | length }} domains"
       - "Host mappings: {{ dns_host_v4_address_mapping | default({}) | length }} entries"
   when: aoscx_debug | bool
@@ -29,13 +30,18 @@
     mgmt_nameservers: "{{ dns_mgmt_nameservers | default(omit) }}"
     domain_name: "{{ dns_domain_name | default(omit) }}"
     domain_list: "{{ dns_domain_list | default(omit) }}"
-    name_servers: "{{ dns_name_servers | default(omit) }}"
     host_v4_address_mapping: "{{ dns_host_v4_address_mapping | default(omit) }}"
     vrf: "{{ dns_vrf | default(omit) }}"
   when:
     - >
       dns_domain_name is defined or
       dns_mgmt_nameservers is defined or
-      dns_name_servers is defined or
       dns_domain_list is defined or
       dns_host_v4_address_mapping is defined
+
+- name: configure_dns | Configure DNS name servers per VRF
+  arubanetworks.aoscx.aoscx_dns:
+    name_servers: "{{ item.value }}"
+    vrf: "{{ item.key }}"
+  loop: "{{ dns_name_servers | dict2items }}"
+  when: dns_name_servers is defined

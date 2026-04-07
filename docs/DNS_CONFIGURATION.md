@@ -13,11 +13,18 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
     "Primary": "10.10.2.10",
     "Secondary": "10.10.2.11"
   },
-  "dns_name_servers": {
-    "0": "4.4.4.8",
-    "1": "4.4.4.10",
-    "2": "8.8.8.8"
-  },
+    "dns_name_servers": {
+        "lab-blue": {
+            "0": "4.4.4.8"
+        },
+        "lab-green": {
+            "0": "4.4.4.10"
+        },
+        "mgmt": {
+            "0": "8.8.8.8",
+            "1": "1.1.1.1"
+        }
+    },
   "dns_domain_list": {
     "0": "hp.com",
     "1": "aru.com",
