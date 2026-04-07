@@ -386,7 +386,7 @@ The role could support **both** approaches:
 
 ### Automatic Configuration Based on Device Role
 
-The role automatically configures route reflector settings based on the device's role in NetBox:
+The role automatically configures route reflector settings based on the device's **roles field** (from NetBox device roles, provided as `device_roles` list in the inventory):
 
 **Supported Roles:**
 
