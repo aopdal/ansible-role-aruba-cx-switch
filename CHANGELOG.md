@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-04-07
+
+### Fixed
+
+- bgp route reflector conf using device_roles
+
 ## [0.9.0] - 2026-04-07
 
 ### Added
