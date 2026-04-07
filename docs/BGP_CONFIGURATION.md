@@ -46,7 +46,7 @@ This task configures BGP with EVPN (Ethernet VPN) address family support for ove
 
 **Spine (Route Reflector):**
 
-> **Note**: When using the netbox-bgp plugin, route reflector configuration is **automatic** for devices with role `spine`, `route-reflector`, or `rr`. All BGP neighbors are automatically configured as route-reflector clients. See [NetBox BGP Plugin Integration](NETBOX_BGP_PLUGIN.md) for details.
+> **Note**: When using the netbox-bgp plugin, route reflector configuration is **automatic** for devices with device role (from NetBox's device roles field) of `spine`, `route-reflector`, or `rr`. All BGP neighbors are automatically configured as route-reflector clients. See [NetBox BGP Plugin Integration](NETBOX_BGP_PLUGIN.md) for details.
 
 ```json
 {

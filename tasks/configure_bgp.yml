@@ -11,11 +11,10 @@
 - name: Get BGP sessions from NetBox BGP plugin
   when: aoscx_use_netbox_bgp_plugin | default(true) | bool
   delegate_to: localhost
-  run_once: true
   block:
-    - name: Query NetBox BGP plugin for all sessions
+    - name: Query NetBox BGP plugin for sessions for this device
       ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/"
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/?device={{ inventory_hostname }}&limit=0"
         method: GET
         headers:
           Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
@@ -26,26 +25,18 @@
       register: netbox_bgp_sessions_raw
       no_log: "{{ aoscx_no_log | default(false) }}"
 
-    - name: Set fact when BGP plugin is available
+    - name: Set BGP session facts for this device
       ansible.builtin.set_fact:
         netbox_bgp_plugin_available: "{{ netbox_bgp_sessions_raw.status == 200 }}"
-        netbox_bgp_sessions_all: "{{ netbox_bgp_sessions_raw.json.results | default([]) }}"
-      run_once: true
+        device_bgp_sessions: >-
+          {{ netbox_bgp_sessions_raw.json.results | default([]) |
+             selectattr('status.value', 'in', ['active', 'staged', 'planned']) |
+             list }}
 
     - name: Debug BGP plugin status
       ansible.builtin.debug:
         msg: "NetBox BGP plugin: {{ 'Available ✓' if netbox_bgp_plugin_available else 'Not available' }}"
       when: aoscx_debug | default(false) | bool
-
-- name: Filter BGP sessions for this device from plugin
-  ansible.builtin.set_fact:
-    device_bgp_sessions: "{{ netbox_bgp_sessions_all |
-      selectattr('device.name', 'equalto', inventory_hostname) |
-      selectattr('status.value', 'in', ['active', 'planned']) |
-      list }}"
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - netbox_bgp_sessions_all is defined
 
 # Derive VRF and address-family for each session by looking up the local IP
 # on the device's interfaces (provided by the NetBox inventory plugin).
@@ -555,7 +546,7 @@
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
-    - role | default('') | lower in ['spine', 'route-reflector', 'rr']
+    - (device_roles | default([]) | first | lower) in ['spine', 'route-reflector', 'rr']
   vars:
     ansible_connection: network_cli
 
@@ -574,7 +565,7 @@
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
-    - role | default('') | lower in ['spine', 'route-reflector', 'rr']
+    - (device_roles | default([]) | first | lower) in ['spine', 'route-reflector', 'rr']
     - bgp_ipv4_enabled | default(false) | bool
   vars:
     ansible_connection: network_cli
@@ -720,7 +711,7 @@
     msg:
       - "=== BGP Configuration (netbox-bgp plugin) ==="
       - "Device: {{ inventory_hostname }}"
-      - "Device Role: {{ role | default('not set') }}"
+      - "Device Role: {{ device_roles | default([]) | first | default('not set') }}"
       - "Local AS: {{ device_bgp_sessions[0].local_as.asn }}"
       - "Router ID: {{ device_bgp_sessions[0].local_address.address.split('/')[0] }}"
       - "Total Sessions: {{ device_bgp_sessions | length }}"
@@ -728,7 +719,9 @@
       - "VRF Sessions: {{ bgp_vrf_sessions | default([]) | length }}"
       - "Active Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'active') | list | length }}"
       - "Planned Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'planned') | list | length }}"
-      - "Route Reflector: {{ 'Yes (all neighbors are RR clients)' if (role | default('') | lower in ['spine', 'route-reflector', 'rr']) else 'No' }}"
+      - >-
+        Route Reflector: {{ 'Yes (all neighbors are RR clients)' if ((device_roles | default([])
+        | first | lower) in ['spine', 'route-reflector', 'rr']) else 'No' }}
   when:
     - aoscx_debug | default(false) | bool
     - netbox_bgp_plugin_available | default(false)
