@@ -87,6 +87,7 @@ The following tasks **only run when explicitly requested** via tags:
 ```yaml
 when:
   - aoscx_configure_vsx | bool
+  - custom_fields.device_vsx | default(false) | bool
   - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in ansible_run_tags"
 ```
 
@@ -97,6 +98,7 @@ when:
 ```yaml
 when:
   - aoscx_configure_ospf | bool
+  - custom_fields.device_ospf | default(false) | bool
   - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
 ```
 
@@ -107,6 +109,7 @@ when:
 ```yaml
 when:
   - aoscx_configure_bgp | bool
+  - custom_fields.device_bgp | default(false) | bool
   - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
 ```
 

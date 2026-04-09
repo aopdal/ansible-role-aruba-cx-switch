@@ -128,10 +128,12 @@ vlan_changes:
 Enable debug output to see VLAN analysis:
 
 ```bash
-ansible-playbook -vv playbook.yml
+# -v or higher triggers debug output in identify_vlan_changes.yml
+ansible-playbook -v playbook.yml
 ```
 
-Or set in group_vars:
+Or set `aoscx_debug: true` in group_vars/host_vars to enable detailed debug
+output in configure_evpn.yml, configure_vxlan.yml, and related tasks:
 
 ```yaml
 aoscx_debug: true
@@ -154,56 +156,63 @@ Debug output shows:
 
 ### Testing EVPN/VXLAN Detection
 
-The role uses `show evpn evi` to detect existing EVPN and VXLAN configuration:
+The role runs `show evpn evi` on the switch and passes the output through the
+`parse_evpn_evi_output` filter plugin (`filter_plugins/netbox_filters_lib/vlan_filters.py`):
 
-```bash
-# On the switch, check the output format
-show evpn evi
+```yaml
+- name: Get existing EVPN/VXLAN configuration
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show evpn evi
+  register: evpn_config_output
 
-# Expected output format:
+- name: Parse EVPN EVI output
+  ansible.builtin.set_fact:
+    evpn_parsed: "{{ evpn_config_output.stdout[0] | parse_evpn_evi_output }}"
+```
+
+The filter returns:
+
+```python
+{
+  "evpn_vlans":    [10, 20, 30],          # VLAN IDs with EVPN configured
+  "vxlan_vlans":   [10, 20, 30],          # VLAN IDs with VXLAN configured
+  "vxlan_vnis":    [10100010, 10100020],  # VNI values
+  "vxlan_mappings": [[10100010, 10], [10100020, 20]]  # [VNI, VLAN] pairs
+}
+```
+
+**Expected `show evpn evi` output format:**
+
+```
 L2VNI : 10100010
     Route Distinguisher        : 172.20.1.33:10
     VLAN                       : 10
     Status                     : up
-    ...
+    RT Import                  : 65005:10
+    RT Export                  : 65005:10
 ```
 
-**Regex patterns used:**
-
-```yaml
-# EVPN VLANs (configure_evpn.yml)
-regex_findall('VLAN\\s+:\\s+(\\d+)')
-# Result: [10, 20, 30, ...]
-
-# VXLAN VNI-to-VLAN mappings (configure_vxlan.yml)
-# NOTE: Ansible doesn't support dotall parameter - use [\s\S] instead of .*?
-regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True)
-# Result: [[10100010, 10], [10100020, 20], ...]
-```
-
-**To test locally:**
+**To test the filter locally:**
 
 ```python
 import re
 
 output = """
 L2VNI : 10100010
+    Route Distinguisher        : 172.20.1.33:10
     VLAN                       : 10
 L2VNI : 10100020
     VLAN                       : 20
 """
 
-# Test EVPN regex
-vlans = re.findall(r'VLAN\s+:\s+(\d+)', output)
-print(f"VLANs: {vlans}")  # ['10', '20']
+# VNI pattern (used by the filter)
+vnis = re.findall(r'^L2VNI\s+:\s+(\d+)', output, re.MULTILINE)
+print(f"VNIs: {vnis}")   # ['10100010', '10100020']
 
-# Test VXLAN regex (use re.DOTALL for Python, [\s\S] pattern for Ansible)
-# Python version:
-mappings = re.findall(r'L2VNI\s+:\s+(\d+).*?VLAN\s+:\s+(\d+)', output, re.DOTALL)
-print(f"Mappings: {mappings}")  # [('10100010', '10'), ('10100020', '20')]
-
-# Ansible equivalent pattern (no re.DOTALL flag support):
-# regex_findall('L2VNI\\s+:\\s+(\\d+)[\\s\\S]*?VLAN\\s+:\\s+(\\d+)', multiline=True)
+# VLAN pattern (used by the filter)
+vlans = re.findall(r'^\s+VLAN\s+:\s+(\d+)', output, re.MULTILINE)
+print(f"VLANs: {vlans}") # ['10', '20']
 ```
 
 ## File Locations

@@ -41,17 +41,7 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
 }
 ```
 
-### Simple Example (Minimum Configuration)
-
-```json
-{
-  "dns_domain_name": "opdal.net",
-  "dns_mgmt_nameservers": {
-    "Primary": "91.90.45.8",
-    "Secondary": "1.1.1.1"
-  }
-}
-```
+Keep in mind, not all Aruba CX devices have a dedicated mgmt VRF and a dedicated MGMT ethernet interfacce. The you must configure the VRF to default. And map the config context so the variables becoms right.
 
 ### Management Network Example
 
@@ -76,36 +66,6 @@ Here's the JSON structure you can use in NetBox config_context for DNS configura
 }
 ```
 
-### Enterprise Example with Host Mappings
-
-```json
-{
-  "dns_domain_name": "company.local",
-  "dns_mgmt_nameservers": {
-    "Primary": "10.0.1.10",
-    "Secondary": "10.0.1.11"
-  },
-  "dns_name_servers": {
-    "0": "10.0.1.10",
-    "1": "10.0.1.11",
-    "2": "10.0.2.10"
-  },
-  "dns_domain_list": {
-    "0": "company.local",
-    "1": "company.com",
-    "2": "internal.local"
-  },
-  "dns_host_v4_address_mapping": {
-    "ntp1": "10.0.1.100",
-    "ntp2": "10.0.1.101",
-    "syslog": "10.0.1.200",
-    "tacacs": "10.0.1.210",
-    "netbox": "10.0.2.100",
-    "ansible": "10.0.2.110"
-  },
-  "dns_vrf": "mgmt"
-}
-```
 
 ## Field Descriptions
 

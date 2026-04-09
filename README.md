@@ -87,9 +87,11 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
 - ❌ **STP** - on roadmap
 - ❌ **BFD** - on roadmap
+- ❌ **IGMP Snooping** - on roadmap
 - ❌ **DHCP relay IPv4** - on roadmap
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
+- ❌ **DHCP Snooping** - Not desided
 - ❌ **IPv6 SLAAC** - on roadmap
 - ❌ **Loop protection** - on roadmap
 - ❌ **ACL** - on roadmap
@@ -98,6 +100,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ❌ **SNMP** - on roadmap
 - ❌ **Static routing** - on roadmap
 - ❌ **L3 VNI** - on roadmap
+- ❌ **Multicast routing** - not on roadmap
 
 ## Advanced L3 Interface Features
 

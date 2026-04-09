@@ -99,7 +99,6 @@ nav:
                             - Anycast Gateway: ANYCAST_GATEWAY.md
                   - EVPN & VXLAN:
                             - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
-                            - Configuration Modes: EVPN_VXLAN_MODES.md
                   - BGP: BGP_CONFIGURATION.md
                   - Tag-Dependent Tasks:
                             - Overview: TAG_DEPENDENT_INCLUDES.md
@@ -126,9 +125,6 @@ nav:
                   - Workspace Setup: WORKSPACE.md
                   - DevContainer Setup: DEVCONTAINER_SETUP.md
                   - DevContainer Mounts: DEVCONTAINER_MOUNTS.md
-        - Internal:
-                  - Documentation Integration: DOCUMENTATION_INTEGRATION.md
-                  - Verification Checklist: VERIFICATION_CHECKLIST.md
 
 extra:
         social:

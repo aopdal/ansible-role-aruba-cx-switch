@@ -34,18 +34,25 @@ ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 --list-tas
 
 **Expected**: Shows all three task includes
 
+> **Note:** OSPF, BGP, and VSX tasks require the corresponding NetBox device custom field (`device_ospf`, `device_bgp`, `device_vsx`) to be `true` in addition to the tag. If the custom field is not set on the test device, the tasks are silently skipped even when the tag matches — giving a misleading "no tasks" result.
+
 ## Detailed Test Matrix
 
-| Command | VLANs | Interfaces | OSPF | BGP | VSX | Base Config |
-|---------|-------|------------|------|-----|-----|-------------|
-| `-t vlans` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `-t interfaces` | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `-t routing` | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
-| `-t ospf` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `-t bgp` | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `-t vsx` | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `-t base_config` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| No tags | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Command | VLANs | VRFs | Interfaces | OSPF | BGP | VSX | Base Config |
+|---------|-------|------|------------|------|-----|-----|-------------|
+| `-t vlans` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `-t vrfs` | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `-t interfaces` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `-t routing` | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| `-t ospf` | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `-t bgp` | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `-t vsx` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| `-t base_config` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| No tags | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+> VRFs (`configure_vrfs.yml`) are tagged `vrfs, layer3, routing`. Unlike OSPF/BGP/VSX, they do **not** use the `ansible_run_tags` guard — they always run when `aoscx_configure_vrfs: true` and their tag is active.
+>
+> OSPF/BGP/VSX use the `ansible_run_tags` guard and additionally require the `device_ospf`/`device_bgp`/`device_vsx` custom field to be `true` on the device.
 
 ## Real-World Scenarios
 
@@ -99,9 +106,9 @@ echo
 echo "2. Testing -t routing (should show OSPF and BGP):"
 ROUTING_COUNT=$(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t routing --list-tasks | grep -E "(OSPF|BGP)" | wc -l)
 if [ "$ROUTING_COUNT" -eq 2 ]; then
-    echo "✅ PASS: Both routing protocols included"
+    echo "✅ PASS: Both routing protocols included (VRFs also run but not grep'd here)"
 else
-    echo "❌ FAIL: Expected 2 routing tasks, got $ROUTING_COUNT"
+    echo "❌ FAIL: Expected 2 routing tasks, got $ROUTING_COUNT (ensure device_ospf and device_bgp custom fields are true)"
 fi
 echo
 
