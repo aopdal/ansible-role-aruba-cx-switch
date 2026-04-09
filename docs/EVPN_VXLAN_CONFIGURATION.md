@@ -744,8 +744,7 @@ show vlan
 
 ## Related Documentation
 
-- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP EVPN configuration
-- [BGP_EVPN_FABRIC_EXAMPLE.md](BGP_EVPN_FABRIC_EXAMPLE.md) - Complete fabric example
+- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP EVPN configuration and fabric examples
 - [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md) - Base system and VLAN configuration
 
 ## Integration with Other Tasks

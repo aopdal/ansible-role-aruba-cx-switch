@@ -91,8 +91,7 @@ nav:
       - Configuration Modes: docs/EVPN_VXLAN_MODES.md
       - Cleanup Process: docs/EVPN_VXLAN_CLEANUP_SUMMARY.md
     - BGP:
-      - Hybrid Configuration: docs/BGP_HYBRID_CONFIGURATION.md
-      - NetBox BGP Plugin: docs/NETBOX_BGP_PLUGIN.md
+      - Configuration Guide: docs/BGP_CONFIGURATION.md
 ```
 
 ### Features Enabled
@@ -174,7 +173,7 @@ Standard Markdown tables work great and look beautiful with Material theme.
 
 1. **Keep docs in `docs/`** - Clean separation
 2. **Use descriptive filenames** - `EVPN_VXLAN_CONFIGURATION.md` not `config.md`
-3. **Link between pages** - Use relative links: `[BGP Setup](BGP_HYBRID_CONFIGURATION.md)`
+3. **Link between pages** - Use relative links: `[BGP Setup](BGP_CONFIGURATION.md)`
 4. **Add examples** - Your YAML examples are excellent
 5. **Update navigation** - Add new pages to `mkdocs.yml` nav section
 

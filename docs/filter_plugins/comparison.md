@@ -16,7 +16,7 @@ The module specifically compares VLAN assignments: which VLANs are on each inter
 
 The `comparison.py` module provides state comparison logic for determining configuration changes between NetBox (source of truth) and device facts (current state). This enables idempotent playbook execution by only making necessary changes.
 
-**File Location**: [filter_plugins/netbox_filters_lib/comparison.py](../../filter_plugins/netbox_filters_lib/comparison.py)
+**File Location**: `filter_plugins/netbox_filters_lib/comparison.py`
 
 **Lines of Code**: 279 lines
 

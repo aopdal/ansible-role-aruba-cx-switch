@@ -759,9 +759,8 @@ The `aopdal.aruba_cx_switch` role is a key component in this ecosystem, bridging
 
 ## Related Documentation
 
-- [ZTP_CONFIGURATION.md](ZTP_CONFIGURATION.md) - Detailed ZTP setup and usage
 - [NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md) - NetBox configuration and custom fields
 - [QUICKSTART.md](QUICKSTART.md) - Getting started with the role
 - [REQUIREMENTS.md](REQUIREMENTS.md) - Required software and libraries
 - [EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md) - EVPN/VXLAN fabric setup
-- [BGP_HYBRID_CONFIGURATION.md](BGP_HYBRID_CONFIGURATION.md) - BGP configuration options
+- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP configuration options

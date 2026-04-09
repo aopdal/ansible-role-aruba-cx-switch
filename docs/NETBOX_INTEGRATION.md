@@ -568,7 +568,7 @@ GET /api/plugins/bgp/session/?device_id=123&status=active
   # ... configure from config_context
 ```
 
-**See:** `docs/BGP_HYBRID_CONFIGURATION.md` for complete details.
+**See:** [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) for complete details.
 
 ---
 
@@ -710,7 +710,7 @@ custom_fields:
 5. **Remove config_context BGP data** (keep other data)
 6. **Document migration** for team
 
-**See:** `docs/BGP_MIGRATION_GUIDE.md` for step-by-step instructions.
+**See:** [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) for step-by-step instructions.
 
 ---
 
@@ -823,7 +823,6 @@ curl -H "Authorization: Token $TOKEN" \
 ## Related Documentation
 
 - [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md) - Base system configuration details
-- [BGP_HYBRID_CONFIGURATION.md](BGP_HYBRID_CONFIGURATION.md) - BGP hybrid mode
-- [BGP_MIGRATION_GUIDE.md](BGP_MIGRATION_GUIDE.md) - Migrating to netbox-bgp plugin
+- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP configuration
+- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP configuration and netbox-bgp plugin details
 - [EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md) - EVPN/VXLAN with L2VPNs
-- [NETBOX_BGP_PLUGIN.md](NETBOX_BGP_PLUGIN.md) - netbox-bgp plugin details

@@ -85,6 +85,19 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **VXLAN Configuration** - Overlay networks with VNI mapping and cleanup
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
+- ❌ **STP** - on roadmap
+- ❌ **BFD** - on roadmap
+- ❌ **DHCP relay IPv4** - on roadmap
+- ❌ **DHCP relay IPv6 Stateful** - on roadmap
+- ❌ **DHCP relay IPv6 Stateless** - on roadmap
+- ❌ **IPv6 SLAAC** - on roadmap
+- ❌ **Loop protection** - on roadmap
+- ❌ **ACL** - on roadmap
+- ❌ **QoS** - not on roadmap
+- ❌ **Logging** - on roadmap
+- ❌ **SNMP** - on roadmap
+- ❌ **Static routing** - on roadmap
+- ❌ **L3 VNI** - on roadmap
 
 ## Advanced L3 Interface Features
 
@@ -239,7 +252,7 @@ roles:
 
 - **[docs/QUICKSTART.md](QUICKSTART.md)** - Quick start guide for using the role
 - **[docs/QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Common tasks reference
-- **[docs/README.md](README.md)** - Complete documentation index
+- **[docs/README_DOCS.md](README_DOCS.md)** - Complete documentation index
 
 ### NetBox Integration (Essential)
 
@@ -305,7 +318,7 @@ group_by:
 
 ## Role Variables
 
-See [defaults/main.yml](../defaults/main.yml) for all available variables.
+See defaults/main.yml for all available variables.
 
 ### Core Variables
 
@@ -832,8 +845,8 @@ This role includes comprehensive testing. For detailed testing information, see:
 
 - **[docs/DEVELOPMENT.md](DEVELOPMENT.md)** - Unit tests and development testing
 - **[docs/TESTING_ENVIRONMENT.md](TESTING_ENVIRONMENT.md)** - Integration testing setup
-- **[tests/unit/README.md](../tests/unit/README.md)** - Unit test documentation
-- **[testing-scripts/README.md](../testing-scripts/README.md)** - Testing scripts usage
+- **tests/unit/README.md** - Unit test documentation
+- **testing-scripts/README.md** - Testing scripts usage
 
 ## License
 

@@ -1,147 +1,115 @@
 # Release Process
 
-Guide to the release process for the Aruba CX Switch Ansible Role.
+## TL;DR
 
-## Overview
+1. Update `CHANGELOG.md` — move `[Unreleased]` content to a new version section
+2. Update `VERSION` file with the new version number
+3. Merge PR to `main`
+4. Workflow creates Git tag and GitHub Release automatically
 
-Releases are created by updating the `VERSION` file and `CHANGELOG.md` in a pull request. When the PR is merged to `main`, a GitHub Actions workflow automatically creates a Git tag and GitHub Release from the current state — no direct pushes to `main` are needed.
-
-**Release flow:**
-
-1. Update `VERSION` and `CHANGELOG.md` in your PR
-2. Merge PR to `main`
-3. Workflow creates Git tag and GitHub Release automatically
+```bash
+echo "0.6.0" > VERSION
+vim CHANGELOG.md          # move [Unreleased] → [0.6.0] - YYYY-MM-DD
+git add VERSION CHANGELOG.md
+git commit -m "chore: release version 0.6.0"
+git push
+gh pr create --title "chore: release v0.6.0" --fill
+gh pr merge --merge
+```
 
 ---
 
-## Quick Start
+## Overview
 
-### Step-by-Step Release
+Releases are created by updating `VERSION` and `CHANGELOG.md` in a pull request. When the PR
+is merged to `main`, a GitHub Actions workflow automatically creates a Git tag and GitHub
+Release — no direct pushes to `main` are needed.
 
-```bash
-# 1. Create a branch (or use your feature branch)
-git checkout -b release/0.6.0
+```mermaid
+flowchart TD
+    Dev["Developer\n1. Create branch\n2. Update CHANGELOG.md [Unreleased]\n3. Bump VERSION\n4. Move [Unreleased] → versioned section\n5. Open PR and merge to main"]
 
-# 2. Bump the version
-echo "0.6.0" > VERSION
+    Workflow["GitHub Actions: release.yml\nTrigger: VERSION changed on main (or manual)\n\n1. Run CI tests\n2. Read VERSION file\n3. Check tag does not exist\n4. Extract release notes from CHANGELOG.md\n5. Create Git tag v{version}\n6. Create GitHub Release"]
 
-# 3. Update CHANGELOG.md — move [Unreleased] content to new version
-#    (see Changelog Management below)
+    Artifacts["Release Artifacts\n• Git tag: v{version}\n• GitHub Release with notes + source\n• No commits pushed to main"]
 
-# 4. Commit and push
-git add VERSION CHANGELOG.md
-git commit -m "chore: release version 0.6.0"
-git push -u origin release/0.6.0
+    Dev --> Workflow --> Artifacts
 
-# 5. Create PR and merge
-gh pr create --title "chore: release v0.6.0" --body "Bump version and changelog"
-
-# 6. After merge → workflow creates tag v0.6.0 and GitHub Release
-```
-
-### Manual Trigger
-
-You can also trigger the release workflow manually (e.g. if the VERSION was already updated in a previous PR):
-
-```bash
-# Via GitHub CLI
-gh workflow run release.yml --ref main
-
-# Via GitHub UI: Actions → Release → Run workflow
+    style Dev fill:#e1f5ff
+    style Workflow fill:#fff3e0
+    style Artifacts fill:#e8f5e9
 ```
 
 ---
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/) (SemVer):
+This project follows [Semantic Versioning](https://semver.org/):
 
 ```
 MAJOR.MINOR.PATCH
-  │     │     │
-  │     │     └─ Patch: Bug fixes, small improvements
-  │     └─────── Minor: New features, backward compatible
-  └───────────── Major: Breaking changes
+  │     │     └─ Bug fixes, small improvements
+  │     └─────── New features, backward compatible
+  └───────────── Breaking changes
 ```
 
-### Version Examples
+| Bump | Before → After | When |
+|------|---------------|------|
+| Patch | `0.5.0` → `0.5.1` | Bug fix, documentation update |
+| Minor | `0.5.1` → `0.6.0` | New feature |
+| Major | `0.6.0` → `1.0.0` | Breaking change |
 
-- **Patch**: `0.5.0` → `0.5.1` — Bug fix, documentation update
-- **Minor**: `0.5.1` → `0.6.0` — New feature (e.g., OSPF support)
-- **Major**: `0.6.0` → `1.0.0` — Breaking change (e.g., API change)
+The current version is stored in [`VERSION`](../VERSION) as a single plain-text line.
 
-### Current Version
-
-The current version is stored in the [`VERSION`](../VERSION) file as a single line:
-
-```
-0.5.0
-```
-
-**Note**: This is an Ansible **Role** (not a Collection), so we use a simple `VERSION` file instead of `galaxy.yml`.
+> **Note**: This is an Ansible **Role** (not a Collection). Roles use `meta/main.yml` for
+> Galaxy metadata; the `VERSION` file is the version source of truth, not `galaxy.yml`.
 
 ### Conventional Commits
 
-While the release workflow no longer auto-determines version bumps from commits, conventional commits are still recommended for readable history:
+Recommended for readable history:
 
-| Commit Prefix | Meaning | Example |
-|--------------|---------|---------|
-| `feat:` | New feature | `feat: add anycast gateway support for SVIs` |
-| `fix:` | Bug fix | `fix: correct ipaddr filter usage in L3 tasks` |
-| `docs:` | Documentation | `docs: update OSPF configuration guide` |
-| `chore:` | Maintenance | `chore: release version 0.6.0` |
-| `feat!:` or `BREAKING CHANGE:` | Breaking change | `feat!: redesign configuration variable structure` |
+| Prefix | Meaning |
+|--------|---------|
+| `feat:` | New feature |
+| `fix:` | Bug fix |
+| `docs:` | Documentation |
+| `chore:` | Maintenance (e.g., release commit) |
+| `feat!:` / `BREAKING CHANGE:` | Breaking change |
 
 ---
 
 ## Changelog Management
 
-All changes are tracked in [`CHANGELOG.md`](../CHANGELOG.md) following [Keep a Changelog](https://keepachangelog.com/) format.
+All changes are tracked in [`CHANGELOG.md`](CHANGELOG.md) following
+[Keep a Changelog](https://keepachangelog.com/) format.
 
-### Adding Changes During Development
+### During Development
 
-Add your changes to the `[Unreleased]` section as you work:
+Add entries to the `[Unreleased]` section as you work:
 
 ```markdown
 ## [Unreleased]
 
 ### Added
 - **OSPF configuration support** - New filters and tasks for OSPF
-  - Interface selection via custom fields
-  - Area-based configuration
 ```
 
 ### Preparing a Release
 
-When releasing, move the `[Unreleased]` content to a new version section:
+Move `[Unreleased]` content to a new versioned section:
 
-**Before:**
-```markdown
-## [Unreleased]
-
-### Added
-- New OSPF support
-
-## [0.5.0] - 2026-02-25
-```
-
-**After:**
 ```markdown
 ## [Unreleased]
 
 ## [0.6.0] - 2026-03-15
 
 ### Added
-- New OSPF support
+- **OSPF configuration support** - New filters and tasks for OSPF
 
 ## [0.5.0] - 2026-02-25
 ```
 
-Also update the comparison links at the bottom of the file.
-
-### Categories
-
-Use these categories in order:
+### Changelog Categories (in order)
 
 1. **Added** — New features
 2. **Changed** — Changes to existing functionality
@@ -152,93 +120,38 @@ Use these categories in order:
 
 ---
 
-## Release Workflow Details
+## Release Workflow
 
-### How It Works
+**File**: `.github/workflows/release.yml`
 
-The workflow (`.github/workflows/release.yml`) triggers on:
+**Triggers**:
+- Push to `main` when `VERSION` file changes
+- Manual dispatch (`workflow_dispatch`)
 
-- **Push to `main`** when the `VERSION` file changes
-- **Manual dispatch** (`workflow_dispatch`)
+**Steps**:
 
-**Steps:**
+1. Run CI tests (lint, syntax check, unit tests)
+2. Read `VERSION` file
+3. Check if `v{version}` tag already exists — skip if so
+4. Extract release notes from the matching `## [x.y.z]` section in `CHANGELOG.md`
+5. Create annotated Git tag `v{version}`
+6. Create GitHub Release with extracted notes
 
-1. **Run CI tests** — Lint, syntax check, unit tests must pass
-2. **Read VERSION** — Gets the version string from the file
-3. **Check tag** — Skips if `v{version}` tag already exists
-4. **Extract release notes** — Pulls content from `CHANGELOG.md` for that version
-5. **Create tag** — Annotated tag `v{version}`
-6. **Create GitHub Release** — With release notes from the changelog
+**Key configuration**:
 
-The workflow does **not** commit or push to `main`. It only creates tags and releases.
+```yaml
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]      # Only triggers when VERSION changes
+  workflow_dispatch:
 
-### Branch Protection Compatibility
-
-The release workflow works with branch protection because it never pushes commits to protected branches. It only pushes tags, which are not restricted by the pull request requirement.
-
----
-
-## GitHub Releases
-
-Each release creates a GitHub Release with:
-
-- **Tag**: `v{version}` (e.g., `v0.5.0`)
-- **Release Name**: `Release v{version}`
-- **Release Notes**: Extracted from `CHANGELOG.md`
-- **Assets**: Source code (zip/tar.gz) — automatically added by GitHub
-
-### Viewing Releases
-
-```bash
-# List releases
-gh release list
-
-# View specific release
-gh release view v0.5.0
-
-# Download release assets
-gh release download v0.5.0
+permissions:
+  contents: write         # Required for creating tags and releases
 ```
 
----
-
-## Git Tags
-
-Tags follow the format `v{version}`:
-
-- `v0.5.0` — First public release
-- `v0.6.0` — Feature release
-- `v1.0.0` — First major stable release
-
-### Tag Management
-
-```bash
-# List tags
-git tag -l
-
-# View tag details
-git show v0.5.0
-
-# Checkout specific version
-git checkout v0.5.0
-
-# Delete tag (if needed)
-git tag -d v0.5.0
-git push origin :refs/tags/v0.5.0
-```
-
----
-
-## Ansible Galaxy Publishing
-
-**Status**: Not yet enabled
-
-When ready to publish to Ansible Galaxy:
-
-1. **Galaxy Namespace** — Claim `aopdal` namespace on Ansible Galaxy
-2. **API Key** — Generate API key from https://galaxy.ansible.com/me/preferences
-3. **GitHub Secret** — Add `GALAXY_API_KEY` to repository secrets
-4. **Import**: `ansible-galaxy role import aopdal ansible-role-aruba-cx-switch`
+The workflow never commits to `main`. It only pushes tags (`refs/tags/*`), which are not
+restricted by branch protection pull-request rules.
 
 ---
 
@@ -246,113 +159,160 @@ When ready to publish to Ansible Galaxy:
 
 ### Pre-Release
 
-- [ ] All tests passing (CI green)
+- [ ] CI green
 - [ ] `CHANGELOG.md` updated — `[Unreleased]` content moved to new version section
-- [ ] `VERSION` file updated with new version number
-- [ ] Documentation updated if needed
+- [ ] `VERSION` file updated
 
 ### During Release
 
-- [ ] Create PR with VERSION + CHANGELOG changes
+- [ ] PR created with VERSION + CHANGELOG changes
 - [ ] CI passes on PR
-- [ ] Merge PR to main
+- [ ] PR merged to `main`
 
 ### Post-Release
 
 - [ ] GitHub Release created automatically
 - [ ] Git tag created
-- [ ] `CHANGELOG.md` has empty `[Unreleased]` section ready for next cycle
+- [ ] `CHANGELOG.md` has an empty `[Unreleased]` section ready for the next cycle
 
 ---
 
 ## Common Scenarios
 
-### Scenario 1: Regular Feature Release
+### Regular Feature Release
 
 ```
-Situation: Added new OSPF configuration support
-
-1. Develop on feature branch, update CHANGELOG.md [Unreleased]
-2. When ready to release:
-   - Update VERSION: 0.5.0 → 0.6.0
-   - Move [Unreleased] to [0.6.0] section in CHANGELOG.md
-3. Merge PR to main
-4. Workflow creates v0.6.0 tag and release
+1. Develop on feature branch, add entries to CHANGELOG.md [Unreleased]
+2. Update VERSION: 0.5.0 → 0.6.0
+3. Move [Unreleased] → [0.6.0] - YYYY-MM-DD in CHANGELOG.md
+4. Merge PR to main
+5. Workflow creates v0.6.0 tag and release
 ```
 
-### Scenario 2: Critical Bug Fix
+### Critical Bug Fix (Patch)
 
 ```
-Situation: Fixed critical VLAN deletion bug
-
-1. Fix on hotfix branch, update CHANGELOG.md [Unreleased]
+1. Fix on hotfix branch, add entries to CHANGELOG.md [Unreleased]
 2. Update VERSION: 0.6.0 → 0.6.1
-3. Move [Unreleased] to [0.6.1] section in CHANGELOG.md
+3. Move [Unreleased] → [0.6.1] - YYYY-MM-DD in CHANGELOG.md
 4. Merge PR to main
 5. Workflow creates v0.6.1 tag and release
 ```
 
-### Scenario 3: Major Breaking Change
+### Manual Trigger
 
+If `VERSION` was already updated in a previous PR:
+
+```bash
+gh workflow run release.yml --ref main
+# or: Actions → Release → Run workflow
 ```
-Situation: Refactored configuration variable structure
 
-1. Develop on feature branch
-2. Update VERSION: 0.6.1 → 1.0.0
-3. Update CHANGELOG.md with breaking changes noted
-4. Merge PR to main
-5. Workflow creates v1.0.0 tag and release
+---
+
+## Reference Commands
+
+### Version & Tags
+
+```bash
+cat VERSION
+git tag -l
+git describe --tags --abbrev=0
+git show v0.5.0
+git checkout v0.5.0
+```
+
+### GitHub Releases
+
+```bash
+gh release list
+gh release view v0.5.0
+gh release download v0.5.0
+```
+
+### Workflow Status
+
+```bash
+gh run list --workflow=release.yml
+gh run view <run-id> --log
+```
+
+### Delete a Release (Recovery)
+
+```bash
+gh release delete v0.6.0 --yes
+git tag -d v0.6.0
+git push origin :refs/tags/v0.6.0
+gh workflow run release.yml --ref main   # re-trigger
 ```
 
 ---
 
 ## Troubleshooting
 
-### Release Workflow Failed
-
-**Check**:
-- GitHub Actions logs for error details
-- Ensure `CHANGELOG.md` has a section matching the version in `VERSION`
-
-### Tag Already Exists
-
-```bash
-# Delete tag and re-trigger
-gh release delete v0.6.0 --yes
-git tag -d v0.6.0
-git push origin :refs/tags/v0.6.0
-
-# Re-trigger workflow
-gh workflow run release.yml --ref main
-```
-
-### Release Notes Empty
-
-The workflow extracts notes from `CHANGELOG.md` by matching the version header. Ensure:
-- There is a `## [0.6.0] - YYYY-MM-DD` section in `CHANGELOG.md`
-- Content exists between that header and the next version header
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| Tag already exists | Version already released | Delete tag (see above) or bump VERSION |
+| Release notes empty | No matching `## [x.y.z]` in CHANGELOG | Add version section matching VERSION |
+| Workflow not triggered | VERSION not in changed files | Ensure VERSION was modified in the merged PR |
+| CI tests failed | Code issues | Fix tests, update PR, re-merge |
 
 ---
 
-## Files Modified in a Release
+## Role vs Collection
 
-| File | Who Updates | When |
-|------|------------|------|
-| `VERSION` | Developer (in PR) | Before merge |
-| `CHANGELOG.md` | Developer (in PR) | Before merge |
-| Git tag | Workflow (automated) | After merge |
-| GitHub Release | Workflow (automated) | After merge |
+This is an Ansible **Role**, not a Collection:
+
+| Feature | Collection | Role (This Project) |
+|---------|-----------|---------------------|
+| Metadata file | `galaxy.yml` | `meta/main.yml` |
+| Version storage | `galaxy.yml` | `VERSION` file |
+| Namespace | `namespace.collection_name` | `author.role_name` |
+| Publish | `collection publish` | `role import` |
+| Install | `collection install` | `role install` |
+
+```bash
+# Confirm this is a Role
+ls meta/main.yml          # ✅ Exists
+ls galaxy.yml 2>/dev/null # ❌ Should NOT exist
+```
+
+---
+
+## Ansible Galaxy Publishing (Future)
+
+When ready to publish to Galaxy:
+
+1. Claim `aopdal` namespace at https://galaxy.ansible.com
+2. Generate an API key at https://galaxy.ansible.com/me/preferences
+3. Add `GALAXY_API_KEY` to repository secrets
+4. Add to workflow:
+
+```yaml
+- name: Import role to Ansible Galaxy
+  run: >-
+    ansible-galaxy role import
+    --api-key ${{ secrets.GALAXY_API_KEY }}
+    aopdal ansible-role-aruba-cx-switch
+```
+
+Installing once published:
+
+```bash
+ansible-galaxy role install aopdal.aruba_cx_switch
+ansible-galaxy role install aopdal.aruba_cx_switch,v0.6.0
+```
 
 ---
 
 ## Best Practices
 
-1. **Update CHANGELOG as you go** — Add entries to `[Unreleased]` during development
-2. **Bump VERSION in the release PR** — Keep version bump as a clear, separate commit
-3. **Use Semantic Versioning** — Follow SemVer strictly
-4. **Write detailed notes** — Help users understand what changed
-5. **Test before merge** — CI should be green
-6. **Tag consistently** — Always use `v` prefix (e.g., `v0.6.0`)
+1. **Update CHANGELOG as you go** — Add entries during development, not just at release time
+2. **Bump VERSION in the release PR** — Keep the version bump as a clear, dedicated commit
+3. **Follow SemVer** — Patch for fixes, Minor for features, Major for breaking changes
+4. **Write meaningful changelog entries** — Help users understand what actually changed
+5. **Keep CI green** — Don't merge a release PR with failing tests
+6. **Use `v` prefix on tags** — Always `v0.6.0`, never `0.6.0`
 
 ---
 
@@ -361,7 +321,5 @@ The workflow extracts notes from `CHANGELOG.md` by matching the version header. 
 - [Semantic Versioning](https://semver.org/)
 - [Keep a Changelog](https://keepachangelog.com/)
 - [GitHub Releases Documentation](https://docs.github.com/en/repositories/releasing-projects-on-github)
-- [Release Integration](RELEASE_INTEGRATION.md)
-- [Release Quick Reference](RELEASE_QUICK_REFERENCE.md)
-- [CHANGELOG.md](../CHANGELOG.md)
 - [Contributing Guide](CONTRIBUTING.md)
+- [CHANGELOG.md](CHANGELOG.md)

@@ -29,7 +29,6 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 ## Examples (Recommended Starting Point)
 
 - **[examples/](../examples/)** - Complete, runnable examples
-    - **[minimal-deployment/](../examples/minimal-deployment/)** - Simple single-switch deployment for getting started
     - **[bgp-evpn-fabric/](../examples/bgp-evpn-fabric/)** - Production BGP/EVPN fabric with spine-leaf topology
     - Each example includes inventory, playbooks, group_vars, and sample NetBox data
     - **Best way to understand how all the pieces fit together**
@@ -87,11 +86,6 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - IPv4 unicast and EVPN address families
     - VRF route distinguishers
 
-- **[BGP_HYBRID_CONFIGURATION.md](BGP_HYBRID_CONFIGURATION.md)** - Hybrid config_context + NetBox BGP plugin approach
-- **[NETBOX_BGP_PLUGIN.md](NETBOX_BGP_PLUGIN.md)** - NetBox BGP plugin integration guide
-- **[BGP_MIGRATION_GUIDE.md](BGP_MIGRATION_GUIDE.md)** - Migration from config_context to NetBox BGP plugin
-- **[BGP_EVPN_FABRIC_EXAMPLE.md](BGP_EVPN_FABRIC_EXAMPLE.md)** - Complete fabric example
-
 ### Tag-Dependent Configuration
 
 - **[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md)** - Tag-dependent task implementation
@@ -128,8 +122,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 ### Release Process
 
-- **[RELEASE_PROCESS.md](RELEASE_PROCESS.md)** - Full release guide
-- **[RELEASE_QUICK_REFERENCE.md](RELEASE_QUICK_REFERENCE.md)** - Quick release steps
+- **[RELEASE_PROCESS.md](RELEASE_PROCESS.md)** - Release guide, versioning, changelog, workflow details
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history
 
 ### Documentation Management
@@ -141,4 +134,3 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 - **[DOCUMENTATION_INTEGRATION.md](DOCUMENTATION_INTEGRATION.md)** - Documentation integration details
 - **[VERIFICATION_CHECKLIST.md](VERIFICATION_CHECKLIST.md)** - Final verification checklist
-- **[archive/README.md](archive/README.md)** - Archived development notes and historical documentation

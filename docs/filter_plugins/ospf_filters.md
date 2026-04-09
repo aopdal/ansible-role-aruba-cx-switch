@@ -19,7 +19,7 @@ In NetBox, OSPF configuration is stored as **custom fields** on interfaces (e.g.
 
 The `ospf_filters.py` module provides OSPF (Open Shortest Path First) interface selection and validation functionality. It extracts OSPF configuration from NetBox custom fields and validates OSPF area consistency.
 
-**File Location**: [filter_plugins/netbox_filters_lib/ospf_filters.py](../../filter_plugins/netbox_filters_lib/ospf_filters.py)
+**File Location**: `filter_plugins/netbox_filters_lib/ospf_filters.py`
 
 **Lines of Code**: 112 lines
 

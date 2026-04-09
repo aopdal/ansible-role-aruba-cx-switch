@@ -167,6 +167,6 @@ Debug output includes:
 
 ## Related Documentation
 
-- [BGP EVPN Fabric Example](BGP_EVPN_FABRIC_EXAMPLE.md)
+- [BGP Configuration](BGP_CONFIGURATION.md)
 - [Base Configuration](BASE_CONFIGURATION.md)
 - [Contributing Guide](CONTRIBUTING.md)

@@ -190,10 +190,10 @@ docs-sync: ## Sync README.md to docs/index.md
 	@cp README.md docs/index.md
 	@# Fix links: Remove 'docs/' prefix since index.md is now inside docs/
 	@sed -i 's|(docs/|(|g' docs/index.md
-	@# Fix links: Make relative paths point to root files (tests/, defaults/, etc.)
-	@sed -i 's|(tests/|(../tests/|g' docs/index.md
-	@sed -i 's|(defaults/|(../defaults/|g' docs/index.md
-	@sed -i 's|(testing-scripts/|(../testing-scripts/|g' docs/index.md
+	@# Fix README.md self-reference to point to the actual docs index file
+	@sed -i 's|(README\.md)|(README_DOCS.md)|g' docs/index.md
+	@# Strip links that point to source files outside docs/ (keep link text only)
+	@sed -i -E 's/\[([^]]+)\]\((tests|defaults|testing-scripts)\/[^)]+\)/\1/g' docs/index.md
 	@echo "$(GREEN)✅ README.md synced to docs/index.md with fixed links$(NC)"
 
 docs-serve: ## Serve documentation locally at http://127.0.0.1:8000
