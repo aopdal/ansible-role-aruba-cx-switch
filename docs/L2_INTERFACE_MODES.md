@@ -1,356 +1,270 @@
-# L2 Interface Configuration Modes
-
-This document explains how the role handles L2 interface configuration in both standard and idempotent modes.
+# L2 Interface Configuration
 
 ## Overview
 
-The role provides a **unified task file** (`tasks/configure_l2_interfaces.yml`) that intelligently handles both configuration modes based on the `aoscx_idempotent_mode` variable. This provides:
+The role uses a **two-stage pipeline** for L2 interface configuration:
 
-- **Simplified code** - Single task file instead of duplicate logic
-- **Consistent behavior** - Same categorization and configuration logic
-- **Better maintainability** - Changes in one place
-- **Clear mode separation** - Explicit conditional logic for mode-specific behavior
+1. **`identify_interface_changes.yml`** — Compares NetBox desired state against device
+   facts (gathered via `gather_facts.yml`) and produces an `interface_changes` fact containing
+   only the interfaces that actually need changes. This is where the bulk of the intelligence
+   lives and where performance is won or lost.
+2. **`configure_l2_interfaces.yml`** — Consumes `interface_changes.l2` and applies the
+   required configuration in the selected mode.
+
+This pre-filtering means the role makes **zero API calls to the device** for interfaces that
+are already correctly configured, regardless of mode.
+
+---
+
+## Fact Gathering Modes
+
+Before any interface comparison can happen, the role gathers device state. There are two
+options, controlled by `aoscx_gather_facts_rest_api`.
+
+### Default: aoscx_facts module
+
+```yaml
+aoscx_gather_facts_rest_api: false  # default
+```
+
+Uses the `arubanetworks.aoscx.aoscx_facts` module. Compatible with all firmware versions.
+
+### REST API mode (recommended for performance)
+
+```yaml
+aoscx_gather_facts_rest_api: true
+```
+
+Uses direct REST API calls via `gather_facts_rest_api.yml`. Requires firmware v10.15+.
+
+**Benefits over the default module:**
+
+- **3–5× faster fact gathering** — single authenticated session instead of per-resource module calls
+- **IPv6 addresses included** — the aoscx_facts module returns only URI references for IPv6
+- **VSX virtual IPs** — required for anycast/active-gateway configuration
+- **EVPN/VXLAN facts** — gathered in the same session
+
+```yaml
+# group_vars/switches.yml
+aoscx_gather_facts_rest_api: true
+aoscx_rest_validate_certs: false  # adjust for your environment
+```
+
+REST API credentials default to `ansible_host` / `ansible_user` / `ansible_password`. Override
+with `aoscx_rest_host`, `aoscx_rest_user`, `aoscx_rest_password` if needed.
+
+---
 
 ## Configuration Modes
 
-### Standard Mode (Default)
+### Standard Mode (default)
 
-**Variable:** `aoscx_idempotent_mode: false`
+```yaml
+aoscx_idempotent_mode: false   # default
+aoscx_force_l2_config: false   # default
+```
 
 **Behavior:**
 
-- ✅ **Additive only** - Applies configurations from NetBox without removing existing configs
-- ✅ **Fast execution** - Skips device state analysis
-- ✅ **Safe for initial deployment** - Won't accidentally remove manual configurations
-- ✅ **Simple workflow** - Categorizes interfaces → Applies configurations
-
-**Use Cases:**
-
-- Initial device provisioning
-- Adding new interfaces or VLANs
-- Environments where manual configs coexist with Ansible
-- Testing and development
-
-**Example:**
-
-```yaml
----
-# group_vars/switches.yml
-aoscx_idempotent_mode: false
-aoscx_configure_l2_interfaces: true
-```
+- Applies configurations for interfaces identified as needing changes by
+  `identify_interface_changes.yml`
+- Does not remove any existing configurations
+- Suitable for initial deployment and additive changes
 
 ### Idempotent Mode
 
-**Variable:** `aoscx_idempotent_mode: true`
+```yaml
+aoscx_idempotent_mode: true
+```
 
 **Behavior:**
 
-- ✅ **Full synchronization** - Device state matches NetBox exactly
-- ✅ **Cleanup phase** - Removes configurations not in NetBox
-- ✅ **Change detection** - Analyzes current state vs desired state
-- ✅ **Intelligent cleanup** - Only removes what's not referenced
-- ✅ **Two-phase workflow**:
-    1. **Phase 1**: Cleanup unwanted configurations
-    2. **Phase 2**: Apply desired configurations
+- **Phase 1**: Runs cleanup (`cleanup_l2_vlans.yml`) for interfaces identified as needing
+  cleanup
+- **Phase 2**: Applies configurations for interfaces identified as needing changes
+- Ensures the device matches NetBox exactly
+- Suitable for ongoing drift detection and compliance enforcement
 
 **Cleanup Actions:**
 
 - Removes VLAN assignments from interfaces not matching NetBox
 - Cleans up trunk allowed VLANs
 - Does NOT remove VLAN 1 (default VLAN)
-- Preserves interfaces without L2 configuration in NetBox
+- Only touches interfaces that exist in NetBox
 
-**Use Cases:**
-
-- Ongoing configuration management
-- Drift detection and remediation
-- Compliance enforcement
-- Production environments with NetBox as single source of truth
-
-**Example:**
+### Force Mode
 
 ```yaml
----
-# group_vars/production_switches.yml
-aoscx_idempotent_mode: true
-aoscx_configure_l2_interfaces: true
-aoscx_debug: true  # Recommended for visibility
+aoscx_force_l2_config: true
 ```
 
-## Technical Implementation
+**Behavior:**
 
-### Workflow Diagram
+- Bypasses change detection entirely
+- Configures **all** L2 interfaces from NetBox regardless of current device state
+- Useful when mode changes (e.g. `native-untagged` ↔ `native-tagged`) confuse change
+  detection
+- Takes precedence over `aoscx_idempotent_mode`
+
+---
+
+## Workflow Diagram
 
 ```mermaid
 flowchart TD
-    Start([configure_l2_interfaces.yml])
-    Start --> CheckMode{Check Mode Variable<br/>aoscx_idempotent_mode}
+    Facts[gather_facts.yml\naoscx_facts module OR REST API] --> Identify
 
-    %% Standard Mode Path
-    CheckMode -->|false| StandardMode[Standard Mode<br/>Additive Only]
-    StandardMode --> StandardSet[Use ALL interfaces<br/>from NetBox]
+    Identify[identify_interface_changes.yml\nget_interfaces_needing_config_changes\ninterface_changes.l2 = pre-filtered list]
 
-    %% Idempotent Mode Path
-    CheckMode -->|true| IdempotentMode[Idempotent Mode<br/>Full Sync]
-    IdempotentMode --> Analyze[Analyze device state<br/>get_interfaces_needing_changes]
-    Analyze --> Cleanup[Phase 1: Cleanup<br/>cleanup_l2_vlans.yml]
-    Cleanup --> IdempotentSet[Use FILTERED interfaces<br/>needing changes]
+    Identify --> Entry[configure_l2_interfaces.yml\nAsserts interface_changes is defined]
 
-    %% Convergence Point
-    StandardSet --> Categorize
+    Entry --> CheckForce{aoscx_force_l2_config?}
+
+    CheckForce -->|true| ForceSet[Use ALL L2 interfaces\nfrom NetBox]
+
+    CheckForce -->|false| CheckMode{aoscx_idempotent_mode?}
+
+    CheckMode -->|true| Analyze[get_interfaces_needing_changes\non interface_changes.l2]
+    Analyze --> Cleanup[Phase 1: cleanup_l2_vlans.yml\nfor interfaces needing cleanup]
+    Cleanup --> IdempotentSet[select_interfaces_to_configure\nfrom interface_changes.l2]
+
+    CheckMode -->|false| StandardSet[Use interface_changes.l2\ndirectly]
+
+    ForceSet --> Categorize
     IdempotentSet --> Categorize
+    StandardSet --> Categorize
 
-    %% Common Configuration Path
-    Categorize[Categorize Interfaces<br/>categorize_l2_interfaces]
-    Categorize --> Physical[Configure Physical<br/>configure_l2_physical.yml]
-    Physical --> LAG[Configure LAG<br/>configure_l2_lag.yml]
-    LAG --> MCLAG[Configure MCLAG<br/>configure_l2_mclag.yml]
-    MCLAG --> Summary[Configuration Summary]
-    Summary --> End([Complete])
+    Categorize[categorize_l2_interfaces\nPhysical / LAG / MCLAG × access/tagged/tagged-all]
 
-    %% Styling
-    classDef standardClass fill:#e1f5e1,stroke:#4caf50,stroke-width:2px
-    classDef idempotentClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
-    classDef commonClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    classDef decisionClass fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+    Categorize --> Physical[configure_l2_physical.yml]
+    Physical --> LAG[configure_l2_lag.yml]
+    LAG --> MCLAG[configure_l2_mclag.yml]
+    MCLAG --> End([Complete])
 
-    class StandardMode,StandardSet standardClass
-    class IdempotentMode,Analyze,Cleanup,IdempotentSet idempotentClass
-    class Categorize,Physical,LAG,MCLAG,Summary commonClass
-    class CheckMode decisionClass
+    classDef facts fill:#e1f5e1,stroke:#4caf50,stroke-width:2px
+    classDef identify fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    classDef force fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    classDef idem fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
+    classDef std fill:#e8f5e9,stroke:#43a047,stroke-width:2px
+    classDef common fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+
+    class Facts facts
+    class Identify identify
+    class ForceSet,CheckForce force
+    class CheckMode,Analyze,Cleanup,IdempotentSet idem
+    class StandardSet std
+    class Categorize,Physical,LAG,MCLAG common
 ```
 
-### Key Functions
+---
 
-#### Standard Mode Logic
-
-```jinja2
-interfaces_to_configure: >-
-  {{ interfaces | selectattr('mode', 'defined') | list }}
-```
-
-#### Idempotent Mode Logic
-
-```jinja2
-interfaces_needing_changes: >-
-  {{ interfaces | get_interfaces_needing_changes(ansible_facts) }}
-
-interfaces_to_configure: >-
-  {{ interfaces_needing_changes.configure }}
-```
-
-### Filter Plugin Usage
-
-The role uses custom filter plugins for data transformation:
+## Filter Plugin Reference
 
 | Filter | Purpose | Used In |
 |--------|---------|---------|
-| `get_interfaces_needing_changes` | Analyzes device facts vs NetBox | Idempotent mode only |
-| `categorize_l2_interfaces` | Groups interfaces by type | Both modes |
-| `get_vlans_in_use` | Identifies VLANs referenced by interfaces | Both modes |
-| `compare_interface_vlans` | Compares device vs NetBox state | Idempotent mode only |
+| `get_interfaces_needing_config_changes` | Cross-references NetBox interfaces with device facts to produce `interface_changes` | `identify_interface_changes.yml` (prerequisite) |
+| `get_interfaces_needing_changes` | Within idempotent mode, refines `interface_changes.l2` to `cleanup` and `configure` lists | Idempotent mode only |
+| `select_interfaces_to_configure` | Picks the final `configure` list from the refined analysis | Idempotent mode only |
+| `categorize_l2_interfaces` | Groups interfaces into access/tagged/tagged-all × physical/LAG/MCLAG | All modes |
+| `compare_interface_vlans` | Compares a single interface's NetBox vs device VLAN state | Called by `get_interfaces_needing_changes` |
 
-## Performance Comparison
+---
 
-### Standard Mode
+## Variable Reference
 
-- ⏱️ **Faster** - No device state analysis
-- 📊 **Lower overhead** - Direct configuration application
-- 🔄 **Suitable for**: Large-scale initial deployments
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `aoscx_gather_facts_rest_api` | `false` | Use REST API for fact gathering (3–5× faster, requires v10.15+) |
+| `aoscx_idempotent_mode` | `false` | Enable full sync with cleanup |
+| `aoscx_force_l2_config` | `false` | Bypass change detection, configure all interfaces |
+| `aoscx_configure_l2_interfaces` | `true` | Enable/disable L2 interface configuration |
+| `aoscx_gather_facts` | `true` | Enable fact gathering |
+| `aoscx_debug` | `false` | Enable verbose debug output |
 
-### Idempotent Mode
+---
 
-- ⏱️ **Slower** - Analyzes current state
-- 📊 **Higher overhead** - Fact gathering + comparison + cleanup
-- 🔄 **Suitable for**: Ongoing management, smaller change sets
+## Performance Considerations
 
-**Benchmark (100 interfaces):**
+The most impactful performance decision is **how facts are gathered**, not which configuration
+mode is used.
 
-*Note: The following timing values are approximate and will vary depending on hardware, network conditions, and test environment.*
+| Factor | Impact |
+|--------|--------|
+| `aoscx_gather_facts_rest_api: true` | **3–5× faster** fact gathering |
+| `identify_interface_changes.yml` pre-filtering | Skips device API calls for already-correct interfaces in all modes |
+| Standard vs idempotent mode | Marginal difference once facts are gathered; idempotent adds one cleanup pass |
 
-- Standard Mode: ~2 minutes
-- Idempotent Mode: ~5 minutes (includes cleanup analysis)
+**Recommendation:** Enable `aoscx_gather_facts_rest_api: true` on firmware v10.15+ for the
+largest throughput gain.
 
-## Best Practices
-
-### 1. Use Standard Mode for Initial Deployment
-
-```yaml
-# First-time switch configuration
-aoscx_idempotent_mode: false
-aoscx_configure_vlans: true
-aoscx_configure_l2_interfaces: true
-```
-
-### 2. Switch to Idempotent Mode for Ongoing Management
-
-```yaml
-# After initial deployment
-aoscx_idempotent_mode: true
-aoscx_configure_l2_interfaces: true
-```
-
-### 3. Enable Debug Mode for Visibility
-
-```yaml
-aoscx_debug: true
-# Shows:
-# - Mode selection
-# - Interface categorization
-# - Cleanup actions (idempotent mode)
-# - Configuration summary
-```
-
-### 4. Test in Development First
-
-```yaml
-# Test with idempotent mode on dev switches first
-- hosts: dev_switches
-  vars:
-    aoscx_idempotent_mode: true
-    aoscx_debug: true
-  roles:
-    - aopdal.aruba_cx_switch
-```
-
-### 5. Use Tags for Targeted Runs
-
-```bash
-# Only configure L2 interfaces
-ansible-playbook site.yml --tags l2_interfaces
-
-# Skip cleanup in idempotent mode (if needed)
-ansible-playbook site.yml --skip-tags cleanup
-```
-
-## Troubleshooting
-
-### Issue: Idempotent Mode Not Removing Configs
-
-**Symptoms:**
-
-- Extra VLANs not removed from interfaces
-- Device state doesn't match NetBox
-
-**Possible Causes:**
-
-1. Device facts not gathered: Ensure `aoscx_gather_facts: true`
-2. Interface not in NetBox: Interface must exist in NetBox to be managed
-3. VLAN 1 is protected: Default VLAN is never removed
-
-**Solution:**
-
-```yaml
-# Ensure facts are gathered
-aoscx_gather_facts: true
-
-# Enable debug to see what's detected
-aoscx_debug: true
-
-# Check the analysis output
-```
-
-### Issue: Standard Mode Too Slow
-
-**Symptoms:**
-
-- Configuration takes longer than expected
-
-**Possible Cause:**
-
-- Accidentally using idempotent mode
-
-**Solution:**
-
-```yaml
-# Verify the mode
-- name: Check mode
-  ansible.builtin.debug:
-    msg: "Mode: {{ aoscx_idempotent_mode }}"
-
-# Explicitly set to false
-aoscx_idempotent_mode: false
-```
+---
 
 ## Examples
 
-### Example 1: Initial Deployment (Standard Mode)
+### Initial Deployment (Standard Mode + REST API Facts)
 
 ```yaml
----
-- name: Initial switch deployment
-  hosts: new_switches
-  gather_facts: false
-  vars:
-    aoscx_idempotent_mode: false
-    aoscx_gather_facts: true
-    aoscx_configure_l2_interfaces: true
-
-  roles:
-    - aopdal.aruba_cx_switch
+# group_vars/switches.yml
+aoscx_idempotent_mode: false
+aoscx_gather_facts_rest_api: true
+aoscx_configure_l2_interfaces: true
 ```
 
-**Expected Behavior:**
-
-- Configures all interfaces from NetBox
-- Preserves any existing manual configurations
-- Fast execution (~2 min for 100 interfaces)
-
-### Example 2: Ongoing Management (Idempotent Mode)
+### Ongoing Management (Idempotent Mode + REST API Facts)
 
 ```yaml
----
-- name: Daily configuration sync
-  hosts: production_switches
-  gather_facts: false
-  vars:
-    aoscx_idempotent_mode: true
-    aoscx_gather_facts: true
-    aoscx_configure_l2_interfaces: true
-    aoscx_debug: true
-
-  roles:
-    - aopdal.aruba_cx_switch
+# group_vars/production_switches.yml
+aoscx_idempotent_mode: true
+aoscx_gather_facts_rest_api: true
+aoscx_configure_l2_interfaces: true
+aoscx_debug: true  # recommended for visibility
 ```
 
-**Expected Behavior:**
-
-- Analyzes device state
-- Removes configurations not in NetBox
-- Applies/updates configurations from NetBox
-- Ensures device matches NetBox exactly
-
-### Example 3: Gradual Migration
+### Force Reconfigure (after mode type change)
 
 ```yaml
----
-# Week 1: Use standard mode to add configs
-- name: Week 1 - Add configurations
-  hosts: switches
-  vars:
-    aoscx_idempotent_mode: false
-  roles:
-    - aopdal.aruba_cx_switch
-
-# Week 2: Switch to idempotent after verification
-- name: Week 2 - Enable full sync
-  hosts: switches
-  vars:
-    aoscx_idempotent_mode: true
-    aoscx_debug: true
-  roles:
-    - aopdal.aruba_cx_switch
+# host_vars/specific_switch.yml
+aoscx_force_l2_config: true
+# Reset to false after the run
 ```
 
-## Summary
+---
 
-The unified L2 interface configuration provides:
+## Troubleshooting
 
-- ✅ **Flexibility** - Choose the right mode for your use case
-- ✅ **Safety** - Standard mode for initial deployment
-- ✅ **Compliance** - Idempotent mode for ongoing management
-- ✅ **Simplicity** - Single task file, automatic mode detection
-- ✅ **Visibility** - Debug output shows exactly what's happening
+### Idempotent Mode Not Removing Configs
 
-Choose standard mode for speed and safety during initial deployment, then switch to idempotent mode for ongoing drift detection and compliance enforcement.
+1. Verify facts are gathered: `aoscx_gather_facts: true`
+2. Enable debug to see the change analysis: `aoscx_debug: true`
+3. Check that the interface exists in NetBox — the role only manages interfaces present in NetBox
+
+### Change Detection Not Working (Mode Type Mismatch)
+
+If you switch an interface between `native-untagged` and `native-tagged`, the change
+detection may not catch it correctly. Use force mode for that run:
+
+```yaml
+aoscx_force_l2_config: true
+```
+
+### Slow Fact Gathering
+
+Switch to REST API mode if on firmware v10.15+:
+
+```yaml
+aoscx_gather_facts_rest_api: true
+```
+
+### Debug Interface Analysis
+
+```yaml
+aoscx_debug: true
+```
+
+With `-v` or higher, `identify_interface_changes.yml` prints a full summary:
+
+```
+Physical interfaces needing changes: 3  [1/1/1, 1/1/2, 1/1/5]
+L2 interfaces needing changes: 5
+Interfaces not needing changes: 42
+```

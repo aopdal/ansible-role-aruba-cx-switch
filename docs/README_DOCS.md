@@ -75,8 +75,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 ### EVPN & VXLAN
 
-- **[EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md)** - Complete EVPN/VXLAN configuration guide
-- **[EVPN_VXLAN_MODES.md](EVPN_VXLAN_MODES.md)** - Configuration modes (initial vs idempotent)
+- **[EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md)** - EVPN/VXLAN configuration, operating modes, and cleanup
 
 ### BGP Routing
 

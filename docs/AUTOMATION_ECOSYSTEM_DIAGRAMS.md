@@ -2,6 +2,8 @@
 
 This document provides simplified visual diagrams for the automation ecosystem.
 
+ZTP config generation is not part of this ansible role but the phase is in the diagram for completeness.
+
 ## Quick Reference Diagram
 
 ```mermaid
@@ -211,27 +213,6 @@ graph TB
     style SW2 fill:#e1f5ff,stroke:#3f51b5,stroke-width:2px
     style SRV fill:#e1ffe1,stroke:#4caf50,stroke-width:2px
 ```
-
----
-
-## Feature Interaction Matrix
-
-| Feature | BGP | OSPF | EVPN | VXLAN | VSX | VRFs |
-|---------|:---:|:----:|:----:|:-----:|:---:|:----:|
-| **BGP**    | ● | ○ | ● | ○ | ● | ● |
-| **OSPF**   | ○ | ● | ● | ● | ● | ● |
-| **EVPN**   | ● | ● | ● | ● | ● | ○ |
-| **VXLAN**  | ○ | ● | ● | ● | ● | ○ |
-| **VSX**    | ● | ● | ● | ● | ● | ● |
-| **VRFs**   | ● | ● | ○ | ○ | ● | ● |
-
-**Legend:**
-
-- ● = Required/Strongly recommended
-- ○ = Compatible/Optional
-- × = Incompatible/Not supported together
-
-**Note:** OSPF is commonly used in EVPN/VXLAN fabrics for underlay routing (loopback reachability between leafs and spines), while eBGP handles the overlay (EVPN control plane).
 
 ---
 

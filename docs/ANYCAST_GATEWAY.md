@@ -81,38 +81,32 @@ The `get_interface_ip_addresses()` filter has been extended to:
 
 ### Task Logic
 
-The VLAN interface configuration tasks (`configure_l3_vlan.yml`) conditionally add the `active-gateway` command:
+The `build_l3_config_lines()` filter (`filter_plugins/netbox_filters_lib/l3_config_helpers.py`) generates all CLI configuration lines for an interface in a single call, including the `active-gateway` commands. It emits lines in the order AOS-CX requires:
 
-**IPv4**:
+1. VRF attachment (once)
+2. Regular IPv4 addresses (`ip address`)
+3. Anycast IPv4 — MAC command first, then IP without prefix:
+   ```
+   active-gateway ip mac <mac>
+   active-gateway ip <ip-without-prefix>
+   ```
+4. Regular IPv6 addresses (`ipv6 address`)
+5. Anycast IPv6 — link-local address if needed, then MAC, then IP without prefix:
+   ```
+   ipv6 address link-local <fe80-address-with-prefix>  # only for link-local anycast
+   active-gateway ipv6 mac <mac>
+   active-gateway ipv6 <ip-without-prefix>
+   ```
+6. MTU, L3 counters, OSPF (once)
 
-```jinja2
-{{'active-gateway ip ' + (item.address | ansible.utils.ipaddr('address')) + ' mac ' + item.anycast_mac if (item.ip_role == 'anycast' and item.anycast_mac) else []}}
-```
+The prefix is stripped in Python (`address.split("/")[0]`) — no Ansible collection is needed for this.
 
-**IPv6**:
-
-```jinja2
-{{'active-gateway ipv6 ' + (item.address | ansible.utils.ipaddr('address')) + ' mac ' + item.anycast_mac if (item.ip_role == 'anycast' and item.anycast_mac) else []}}
-```
-
-> **Note**: The `ansible.utils.ipaddr('address')` filter is used to extract only the IP address without the prefix length (e.g., `192.168.1.1` from `192.168.1.1/24`). The `active-gateway` command requires the IP address without the CIDR notation.
-
-The `active-gateway` command is only added when:
+The `active-gateway` commands are only emitted when:
 
 - The IP address role is `anycast` **AND**
-- The interface has an anycast MAC address defined
+- The interface has an anycast MAC address defined (`if_anycast_gateway_mac` custom field)
 
 ## Requirements
-
-### Ansible Collections
-
-This feature requires the `ansible.utils` collection for IP address manipulation:
-
-```bash
-ansible-galaxy collection install ansible.utils
-```
-
-The `ipaddr` filter from `ansible.utils` is used to extract the IP address without the prefix length, which is required by the AOS-CX `active-gateway` command.
 
 ### NetBox Setup
 
@@ -157,10 +151,16 @@ Should show:
 ```
 interface vlan11
     ...
-    ip address 172.20.4.1/27
-    active-gateway ip 172.20.4.1/27 mac 02:01:00:00:01:00
+    ip address 172.20.4.2/27
+    active-gateway ip mac 02:01:00:00:01:00
+    active-gateway ip 172.20.4.1
+    ipv6 address link-local fe80::1/64
+    active-gateway ipv6 mac 02:01:00:00:01:00
+    active-gateway ipv6 fe80::1
     ...
 ```
+
+Note that the `active-gateway ip mac` line appears before `active-gateway ip` (AOS-CX requires this order), and the IP in the `active-gateway ip` command has no CIDR prefix.
 
 ## Idempotency
 
@@ -224,13 +224,9 @@ Each VLAN should have the same anycast MAC configured on its interface custom fi
 ## Example Playbook Output
 
 ```
-TASK [Configure VLAN interfaces (custom VRF) - IPv4] ****************************
-changed: [z13-cx3] => (item=Interface: vlan11 IP: 172.20.4.1/27 Interface VRF: z13-cust_2 Role: anycast)
-ok: [z13-cx3] => (item=Interface: vlan11 IP: 172.20.4.2/27 Interface VRF: z13-cust_2 Role: none)
-
-TASK [Configure VLAN interfaces (custom VRF) - IPv6] ****************************
-ok: [z13-cx3] => (item=Interface: vlan11 IP: 2001:db8:a11::1/64 Interface VRF: z13-cust_2 Role: anycast)
-ok: [z13-cx3] => (item=Interface: vlan11 IP: 2001:db8:a11::2/64 Interface VRF: z13-cust_2 Role: none)
+TASK [Configure vlan L3 interfaces (custom VRF)] ****************************
+changed: [z13-cx3] => (item=Interface: vlan11)
+ok: [z13-cx3] => (item=Interface: vlan11)
 ```
 
-Notice the `Role: anycast` label in the output for anycast gateway IPs.
+Both IPv4 and IPv6 (including `active-gateway` commands) are pushed in a single task call per interface via `build_l3_config_lines`. The loop label shows the interface name; use `DEBUG_ANSIBLE=true` or `-v` to see the generated config lines.

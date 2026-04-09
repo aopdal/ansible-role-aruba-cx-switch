@@ -87,9 +87,7 @@ nav:
     - Setup Guide: docs/SETUP_COMPLETE.md
   - Configuration:
     - EVPN & VXLAN:
-      - Overview: docs/EVPN_VXLAN_CONFIGURATION.md
-      - Configuration Modes: docs/EVPN_VXLAN_MODES.md
-      - Cleanup Process: docs/EVPN_VXLAN_CLEANUP_SUMMARY.md
+      - Configuration Guide: docs/EVPN_VXLAN_CONFIGURATION.md
     - BGP:
       - Configuration Guide: docs/BGP_CONFIGURATION.md
 ```

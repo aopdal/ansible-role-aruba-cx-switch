@@ -102,53 +102,12 @@ graph LR
     style G fill:#ffebee,stroke:#b71c1c
 ```
 
-## Timeline Comparison
-
-### Before Refactoring (Inconsistent)
-
-```mermaid
-gantt
-    title Before Refactoring - Inconsistent VLAN Analysis
-    dateFormat X
-    axisFormat %s
-
-    section Tasks
-    configure_vlans.yml<br/>Fetch VLANs, calc vlans_in_use ❶     :crit, task1, 0, 1
-    configure_evpn.yml<br/>Re-calc vlans_in_use ❷                :crit, task2, 1, 1
-    configure_vxlan.yml<br/>Re-calc vlans_in_use ❸               :crit, task3, 2, 1
-    interface configuration                                       :task4, 3, 1
-    identify_vlan_changes.yml<br/>Re-calc everything ❹           :crit, task5, 4, 1
-    cleanup_* tasks                                               :task6, 5, 1
-```
-
-**❌ Problem:** Multiple calculations with potentially different results
-
-### After Refactoring (Consistent)
-
-```mermaid
-gantt
-    title After Refactoring - Consistent VLAN Analysis
-    dateFormat X
-    axisFormat %s
-
-    section Tasks
-    identify_vlan_changes.yml ✓<br/>SINGLE SOURCE OF TRUTH      :done, task1, 0, 1
-    configure_vlans.yml<br/>Assert + use facts ✓                :active, task2, 1, 1
-    configure_evpn.yml<br/>Assert + use facts ✓                 :active, task3, 2, 1
-    configure_vxlan.yml<br/>Assert + use facts ✓                :active, task4, 3, 1
-    interface configuration                                       :task5, 4, 1
-    identify_vlan_changes.yml ✓<br/>RE-ANALYZE FOR CLEANUP      :done, task6, 5, 1
-    cleanup_* tasks<br/>Assert + use facts ✓                    :active, task7, 6, 1
-```
-
-**✅ Solution:** Consistent analysis, clear dependencies, safe execution
-
 ## Facts Reference Table
 
 | Fact Name | Type | Set By | Used By | Purpose |
 |-----------|------|--------|---------|---------|
-| `vlans` | list[dict] | identify_vlan_changes.yml | All VLAN tasks | VLANs from NetBox (desired state) |
-| `vlans_in_use` | dict | identify_vlan_changes.yml | configure_evpn, configure_vxlan | VLANs currently used by interfaces |
+| `vlans` | list[dict] | identify_vlan_changes.yml | configure_vlans, configure_evpn, configure_vxlan, cleanup_evpn, cleanup_vxlan | VLANs from NetBox (desired state) |
+| `vlans_in_use` | dict | identify_vlan_changes.yml | configure_vlans, configure_evpn, configure_vxlan | VLANs currently used by interfaces |
 | `vlans_in_use.vids` | list[int] | identify_vlan_changes.yml | configure_evpn, configure_vxlan | VLAN IDs in use |
 | `vlan_changes` | dict | identify_vlan_changes.yml | configure_vlans, cleanup_* | Changes needed |
 | `vlan_changes.vlans_to_create` | list[dict] | identify_vlan_changes.yml | configure_vlans | VLANs to create |
