@@ -474,11 +474,9 @@ show ip route vrf <vrf_name>
 
 ## Documentation
 
-- **[BGP_CONFIGURATION.md](../../docs/BGP_CONFIGURATION.md)** - Detailed BGP setup
+- **[BGP_CONFIGURATION.md](../../docs/BGP_CONFIGURATION.md)** - BGP setup, NetBox plugin, and fabric examples
 - **[EVPN_VXLAN_CONFIGURATION.md](../../docs/EVPN_VXLAN_CONFIGURATION.md)** - EVPN/VXLAN guide
-- **[NETBOX_BGP_PLUGIN.md](../../docs/NETBOX_BGP_PLUGIN.md)** - NetBox BGP plugin usage
 - **[FILTER_PLUGINS.md](../../docs/FILTER_PLUGINS.md)** - Data transformation details
-- **[BGP_EVPN_FABRIC_EXAMPLE.md](../../docs/BGP_EVPN_FABRIC_EXAMPLE.md)** - Conceptual example
 
 ## Getting Help
 

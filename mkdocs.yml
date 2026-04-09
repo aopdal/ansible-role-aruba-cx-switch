@@ -13,136 +13,130 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 
 theme:
-      name: material
-      features:
-            - navigation.tabs
-            - navigation.sections
-            - navigation.expand
-            - navigation.top
-            - search.suggest
-            - search.highlight
-            - content.code.copy
-            - content.code.annotate
-      palette:
-            # Light mode
-            - scheme: default
-              primary: indigo
-              accent: indigo
-              toggle:
-                    icon: material/brightness-7
-                    name: Switch to dark mode
-            # Dark mode
-            - scheme: slate
-              primary: indigo
-              accent: indigo
-              toggle:
-                    icon: material/brightness-4
-                    name: Switch to light mode
-      icon:
-            repo: fontawesome/brands/github
+        name: material
+        features:
+                - navigation.tabs
+                - navigation.sections
+                - navigation.expand
+                - navigation.top
+                - search.suggest
+                - search.highlight
+                - content.code.copy
+                - content.code.annotate
+        palette:
+                # Light mode
+                - scheme: default
+                  primary: indigo
+                  accent: indigo
+                  toggle:
+                          icon: material/brightness-7
+                          name: Switch to dark mode
+                # Dark mode
+                - scheme: slate
+                  primary: indigo
+                  accent: indigo
+                  toggle:
+                          icon: material/brightness-4
+                          name: Switch to light mode
+        icon:
+                repo: fontawesome/brands/github
 
 markdown_extensions:
-      - admonition
-      - pymdownx.details
-      - pymdownx.superfences:
-              custom_fences:
-                    - name: mermaid
-                      class: mermaid
-                      format: !!python/name:pymdownx.superfences.fence_code_format
-      - pymdownx.highlight:
-              anchor_linenums: true
-      - pymdownx.inlinehilite
-      - pymdownx.snippets
-      - pymdownx.tabbed:
-              alternate_style: true
-      - tables
-      - toc:
-              permalink: true
-      - attr_list
-      - md_in_html
+        - admonition
+        - pymdownx.details
+        - pymdownx.superfences:
+                  custom_fences:
+                          - name: mermaid
+                            class: mermaid
+                            format: !!python/name:pymdownx.superfences.fence_code_format
+        - pymdownx.highlight:
+                  anchor_linenums: true
+        - pymdownx.inlinehilite
+        - pymdownx.snippets
+        - pymdownx.tabbed:
+                  alternate_style: true
+        - tables
+        - toc:
+                  permalink: true
+        - attr_list
+        - md_in_html
 
 plugins:
-      - search
-      - git-revision-date-localized:
-              enable_creation_date: true
+        - search
+        - git-revision-date-localized:
+                  enable_creation_date: true
 
 nav:
-      - Home: index.md
-      - Documentation Index: README_DOCS.md
-      - Architecture:
-              - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
-              - Visual Reference: AUTOMATION_ECOSYSTEM_DIAGRAMS.md
-      - NetBox Integration:
-              - Integration Reference: NETBOX_INTEGRATION.md
-              - Filter Plugins:
-                      - Overview: FILTER_PLUGINS.md
-                      - Reuse filters: FILTER_PLUGINS_REUSE.md
-                      - Detailed Reference: filter_plugins/index.md
-                      - Utils Module: filter_plugins/utils.md
-                      - VLAN Filters: filter_plugins/vlan_filters.md
-                      - VRF Filters: filter_plugins/vrf_filters.md
-                      - Interface Filters: filter_plugins/interface_filters.md
-                      - Comparison Module: filter_plugins/comparison.md
-                      - OSPF Filters: filter_plugins/ospf_filters.md
-                      - BGP Filters: filter_plugins/bgp_filters.md
-                      - L3 Config Helpers: filter_plugins/l3_config_helpers.md
-                      - REST API Transforms: filter_plugins/rest_api_transforms.md
-      - Configuration:
-              - Base System:
-                      - Overview: BASE_CONFIGURATION.md
-                      - DNS: DNS_CONFIGURATION.md
-              - VLAN Management:
-                      - Workflow Overview: VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
-                      - Visual Diagrams: VLAN_WORKFLOW_DIAGRAMS.md
-                      - Developer Guide: VLAN_DEVELOPER_GUIDE.md
-                      - L2 Interface Modes: L2_INTERFACE_MODES.md
-                      - Anycast Gateway: ANYCAST_GATEWAY.md
-              - EVPN & VXLAN:
-                      - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
-                      - Configuration Modes: EVPN_VXLAN_MODES.md
-              - BGP:
-                      - Configuration Guide: BGP_CONFIGURATION.md
-                      - NetBox BGP Plugin: NETBOX_BGP_PLUGIN.md
-                      - EVPN Fabric Example: BGP_EVPN_FABRIC_EXAMPLE.md
-              - Tag-Dependent Tasks:
-                      - Overview: TAG_DEPENDENT_INCLUDES.md
-                      - Testing: TAG_DEPENDENT_TESTING.md
-      - Development:
-              - Quick Start: QUICKSTART.md
-              - Requirements: REQUIREMENTS.md
-              - Development: DEVELOPMENT.md
-              - Contributing: CONTRIBUTING.md
-      - Testing:
-              - Testing Guide: TESTING.md
-              - Quick Start: TESTING_QUICK_START.md
-              - Environment: TESTING_ENVIRONMENT.md
-              - .ansible/ Directory: ANSIBLE_CACHE_DIRECTORY.md
-      - Reference:
-              - Quick Reference: QUICK_REFERENCE.md
-              - Performance Optimization: PERFORMANCE_OPTIMIZATION.md
-              - Release Process:
-                      - Full Guide: RELEASE_PROCESS.md
-                      - Quick Reference: RELEASE_QUICK_REFERENCE.md
-                      - System Integration: RELEASE_INTEGRATION.md
-                      - Role vs Collection: RELEASE_ROLE_VS_COLLECTION.md
-                      - Changelog: CHANGELOG.md
-              - Documentation Site: DOCUMENTATION_SITE.md # How to use MkDocs
-              - Documentation Sync: DOCS_SYNC_WORKFLOW.md # How README.md syncs to docs/
-              - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md
-              - Workspace Setup: WORKSPACE.md
-              - DevContainer Setup: DEVCONTAINER_SETUP.md
-              - DevContainer Mounts: DEVCONTAINER_MOUNTS.md
-      - Internal:
-              - Documentation Integration: DOCUMENTATION_INTEGRATION.md
-              - Verification Checklist: VERIFICATION_CHECKLIST.md
+        - Home: index.md
+        - Documentation Index: README_DOCS.md
+        - Architecture:
+                  - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
+                  - Visual Reference: AUTOMATION_ECOSYSTEM_DIAGRAMS.md
+        - NetBox Integration:
+                  - Integration Reference: NETBOX_INTEGRATION.md
+                  - Filter Plugins:
+                            - Overview: FILTER_PLUGINS.md
+                            - Reuse filters: FILTER_PLUGINS_REUSE.md
+                            - Detailed Reference: filter_plugins/index.md
+                            - Utils Module: filter_plugins/utils.md
+                            - VLAN Filters: filter_plugins/vlan_filters.md
+                            - VRF Filters: filter_plugins/vrf_filters.md
+                            - Interface Filters: filter_plugins/interface_filters.md
+                            - Comparison Module: filter_plugins/comparison.md
+                            - OSPF Filters: filter_plugins/ospf_filters.md
+                            - BGP Filters: filter_plugins/bgp_filters.md
+                            - L3 Config Helpers: filter_plugins/l3_config_helpers.md
+                            - REST API Transforms: filter_plugins/rest_api_transforms.md
+        - Configuration:
+                  - Base System:
+                            - Overview: BASE_CONFIGURATION.md
+                            - DNS: DNS_CONFIGURATION.md
+                  - VLAN Management:
+                            - Workflow Overview: VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
+                            - Visual Diagrams: VLAN_WORKFLOW_DIAGRAMS.md
+                            - Developer Guide: VLAN_DEVELOPER_GUIDE.md
+                            - L2 Interface Modes: L2_INTERFACE_MODES.md
+                            - Anycast Gateway: ANYCAST_GATEWAY.md
+                  - EVPN & VXLAN:
+                            - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
+                            - Configuration Modes: EVPN_VXLAN_MODES.md
+                  - BGP: BGP_CONFIGURATION.md
+                  - Tag-Dependent Tasks:
+                            - Overview: TAG_DEPENDENT_INCLUDES.md
+                            - Testing: TAG_DEPENDENT_TESTING.md
+        - Development:
+                  - Quick Start: QUICKSTART.md
+                  - Requirements: REQUIREMENTS.md
+                  - Development: DEVELOPMENT.md
+                  - Contributing: CONTRIBUTING.md
+        - Testing:
+                  - Testing Guide: TESTING.md
+                  - Quick Start: TESTING_QUICK_START.md
+                  - Environment: TESTING_ENVIRONMENT.md
+                  - .ansible/ Directory: ANSIBLE_CACHE_DIRECTORY.md
+        - Reference:
+                  - Quick Reference: QUICK_REFERENCE.md
+                  - Performance Optimization: PERFORMANCE_OPTIMIZATION.md
+                  - Release Process:
+                            - Guide: RELEASE_PROCESS.md
+                            - Changelog: CHANGELOG.md
+                  - Documentation Site: DOCUMENTATION_SITE.md # How to use MkDocs
+                  - Documentation Sync: DOCS_SYNC_WORKFLOW.md # How README.md syncs to docs/
+                  - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md
+                  - Workspace Setup: WORKSPACE.md
+                  - DevContainer Setup: DEVCONTAINER_SETUP.md
+                  - DevContainer Mounts: DEVCONTAINER_MOUNTS.md
+        - Internal:
+                  - Documentation Integration: DOCUMENTATION_INTEGRATION.md
+                  - Verification Checklist: VERIFICATION_CHECKLIST.md
 
 extra:
-      social:
-            - icon: fontawesome/brands/github
-              link: https://github.com/aopdal
-      # version:
-      #   provider: mike  # Uncomment when you want to use multi-version docs
+        social:
+                - icon: fontawesome/brands/github
+                  link: https://github.com/aopdal
+        # version:
+        #   provider: mike  # Uncomment when you want to use multi-version docs
 
 extra_javascript:
-      - https://unpkg.com/mermaid@10/dist/mermaid.min.js
-      - javascripts/mermaid-init.js
+        - https://unpkg.com/mermaid@10/dist/mermaid.min.js
+        - javascripts/mermaid-init.js

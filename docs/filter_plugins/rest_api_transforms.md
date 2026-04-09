@@ -16,7 +16,7 @@ Think of it like a translator: the REST API speaks one dialect, the role's filte
 
 The `rest_api_transforms.py` module is a **standalone filter plugin** (separate from `netbox_filters.py`). It provides 4 filters that convert REST API responses into the format expected by `aoscx_facts`-based logic.
 
-**File Location**: [filter_plugins/rest_api_transforms.py](../../filter_plugins/rest_api_transforms.py)
+**File Location**: `filter_plugins/rest_api_transforms.py`
 
 **Dependencies**: `urllib.parse` (Python standard library)
 

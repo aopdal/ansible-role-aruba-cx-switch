@@ -19,7 +19,7 @@ Every Aruba AOS-CX switch has some built-in VRFs (`mgmt`, `default`, `Global`) t
 
 The `vrf_filters.py` module provides VRF (Virtual Routing and Forwarding) extraction and filtering functionality. It handles VRF identification, filtering by usage and tenant, route target extraction, and automatic exclusion of built-in system VRFs.
 
-**File Location**: [filter_plugins/netbox_filters_lib/vrf_filters.py](../../filter_plugins/netbox_filters_lib/vrf_filters.py)
+**File Location**: `filter_plugins/netbox_filters_lib/vrf_filters.py`
 
 **Dependencies**: [utils.py](utils.md) (`_debug`)
 

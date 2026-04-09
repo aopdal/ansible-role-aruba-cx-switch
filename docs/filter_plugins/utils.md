@@ -18,7 +18,7 @@ This is the "toolbox" module that all other filter modules rely on. It provides 
 
 The `utils.py` module provides core utility functions used across all filter modules. These helpers enable debugging, VLAN list formatting, interface selection logic, and IP address processing.
 
-**File Location**: [filter_plugins/netbox_filters_lib/utils.py](../../filter_plugins/netbox_filters_lib/utils.py)
+**File Location**: `filter_plugins/netbox_filters_lib/utils.py`
 
 **Dependencies**: None (base module)
 

@@ -75,7 +75,7 @@ Added reference under "Configuration Guides":
 
 - **[docs/BASE_CONFIGURATION.md](BASE_CONFIGURATION.md)** - Base system
 - **[docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN management workflow
-- **[docs/BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)** - BGP/EVPN fabric
+- **[docs/BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)** - BGP/EVPN fabric configuration, NetBox plugin, and fabric examples
 ...
 ```
 

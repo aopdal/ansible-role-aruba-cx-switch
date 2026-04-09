@@ -21,7 +21,7 @@ NetBox stores BGP sessions (via the NetBox BGP plugin) separately from interface
 
 The `bgp_filters.py` module provides BGP session enrichment functionality. It takes raw BGP session data from the NetBox BGP plugin and adds VRF and address-family metadata by cross-referencing interface IP assignments.
 
-**File Location**: [filter_plugins/netbox_filters_lib/bgp_filters.py](../../filter_plugins/netbox_filters_lib/bgp_filters.py)
+**File Location**: `filter_plugins/netbox_filters_lib/bgp_filters.py`
 
 **Dependencies**: [utils.py](utils.md) (`_debug`)
 
@@ -396,5 +396,4 @@ route-map contexts.
 - [Filter Plugins Overview](../FILTER_PLUGINS.md)
 - [VRF Filters](vrf_filters.md) - VRF extraction and management
 - [Interface Filters](interface_filters.md) - Interface categorization
-- [BGP Configuration Guide](../BGP_CONFIGURATION.md) - Full BGP setup guide
-- [NetBox BGP Plugin](../NETBOX_BGP_PLUGIN.md) - NetBox BGP plugin integration
+- [BGP Configuration Guide](../BGP_CONFIGURATION.md) - NetBox BGP plugin integration and full BGP setup

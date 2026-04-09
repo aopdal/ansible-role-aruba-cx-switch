@@ -85,6 +85,19 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **VXLAN Configuration** - Overlay networks with VNI mapping and cleanup
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
+- ❌ **STP** - on roadmap
+- ❌ **BFD** - on roadmap
+- ❌ **DHCP relay IPv4** - on roadmap
+- ❌ **DHCP relay IPv6 Stateful** - on roadmap
+- ❌ **DHCP relay IPv6 Stateless** - on roadmap
+- ❌ **IPv6 SLAAC** - on roadmap
+- ❌ **Loop protection** - on roadmap
+- ❌ **ACL** - on roadmap
+- ❌ **QoS** - not on roadmap
+- ❌ **Logging** - on roadmap
+- ❌ **SNMP** - on roadmap
+- ❌ **Static routing** - on roadmap
+- ❌ **L3 VNI** - on roadmap
 
 ## Advanced L3 Interface Features
 
@@ -239,7 +252,7 @@ roles:
 
 - **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide for using the role
 - **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Common tasks reference
-- **[docs/README.md](docs/README.md)** - Complete documentation index
+- **[docs/README_DOCS.md](docs/README_DOCS.md)** - Complete documentation index
 
 ### NetBox Integration (Essential)
 

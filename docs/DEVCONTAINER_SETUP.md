@@ -223,7 +223,7 @@ ansible-role-aruba-cx-switch/
 
    - [DEVELOPMENT.md](DEVELOPMENT.md) - Full development guide
    - [TESTING.md](TESTING.md) - Testing instructions
-   - [DevContainer Details](../.devcontainer/README.md) - Container configuration details
+   - DevContainer Details — see `.devcontainer/` in the repository
 
 3. **Start developing**
 

@@ -19,7 +19,7 @@ This module handles everything VLAN-related when configuring a switch from NetBo
 
 The `vlan_filters.py` module provides comprehensive VLAN lifecycle management functionality. It handles extraction, filtering, EVPN/VXLAN configuration, and state comparison for VLANs across NetBox and device facts.
 
-**File Location**: [filter_plugins/netbox_filters_lib/vlan_filters.py](../../filter_plugins/netbox_filters_lib/vlan_filters.py)
+**File Location**: `filter_plugins/netbox_filters_lib/vlan_filters.py`
 
 **Lines of Code**: 455 lines
 
