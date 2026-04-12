@@ -1,0 +1,22 @@
+
+{% if custom_fields.device_vsx == true %}
+vsx
+    system-mac {{ vsx_system_mac }}
+{%   if 'lag' in vsx_keepalive_src %}
+    inter-switch-link {{ vsx_isl_lag | replace("lag", "lag ") }}
+{%   else %}
+    inter-switch-link {{ vsx_isl_lag }}
+{%   endif %}
+    role {{ vsx_role }}
+{%   if vsx_keepalive_vrf is defined  %}
+    keepalive peer {{ vsx_keepalive_peer }} source {{ vsx_keepalive_src }} vrf {{ vsx_keepalive_vrf }}
+{%   else %}
+    keepalive peer {{ vsx_keepalive_peer }} source {{ vsx_keepalive_src }}
+{%   endif %}
+    no split-recovery
+{%   if vsx_role == 'primary' %}
+    vsx-sync mclag-interfaces vsx-global
+{%   else %}
+{%   endif %}
+{% endif %}
+!

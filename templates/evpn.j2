@@ -1,0 +1,16 @@
+
+{% if custom_fields.device_evpn | default(false) | bool %}
+{% if template_vlans is defined and template_vlans | length > 0 %}
+evpn
+{%   for vlan in template_vlans %}
+{%     if vlan.l2vpn_termination.l2vpn is defined %}
+    vlan {{ vlan.vid }}
+        rd auto
+        route-target export auto
+        route-target import auto
+{%     endif %}
+{%   endfor %}
+!
+{% endif %}
+{% endif %}
+!

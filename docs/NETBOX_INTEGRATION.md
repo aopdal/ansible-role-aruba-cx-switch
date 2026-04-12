@@ -24,6 +24,7 @@ Custom fields provide **per-device control** over which features are enabled. Th
 
 | Custom Field Name | Type | Object | Required | Purpose | Used By |
 |-------------------|------|--------|----------|---------|---------|
+| `device_anycast_gateway` | Boolean | Device | No | Enable/disable Anycast Gateway global settings | `configure_anycast_gateway.yml` |
 | `device_bgp` | Boolean | Device | Yes (for BGP) | Enable/disable BGP configuration | `configure_bgp.yml` |
 | `device_bgp_routerid` | Text | Device | Yes (for BGP) | BGP Router ID (typically loopback IP) | `configure_bgp.yml` (config_context mode) |
 | `device_evpn` | Boolean | Device | Yes (for EVPN) | Enable/disable EVPN configuration and cleanup | `configure_evpn.yml`, `cleanup_evpn.yml` |
@@ -32,7 +33,32 @@ Custom fields provide **per-device control** over which features are enabled. Th
 
 ### Creating Custom Fields in NetBox
 
-#### 1. device_bgp (Boolean)
+#### 1. device_anycast_gateway (Boolean)
+
+```
+Name: device_anycast_gateway
+Type: Boolean
+Object Type: dcim > device
+Label: Enable Anycast Gateway
+Description: Enable Anycast Gateway global settings (no ip icmp redirect)
+Default: false
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: device_anycast_gateway
+├─ Type: Boolean
+├─ Content Types: dcim | device
+├─ Label: Enable Anycast Gateway
+└─ Default: ☐ (unchecked)
+```
+
+**Purpose:** Enables global device configuration required for Anycast Gateway functionality (disables ICMP redirect). This is a base system setting that persists and may be required by other features even if not actively using Anycast Gateway.
+
+#### 2. device_bgp (Boolean)
 
 ```
 Name: device_bgp
@@ -55,7 +81,7 @@ Customization → Custom Fields → Add
 └─ Default: ☐ (unchecked)
 ```
 
-#### 2. device_bgp_routerid (Text)
+#### 3. device_bgp_routerid (Text)
 
 ```
 Name: device_bgp_routerid
@@ -80,7 +106,7 @@ Customization → Custom Fields → Add
 
 **Note:** Only required when using `config_context` for BGP. Not needed if using netbox-bgp plugin.
 
-#### 3. device_evpn (Boolean)
+#### 4. device_evpn (Boolean)
 
 ```
 Name: device_evpn
@@ -92,7 +118,7 @@ Default: false
 Required: No
 ```
 
-#### 4. device_vxlan (Boolean)
+#### 5. device_vxlan (Boolean)
 
 ```
 Name: device_vxlan
@@ -104,7 +130,7 @@ Default: false
 Required: No
 ```
 
-#### 5. device_vsx_enabled (Boolean)
+#### 6. device_vsx_enabled (Boolean)
 
 ```
 Name: device_vsx_enabled
@@ -134,6 +160,7 @@ Customization → Custom Fields → Add
 ```yaml
 # Leaf switches (full EVPN/VXLAN fabric participation)
 custom_fields:
+  device_anycast_gateway: true
   device_bgp: true
   device_bgp_routerid: "10.255.255.11"
   device_evpn: true
@@ -141,13 +168,15 @@ custom_fields:
 
 # Spine switches (BGP route reflectors, no VXLAN)
 custom_fields:
+  device_anycast_gateway: false
   device_bgp: true
   device_bgp_routerid: "10.255.255.1"
   device_evpn: false
   device_vxlan: false
 
-# Access switches (no BGP/EVPN/VXLAN)
+# Access switches (no BGP/EVPN/VXLAN, but using Anycast Gateway)
 custom_fields:
+  device_anycast_gateway: true
   device_bgp: false
   device_evpn: false
   device_vxlan: false
@@ -158,6 +187,10 @@ custom_fields:
 Custom fields control task execution:
 
 ```yaml
+# Anycast Gateway configuration
+when:
+  - custom_fields.device_anycast_gateway | default(false) | bool
+
 # BGP configuration
 when:
   - aoscx_configure_bgp | bool

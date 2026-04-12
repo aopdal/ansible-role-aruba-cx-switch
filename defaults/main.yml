@@ -17,6 +17,7 @@ aoscx_configure_banner: true
 aoscx_configure_ntp: true
 aoscx_configure_timezone: true
 aoscx_configure_dns: true
+aoscx_generate_template_config: false
 aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
 aoscx_configure_physical_interfaces: true

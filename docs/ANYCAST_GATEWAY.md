@@ -6,6 +6,27 @@ This document describes how to configure anycast gateway (active-gateway) on SVI
 
 ## NetBox Configuration
 
+### Device Custom Field (Global Requirement)
+
+Anycast Gateway requires a global device-level configuration: **`no ip icmp redirect`**. This is a global setting that must be applied to every device using anycast gateway functionality.
+
+To enable this configuration:
+
+1. Navigate to the device in NetBox
+2. Scroll to **Custom Fields**
+3. Set **`device_anycast_gateway`** to `true` (Boolean)
+4. Save the device
+
+**When enabled**, the role will automatically apply the global setting:
+
+```
+no ip icmp redirect
+```
+
+This is a one-time global configuration that persists even if the custom field is later disabled. The role does not remove this setting to avoid impacting other features that may require it.
+
+**See also**: [NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md#1-device_anycast_gateway-boolean) for full custom field setup instructions.
+
 ### IP Address Role
 
 To mark an IP address as an anycast gateway address:
@@ -107,6 +128,13 @@ The `active-gateway` commands are only emitted when:
 - The interface has an anycast MAC address defined (`if_anycast_gateway_mac` custom field)
 
 ## Requirements
+
+### Device Setup
+
+1. Device custom field **`device_anycast_gateway`** must be set to `true`
+   - Type: Boolean
+   - When enabled, the role applies the global setting: `no ip icmp redirect`
+   - See [NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md#1-device_anycast_gateway-boolean) for setup instructions
 
 ### NetBox Setup
 

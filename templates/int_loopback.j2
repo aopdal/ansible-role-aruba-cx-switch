@@ -1,0 +1,26 @@
+
+{% for intf in interfaces %}
+{%   if 'loopback' in intf.name %}
+interface {{ intf.name }}
+{%     if intf.description != '' %}
+   description {{ intf.description }}
+{%     endif %}
+{%     for address in intf.ip_addresses %}
+{%       if intf.vrf.id is defined %}
+{%         if address.family.label == "IPv4" %}
+   vrf attach {{ intf.vrf.name | replace("Global", "default" ) }}
+{%         endif %}
+{%       endif %}
+{%       if address.family.label == "IPv4" %}
+   ip address {{ address.address }}
+{%       endif %}
+{%       if address.family.label == "IPv6" %}
+   ipv6 address {{ address.address }}
+{%       endif %}
+{%     endfor %}
+{%     if intf.custom_fields.if_ip_ospf_1_area != none %}
+   ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
+{%     endif %}
+{%   endif %}
+{% endfor %}
+!

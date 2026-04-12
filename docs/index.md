@@ -77,6 +77,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support, ip mtu, and l3-counters
 - ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration, and active gateway
+- ✅ **No ICMP redirect** - Configured when using active gateway
 - ✅ **Loopback Interfaces** - Automatic detection, IPv4/IPv6, with VRF support
 - ✅ **OSPF Configuration** - Router instance, areas, and interface configuration
 - ✅ **VSX Configuration** - Active-active redundancy with system MAC, ISL, and keepalive
@@ -87,9 +88,11 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
 - ❌ **STP** - on roadmap
 - ❌ **BFD** - on roadmap
+- ❌ **IGMP Snooping** - on roadmap
 - ❌ **DHCP relay IPv4** - on roadmap
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
+- ❌ **DHCP Snooping** - Not desided
 - ❌ **IPv6 SLAAC** - on roadmap
 - ❌ **Loop protection** - on roadmap
 - ❌ **ACL** - on roadmap
@@ -98,6 +101,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ❌ **SNMP** - on roadmap
 - ❌ **Static routing** - on roadmap
 - ❌ **L3 VNI** - on roadmap
+- ❌ **Multicast routing** - not on roadmap
 
 ## Advanced L3 Interface Features
 
@@ -716,10 +720,12 @@ ansible-playbook site.yml -e aoscx_save_config=false
 
 ### Configuration Tags
 
+- `template_config`, `base_config` - Template-based configuration generation (starting point)
 - `banner`, `base_config`, `system` - Banner configuration
 - `timezone`, `base_config`, `system` - Timezone configuration
 - `ntp`, `base_config`, `system` - NTP configuration
 - `dns`, `base_config`, `system` - DNS configuration
+- `icmp_redirect`, `base_config`, `system` - ICMP redirect configuration (required for Anycast Gateway)
 - `vrfs`, `layer3`, `routing` - VRF configuration
 - `vlans`, `layer2` - VLAN configuration
 - `interfaces`, `physical_interfaces`, `layer1` - Physical interface configuration

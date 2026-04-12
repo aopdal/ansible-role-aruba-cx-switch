@@ -1,0 +1,38 @@
+
+{% if custom_fields.device_bgp is true %}
+router bgp {{ config_context.bgp_as }}
+    bgp router-id {{ custom_fields.device_bgp_routerid }}
+{%   for item in config_context.bgp_peers %}
+    neighbor {{ item.peer }} remote-as {{ config_context.bgp_as }}
+    neighbor {{ item.peer }} update-source loopback 0
+{%   endfor %}
+    address-family ipv4 unicast
+{%   for item in config_context.bgp_peers %}
+{%     if "kjerne" in device_roles or "spine" in device_roles or "core" in device_roles %}
+        neighbor {{ item.peer }} route-reflector-client
+{%     endif %}
+        neighbor {{ item.peer }} send-community extended
+        neighbor {{ item.peer }} activate
+{%   endfor %}
+    exit-address-family
+    address-family l2vpn evpn
+{%   for item in config_context.bgp_peers %}
+{%     if "kjerne" in device_roles or "spine" in device_roles or "core" in device_roles %}
+        neighbor {{ item.peer }} route-reflector-client
+{%     endif %}
+        neighbor {{ item.peer }} send-community extended
+        neighbor {{ item.peer }} activate
+{%   endfor %}
+    exit-address-family
+!
+{%   set vrfs_in_use = nb_vrfs.json.results | filter_vrfs_in_use(interfaces, tenant) %}
+{%   for vrf in vrfs_in_use %}
+    vrf {{ vrf.name }}
+        address-family ipv4 unicast
+            redistribute connected
+        exit-address-family
+        address-family ipv6 unicast
+            redistribute connected
+        exit-address-family
+{%   endfor %}
+{% endif %}
