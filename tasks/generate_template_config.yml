@@ -1,0 +1,46 @@
+---
+# Generate device configuration from Jinja2 templates
+# This is a starting point for template-based configuration generation
+# Currently includes: system, time, ICMP redirect, VRF, VLAN, EVPN, STP, interfaces, VSX, OSPF
+# Note: BGP template not included (requires BGP plugin integration)
+
+- name: Render aoscx configuration template
+  ansible.builtin.template:
+    src: aoscx.j2
+    dest: "/tmp/{{ inventory_hostname }}-config.txt"
+  register: template_config
+  when:
+    - aoscx_generate_template_config | bool
+  tags:
+    - template_config
+    - base_config
+
+- name: Display generated configuration
+  ansible.builtin.debug:
+    msg: "{{ template_config.dest }}"
+  when:
+    - aoscx_generate_template_config | bool
+  tags:
+    - template_config
+    - base_config
+
+- name: Show configuration preview (first 50 lines)
+  ansible.builtin.shell:
+    cmd: "head -50 {{ template_config.dest }}"
+  register: config_preview
+  changed_when: false
+  when:
+    - aoscx_generate_template_config | bool
+  tags:
+    - template_config
+    - debug
+
+- name: Debug - Display configuration preview
+  ansible.builtin.debug:
+    msg: "{{ config_preview.stdout_lines }}"
+  when:
+    - aoscx_generate_template_config | bool
+    - aoscx_debug | bool or ansible_verbosity >= 1
+  tags:
+    - template_config
+    - debug

@@ -20,6 +20,31 @@
     - facts
     - gather
 
+# Generate configuration from Jinja2 templates (starting point)
+- name: Gather VRF and VLAN data for template generation
+  ansible.builtin.include_tasks:
+    file: gather_template_data.yml
+    apply:
+      tags:
+        - template_config
+        - base_config
+  when: aoscx_generate_template_config | bool
+  tags:
+    - template_config
+    - base_config
+
+- name: Include template-based configuration generation
+  ansible.builtin.include_tasks:
+    file: generate_template_config.yml
+    apply:
+      tags:
+        - template_config
+        - base_config
+  when: aoscx_generate_template_config | bool
+  tags:
+    - template_config
+    - base_config
+
 # Base system configurations should be applied early
 - name: Include banner configuration tasks
   ansible.builtin.include_tasks:

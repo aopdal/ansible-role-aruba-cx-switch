@@ -1,0 +1,38 @@
+
+{% if template_vrfs is defined and template_vrfs | length > 0 %}
+{%   for vrf_name in template_vrfs %}
+vrf {{ vrf_name }}
+{%     if template_vrfs_details[vrf_name].rd is defined and template_vrfs_details[vrf_name].rd != none %}
+    rd {{ template_vrfs_details[vrf_name].rd }}
+{%     endif %}
+{%     set export_targets = template_vrfs_details[vrf_name].export_targets | default([]) %}
+{%     set import_targets = template_vrfs_details[vrf_name].import_targets | default([]) %}
+{%     if export_targets | length > 0 or import_targets | length > 0 %}
+{%       set ipv4_exports = export_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv4') | map(attribute='name') | list %}
+{%       set ipv4_imports = import_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv4') | map(attribute='name') | list %}
+{%       if ipv4_exports | length > 0 or ipv4_imports | length > 0 %}
+    address-family ipv4 unicast
+{%         for rt in ipv4_exports %}
+        route-target export {{ rt }}
+{%         endfor %}
+{%         for rt in ipv4_imports %}
+        route-target import {{ rt }}
+{%         endfor %}
+    exit-address-family
+{%       endif %}
+{%       set ipv6_exports = export_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv6') | map(attribute='name') | list %}
+{%       set ipv6_imports = import_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv6') | map(attribute='name') | list %}
+{%       if ipv6_exports | length > 0 or ipv6_imports | length > 0 %}
+    address-family ipv6 unicast
+{%         for rt in ipv6_exports %}
+        route-target export {{ rt }}
+{%         endfor %}
+{%         for rt in ipv6_imports %}
+        route-target import {{ rt }}
+{%         endfor %}
+    exit-address-family
+{%       endif %}
+{%     endif %}
+{%   endfor %}
+!
+{% endif %}

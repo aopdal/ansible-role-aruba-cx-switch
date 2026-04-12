@@ -1,0 +1,15 @@
+
+{% if timezone is defined %}
+clock timezone {{ timezone }}
+{% endif %}
+!
+{% if ntp_servers is defined %}
+{%   for item in ntp_servers %}
+ntp server {{ item.server }}
+{%   endfor %}
+ntp enable
+{%   if ntp_vrf is defined %}
+ntp vrf {{ ntp_vrf }}
+{%   endif %}
+{% endif %}
+!

@@ -1,0 +1,65 @@
+
+{% for intf in interfaces %}
+{%   if 'vlan' in intf.name %}
+{%     if intf.enabled %}
+interface {{ intf.name | replace("vlan", "vlan ") }}
+{%       if intf.description != '' %}
+   description {{ intf.description }}
+{%       endif %}
+{%       if intf.mtu != none %}
+   ip mtu {{ intf.mtu }}
+{%       endif %}
+{%       if intf.vrf.id is defined %}
+{%         if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+   vrf attach {{ intf.vrf.name | replace("Global", "default") }}
+{%         endif %}
+{%       endif %}
+{%       set ipv4_addrs = intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list %}
+{%       set ipv6_addrs = intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv6') | list %}
+{# Regular IPv4 addresses first #}
+{%       for address in ipv4_addrs %}
+{%         if address.role is none or address.role.value != 'anycast' %}
+   ip address {{ address.address }}
+{%         endif %}
+{%       endfor %}
+{# Anycast IPv4 addresses #}
+{%       for address in ipv4_addrs %}
+{%         if address.role is not none and address.role.value == 'anycast' %}
+   active-gateway ip mac {{ intf.custom_fields.if_anycast_gateway_mac }}
+   active-gateway ip {{ address.address.split('/')[0] }}
+{%         endif %}
+{%       endfor %}
+{# Regular IPv6 addresses first #}
+{%       for address in ipv6_addrs %}
+{%         if address.role is none or address.role.value != 'anycast' %}
+   ipv6 address {{ address.address }}
+{%         endif %}
+{%       endfor %}
+{# Anycast IPv6 addresses #}
+{%       for address in ipv6_addrs %}
+{%         if address.role is not none and address.role.value == 'anycast' %}
+{%           if address.address.split('/')[0].lower().startswith('fe80:') %}
+   ipv6 address link-local {{ address.address }}
+{%           endif %}
+   active-gateway ipv6 mac {{ intf.custom_fields.if_anycast_gateway_mac }}
+   active-gateway ipv6 {{ address.address.split('/')[0] }}
+{%         endif %}
+{%       endfor %}
+{%       if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+   l3-counters
+{%       endif %}
+{%       if intf.custom_fields.if_ip_ospf_1_area != none %}
+   ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
+{%         if intf.custom_fields.if_ip_ospf_network != none %}
+   ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
+{%         endif %}
+{%       endif %}
+{%       if intf.custom_fields.if_ip_helper != none %}
+   ip helper-address {{ intf.custom_fields.if_ip_helper }}
+{%       endif %}
+{%     else %}
+no interface {{ intf.name | replace("vlan", "vlan ") }}
+{%     endif %}
+{%   endif %}
+{% endfor %}
+!

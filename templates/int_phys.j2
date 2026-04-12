@@ -1,0 +1,146 @@
+
+{% for intf in interfaces %}
+{%   if 'mgmt' not in intf.name and 'lag' not in intf.name and 'loopback' not in intf.name and 'vlan' not in intf.name %}
+interface {{ intf.name }}
+{%     if intf.description != '' %}
+{%       if intf.description == 'AP_Aruba' %}
+   description {{ intf.name }} {{ intf.description }}
+{%       else %}
+   description {{ intf.description }}
+{%       endif %}
+{%     endif %}
+{%     if intf.enabled %}
+   no shutdown
+{%     else %}
+   shutdown
+{%     endif %}
+{%     if intf.custom_fields.if_persona != none %}
+{%       if intf.custom_fields.if_persona == "none" %}
+   no persona
+{%       else %}
+   persona {{ intf.custom_fields.if_persona }}
+{%       endif %}
+{%     endif %}
+{%     if intf.lag != none %}
+   {{ intf.lag.name | replace("lag", "lag ") }}
+{%     endif %}
+{%     if intf.mtu != none and intf.parent is none %}
+   mtu {{ intf.mtu }}
+{%     endif %}
+{%     if intf.custom_fields.if_ip_unnumbered %}\
+   ip unnumbered interface loopback 0
+{%       if intf.mtu != none %}
+   ip mtu {{ intf.mtu }}
+{%       endif %}
+   l3-counters
+{%     endif %}
+{%     if intf.parent is not none %}
+{# Subinterface - L3 routed configuration #}
+{%       set subint_vid = intf.name.split('.')[-1] %}
+   encapsulation dot1q {{ subint_vid }}
+{%       if intf.ip_addresses | length > 0 %}
+   routing
+{%         if intf.vrf.id is defined %}
+{%           if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+   vrf attach {{ intf.vrf.name | replace("Global", "default") }}
+{%           endif %}
+{%         endif %}
+{%         for address in intf.ip_addresses %}
+{%           if address.family.label == "IPv4" %}
+   ip address {{ address.address }}
+{%           endif %}
+{%           if address.family.label == "IPv6" %}
+   ipv6 address {{ address.address }}
+{%           endif %}
+{%         endfor %}
+{%         if intf.custom_fields.if_ip_ospf_1_area != none %}
+   ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
+{%           if intf.custom_fields.if_ip_ospf_network != none %}
+   ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
+{%           endif %}
+{%         endif %}
+{%         if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+   l3-counters
+{%         endif %}
+{%         if intf.mtu != none %}
+   ip mtu {{ intf.mtu }}
+{%         endif %}
+{%       endif %}
+{%     elif intf.ip_addresses | length > 0 %}
+{# Non-subinterface with IP addresses - L3 routing #}
+   routing
+{%       for address in intf.ip_addresses %}
+{%         if intf.vrf.id is defined %}
+{%           if address.family.label == "IPv4" %}
+   vrf attach {{ intf.vrf.name | replace("Global", "default") }}
+{%           endif %}
+{%         endif %}
+{%         if address.family.label == "IPv4" %}
+   ip address {{ address.address }}
+{%         endif %}
+{%         if address.family.label == "IPv6" %}
+   ipv6 address {{ address.address }}
+{%         endif %}
+{%       endfor %}
+{%       if intf.custom_fields.if_ip_ospf_1_area != none %}
+   ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
+{%         if intf.custom_fields.if_ip_ospf_network != none %}
+   ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
+{%         endif %}
+{%       endif %}
+{%       if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+   l3-counters
+{%       endif %}
+{%       if intf.mtu != none %}
+   ip mtu {{ intf.mtu }}
+{%       endif %}
+{%     endif %}
+{%     if intf.parent is none and intf.ip_addresses | length == 0 %}
+{# Physical interface without IP - L2 settings #}
+{%       if intf.custom_fields.if_ip_helper != none %}
+   ip helper-address {{ intf.custom_fields.if_ip_helper }}
+{%       endif %}
+{%       if intf.mode %}
+   no routing
+{%         if intf.mode.value == 'access' %}
+{%           if intf.untagged_vlan.vid is defined %}
+   vlan access {{ intf.untagged_vlan.vid }}
+{%           endif %}
+{%         elif intf.mode.value == 'tagged-all' %}
+{%           if intf.untagged_vlan != none %}
+   vlan trunk native {{ intf.untagged_vlan.vid }}
+{%           else %}
+   vlan trunk native 1 tag
+{%           endif %}
+   vlan trunk allowed all
+{%         elif intf.mode.value == 'tagged' %}
+{%           if intf.untagged_vlan != none %}
+{%             if intf.tagged_vlans.0.vid is defined %}
+   vlan trunk native {{ intf.untagged_vlan.vid }}
+{%               set vlan_ids = [intf.untagged_vlan.vid] + (intf.tagged_vlans | map(attribute="vid") | list) %}
+   vlan trunk allowed {{ vlan_ids | collapse_vlan_list }}
+{%             endif %}
+{%           else %}
+{%             if intf.tagged_vlans.0.vid is defined %}
+   vlan trunk native {{ intf.tagged_vlans.0.vid }} tag
+{%               set vlan_ids = intf.tagged_vlans | map(attribute="vid") | list %}
+   vlan trunk allowed {{ vlan_ids | collapse_vlan_list }}
+{%             endif %}
+{%           endif %}
+{%         endif %}
+{%       endif %}
+{%       if config_context.mstp_config_name is defined %}
+{%         if intf.custom_fields.if_stp_bpdu_guard %}
+   spanning-tree bpdu-guard
+{%         endif %}
+{%         if intf.custom_fields.if_stp_edge_port %}
+   spanning-tree port-type admin-edge
+{%         endif %}
+{%         if intf.custom_fields.if_stp_root_guard %}
+   spanning-tree root-guard
+{%         endif %}
+{%       endif %}
+{%     endif %}
+{%   endif %}
+{% endfor %}
+!

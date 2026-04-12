@@ -1,0 +1,18 @@
+
+{% for intf in interfaces %}
+{%   if 'mgmt' in intf.name %}
+interface {{ intf.name }}
+{%     for address in intf.ip_addresses %}
+{%       if address.family.label == "IPv4" %}
+   ip static {{ address.address }}
+{%       endif %}
+{%     endfor %}
+{%     if mgmt_defaultgateway is defined %}
+   default-gateway {{ mgmt_defaultgateway }}
+{%     endif %}
+{%     if mgmt_nameserver is defined %}
+   nameserver {{ mgmt_nameserver }}
+{%     endif %}
+{%   endif %}
+{% endfor %}
+!

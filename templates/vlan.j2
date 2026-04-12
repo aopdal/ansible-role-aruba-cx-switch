@@ -1,0 +1,15 @@
+
+{% if template_vlans is defined and template_vlans | length > 0 %}
+{%   set vlans_to_config = template_vlans | selectattr('vid', 'in', template_vlans_in_use.vids | default([])) | list %}
+{%   for vlan in vlans_to_config %}
+vlan {{ vlan.vid }}
+{%     if vlan.vid != 1 %}
+    name {{ vlan.name | default('VLAN' + vlan.vid | string) }}
+{%       if vlan.custom_fields.vlan_ip_igmp_snooping is defined and vlan.custom_fields.vlan_ip_igmp_snooping == true %}
+    ip igmp snooping enable
+    ip igmp snooping version 2
+{%       endif %}
+{%     endif %}
+{%   endfor %}
+!
+{% endif %}

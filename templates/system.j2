@@ -1,0 +1,13 @@
+hostname {{ inventory_hostname }}
+!
+{% if motd is defined %}
+banner motd !
+{{ motd }}!
+{% endif %}
+!
+user {{ ansible_user }} group administrators password plaintext {{ stage_password }}
+!
+hpe-anw-central
+    disable
+ssh server vrf mgmt
+!

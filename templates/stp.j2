@@ -1,0 +1,10 @@
+
+{% if mstp_config_name is defined %}
+spanning-tree
+{%   if mstp_priority is defined %}
+spanning-tree priority {{ mstp_priority }}
+{%   endif %}
+spanning-tree config-name {{ mstp_config_name }}
+spanning-tree config-revision {{ mstp_config_revision }}
+{% endif %}
+!

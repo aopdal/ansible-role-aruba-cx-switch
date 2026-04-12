@@ -1,0 +1,11 @@
+
+{% if custom_fields.device_ospf is true %}
+{%   for vrf_entry in ospf_vrfs %}
+router ospf {{ ospf_process_id }} vrf {{ vrf_entry.vrf }}
+    router-id {{ custom_fields.device_ospf_1_routerid }}
+{%     for area in vrf_entry.areas %}
+    area {{ area.area }}
+{%     endfor %}
+{%   endfor %}
+{% endif %}
+!

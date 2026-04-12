@@ -1,0 +1,13 @@
+
+{% if "inngangssvitsj" in device_roles or "switch" in device_roles %}
+{%   for intf in interfaces %}
+{%     if 'vlan' in intf.name %}
+{%       for address in intf.ip_addresses %}
+{%         if address.family.label == "IPv4" %}
+ip route 0.0.0.0/0 {{ address.address | ansible.utils.ipaddr('first_usable') }}
+{%         endif %}
+{%       endfor %}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+!
