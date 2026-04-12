@@ -77,6 +77,20 @@
     - base_config
     - system
 
+- name: Include Anycast Gateway configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_anycast_gateway.yml
+    apply:
+      tags:
+        - icmp_redirect
+        - base_config
+        - system
+  when: custom_fields.device_anycast_gateway | default(false) | bool
+  tags:
+    - icmp_redirect
+    - base_config
+    - system
+
 # VRFs should be configured before L3 interfaces
 - name: Include VRF configuration tasks
   ansible.builtin.include_tasks:

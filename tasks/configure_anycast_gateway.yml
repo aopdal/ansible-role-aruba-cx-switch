@@ -1,0 +1,16 @@
+---
+# Configure Anycast Gateway settings
+# This sets global device configuration needed for anycast gateway functionality
+# Note: No cleanup task - these settings may be required by other features
+
+- name: Configure global anycast gateway settings (no ip icmp redirect)
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no ip icmp redirect"
+  when: custom_fields.device_anycast_gateway | default(false) | bool
+  tags:
+    - icmp_redirect
+    - base_config
+    - system
+  vars:
+    ansible_connection: network_cli
