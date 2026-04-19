@@ -55,7 +55,7 @@ class TestIsIPv4Address:
     def test_ipv6_addresses(self):
         """Test IPv6 addresses return False"""
         assert is_ipv4_address("2001:db8::1/64") is False
-        assert is_ipv4_address("fe80::1/128") is False
+        assert is_ipv4_address("fe80::1/64") is False
         assert is_ipv4_address("::1/128") is False
 
     def test_invalid_formats(self):
@@ -79,7 +79,7 @@ class TestIsIPv6Address:
     def test_valid_ipv6_addresses(self):
         """Test valid IPv6 addresses"""
         assert is_ipv6_address("2001:db8::1/64") is True
-        assert is_ipv6_address("fe80::1/128") is True
+        assert is_ipv6_address("fe80::1/64") is True
         assert is_ipv6_address("::1/128") is True
         assert is_ipv6_address("2001:db8:85a3::8a2e:370:7334/128") is True
 
