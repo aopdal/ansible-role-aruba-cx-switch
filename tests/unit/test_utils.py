@@ -83,12 +83,12 @@ class TestExtractIPAddresses:
         nb_intf = {
             "ip_addresses": [
                 {"address": "2001:db8::1/64"},
-                {"address": "fe80::1/128"},
+                {"address": "fe80::1/64"},
             ]
         }
         ipv4, ipv6 = extract_ip_addresses(nb_intf)
         assert ipv4 == []
-        assert ipv6 == ["2001:db8::1/64", "fe80::1/128"]
+        assert ipv6 == ["2001:db8::1/64", "fe80::1/64"]
 
     def test_mixed_ip_versions(self):
         """Test interface with both IPv4 and IPv6"""
@@ -97,12 +97,12 @@ class TestExtractIPAddresses:
                 {"address": "192.168.1.1/24"},
                 {"address": "2001:db8::1/64"},
                 {"address": "10.0.0.1/24"},
-                {"address": "fe80::1/128"},
+                {"address": "fe80::1/64"},
             ]
         }
         ipv4, ipv6 = extract_ip_addresses(nb_intf)
         assert ipv4 == ["192.168.1.1/24", "10.0.0.1/24"]
-        assert ipv6 == ["2001:db8::1/64", "fe80::1/128"]
+        assert ipv6 == ["2001:db8::1/64", "fe80::1/64"]
 
     def test_invalid_ip_objects(self):
         """Test handling of invalid IP objects"""
