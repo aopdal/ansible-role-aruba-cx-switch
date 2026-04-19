@@ -119,6 +119,43 @@ class TestExtractIPAddresses:
         assert ipv4 == ["192.168.1.1/24"]
         assert ipv6 == ["2001:db8::1/64"]
 
+    def test_exclude_anycast_skips_anycast_ips(self):
+        """Test that exclude_anycast=True omits IPs with role 'anycast'"""
+        nb_intf = {
+            "ip_addresses": [
+                {"address": "192.168.1.1/24", "role": None},
+                {"address": "10.0.0.1/24", "role": {"value": "anycast"}},
+                {"address": "2001:db8::1/64", "role": {"value": "anycast"}},
+                {"address": "172.16.0.1/24"},  # no role key at all
+            ]
+        }
+        ipv4, ipv6 = extract_ip_addresses(nb_intf, exclude_anycast=True)
+        assert ipv4 == ["192.168.1.1/24", "172.16.0.1/24"]
+        assert ipv6 == []
+
+    def test_exclude_anycast_false_includes_all(self):
+        """Test that exclude_anycast=False (default) includes anycast IPs"""
+        nb_intf = {
+            "ip_addresses": [
+                {"address": "192.168.1.1/24"},
+                {"address": "10.0.0.1/24", "role": {"value": "anycast"}},
+            ]
+        }
+        ipv4, ipv6 = extract_ip_addresses(nb_intf, exclude_anycast=False)
+        assert ipv4 == ["192.168.1.1/24", "10.0.0.1/24"]
+
+    def test_exclude_anycast_string_role_value(self):
+        """Test exclude_anycast with plain string role (non-dict)"""
+        nb_intf = {
+            "ip_addresses": [
+                {"address": "10.0.0.1/24", "role": "anycast"},
+                {"address": "192.168.1.1/24", "role": "regular"},
+            ]
+        }
+        ipv4, ipv6 = extract_ip_addresses(nb_intf, exclude_anycast=True)
+        assert "10.0.0.1/24" not in ipv4
+        assert "192.168.1.1/24" in ipv4
+
 
 class TestPopulateIPChanges:
     """Tests for populate_ip_changes function"""

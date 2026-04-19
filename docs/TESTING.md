@@ -18,7 +18,7 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 
 This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
 
-1. ✅ **Python Unit Tests** (`pytest`) - 284 tests for filter plugins
+1. ✅ **Python Unit Tests** (`pytest`) - 298 tests for filter plugins — see [UNIT_TESTING.md](UNIT_TESTING.md)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
 3. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
 4. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
@@ -769,6 +769,8 @@ If you encounter issues:
 
 ### Related Documentation
 
+- [UNIT_TESTING.md](UNIT_TESTING.md) - Filter plugin unit test reference (pytest)
+- [TESTING_SCRIPTS.md](TESTING_SCRIPTS.md) - Helper scripts for test environment setup
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and workflow
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command cheat sheet
 - [CHANGELOG.md](CHANGELOG.md) - Version history and changes

@@ -178,6 +178,7 @@ def get_sample_ip_addresses():
             "address": "10.1.10.1/24",
             "vrf": {"name": "default"},
             "assigned_object": {
+                "id": 4,
                 "name": "vlan10",
                 "device": {"name": "switch1"},
             },
@@ -187,6 +188,7 @@ def get_sample_ip_addresses():
             "address": "10.255.255.1/32",
             "vrf": {"name": "default"},
             "assigned_object": {
+                "id": 5,
                 "name": "loopback0",
                 "device": {"name": "switch1"},
             },
@@ -196,6 +198,7 @@ def get_sample_ip_addresses():
             "address": "192.168.100.1/30",
             "vrf": {"name": "customer_a"},
             "assigned_object": {
+                "id": 6,
                 "name": "1/1/5",
                 "device": {"name": "switch1"},
             },
@@ -204,29 +207,37 @@ def get_sample_ip_addresses():
 
 
 def get_sample_ansible_facts():
-    """Sample Ansible facts for testing"""
+    """Sample aoscx_facts device facts for testing.
+
+    Uses the actual aoscx_facts format:
+    - interfaces keyed by name under ansible_network_resources
+    - vlan_tag: dict of {vid_str: {}} for the untagged VLAN
+    - vlan_trunks: dict of {vid_str: {}} for tagged VLANs
+    """
     return {
-        "ansible_net_interfaces": {
-            "1/1/1": {
-                "mode": "access",
-                "untagged_vlan": 10,
-                "tagged_vlans": [],
+        "ansible_network_resources": {
+            "interfaces": {
+                "1/1/1": {
+                    "vlan_mode": "access",
+                    "vlan_tag": {"10": {}},
+                    "vlan_trunks": {},
+                },
+                "1/1/2": {
+                    "vlan_mode": "trunk",
+                    "vlan_tag": {},
+                    "vlan_trunks": {"20": {}, "30": {}, "40": {}},  # 40 is extra
+                },
+                "vlan99": {
+                    "type": "vlan",
+                    "ip4_address": "10.99.99.1/24",
+                },
             },
-            "1/1/2": {
-                "mode": "trunk",
-                "untagged_vlan": None,
-                "tagged_vlans": [20, 30, 40],  # 40 is extra
+            "vlans": {
+                "10": {"name": "VLAN10"},
+                "20": {"name": "VLAN20"},
+                "30": {"name": "VLAN30"},
+                "99": {"name": "VLAN99"},  # Extra VLAN not in NetBox
             },
-            "vlan99": {
-                "type": "vlan",
-                "ip_address": "10.99.99.1/24",
-            },
-        },
-        "ansible_net_vlans": {
-            "10": {"name": "VLAN10"},
-            "20": {"name": "VLAN20"},
-            "30": {"name": "VLAN30"},
-            "99": {"name": "VLAN99"},  # Extra VLAN not in NetBox
         },
     }
 

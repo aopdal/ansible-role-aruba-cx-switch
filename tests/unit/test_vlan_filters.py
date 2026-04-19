@@ -12,7 +12,7 @@ from netbox_filters_lib.vlan_filters import (
     get_vlan_interfaces,
     parse_evpn_evi_output,
 )
-from .fixtures import get_sample_interfaces, get_sample_vlans, get_sample_ansible_facts
+from .fixtures import get_sample_interfaces, get_sample_vlans
 
 
 class TestExtractVlanIds:
