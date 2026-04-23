@@ -78,6 +78,9 @@ aoscx_gather_facts_rest_api: false
 # aoscx_rest_password: "{{ ansible_password }}"  # REST API password
 aoscx_rest_validate_certs: false # Validate SSL certificates for REST API
 
+# Directory for generated template configuration files
+aoscx_template_config_output_dir: "/tmp"
+
 # REST API version for direct REST API calls (enhanced facts, REST API fact gathering)
 # This is SEPARATE from ansible_aoscx_rest_version (which is for pyaoscx modules)
 # Direct REST API calls require v10.15+ for proper ip6_addresses expansion with depth=2
