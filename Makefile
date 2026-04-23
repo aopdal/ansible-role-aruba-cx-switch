@@ -185,7 +185,7 @@ docs-install: ## Install documentation dependencies
 	@pip install -r requirements-docs.txt
 	@echo "$(GREEN)✅ Documentation dependencies installed$(NC)"
 
-docs-sync: ## Sync README.md to docs/index.md
+docs-sync: ## Sync README.md to docs/index.md and CHANGELOG.md to docs/CHANGELOG.md
 	@echo "$(BLUE)Syncing README.md to docs/index.md...$(NC)"
 	@cp README.md docs/index.md
 	@# Fix links: Remove 'docs/' prefix since index.md is now inside docs/
@@ -195,6 +195,9 @@ docs-sync: ## Sync README.md to docs/index.md
 	@# Strip links that point to source files outside docs/ (keep link text only)
 	@sed -i -E 's/\[([^]]+)\]\((tests|defaults|testing-scripts)\/[^)]+\)/\1/g' docs/index.md
 	@echo "$(GREEN)✅ README.md synced to docs/index.md with fixed links$(NC)"
+	@echo "$(BLUE)Syncing CHANGELOG.md to docs/CHANGELOG.md...$(NC)"
+	@cp CHANGELOG.md docs/CHANGELOG.md
+	@echo "$(GREEN)✅ CHANGELOG.md synced to docs/CHANGELOG.md$(NC)"
 
 docs-serve: ## Serve documentation locally at http://127.0.0.1:8000
 	@echo "$(BLUE)Starting documentation server...$(NC)"

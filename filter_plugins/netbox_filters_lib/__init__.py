@@ -27,6 +27,12 @@ from .vrf_filters import (
     filter_vrfs_in_use,
     get_vrfs_in_use,
     filter_configurable_vrfs,
+    get_all_rt_names,
+    build_vrf_rt_config,
+)
+from .bgp_filters import (
+    get_bgp_session_vrf_info,
+    collect_ebgp_vrf_policy_config,
 )
 from .interface_categorization import (
     categorize_l2_interfaces,
@@ -78,6 +84,11 @@ __all__ = [
     "filter_vrfs_in_use",
     "get_vrfs_in_use",
     "filter_configurable_vrfs",
+    "get_all_rt_names",
+    "build_vrf_rt_config",
+    # BGP filters
+    "get_bgp_session_vrf_info",
+    "collect_ebgp_vrf_policy_config",
     # Interface categorization
     "categorize_l2_interfaces",
     "categorize_l3_interfaces",

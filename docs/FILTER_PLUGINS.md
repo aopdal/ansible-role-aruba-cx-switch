@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **36 custom filters** organized into 11 modules across 2 plugin files. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, BGP session enrichment, REST API data normalization, and state comparison between NetBox (source of truth) and device facts.
+This library provides **37 custom filters** organized into 11 modules across 2 plugin files. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, BGP session enrichment, REST API data normalization, and state comparison between NetBox (source of truth) and device facts.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
@@ -305,6 +305,7 @@ filter_plugins/
     ├── l3_config_helpers.py             # L3 configuration optimization (181 lines)
     ├── vlan_filters.py                  # VLAN operations (454 lines)
     ├── vrf_filters.py                   # VRF operations (191 lines)
+    ├── bgp_filters.py                   # BGP session enrichment (~350 lines)
     ├── interface_categorization.py      # L2/L3 interface categorization (294 lines)
     ├── interface_ip_processing.py       # IP address matching (106 lines)
     ├── interface_change_detection.py    # Change detection & idempotency (814 lines)
@@ -370,7 +371,7 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
 
 - **`group_interface_ips(interface_ip_list)`**
     - Group flat per-IP items into per-interface items for use with `build_l3_config_lines`
-    - Filters to `_needs_add=True`, sorts addresses (anycast-before-regular, IPv4 before IPv6)
+    - Filters to `_needs_add=True`, sorts addresses (regular-before-anycast, IPv4 before IPv6)
     - Returns: List of `{interface_name, interface, addresses}` dicts
 
 - **`build_l3_config_lines(item, interface_type, vrf_type, l3_counters_enable=True, ospf_process_id=1)`**
@@ -408,7 +409,7 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
 
 - **`get_vlans_in_use(interfaces, vlan_interfaces=None)`**
     - Get comprehensive VLAN details with full metadata
-    - Returns: Dict with `vlan_ids`, `vlans`, and detailed VLAN info
+    - Returns: Dict with `vids` (sorted list of VLAN IDs) and `vlans` (list of VLAN objects)
 
 - **`get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None)`**
     - Determine which VLANs need to be added or removed
@@ -421,13 +422,13 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
 
 ### `vrf_filters.py` - VRF Operations
 
-VRF extraction and filtering (4 filters, 191 lines):
+VRF extraction and filtering (6 filters, 191 lines):
 
 - **`extract_interface_vrfs(interfaces)`**
     - Extract unique VRF names from interfaces
     - Returns: Set of VRF names
 
-- **filter_vrfs_in_use(vrfs, interfaces, tenant=None)`**
+- **`filter_vrfs_in_use(vrfs, interfaces, tenant=None)`**
     - Filter VRF objects to only those in use on interfaces
     - Excludes built-in VRFs (mgmt, Global)
     - Optional tenant filtering
@@ -443,6 +444,15 @@ VRF extraction and filtering (4 filters, 191 lines):
     - Filters out: mgmt, MGMT, Global, global, default, Default
     - Returns: List of configurable VRF objects
 
+- **`get_all_rt_names(vrf_details)`**
+    - Extract all unique route target names from VRF export/import target lists
+    - Returns: Sorted list of unique RT name strings
+
+- **`build_vrf_rt_config(vrf_details)`**
+    - Build address-family-aware route target config grouped per VRF
+    - Reads `address_family` custom field from RT objects; defaults to `ipv4`
+    - Returns: Dict keyed by VRF name → `{ipv4: {export: [], import: []}, ipv6: {...}}`
+
 ### `interface_categorization.py` - Interface Categorization
 
 L2 and L3 interface categorization by type and configuration (2 filters, 294 lines):
@@ -456,13 +466,15 @@ L2 and L3 interface categorization by type and configuration (2 filters, 294 lin
 
 - **`categorize_l3_interfaces(interfaces)`**
     - Categorize L3 interfaces by type and VRF
-    - Returns dict with 7 categories:
+    - Returns dict with 9 categories:
     - `physical_default_vrf`: Physical interfaces in default/Global/mgmt VRF
     - `physical_custom_vrf`: Physical interfaces in custom VRFs
     - `vlan_default_vrf`: VLAN/SVI interfaces in default VRF
     - `vlan_custom_vrf`: VLAN/SVI interfaces in custom VRFs
     - `lag_default_vrf`: LAG interfaces in default VRF
     - `lag_custom_vrf`: LAG interfaces in custom VRFs
+    - `subinterface_default_vrf`: Sub-interfaces in default VRF
+    - `subinterface_custom_vrf`: Sub-interfaces in custom VRFs
     - `loopback`: Loopback interfaces
 
 ### `interface_ip_processing.py` - IP Address Processing
@@ -486,7 +498,7 @@ IP address to interface matching and anycast gateway processing (1 filter, 106 l
 
 NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
 
-- **`get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts={})`**
+- **`get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts=None)`**
     - Compare NetBox interface configuration with device state
     - Implements granular change detection for:
       - Physical properties (enabled/disabled, description, MTU)
@@ -510,10 +522,19 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
       - `ipv6_addresses`: List of IPv6 addresses needing configuration (all addresses when enhanced facts are absent; only addresses needing addition when enhanced facts are available)
     - See "L3 Interface IP Address Idempotency" section for performance details
 
-- **`_categorize_interface_for_changes(intf, result_dict, needs_change=True)`**
-    - Helper function to categorize interfaces into appropriate change categories
-    - Handles multi-category assignment (e.g., LAG member in both `lag_members` and `physical`)
-    - Internal use only
+### `bgp_filters.py` - BGP Session Enrichment
+
+BGP session enrichment with VRF and address-family metadata (2 filters):
+
+- **`get_bgp_session_vrf_info(sessions, interfaces)`**
+    - Enrich BGP session objects with VRF and address-family by cross-referencing interface IP assignments
+    - Normalises built-in VRF names (mgmt, Global, default) to `'default'`
+    - Returns: List of session dicts, each with added `_vrf` (str) and `_af` (`'ipv4'`/`'ipv6'`) fields
+
+- **`collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_rules)`**
+    - Build AOS-CX CLI commands for route-maps and prefix lists from NetBox BGP plugin data
+    - Route-map entries use `route-map NAME permit seq INDEX` syntax
+    - Returns: Dict with `prefix_lists` and `route_map_rules` lists
 
 ### `comparison.py` - State Comparison
 NetBox vs device state comparison (2 filters, 295 lines):
@@ -568,7 +589,7 @@ All filters are available through the standard Ansible filter syntax:
 # Get VLANs in use with full details
 - set_fact:
     vlans_in_use: "{{ interfaces | get_vlans_in_use }}"
-    # Returns: { vlan_ids: [...], vlans: {...}, ... }
+    # Returns: { vids: [...], vlans: [...] }
 
 # Filter to VLANs actually in use
 - set_fact:
@@ -636,7 +657,7 @@ All filters are available through the standard Ansible filter syntax:
 # Categorize L3 interfaces by type and VRF
 - set_fact:
     l3_interfaces: "{{ interfaces | categorize_l3_interfaces }}"
-    # Returns dict with 7 categories:
+    # Returns dict with 9 categories:
     # {
     #   physical_default_vrf: [...],
     #   physical_custom_vrf: [...],
@@ -644,6 +665,8 @@ All filters are available through the standard Ansible filter syntax:
     #   vlan_custom_vrf: [...],
     #   lag_default_vrf: [...],
     #   lag_custom_vrf: [...],
+    #   subinterface_default_vrf: [...],
+    #   subinterface_custom_vrf: [...],
     #   loopback: [...]
     # }
 
@@ -834,6 +857,7 @@ All filters are available through the standard Ansible filter syntax:
     - Change detection → `interface_change_detection.py`
     - State comparison → `comparison.py`
     - OSPF operations → `ospf_filters.py`
+    - BGP operations → `bgp_filters.py`
     - L3 configuration helpers → `l3_config_helpers.py`
     - General utilities → `utils.py`
 
@@ -932,6 +956,7 @@ netbox_filters.py (main entry point)
     ├── utils.py (no dependencies)
     ├── vlan_filters.py → utils
     ├── vrf_filters.py → utils
+    ├── bgp_filters.py → utils
     ├── interface_categorization.py → utils
     ├── interface_ip_processing.py → utils
     ├── interface_change_detection.py → utils
@@ -949,9 +974,9 @@ netbox_filters.py (main entry point)
 
 ## Statistics
 
-- **Total Filters**: 29
-- **Total Lines**: ~2,700 (including docstrings and comments)
-- **Modules**: 9 (8 feature modules + 1 utility)
+- **Total Filters**: 37
+- **Total Lines**: ~3,100 (including docstrings and comments)
+- **Modules**: 11 (10 feature modules + 1 utility)
 - **Test Coverage**: Used in production for 100+ switches
 - **Code Quality**: Pylint score 9.30/10
 
@@ -963,12 +988,13 @@ netbox_filters.py (main entry point)
 | `vlan_filters.py` | 8 | 454 | VLAN lifecycle management |
 | `comparison.py` | 2 | 295 | State comparison logic |
 | `interface_categorization.py` | 2 | 294 | Interface categorization |
-| `vrf_filters.py` | 4 | 191 | VRF operations |
-| `l3_config_helpers.py` | 5 | 181 | L3 configuration optimization |
-| `utils.py` | 2 | 176 | Helper functions |
+| `vrf_filters.py` | 6 | 191 | VRF operations |
+| `l3_config_helpers.py` | 6 | 181 | L3 configuration optimization |
+| `utils.py` | 5 | 176 | Helper functions |
 | `ospf_filters.py` | 4 | 138 | OSPF configuration |
+| `bgp_filters.py` | 2 | 350 | BGP session enrichment |
 | `interface_ip_processing.py` | 1 | 106 | IP address matching |
-| **Total** | **29** | **~2,700** | **9 modules** |
+| **Total** | **37** | **~3,100** | **11 modules** |
 
 ## Migration Guide
 

@@ -7,7 +7,7 @@
 - name: Render aoscx configuration template
   ansible.builtin.template:
     src: aoscx.j2
-    dest: "/tmp/{{ inventory_hostname }}-config.txt"
+    dest: "{{ aoscx_template_config_output_dir }}/{{ inventory_hostname }}-config.txt"
   register: template_config
   when:
     - aoscx_generate_template_config | bool

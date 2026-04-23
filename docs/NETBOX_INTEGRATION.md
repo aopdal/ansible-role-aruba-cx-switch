@@ -235,12 +235,6 @@ Config context provides **configuration data** for features. This is JSON data a
 | | `vsx_keepalive_peer` | String | VSX peer keepalive IP address | ✅ Active |
 | | `vsx_keepalive_src` | String | Source IP for keepalive | ✅ Active |
 | | `vsx_keepalive_vrf` | String | VRF for keepalive (default: mgmt) | ✅ Active |
-| **BGP (Fallback)** | `bgp_as` | Integer | BGP AS Number | ⚠️ Hybrid (fallback) |
-| | `bgp_peers` | List | BGP EVPN neighbors | ⚠️ Hybrid (fallback) |
-| | `bgp_ipv4_peers` | List | BGP IPv4 unicast peers | ⚠️ Hybrid (fallback) |
-| | `bgp_vrfs` | List | BGP VRF configurations | ⚠️ Hybrid (fallback) |
-| | `bgp_rr_clients` | List | Route reflector clients | ⚠️ Hybrid (fallback) |
-| | `bgp_additional_config` | List | Additional BGP commands | ⚠️ Hybrid (fallback) |
 
 ### Base System Config Context Examples
 
@@ -302,100 +296,6 @@ Ansible access:
 - `dns.servers`
 - `dns.hosts`
 
-### BGP Config Context (Fallback Mode)
-
-**Important:** BGP configuration supports **two modes**:
-
-1. **netbox-bgp plugin** (preferred) - Structured data via plugin API
-2. **config_context** (fallback) - JSON data for migration period
-
-#### BGP AS Number
-
-```json
-{
-  "bgp_as": 65000
-}
-```
-
-#### BGP EVPN Neighbors
-
-```json
-{
-  "bgp_peers": [
-    {
-      "peer": "10.255.255.1",
-      "remote_as": 65000,
-      "description": "spine1-evpn"
-    },
-    {
-      "peer": "10.255.255.2",
-      "remote_as": 65000,
-      "description": "spine2-evpn"
-    }
-  ]
-}
-```
-
-#### BGP IPv4 Unicast Peers
-
-```json
-{
-  "bgp_ipv4_peers": [
-    {
-      "peer": "192.168.1.1",
-      "remote_as": 65001,
-      "description": "external-peer"
-    }
-  ]
-}
-```
-
-#### BGP VRFs
-
-```json
-{
-  "bgp_vrfs": [
-    {
-      "name": "customer1",
-      "rd": "65000:100",
-      "route_targets": {
-        "import": ["65000:100"],
-        "export": ["65000:100"]
-      }
-    }
-  ]
-}
-```
-
-#### Complete BGP Config Context Example
-
-```json
-{
-  "bgp_as": 65000,
-  "bgp_peers": [
-    {
-      "peer": "10.255.255.1",
-      "remote_as": 65000,
-      "description": "spine1-evpn",
-      "update_source": "loopback0"
-    },
-    {
-      "peer": "10.255.255.2",
-      "remote_as": 65000,
-      "description": "spine2-evpn",
-      "update_source": "loopback0"
-    }
-  ],
-  "bgp_rr_clients": [
-    "10.255.255.11",
-    "10.255.255.12"
-  ],
-  "bgp_additional_config": [
-    "maximum-paths 4",
-    "distance bgp 20 200 200"
-  ]
-}
-```
 
 ### Config Context Hierarchy
 
@@ -720,33 +620,6 @@ custom_fields:
 
 ---
 
-## Migration Path: config_context → Plugins
-
-### Current State
-
-- ✅ Base system: config_context (stable)
-- ⚠️ BGP: Hybrid (plugin preferred, config_context fallback)
-- ✅ EVPN/VXLAN: Native NetBox objects (L2VPN)
-
-### Future State (Recommended)
-
-- ✅ Base system: config_context (keep as-is)
-- ✅ BGP: netbox-bgp plugin only
-- ✅ EVPN/VXLAN: Native NetBox objects (current)
-
-### Migration Steps
-
-1. **Install netbox-bgp plugin** in NetBox
-2. **Create BGP objects** (sessions, communities, routing policies)
-3. **Test hybrid mode** (role automatically uses plugin)
-4. **Verify BGP config** matches expectations
-5. **Remove config_context BGP data** (keep other data)
-6. **Document migration** for team
-
-**See:** [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) for step-by-step instructions.
-
----
-
 ## Troubleshooting
 
 ### Custom Fields Not Working
@@ -829,10 +702,6 @@ curl -H "Authorization: Token $TOKEN" \
 **VSX (Stable):**
 
 - `vsx_system_mac`, `vsx_role`, `vsx_isl_ports`, `vsx_keepalive_peer`, `vsx_keepalive_src`, `vsx_keepalive_vrf`
-
-**BGP (Hybrid/Fallback):**
-
-- `bgp_as`, `bgp_peers`, `bgp_ipv4_peers`, `bgp_vrfs`, `bgp_rr_clients`
 
 ### NetBox Objects
 

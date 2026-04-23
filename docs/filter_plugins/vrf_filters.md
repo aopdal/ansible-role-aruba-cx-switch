@@ -814,6 +814,6 @@ DEBUG: Built-in VRFs filtered out: {'mgmt', 'MGMT', 'Global', 'global', 'default
 
 - [Filter Plugins Overview](../FILTER_PLUGINS.md)
 - [Utils Module](utils.md) - Debug functions
-- [Interface Filters](interface_filters.md) - L3 interface categorization by VRF
+- [Interface Categorization](interface_categorization.md) - L3 interface categorization by VRF
 - [VLAN Filters](vlan_filters.md) - VLAN operations
 - [NetBox Integration](../NETBOX_INTEGRATION.md)
