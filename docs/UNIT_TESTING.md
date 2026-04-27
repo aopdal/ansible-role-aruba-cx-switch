@@ -13,11 +13,11 @@ The test suite covers **37 filter functions** across **11 modules**:
 - `select_interfaces_to_configure` - Interface selection for idempotent mode
 
 ### 2. VLAN Filters (`test_vlan_filters.py`)
-- `extract_vlan_ids` - Extract VLANs from interfaces
+- `extract_vlan_ids` - Extract VLANs from interfaces (excludes tagged VLANs on subinterfaces)
 - `filter_vlans_in_use` - Filter to in-use VLANs
 - `extract_evpn_vlans` - Extract EVPN-enabled VLANs
 - `extract_vxlan_mappings` - Extract VXLAN VNI mappings
-- `get_vlans_in_use` - Get all VLANs in use
+- `get_vlans_in_use` - Get all VLANs in use (excludes tagged VLANs on subinterfaces)
 - `get_vlans_needing_changes` - Identify VLAN changes
 - `get_vlan_interfaces` - Extract VLAN interfaces
 - `parse_evpn_evi_output` - Parse CLI show evpn evi output

@@ -52,14 +52,27 @@ Scans interface configurations to build a comprehensive list of all VLANs that n
 
 1. Initialize empty set for VLAN IDs
 2. For each interface:
-   - Extract VLAN ID from interface name if it starts with "vlan"
+   - Extract VLAN ID from interface name if it starts with `vlan`
    - Add untagged VLAN ID if present
-   - Add all tagged VLAN IDs if present
+   - **Skip tagged VLANs if the interface is a subinterface** (type `virtual` with a parent)
+   - Add all tagged VLAN IDs if present (physical/LAG interfaces only)
 3. Sort and return as list
+
+> **Note:** Tagged VLANs on subinterfaces (e.g. `1/1/3.100`) are intentionally excluded. A subinterface uses an encapsulation VLAN for L3 routing and does not require a standalone VLAN to be created on the switch.
 
 #### Implementation Details
 
 ```python
+def _is_subinterface(interface):
+    """Return True when interface is a subinterface (virtual + parent)."""
+    if not interface or not isinstance(interface, dict):
+        return False
+    type_obj = interface.get("type")
+    type_value = type_obj.get("value") if isinstance(type_obj, dict) else None
+    has_parent = interface.get("parent") is not None
+    return type_value == "virtual" and has_parent
+
+
 def extract_vlan_ids(interfaces):
     vlan_ids = set()
 
@@ -77,6 +90,10 @@ def extract_vlan_ids(interfaces):
             vid = interface["untagged_vlan"].get("vid")
             if vid is not None:
                 vlan_ids.add(vid)
+
+        # Tagged VLANs on subinterfaces do not require standalone VLAN creation.
+        if _is_subinterface(interface):
+            continue
 
         # Tagged VLANs
         if interface.get("tagged_vlans") and interface["tagged_vlans"] is not None:
@@ -348,11 +365,14 @@ Provides detailed VLAN information including both IDs and full VLAN objects with
 1. Initialize empty dicts/sets for tracking VLANs
 2. Process physical/LAG interfaces:
    - Extract untagged VLAN
-   - Extract tagged VLANs
    - Skip management interfaces
+   - **Skip tagged VLANs if the interface is a subinterface** (type `virtual` with a parent)
+   - Extract tagged VLANs (physical/LAG interfaces only)
 3. Process VLAN/SVI interfaces (if provided):
    - Extract VLAN from interface
 4. Return dict with VIDs and VLAN objects
+
+> **Note:** Tagged VLANs on subinterfaces are excluded because a subinterface uses an encapsulation VLAN for L3 routing and does not require a standalone VLAN to be created on the switch.
 
 #### Usage Examples
 
