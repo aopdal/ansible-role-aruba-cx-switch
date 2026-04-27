@@ -8,6 +8,18 @@ import re
 from .utils import _debug
 
 
+def _is_subinterface(interface):
+    """Return True when interface is a subinterface (virtual + parent)."""
+    if not interface or not isinstance(interface, dict):
+        return False
+
+    type_obj = interface.get("type")
+    type_value = type_obj.get("value") if isinstance(type_obj, dict) else None
+    has_parent = interface.get("parent") is not None
+
+    return type_value == "virtual" and has_parent
+
+
 def extract_vlan_ids(interfaces):
     """
     Extract all VLAN IDs in use from interfaces
@@ -34,6 +46,10 @@ def extract_vlan_ids(interfaces):
             vid = interface["untagged_vlan"].get("vid")
             if vid is not None:
                 vlan_ids.add(vid)
+
+        # Tagged VLANs on subinterfaces do not require standalone VLAN creation.
+        if _is_subinterface(interface):
+            continue
 
         # Tagged VLANs
         if interface.get("tagged_vlans") and interface["tagged_vlans"] is not None:
@@ -179,6 +195,9 @@ def get_vlans_in_use(interfaces, vlan_interfaces=None):
 
         # Get tagged VLANs
         tagged_vlans = intf.get("tagged_vlans")
+        if _is_subinterface(intf):
+            continue
+
         if tagged_vlans and isinstance(tagged_vlans, list):
             for vlan in tagged_vlans:
                 if vlan and isinstance(vlan, dict):

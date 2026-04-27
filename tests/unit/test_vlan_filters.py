@@ -42,6 +42,20 @@ class TestExtractVlanIds:
         result = extract_vlan_ids(interfaces)
         assert result == [20, 30]
 
+    def test_skip_tagged_vlans_on_subinterface(self):
+        """Tagged VLANs on subinterfaces should not drive VLAN creation."""
+        interfaces = [
+            {
+                "name": "1/1/3.100",
+                "type": {"value": "virtual"},
+                "parent": {"name": "1/1/3"},
+                "untagged_vlan": None,
+                "tagged_vlans": [{"vid": 100}],
+            }
+        ]
+        result = extract_vlan_ids(interfaces)
+        assert result == []
+
     def test_extract_from_vlan_interface(self):
         """Test extracting VLAN from VLAN interface"""
         interfaces = [{"name": "vlan100"}]
@@ -181,6 +195,27 @@ class TestGetVlansInUse:
         result = get_vlans_in_use([], [])
         assert result["vids"] == []
         assert len(result["vids"]) == 0
+
+    def test_get_vlans_in_use_skips_subinterface_tagged_vlan(self):
+        """Subinterface tagged VLANs should not be marked as VLANs in use."""
+        interfaces = [
+            {
+                "name": "1/1/3.200",
+                "type": {"value": "virtual"},
+                "parent": {"name": "1/1/3"},
+                "untagged_vlan": None,
+                "tagged_vlans": [{"vid": 200}],
+            },
+            {
+                "name": "1/1/10",
+                "type": {"value": "1000base-t"},
+                "untagged_vlan": {"vid": 10},
+                "tagged_vlans": [],
+            },
+        ]
+
+        result = get_vlans_in_use(interfaces, [])
+        assert sorted(result["vids"]) == [10]
 
 
 class TestGetVlansNeedingChanges:
