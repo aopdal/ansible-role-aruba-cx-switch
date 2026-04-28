@@ -100,6 +100,7 @@ nav:
                   - EVPN & VXLAN:
                             - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
                   - BGP: BGP_CONFIGURATION.md
+                  - OSPF: OSPF_CONFIGURATION.md
                   - Tag-Dependent Tasks:
                             - Overview: TAG_DEPENDENT_INCLUDES.md
                             - Testing: TAG_DEPENDENT_TESTING.md

@@ -1,0 +1,18 @@
+---
+# Encrypt this file with:
+#   ansible-vault encrypt group_vars/routing-switch/vault.yml
+#
+# All keys here MUST be prefixed with `vault_` and referenced from a
+# plaintext vars file (see ospf.yml). Never reference vault_* variables
+# directly from tasks/templates.
+
+vault_ospf_auth_keys:
+  default:
+    secret: "ChangeMe-DefaultVrfSecret"
+    encrypted: false
+  mgmt:
+    secret: "ChangeMe-MgmtVrfSecret"
+    encrypted: false
+  # tenant_a:
+  #   secret: "$1$mdp$abcdef0123456789abcdef01"  # ciphertext from device
+  #   encrypted: true

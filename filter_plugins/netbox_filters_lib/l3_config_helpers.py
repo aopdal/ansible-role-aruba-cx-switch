@@ -85,7 +85,11 @@ def get_interface_vrf(interface_data):
     return "default"
 
 
-def group_interface_ips(interface_ip_list, ospf_facts=None, ospf_process_id=1):
+def group_interface_ips(
+    interface_ip_list,
+    ospf_facts=None,
+    ospf_process_id=1,
+):
     """
     Group a flat list of per-IP interface items into per-interface items.
 
@@ -97,7 +101,8 @@ def group_interface_ips(interface_ip_list, ospf_facts=None, ospf_process_id=1):
     - At least one IP address has _needs_add=True, OR
     - The interface has OSPF configured (if_ip_ospf_1_area set) AND either:
       - ospf_facts is None (no comparison possible — always include), OR
-      - The interface is not already registered in the correct OSPF area
+      - The interface is not already registered in the correct OSPF area, OR
+      - The interface's OSPF network type does not match the desired type.
 
     Args:
         interface_ip_list: List of per-IP items, each with keys:
@@ -108,9 +113,11 @@ def group_interface_ips(interface_ip_list, ospf_facts=None, ospf_process_id=1):
             - anycast_mac: MAC address for anycast gateway or None
             - _needs_add: Boolean indicating if this IP needs to be configured
         ospf_facts: Optional dict of OSPF interface facts gathered from the device
-            REST API, structured as {vrf: {process_id_str: {area: [intf_names]}}}.
-            When provided, interfaces already in the correct OSPF area are skipped
-            (unless IPs also need adding). When None, all OSPF interfaces are included.
+            REST API, structured as
+            ``{vrf: {process_id_str: {area: {intf_name: {ospf_if_type, ...}}}}}``.
+            When provided, interfaces already in the correct OSPF area with
+            the correct network type are skipped unless IPs also need adding.
+            When None, all OSPF interfaces are included.
         ospf_process_id: OSPF process ID to look up in ospf_facts (default: 1)
 
     Returns:
@@ -208,7 +215,11 @@ def group_interface_ips(interface_ip_list, ospf_facts=None, ospf_process_id=1):
 
 
 def build_l3_config_lines(
-    item, interface_type, vrf_type, l3_counters_enable=True, ospf_process_id=1
+    item,
+    interface_type,
+    vrf_type,
+    l3_counters_enable=True,
+    ospf_process_id=1,
 ):
     """
     Build all L3 configuration lines for a single interface.
@@ -261,6 +272,12 @@ def build_l3_config_lines(
         lines.append(f"vrf attach {vrf_name}")
         _debug(f"  Adding VRF attachment: {vrf_name}")
 
+    # MTU — before IP addresses (matches device CLI order)
+    mtu = interface_obj.get("mtu")
+    if mtu:
+        lines.append(f"ip mtu {mtu}")
+        _debug(f"  Adding MTU: {mtu}")
+
     # IP addresses: regular-before-anycast, IPv4 before IPv6
     # AOS-CX requires 'ip address' before 'active-gateway ip' for each address family
     ipv4_addrs = [a for a in addresses if ":" not in a.get("address", "")]
@@ -311,12 +328,6 @@ def build_l3_config_lines(
         _debug(
             f"  Adding IPv6 anycast gateway: {address} (MAC: {addr_item['anycast_mac']})"
         )
-
-    # MTU — once per interface
-    mtu = interface_obj.get("mtu")
-    if mtu:
-        lines.append(f"ip mtu {mtu}")
-        _debug(f"  Adding MTU: {mtu}")
 
     # L3 counters — once per interface (not supported on loopback)
     if l3_counters_enable and interface_type != "loopback":

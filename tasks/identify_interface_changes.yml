@@ -40,7 +40,8 @@
   ansible.builtin.debug:
     msg:
       - "Interface 1/1/5 from device facts:"
-      - "{{ ansible_facts.network_resources.interfaces['1/1/5'] | default('NOT FOUND') }}"
+      - "{{ ansible_facts.network_resources.interfaces['1/1/5'] | default('NOT
+        FOUND') }}"
   when:
     - aoscx_debug | default(false) | bool
     - ansible_facts is defined
@@ -54,9 +55,9 @@
     msg:
       - "=== VLAN Interface Facts (first 3) ==="
       - >-
-        {{ ansible_facts.network_resources.interfaces | dict2items
-        | selectattr('key', 'match', '^vlan') | list | first
-        | default('No VLAN interfaces found') }}
+        {{ ansible_facts.network_resources.interfaces | dict2items |
+        selectattr('key', 'match', '^vlan') | list | first | default('No VLAN
+        interfaces found') }}
   when:
     - aoscx_debug | default(false) | bool
     - ansible_facts is defined
@@ -69,9 +70,12 @@
   ansible.builtin.debug:
     msg:
       - "=== Enhanced Facts Status ==="
-      - "REST API facts enabled: {{ aoscx_gather_facts_rest_api | default(false) }}"
-      - "Enhanced facts available: {{ aoscx_enhanced_interface_facts is defined and aoscx_enhanced_interface_facts | length > 0 }}"
-      - "Enhanced interfaces count: {{ aoscx_enhanced_interface_facts | default({}) | length }}"
+      - "REST API facts enabled: {{ aoscx_gather_facts_rest_api | default(false)
+        }}"
+      - "Enhanced facts available: {{ aoscx_enhanced_interface_facts is defined
+        and aoscx_enhanced_interface_facts | length > 0 }}"
+      - "Enhanced interfaces count: {{ aoscx_enhanced_interface_facts |
+        default({}) | length }}"
   when:
     - aoscx_debug | default(false) | bool
   tags:
@@ -81,9 +85,12 @@
   ansible.builtin.debug:
     msg:
       - "=== Enhanced Facts for vlan11 ==="
-      - "Keys available: {{ (aoscx_enhanced_interface_facts | default({})).keys() | select('match', '^vlan') | list }}"
-      - "vlan11 data: {{ aoscx_enhanced_interface_facts['vlan11'] | default('NOT FOUND') }}"
-      - "vlan11 ip6_addresses: {{ (aoscx_enhanced_interface_facts['vlan11'] | default({})).get('ip6_addresses', 'NOT FOUND') }}"
+      - "Keys available: {{ (aoscx_enhanced_interface_facts |
+        default({})).keys() | select('match', '^vlan') | list }}"
+      - "vlan11 data: {{ aoscx_enhanced_interface_facts['vlan11'] | default('NOT
+        FOUND') }}"
+      - "vlan11 ip6_addresses: {{ (aoscx_enhanced_interface_facts['vlan11'] |
+        default({})).get('ip6_addresses', 'NOT FOUND') }}"
   when:
     - aoscx_debug | default(false) | bool
     - aoscx_enhanced_interface_facts is defined
@@ -95,8 +102,11 @@
   ansible.builtin.debug:
     msg:
       - "=== LAG Interface Facts ==="
-      - "LAG keys: {{ ansible_facts.network_resources.interfaces | dict2items | selectattr('key', 'match', '^lag') | map(attribute='key') | list }}"
-      - "lag250 device facts: {{ ansible_facts.network_resources.interfaces['lag250'] | default('NOT FOUND') }}"
+      - "LAG keys: {{ ansible_facts.network_resources.interfaces | dict2items |
+        selectattr('key', 'match', '^lag') | map(attribute='key') | list }}"
+      - "lag250 device facts: {{
+        ansible_facts.network_resources.interfaces['lag250'] | default('NOT
+        FOUND') }}"
   when:
     - aoscx_debug | default(false) | bool
     - ansible_facts is defined
@@ -109,7 +119,8 @@
   ansible.builtin.debug:
     msg:
       - "=== LAG Interfaces from NetBox ==="
-      - "lag250 NetBox: {{ interfaces | selectattr('name', 'equalto', 'lag250') | first | default('NOT FOUND') }}"
+      - "lag250 NetBox: {{ interfaces | selectattr('name', 'equalto', 'lag250')
+        | first | default('NOT FOUND') }}"
   when:
     - aoscx_debug | default(false) | bool
     - interfaces is defined
@@ -136,25 +147,32 @@
       - "=== Interface Change Analysis ==="
       - "Device: {{ inventory_hostname }}"
       - "Total interfaces from NetBox: {{ interfaces | default([]) | length }}"
-      - "Physical interfaces needing changes: {{ interface_changes.physical | default([]) | length }}"
+      - "Physical interfaces needing changes: {{ interface_changes.physical |
+        default([]) | length }}"
       - >-
-        Physical interface names:
-        {{ interface_changes.physical | default([]) | map(attribute='name') | list }}
-      - "LAG interfaces needing changes: {{ interface_changes.lag | default([]) | length }}"
+        Physical interface names: {{ interface_changes.physical | default([]) |
+        map(attribute='name') | list }}
+      - "LAG interfaces needing changes: {{ interface_changes.lag | default([])
+        | length }}"
       - >-
-        LAG interface names:
-        {{ interface_changes.lag | default([]) | map(attribute='name') | list }}
-      - "MCLAG interfaces needing changes: {{ interface_changes.mclag | default([]) | length }}"
+        LAG interface names: {{ interface_changes.lag | default([]) |
+        map(attribute='name') | list }}
+      - "MCLAG interfaces needing changes: {{ interface_changes.mclag |
+        default([]) | length }}"
       - >-
-        MCLAG interface names:
-        {{ interface_changes.mclag | default([]) | map(attribute='name') | list }}
-      - "L2 interfaces needing changes: {{ interface_changes.l2 | default([]) | length }}"
+        MCLAG interface names: {{ interface_changes.mclag | default([]) |
+        map(attribute='name') | list }}
+      - "L2 interfaces needing changes: {{ interface_changes.l2 | default([]) |
+        length }}"
       - >-
-        L2 interface names (first 10):
-        {{ (interface_changes.l2 | default([]) | map(attribute='name') | list)[:10] }}
-      - "L3 interfaces needing changes: {{ interface_changes.l3 | default([]) | length }}"
-      - "LAG member changes: {{ interface_changes.lag_members | default([]) | length }}"
-      - "Interfaces not needing changes: {{ interface_changes.no_changes | default([]) | length }}"
+        L2 interface names (first 10): {{ (interface_changes.l2 | default([]) |
+        map(attribute='name') | list)[:10] }}
+      - "L3 interfaces needing changes: {{ interface_changes.l3 | default([]) |
+        length }}"
+      - "LAG member changes: {{ interface_changes.lag_members | default([]) |
+        length }}"
+      - "Interfaces not needing changes: {{ interface_changes.no_changes |
+        default([]) | length }}"
   when:
     - aoscx_debug | default(false) | bool
     - interface_changes is defined
@@ -171,7 +189,8 @@
       - interface_changes.l2 is defined
       - interface_changes.l3 is defined
       - interface_changes.no_changes is defined
-    fail_msg: "ERROR: Interface change analysis failed - interface_changes fact not properly set"
+    fail_msg: "ERROR: Interface change analysis failed - interface_changes fact not
+      properly set"
     success_msg: "Interface change analysis completed successfully"
   tags:
     - always

@@ -1,0 +1,19 @@
+---
+# OSPF interface MD5 authentication settings (per VRF)
+#
+# This file is the *plaintext* indirection layer. It only references the
+# encrypted `vault_ospf_auth_keys` variable defined in vault.yml.
+# Templates and tasks should reference `ospf_auth_keys` (NOT vault_*),
+# so the codebase stays grep-friendly without decrypting the vault.
+#
+# Each entry is keyed by the VRF name as configured in NetBox (use 'default'
+# for the global/Global VRF). The value is a dict:
+#   secret:    MD5 key (cleartext today, switch-side ciphertext later)
+#   encrypted: false while pushing cleartext; flip to true when you replace
+#              `secret` with the ciphertext returned by 'show running-config'.
+
+ospf_auth_keys: "{{ vault_ospf_auth_keys }}"
+
+# MD5 key ID used in `ip ospf message-digest-key <id> md5 <secret>`.
+# Same value applied to all interfaces; change only if rotating keys.
+ospf_auth_key_id: 1
