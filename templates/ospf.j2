@@ -1,10 +1,16 @@
 
 {% if custom_fields.device_ospf is true %}
 {%   for vrf_entry in ospf_vrfs %}
+{%     set _ospf_key = (ospf_auth_keys | default({})).get(vrf_entry.vrf) %}
 router ospf {{ ospf_process_id }} vrf {{ vrf_entry.vrf }}
     router-id {{ custom_fields.device_ospf_1_routerid }}
 {%     for area in vrf_entry.areas %}
     area {{ area.area }}
+{%       if _ospf_key is mapping and _ospf_key.get('secret') %}
+    area {{ area.area }} authentication message-digest
+{%       elif _ospf_key is string and _ospf_key | length > 0 %}
+    area {{ area.area }} authentication message-digest
+{%       endif %}
 {%     endfor %}
 {%   endfor %}
 {% endif %}
