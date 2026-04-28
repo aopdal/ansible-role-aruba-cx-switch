@@ -45,6 +45,9 @@ interface {{ intf.name }}
    vrf attach {{ intf.vrf.name | replace("Global", "default") }}
 {%           endif %}
 {%         endif %}
+{%         if intf.mtu != none %}
+   ip mtu {{ intf.mtu }}
+{%         endif %}
 {%         for address in intf.ip_addresses %}
 {%           if address.family.label == "IPv4" %}
    ip address {{ address.address }}
@@ -53,28 +56,37 @@ interface {{ intf.name }}
    ipv6 address {{ address.address }}
 {%           endif %}
 {%         endfor %}
+{%         if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+   l3-counters
+{%         endif %}
 {%         if intf.custom_fields.if_ip_ospf_1_area != none %}
    ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
 {%           if intf.custom_fields.if_ip_ospf_network != none %}
    ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
 {%           endif %}
-{%         endif %}
-{%         if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
-   l3-counters
-{%         endif %}
-{%         if intf.mtu != none %}
-   ip mtu {{ intf.mtu }}
+{%           set _vrf = (intf.vrf.name | default('default')) | replace('Global', 'default') %}
+{%           set _k = (ospf_auth_keys | default({})).get(_vrf) %}
+{%           if _k is mapping and _k.get('secret') %}
+   ip ospf authentication message-digest
+   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 {{ 'ciphertext ' if _k.get('encrypted') else 'plaintext ' }}{{ _k.secret }}
+{%           elif _k is string and _k | length > 0 %}
+   ip ospf authentication message-digest
+   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 plaintext {{ _k }}
+{%           endif %}
 {%         endif %}
 {%       endif %}
 {%     elif intf.ip_addresses | length > 0 %}
 {# Non-subinterface with IP addresses - L3 routing #}
    routing
-{%       for address in intf.ip_addresses %}
-{%         if intf.vrf.id is defined %}
-{%           if address.family.label == "IPv4" %}
+{%       if intf.vrf.id is defined %}
+{%         if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
    vrf attach {{ intf.vrf.name | replace("Global", "default") }}
-{%           endif %}
 {%         endif %}
+{%       endif %}
+{%       if intf.mtu != none %}
+   ip mtu {{ intf.mtu }}
+{%       endif %}
+{%       for address in intf.ip_addresses %}
 {%         if address.family.label == "IPv4" %}
    ip address {{ address.address }}
 {%         endif %}
@@ -82,18 +94,25 @@ interface {{ intf.name }}
    ipv6 address {{ address.address }}
 {%         endif %}
 {%       endfor %}
+{%       if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+   l3-counters
+{%       endif %}
 {%       if intf.custom_fields.if_ip_ospf_1_area != none %}
    ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
 {%         if intf.custom_fields.if_ip_ospf_network != none %}
    ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
 {%         endif %}
+{%         set _vrf = (intf.vrf.name | default('default')) | replace('Global', 'default') %}
+{%         set _k = (ospf_auth_keys | default({})).get(_vrf) %}
+{%         if _k is mapping and _k.get('secret') %}
+   ip ospf authentication message-digest
+   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 {{ 'ciphertext ' if _k.get('encrypted') else 'plaintext ' }}{{ _k.secret }}
+{%         elif _k is string and _k | length > 0 %}
+   ip ospf authentication message-digest
+   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 plaintext {{ _k }}
+{%         endif %}
 {%       endif %}
-{%       if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
-   l3-counters
-{%       endif %}
-{%       if intf.mtu != none %}
-   ip mtu {{ intf.mtu }}
-{%       endif %}
+
 {%     endif %}
 {%     if intf.parent is none and intf.ip_addresses | length == 0 %}
 {# Physical interface without IP - L2 settings #}

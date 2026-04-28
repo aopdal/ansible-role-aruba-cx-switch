@@ -53,6 +53,15 @@ interface {{ intf.name | replace("vlan", "vlan ") }}
 {%         if intf.custom_fields.if_ip_ospf_network != none %}
    ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
 {%         endif %}
+{%         set _vrf = (intf.vrf.name | default('default')) | replace('Global', 'default') %}
+{%         set _k = (ospf_auth_keys | default({})).get(_vrf) %}
+{%         if _k is mapping and _k.get('secret') %}
+   ip ospf authentication message-digest
+   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 {{ 'ciphertext ' if _k.get('encrypted') else 'plaintext ' }}{{ _k.secret }}
+{%         elif _k is string and _k | length > 0 %}
+   ip ospf authentication message-digest
+   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 plaintext {{ _k }}
+{%         endif %}
 {%       endif %}
 {%       if intf.custom_fields.if_ip_helper != none %}
    ip helper-address {{ intf.custom_fields.if_ip_helper }}

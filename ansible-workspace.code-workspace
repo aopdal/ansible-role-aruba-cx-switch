@@ -7,10 +7,6 @@
         {
             "name": "🧪 Test Environment",
             "path": "/workspaces/aruba-role-testing"
-        },
-        {
-            "name": "📚 Auto NetOps (read-only)",
-            "path": "/workspaces/auto-netops-ansible"
         }
     ],
     "settings": {

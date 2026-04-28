@@ -42,7 +42,7 @@
     url: "https://{{ _rest_host }}/rest/v1/firmware"
     method: GET
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200]
+    status_code: [ 200 ]
     return_content: true
   register: _rest_firmware
   delegate_to: localhost
@@ -81,21 +81,23 @@
 - name: Set interface attributes to query
   ansible.builtin.set_fact:
     _rest_interface_base_attrs: "{{
-      'name,admin,description,mtu,type,ip4_address,ip6_addresses,'
-      ~ 'ip6_address_link_local,'
-      ~ 'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,'
-      ~ 'other_config,routing,vrf' }}"
-    _rest_interface_ospf_attrs: "ospf_if_type"
-    _rest_interface_vsx_attrs: "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_ip6,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6"
+      'name,admin,description,mtu,type,ip4_address,ip6_addresses,' ~
+      'ip6_address_link_local,' ~
+      'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,' ~
+      'other_config,routing,vrf' }}"
+    _rest_interface_ospf_attrs: "ospf_if_type,ospf_auth_type"
+    _rest_interface_vsx_attrs: "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_i\
+      p6,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6"
   tags:
     - always
 
 - name: Build interface attributes query string
   ansible.builtin.set_fact:
     _rest_interface_attrs: >-
-      {{ _rest_interface_base_attrs
-      }}{% if custom_fields.device_ospf | default(false) | bool %},{{ _rest_interface_ospf_attrs }}{% endif
-      %}{% if custom_fields.device_vsx | default(false) | bool %},{{ _rest_interface_vsx_attrs }}{% endif %}
+      {{ _rest_interface_base_attrs }}{% if custom_fields.device_ospf |
+      default(false) | bool %},{{ _rest_interface_ospf_attrs }}{% endif %}{% if
+      custom_fields.device_vsx | default(false) | bool %},{{
+      _rest_interface_vsx_attrs }}{% endif %}
   tags:
     - always
 
@@ -122,7 +124,7 @@
       username: "{{ _rest_user }}"
       password: "{{ _rest_password }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200]
+    status_code: [ 200 ]
     return_content: true
   register: _rest_login
   delegate_to: localhost
@@ -133,12 +135,13 @@
 # Query interfaces with depth=2 to get expanded IPv6 addresses and VSX virtual IPs
 - name: Query interfaces via REST API
   ansible.builtin.uri:
-    url: "{{ _rest_api_base }}/system/interfaces?depth=2&attributes={{ _rest_interface_attrs }}"
+    url: "{{ _rest_api_base }}/system/interfaces?depth=2&attributes={{
+      _rest_interface_attrs }}"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200]
+    status_code: [ 200 ]
     return_content: true
   register: _rest_interfaces
   delegate_to: localhost
@@ -154,7 +157,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200]
+    status_code: [ 200 ]
     return_content: true
   register: _rest_vlans
   delegate_to: localhost
@@ -165,8 +168,10 @@
   ansible.builtin.debug:
     msg:
       - "VLAN response type: {{ _rest_vlans.json | type_debug }}"
-      - "VLAN response keys: {{ _rest_vlans.json.keys() | list if _rest_vlans.json is mapping else 'NOT A DICT' }}"
-      - "VLAN response (first 500 chars): {{ _rest_vlans.json | string | truncate(500) }}"
+      - "VLAN response keys: {{ _rest_vlans.json.keys() | list if
+        _rest_vlans.json is mapping else 'NOT A DICT' }}"
+      - "VLAN response (first 500 chars): {{ _rest_vlans.json | string |
+        truncate(500) }}"
   when:
     - aoscx_debug | default(false) | bool
     - _rest_vlans is defined
@@ -181,7 +186,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200, 404]
+    status_code: [ 200, 404 ]
     return_content: true
   register: _rest_evpn
   delegate_to: localhost
@@ -199,7 +204,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200, 404]
+    status_code: [ 200, 404 ]
     return_content: true
   register: _rest_evpn_vlans
   delegate_to: localhost
@@ -217,7 +222,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200, 404]
+    status_code: [ 200, 404 ]
     return_content: true
   register: _rest_vnis
   delegate_to: localhost
@@ -239,9 +244,8 @@
 - name: Build OSPF query list from NetBox interfaces
   ansible.builtin.set_fact:
     _ospf_queries: >-
-      {%- set queries = [] -%}
-      {%- set seen = [] -%}
-      {%- for intf in interfaces | default([]) | select_ospf_interfaces -%}
+      {%- set queries = [] -%} {%- set seen = [] -%} {%- for intf in interfaces
+      | default([]) | select_ospf_interfaces -%}
         {%- set vrf = (intf.vrf.name | default('default')) if intf.vrf is mapping else 'default' -%}
         {%- set area = intf.custom_fields.if_ip_ospf_1_area -%}
         {%- set key = vrf ~ '|1|' ~ area -%}
@@ -249,8 +253,7 @@
           {%- set _ = seen.append(key) -%}
           {%- set _ = queries.append({'vrf': vrf, 'process_id': '1', 'area': area}) -%}
         {%- endif -%}
-      {%- endfor -%}
-      {{ queries }}
+      {%- endfor -%} {{ queries }}
   when:
     - aoscx_configure_ospf | default(false) | bool
     - custom_fields.device_ospf | default(false) | bool
@@ -260,13 +263,14 @@
 - name: Query OSPF interface facts from REST API
   ansible.builtin.uri:
     url: >-
-      {{ _rest_api_base }}/system/vrfs/{{ item.vrf }}/ospf_routers/{{ item.process_id
-      }}/areas/{{ item.area }}/ospf_interfaces?attributes=port&depth=1
+      {{ _rest_api_base }}/system/vrfs/{{ item.vrf }}/ospf_routers/{{
+      item.process_id }}/areas/{{ item.area
+      }}/ospf_interfaces?attributes=port&depth=1
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200, 404]
+    status_code: [ 200, 404 ]
     return_content: true
   loop: "{{ _ospf_queries | default([]) }}"
   loop_control:
@@ -283,8 +287,8 @@
 - name: Build OSPF interface facts from REST API responses
   ansible.builtin.set_fact:
     aoscx_ospf_interface_facts: >-
-      {%- set result = {} -%}
-      {%- for resp in _rest_ospf_results.results | default([]) -%}
+      {%- set result = {} -%} {%- for resp in _rest_ospf_results.results |
+      default([]) -%}
         {%- if resp.status == 200 and resp.json is mapping -%}
           {%- set vrf = resp.item.vrf -%}
           {%- set pid = resp.item.process_id -%}
@@ -294,12 +298,14 @@
           {%- set area_dict = {} -%}
           {%- for intf_name in resp.json.keys() -%}
             {%- set intf_data = _rest_interfaces.json.get(intf_name, {}) -%}
-            {%- set _ = area_dict.update({intf_name: {'ospf_if_type': intf_data.get('ospf_if_type')}}) -%}
+            {%- set _ = area_dict.update({intf_name: {
+                'ospf_if_type': intf_data.get('ospf_if_type'),
+                'ospf_auth_type': intf_data.get('ospf_auth_type'),
+            }}) -%}
           {%- endfor -%}
           {%- set _ = result[vrf][pid].update({area: area_dict}) -%}
         {%- endif -%}
-      {%- endfor -%}
-      {{ result }}
+      {%- endfor -%} {{ result }}
   when:
     - aoscx_configure_ospf | default(false) | bool
     - custom_fields.device_ospf | default(false) | bool
@@ -315,7 +321,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [200, 204]
+    status_code: [ 200, 204 ]
   delegate_to: localhost
   no_log: true
   tags:

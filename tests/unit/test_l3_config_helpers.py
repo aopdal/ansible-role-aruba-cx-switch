@@ -395,12 +395,12 @@ class TestBuildL3ConfigLines:
         assert "active-gateway ipv6 2001:db8:1000:17::1" in lines
         # IPv6 regular
         assert "ipv6 address 2001:db8:1000:17::2/64" in lines
-        # Order: vrf -> regular IPv4 -> anycast IPv4 -> regular IPv6 -> anycast IPv6 -> mtu -> l3-counters
-        assert lines.index("vrf attach lab-blue") < lines.index("ip address 172.27.4.226/27")
+        # Order: vrf -> ip mtu -> regular IPv4 -> anycast IPv4 -> regular IPv6 -> anycast IPv6 -> l3-counters
+        assert lines.index("vrf attach lab-blue") < lines.index("ip mtu 9198")
+        assert lines.index("ip mtu 9198") < lines.index("ip address 172.27.4.226/27")
         assert lines.index("ip address 172.27.4.226/27") < lines.index("active-gateway ip mac 00:00:00:01:00:01")
         assert lines.index("ipv6 address 2001:db8:1000:17::2/64") < lines.index("active-gateway ipv6 mac 00:00:00:01:00:01")
-        assert lines.index("active-gateway ipv6 2001:db8:1000:17::1") < lines.index("ip mtu 9198")
-        assert lines.index("ip mtu 9198") < lines.index("l3-counters")
+        assert lines.index("active-gateway ipv6 2001:db8:1000:17::1") < lines.index("l3-counters")
 
     def test_vlan_link_local_anycast_gateway(self):
         """Link-local IPv6 anycast generates 'ipv6 address link-local' before active-gateway"""
@@ -504,7 +504,7 @@ class TestBuildL3ConfigLines:
         assert "l3-counters" in lines
 
     def test_command_order_custom_vrf(self):
-        """VRF first, then IPs, then MTU, then l3-counters"""
+        """VRF first, then MTU, then IPs, then l3-counters"""
         item = _make_item(
             {"vrf": {"name": "TEST"}, "mtu": 9000},
             [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
@@ -512,7 +512,7 @@ class TestBuildL3ConfigLines:
         lines = build_l3_config_lines(item, "physical", "custom", True)
 
         assert lines[0] == "vrf attach TEST"
-        assert lines.index("ip address 10.0.0.1/24") < lines.index("ip mtu 9000")
+        assert lines.index("ip mtu 9000") < lines.index("ip address 10.0.0.1/24")
         assert lines[-1] == "l3-counters"
 
     def test_subinterface_with_encapsulation(self):

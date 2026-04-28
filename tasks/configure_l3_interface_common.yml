@@ -21,15 +21,24 @@
 #
 # Uses aoscx_ospf_interface_facts (gathered in gather_facts_rest_api.yml) when available
 # to skip OSPF-only pushes for interfaces that are already in the correct OSPF area.
+#
+# OSPF authentication (md5) is configured separately by configure_ospf.yml using
+# the arubanetworks.aoscx.aoscx_ospf_interface module, so secrets never appear
+# in the lines pushed by aoscx_config and no_log is no longer required here.
 
 - name: "Configure {{ interface_type }} L3 interfaces ({{ vrf_type }} VRF)"
   arubanetworks.aoscx.aoscx_config:
-    lines: "{{ item | build_l3_config_lines(interface_type, vrf_type, aoscx_l3_counters_enable | default(true), ospf_process_id | default(1)) }}"
-    parents: "interface {{ item.interface_name | format_interface_name(interface_type) }}"
+    lines: "{{ item | build_l3_config_lines(interface_type, vrf_type,
+      aoscx_l3_counters_enable | default(true), ospf_process_id | default(1))
+      }}"
+    parents: "interface {{ item.interface_name |
+      format_interface_name(interface_type) }}"
   loop: "{{ _grouped_interfaces }}"
   loop_control:
     label: "Interface: {{ item.interface_name }}"
   when: _grouped_interfaces | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
-    _grouped_interfaces: "{{ interface_list | group_interface_ips(aoscx_ospf_interface_facts | default(none), ospf_process_id | default(1)) }}"
+    _grouped_interfaces: "{{ interface_list |
+      group_interface_ips(aoscx_ospf_interface_facts | default(none),
+      ospf_process_id | default(1)) }}"

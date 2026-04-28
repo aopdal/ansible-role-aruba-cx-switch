@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-04-28
+
+### Added
+
+- OSPF authentication on interfaces
+
+### Fixed
+
+- filter plugins and testing doc - exclude VLAN on subinterfaces
+- configuration templates config order
+
 ## [0.10.2] - 2026-04-27
 
 ### Fixed

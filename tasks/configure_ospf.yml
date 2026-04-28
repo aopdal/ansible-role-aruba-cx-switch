@@ -9,7 +9,9 @@
   ansible.builtin.debug:
     msg:
       - "Interfaces with OSPF config: {{ ospf_interfaces | length }}"
-      - "OSPF Areas in use: {{ ospf_interfaces | map(attribute='custom_fields.if_ip_ospf_1_area') | select | unique | list }}"
+      - "OSPF Areas in use: {{ ospf_interfaces |
+        map(attribute='custom_fields.if_ip_ospf_1_area') | select | unique |
+        list }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Get OSPF configuration from config_context
@@ -63,12 +65,88 @@
     label: "VRF: {{ item.0.vrf }} Area: {{ item.1.area }}"
   when: ospf_config.vrfs | length > 0
 
+# Per-interface OSPF configuration (area attachment, network type, MD5 auth).
+#
+# Uses arubanetworks.aoscx.aoscx_ospf_interface (REST-based, idempotent) so we
+# do not have to push CLI lines containing cleartext secrets via aoscx_config.
+# Authentication is only configured when ospf_auth_keys has an entry for the
+# interface's VRF; otherwise just area + network type are reconciled.
+- name: Build per-interface OSPF parameter list
+  ansible.builtin.set_fact:
+    _ospf_interface_items: >-
+      {%- set out = [] -%} {%- set _net_map = {
+        'point-to-point': 'point_to_point',
+        'broadcast': 'broadcast',
+        'nbma': 'nbma',
+        'point-to-multipoint': 'point_to_multipoint',
+        'loopback': 'loopback',
+      } -%} {%- for intf in ospf_interfaces -%}
+        {%- set vrf_name = ((intf.vrf.name | default('default'))
+          if intf.vrf is mapping else 'default') | replace('Global', 'default') -%}
+        {%- set area = intf.custom_fields.if_ip_ospf_1_area -%}
+        {%- set network = intf.custom_fields.if_ip_ospf_network -%}
+        {%- set _ = out.append({
+          'interface_name': intf.name,
+          'vrf': vrf_name,
+          'area_id': area,
+          'network_type': _net_map.get(network),
+        }) -%}
+      {%- endfor -%} {{ out }}
+  when: ospf_interfaces | length > 0
+
+- name: Configure OSPF on interfaces (area + network type)
+  arubanetworks.aoscx.aoscx_ospf_interface:
+    vrf: "{{ item.vrf }}"
+    version: v2
+    ospf_id: "{{ ospf_config.process_id | int }}"
+    area_id: "{{ item.area_id }}"
+    interface_name: "{{ item.interface_name }}"
+    type: "{{ item.network_type | default(omit) }}"
+    state: create
+  loop: "{{ _ospf_interface_items | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }}, area: {{
+      item.area_id }})"
+  when:
+    - _ospf_interface_items | default([]) | length > 0
+
+# Apply MD5 authentication to OSPF interfaces when a per-VRF secret is configured.
+# Run as a separate, no_log task so the rest of the OSPF reconciliation is
+# visible in playbook output.
+- name: Configure OSPF MD5 authentication on interfaces
+  arubanetworks.aoscx.aoscx_ospf_interface:
+    vrf: "{{ item.vrf }}"
+    version: v2
+    ospf_id: "{{ ospf_config.process_id | int }}"
+    area_id: "{{ item.area_id }}"
+    interface_name: "{{ item.interface_name }}"
+    ospfv2_auth_type: md5
+    ospfv2_auth_md5_keys:
+      - id: "{{ ospf_auth_key_id | default(1) | int }}"
+        key: >-
+          {{ (ospf_auth_keys[item.vrf].secret
+              if ospf_auth_keys[item.vrf] is mapping
+              else ospf_auth_keys[item.vrf]) }}
+    state: update
+  loop: "{{ _ospf_interface_items | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }})"
+  when:
+    - _ospf_interface_items | default([]) | length > 0
+    - ospf_auth_keys is defined
+    - ospf_auth_keys.get(item.vrf) is not none
+    - (ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
+      else ospf_auth_keys[item.vrf]) | default('') | length > 0
+  no_log: true
+
 - name: Debug - OSPF configuration summary
   ansible.builtin.debug:
     msg:
       - "OSPF Process ID: {{ ospf_config.process_id }}"
-      - "OSPF Router configured: {{ ospf_config.router_id is defined and ospf_config.router_id | length > 0 }}"
+      - "OSPF Router configured: {{ ospf_config.router_id is defined and
+        ospf_config.router_id | length > 0 }}"
       - "OSPF VRFs configured: {{ ospf_config.vrfs | length }}"
-      - "Total OSPF Areas configured: {{ ospf_config.vrfs | map(attribute='areas') | map('default', []) | map('length') | sum }}"
+      - "Total OSPF Areas configured: {{ ospf_config.vrfs |
+        map(attribute='areas') | map('default', []) | map('length') | sum }}"
       - "OSPF Interfaces configured: {{ ospf_interfaces | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 0

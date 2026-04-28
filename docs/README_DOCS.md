@@ -85,6 +85,14 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - IPv4 unicast and EVPN address families
     - VRF route distinguishers
 
+### OSPF
+
+- **[OSPF_CONFIGURATION.md](OSPF_CONFIGURATION.md)** - Complete OSPF
+  reference: NetBox modelling (custom fields + config context),
+  router/area/interface configuration, per-VRF MD5 authentication
+  with vault indirection, VRF-name matching rules, and
+  cleartext-to-ciphertext migration.
+
 ### Tag-Dependent Configuration
 
 - **[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md)** - Tag-dependent task implementation

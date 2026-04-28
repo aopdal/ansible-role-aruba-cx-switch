@@ -7,7 +7,8 @@
     }
   },
   "mounts": [
-    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
+    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
+    "source=${localEnv:HOME}/code/aruba-role-testing,target=/workspaces/aruba-role-testing,type=bind"
   ],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
@@ -36,7 +37,6 @@
         "charliermarsh.ruff",
         "eamodio.gitlens",
         "mhutchie.git-graph",
-        "streetsidesoftware.code-spell-checker",
         "usernamehw.errorlens",
         "oderwat.indent-rainbow"
       ],
