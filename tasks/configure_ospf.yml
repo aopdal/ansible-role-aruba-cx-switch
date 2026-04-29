@@ -113,6 +113,7 @@
 # Apply MD5 authentication to OSPF interfaces when a per-VRF secret is configured.
 # Run as a separate, no_log task so the rest of the OSPF reconciliation is
 # visible in playbook output.
+# Loopback interfaces are excluded since they never have OSPF neighbors.
 - name: Configure OSPF MD5 authentication on interfaces
   arubanetworks.aoscx.aoscx_ospf_interface:
     vrf: "{{ item.vrf }}"
@@ -133,6 +134,7 @@
     label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }})"
   when:
     - _ospf_interface_items | default([]) | length > 0
+    - "'loopback' not in item.interface_name"
     - ospf_auth_keys is defined
     - ospf_auth_keys.get(item.vrf) is not none
     - (ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
