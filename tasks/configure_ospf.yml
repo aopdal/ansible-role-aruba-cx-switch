@@ -65,7 +65,7 @@
     label: "VRF: {{ item.0.vrf }} Area: {{ item.1.area }}"
   when: ospf_config.vrfs | length > 0
 
-# Per-interface OSPF configuration (area attachment, network type, MD5 auth).
+# Per-interface OSPF configuration (area attachment, network type, passive, MD5 auth).
 #
 # Uses arubanetworks.aoscx.aoscx_ospf_interface (REST-based, idempotent) so we
 # do not have to push CLI lines containing cleartext secrets via aoscx_config.
@@ -85,16 +85,28 @@
           if intf.vrf is mapping else 'default') | replace('Global', 'default') -%}
         {%- set area = intf.custom_fields.if_ip_ospf_1_area -%}
         {%- set network = intf.custom_fields.if_ip_ospf_network -%}
+        {%- set passive = intf.custom_fields.if_ip_ospf_passive | default(false) -%}
+        {%- set auth_enabled = intf.custom_fields.if_ip_ospf_auth | default(true) -%}
         {%- set _ = out.append({
           'interface_name': intf.name,
           'vrf': vrf_name,
           'area_id': area,
           'network_type': _net_map.get(network),
+          'passive': passive,
+          'auth_enabled': auth_enabled,
         }) -%}
       {%- endfor -%} {{ out }}
   when: ospf_interfaces | length > 0
 
-- name: Configure OSPF on interfaces (area + network type)
+# Configure OSPF on interfaces - unified task for area, network type, and authentication.
+# The module requires auth parameters when auth is already configured, so we always
+# provide them: either enabling MD5 auth or explicitly disabling with 'none'.
+# Authentication is disabled (ospfv2_auth_type: none) when:
+#   - Interface is loopback (never has neighbors)
+#   - Interface is passive (no neighbors, auth irrelevant)
+#   - if_ip_ospf_auth custom field is false (selective auth within VRF)
+#   - No auth key configured for the VRF
+- name: Configure OSPF on interfaces (area, network type, and authentication)
   arubanetworks.aoscx.aoscx_ospf_interface:
     vrf: "{{ item.vrf }}"
     version: v2
@@ -102,42 +114,80 @@
     area_id: "{{ item.area_id }}"
     interface_name: "{{ item.interface_name }}"
     type: "{{ item.network_type | default(omit) }}"
-    state: create
+    ospfv2_auth_type: >-
+      {%- if 'loopback' in item.interface_name or
+             item.passive or
+             not item.auth_enabled or
+             ospf_auth_keys is not defined or
+             ospf_auth_keys.get(item.vrf) is none or
+             (ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
+              else ospf_auth_keys[item.vrf]) | default('') | length == 0 -%}
+        none
+      {%- else -%}
+        md5
+      {%- endif -%}
+    ospfv2_auth_md5_keys: >-
+      {%- if 'loopback' not in item.interface_name and
+             not item.passive and
+             item.auth_enabled and
+             ospf_auth_keys is defined and
+             ospf_auth_keys.get(item.vrf) is not none and
+             (ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
+              else ospf_auth_keys[item.vrf]) | default('') | length > 0 -%}
+        [{"id": {{ ospf_auth_key_id | default(1) | int }},
+          "key": "{{ (ospf_auth_keys[item.vrf].secret
+                      if ospf_auth_keys[item.vrf] is mapping
+                      else ospf_auth_keys[item.vrf]) }}"}]
+      {%- else -%}
+        {{ omit }}
+      {%- endif -%}
+    state: update
   loop: "{{ _ospf_interface_items | default([]) }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }}, area: {{
       item.area_id }})"
   when:
     - _ospf_interface_items | default([]) | length > 0
+  no_log: true
 
-# Apply MD5 authentication to OSPF interfaces when a per-VRF secret is configured.
-# Run as a separate, no_log task so the rest of the OSPF reconciliation is
-# visible in playbook output.
-- name: Configure OSPF MD5 authentication on interfaces
-  arubanetworks.aoscx.aoscx_ospf_interface:
-    vrf: "{{ item.vrf }}"
-    version: v2
-    ospf_id: "{{ ospf_config.process_id | int }}"
-    area_id: "{{ item.area_id }}"
-    interface_name: "{{ item.interface_name }}"
-    ospfv2_auth_type: md5
-    ospfv2_auth_md5_keys:
-      - id: "{{ ospf_auth_key_id | default(1) | int }}"
-        key: >-
-          {{ (ospf_auth_keys[item.vrf].secret
-              if ospf_auth_keys[item.vrf] is mapping
-              else ospf_auth_keys[item.vrf]) }}
-    state: update
+# Configure passive OSPF interfaces (no OSPF hello packets sent/received).
+# The aoscx_ospf_interface module doesn't support passive configuration,
+# so we use CLI commands. Loopback interfaces are excluded since passive
+# is implicit on loopbacks and not configurable via CLI.
+# Note: aoscx_config requires CLI/SSH connection, not REST API.
+- name: Configure OSPF passive interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - ip ospf passive
+    parents:
+      - "interface {{ item.interface_name }}"
+  vars:
+    ansible_connection: ansible.netcommon.network_cli
   loop: "{{ _ospf_interface_items | default([]) }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }})"
   when:
     - _ospf_interface_items | default([]) | length > 0
-    - ospf_auth_keys is defined
-    - ospf_auth_keys.get(item.vrf) is not none
-    - (ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
-      else ospf_auth_keys[item.vrf]) | default('') | length > 0
-  no_log: true
+    - item.passive | bool
+    - "'loopback' not in item.interface_name"
+
+# Remove passive from OSPF interfaces where NetBox state changed from passive to active.
+# aoscx_config is idempotent - only makes changes if config differs from desired state.
+- name: Remove OSPF passive from non-passive interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - no ip ospf passive
+    parents:
+      - "interface {{ item.interface_name }}"
+  vars:
+    ansible_connection: ansible.netcommon.network_cli
+  loop: "{{ _ospf_interface_items | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }})"
+  when:
+    - _ospf_interface_items | default([]) | length > 0
+    - not item.passive | bool
+    - "'loopback' not in item.interface_name"
 
 - name: Debug - OSPF configuration summary
   ansible.builtin.debug:
