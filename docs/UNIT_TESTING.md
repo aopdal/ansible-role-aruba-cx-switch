@@ -4,7 +4,7 @@ Comprehensive unit tests for all custom Ansible filter plugins in this role.
 
 ## Test Coverage
 
-The test suite covers **37 filter functions** across **11 modules**:
+The test suite covers **38 filter functions** across **10 modules**:
 
 ### 1. Utility Functions (`test_utils.py`)
 - `collapse_vlan_list` - VLAN range collapsing
@@ -19,6 +19,7 @@ The test suite covers **37 filter functions** across **11 modules**:
 - `extract_vxlan_mappings` - Extract VXLAN VNI mappings
 - `get_vlans_in_use` - Get all VLANs in use (excludes tagged VLANs on subinterfaces)
 - `get_vlans_needing_changes` - Identify VLAN changes
+- `get_vlans_needing_igmp_update` - Identify VLANs needing IGMP snooping updates (compares NetBox `vlan_ip_igmp_snooping` field vs current device state from enhanced REST API facts)
 - `get_vlan_interfaces` - Extract VLAN interfaces
 - `parse_evpn_evi_output` - Parse CLI show evpn evi output
 

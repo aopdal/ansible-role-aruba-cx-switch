@@ -25,9 +25,12 @@
   ansible.builtin.debug:
     msg:
       - "=== VLAN Creation (configure_vlans.yml) ==="
-      - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{ vlan_changes.vlans_to_create | map(attribute='vid') | list | sort }}"
-      - "VLANs to delete (later): {{ vlan_changes.vlans_to_delete | length }} - {{ vlan_changes.vlans_to_delete | sort }}"
-      - "Note: VLAN deletion happens in cleanup_vlans.yml after interface cleanup"
+      - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{
+        vlan_changes.vlans_to_create | map(attribute='vid') | list | sort }}"
+      - "VLANs to delete (later): {{ vlan_changes.vlans_to_delete | length }} -
+        {{ vlan_changes.vlans_to_delete | sort }}"
+      - "Note: VLAN deletion happens in cleanup_vlans.yml after interface
+        cleanup"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Create VLANs
@@ -53,9 +56,11 @@
     vlan_id: "{{ item.vid }}"
     ip_igmp_snooping: "{{ item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
     state: update
-  loop: "{{ vlans | get_vlans_needing_igmp_update(vlans_in_use, aoscx_enhanced_vlan_facts | default(none)) }}"
+  loop: "{{ vlans | get_vlans_needing_igmp_update(vlans_in_use,
+    aoscx_enhanced_vlan_facts | default(none)) }}"
   loop_control:
-    label: "VLAN {{ item.vid }} - IGMP snooping: {{ item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
+    label: "VLAN {{ item.vid }} - IGMP snooping: {{
+      item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
   when:
     - vlans | length > 0
     - vlans_in_use.vids | length > 0
