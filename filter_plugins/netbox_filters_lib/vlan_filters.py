@@ -493,3 +493,111 @@ def parse_evpn_evi_output(output):
 
     _debug(f"Parsed EVPN EVI output: {len(vlans_int)} VLANs, {len(vnis_int)} VNIs")
     return result
+
+
+def get_vlans_needing_igmp_update(
+    device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None
+):
+    """
+    Determine which VLANs need IGMP snooping configuration updates
+
+    Filters VLANs to only those that:
+    1. Are in use on interfaces
+    2. Have vlan_ip_igmp_snooping custom field defined
+    3. Have different IGMP setting than current device state (when facts available)
+
+    Args:
+        device_vlans: List of VLAN objects available for this device from NetBox
+        vlans_in_use_dict: Dict from get_vlans_in_use() with 'vids' and 'vlans'
+        enhanced_vlan_facts: Optional dict from REST API with current IGMP state
+                           Format: {"101": {"mgmd_enable": {"igmp": false}, ...}, ...}
+
+    Returns:
+        List of VLAN objects needing IGMP snooping configuration updates
+    """
+    vlans_needing_update = []
+
+    # Ensure inputs are valid
+    if not device_vlans:
+        _debug("No device VLANs provided")
+        return vlans_needing_update
+
+    if not vlans_in_use_dict or "vids" not in vlans_in_use_dict:
+        _debug("No VLANs in use provided")
+        return vlans_needing_update
+
+    vids_in_use = set(vlans_in_use_dict["vids"])
+    _debug(f"VLANs in use on interfaces: {sorted(list(vids_in_use))}")
+
+    # Process each VLAN
+    for vlan in device_vlans:
+        if not vlan or not isinstance(vlan, dict):
+            continue
+
+        vid = vlan.get("vid")
+        if vid is None or vid < 2 or vid > 4094:
+            continue
+
+        # Skip if VLAN is not in use
+        if vid not in vids_in_use:
+            _debug(f"VLAN {vid} not in use - skipping IGMP check")
+            continue
+
+        # Check if IGMP snooping custom field is defined
+        custom_fields = vlan.get("custom_fields", {})
+        desired_igmp = custom_fields.get("vlan_ip_igmp_snooping")
+
+        if desired_igmp is None:
+            _debug(f"VLAN {vid} has no vlan_ip_igmp_snooping custom field - skipping")
+            continue
+
+        # Convert to boolean
+        desired_igmp_bool = bool(desired_igmp)
+
+        # If we have enhanced facts, compare current vs desired state
+        if enhanced_vlan_facts and isinstance(enhanced_vlan_facts, dict):
+            vid_str = str(vid)
+
+            if vid_str in enhanced_vlan_facts:
+                vlan_facts = enhanced_vlan_facts[vid_str]
+
+                # Get current IGMP state from mgmd_enable.igmp
+                if isinstance(vlan_facts, dict):
+                    mgmd_enable = vlan_facts.get("mgmd_enable", {})
+                    if isinstance(mgmd_enable, dict):
+                        current_igmp = mgmd_enable.get("igmp", False)
+                        current_igmp_bool = bool(current_igmp)
+
+                        # Only update if different
+                        if desired_igmp_bool != current_igmp_bool:
+                            vlans_needing_update.append(vlan)
+                            _debug(
+                                f"VLAN {vid} IGMP needs update: "
+                                f"{current_igmp_bool} -> {desired_igmp_bool}"
+                            )
+                        else:
+                            _debug(
+                                f"VLAN {vid} IGMP already correct: {current_igmp_bool}"
+                            )
+                        continue
+
+            # If we get here, VLAN not found in enhanced facts
+            # Add it to be safe (assume it needs update)
+            _debug(
+                f"VLAN {vid} not in enhanced facts - assuming needs update "
+                f"to {desired_igmp_bool}"
+            )
+            vlans_needing_update.append(vlan)
+        else:
+            # No enhanced facts - assume all VLANs need update
+            _debug(
+                f"No enhanced facts - VLAN {vid} will be updated to {desired_igmp_bool}"
+            )
+            vlans_needing_update.append(vlan)
+
+    _debug(
+        f"VLANs needing IGMP update: {len(vlans_needing_update)} - "
+        f"{[v.get('vid') for v in vlans_needing_update]}"
+    )
+
+    return vlans_needing_update

@@ -9,6 +9,7 @@ from netbox_filters_lib.vlan_filters import (
     extract_vxlan_mappings,
     get_vlans_in_use,
     get_vlans_needing_changes,
+    get_vlans_needing_igmp_update,
     get_vlan_interfaces,
     parse_evpn_evi_output,
 )
@@ -367,3 +368,148 @@ that doesn't contain L2VNI data"""
         result = parse_evpn_evi_output(output)
         assert result["vxlan_vnis"] == [16777200]
         assert result["vxlan_vlans"] == [4094]
+
+
+class TestGetVlansNeedingIgmpUpdate:
+    """Tests for get_vlans_needing_igmp_update function"""
+
+    def test_filter_vlans_with_igmp_custom_field(self):
+        """Test filtering VLANs that have IGMP snooping custom field"""
+        vlans = [
+            {"vid": 10, "name": "VLAN10", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+            {"vid": 20, "name": "VLAN20", "custom_fields": {"vlan_ip_igmp_snooping": False}},
+            {"vid": 30, "name": "VLAN30", "custom_fields": {}},  # No IGMP field
+        ]
+        vlans_in_use = {"vids": [10, 20, 30], "vlans": vlans}
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use)
+        result_vids = [v["vid"] for v in result]
+
+        # Should include VLANs with defined IGMP field (10 and 20), exclude 30
+        assert sorted(result_vids) == [10, 20]
+
+    def test_skip_vlans_not_in_use(self):
+        """Test that VLANs not in use are skipped even if IGMP field is set"""
+        vlans = [
+            {"vid": 10, "name": "VLAN10", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+            {"vid": 20, "name": "VLAN20", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+            {"vid": 30, "name": "VLAN30", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+        ]
+        vlans_in_use = {"vids": [10, 20], "vlans": vlans[:2]}  # Only 10 and 20 in use
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use)
+        result_vids = [v["vid"] for v in result]
+
+        # Should only include VLANs 10 and 20 (in use)
+        assert sorted(result_vids) == [10, 20]
+
+    def test_skip_invalid_vlan_ids(self):
+        """Test that invalid VLAN IDs (< 2 or > 4094) are skipped"""
+        vlans = [
+            {"vid": 1, "name": "VLAN1", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+            {"vid": 10, "name": "VLAN10", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+            {"vid": 4095, "name": "VLAN4095", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+        ]
+        vlans_in_use = {"vids": [1, 10, 4095], "vlans": vlans}
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use)
+        result_vids = [v["vid"] for v in result]
+
+        # Should only include VLAN 10 (valid range 2-4094)
+        assert result_vids == [10]
+
+    def test_with_enhanced_facts_no_change_needed(self):
+        """Test with enhanced facts when IGMP state matches (no update needed)"""
+        vlans = [
+            {"vid": 101, "name": "VLAN101", "custom_fields": {"vlan_ip_igmp_snooping": False}},
+            {"vid": 102, "name": "VLAN102", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+        ]
+        vlans_in_use = {"vids": [101, 102], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"mgmd_enable": {"igmp": False}, "mgmd_enable_status": {}},
+            "102": {"mgmd_enable": {"igmp": True}, "mgmd_enable_status": {"igmp": True}},
+        }
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use, enhanced_facts)
+
+        # No VLANs need update (all match current state)
+        assert result == []
+
+    def test_with_enhanced_facts_change_needed(self):
+        """Test with enhanced facts when IGMP state differs (update needed)"""
+        vlans = [
+            {"vid": 101, "name": "VLAN101", "custom_fields": {"vlan_ip_igmp_snooping": True}},   # needs enable
+            {"vid": 102, "name": "VLAN102", "custom_fields": {"vlan_ip_igmp_snooping": False}},  # needs disable
+            {"vid": 103, "name": "VLAN103", "custom_fields": {"vlan_ip_igmp_snooping": True}},   # already correct
+        ]
+        vlans_in_use = {"vids": [101, 102, 103], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"mgmd_enable": {"igmp": False}, "mgmd_enable_status": {}},
+            "102": {"mgmd_enable": {"igmp": True}, "mgmd_enable_status": {"igmp": True}},
+            "103": {"mgmd_enable": {"igmp": True}, "mgmd_enable_status": {"igmp": True}},
+        }
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        # Should only include VLANs 101 and 102 (state differs)
+        assert sorted(result_vids) == [101, 102]
+
+    def test_with_enhanced_facts_vlan_not_in_facts(self):
+        """Test when VLAN is in use but not in enhanced facts (assume needs update)"""
+        vlans = [
+            {"vid": 101, "name": "VLAN101", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+            {"vid": 102, "name": "VLAN102", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+        ]
+        vlans_in_use = {"vids": [101, 102], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"mgmd_enable": {"igmp": True}, "mgmd_enable_status": {"igmp": True}},
+            # VLAN 102 missing from facts
+        }
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        # Should include VLAN 102 (not in facts, assume needs update)
+        assert result_vids == [102]
+
+    def test_without_enhanced_facts_all_updated(self):
+        """Test without enhanced facts (all VLANs with IGMP field are updated)"""
+        vlans = [
+            {"vid": 10, "name": "VLAN10", "custom_fields": {"vlan_ip_igmp_snooping": True}},
+            {"vid": 20, "name": "VLAN20", "custom_fields": {"vlan_ip_igmp_snooping": False}},
+            {"vid": 30, "name": "VLAN30", "custom_fields": {}},
+        ]
+        vlans_in_use = {"vids": [10, 20, 30], "vlans": vlans}
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use, None)
+        result_vids = [v["vid"] for v in result]
+
+        # Without facts, should include all VLANs with IGMP field defined
+        assert sorted(result_vids) == [10, 20]
+
+    def test_empty_inputs(self):
+        """Test with empty inputs"""
+        assert get_vlans_needing_igmp_update([], {"vids": [], "vlans": []}) == []
+        assert get_vlans_needing_igmp_update(None, {"vids": [], "vlans": []}) == []
+        assert get_vlans_needing_igmp_update([], None) == []
+
+    def test_igmp_boolean_conversion(self):
+        """Test that IGMP values are properly converted to boolean"""
+        vlans = [
+            {"vid": 10, "name": "VLAN10", "custom_fields": {"vlan_ip_igmp_snooping": 1}},      # truthy
+            {"vid": 20, "name": "VLAN20", "custom_fields": {"vlan_ip_igmp_snooping": 0}},      # falsy
+            {"vid": 30, "name": "VLAN30", "custom_fields": {"vlan_ip_igmp_snooping": "yes"}},  # truthy string
+        ]
+        vlans_in_use = {"vids": [10, 20, 30], "vlans": vlans}
+        enhanced_facts = {
+            "10": {"mgmd_enable": {"igmp": False}},  # 1 != False -> needs update
+            "20": {"mgmd_enable": {"igmp": False}},  # 0 == False -> no update
+            "30": {"mgmd_enable": {"igmp": False}},  # "yes" != False -> needs update
+        }
+
+        result = get_vlans_needing_igmp_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        # VLANs 10 and 30 need update (truthy != False), VLAN 20 is correct
+        assert sorted(result_vids) == [10, 30]
