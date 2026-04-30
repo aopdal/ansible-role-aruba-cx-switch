@@ -416,6 +416,13 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
     - Compares NetBox with current device state
     - Returns: Dict with `vlans_to_create` and `vlans_to_delete` lists
 
+- **`get_vlans_needing_igmp_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None)`**
+    - Determine which VLANs need IGMP snooping configuration updates
+    - Filters to VLANs in use with `vlan_ip_igmp_snooping` custom field defined
+    - Compares desired NetBox state vs current device state (when enhanced facts available)
+    - Only returns VLANs where IGMP setting differs from device
+    - Returns: List of VLAN objects needing IGMP snooping updates
+
 - **`get_vlan_interfaces(interfaces)`**
     - Extract VLAN/SVI interfaces (e.g., vlan100, vlan200)
     - Returns: List of VLAN interface objects

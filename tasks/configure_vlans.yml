@@ -25,9 +25,12 @@
   ansible.builtin.debug:
     msg:
       - "=== VLAN Creation (configure_vlans.yml) ==="
-      - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{ vlan_changes.vlans_to_create | map(attribute='vid') | list | sort }}"
-      - "VLANs to delete (later): {{ vlan_changes.vlans_to_delete | length }} - {{ vlan_changes.vlans_to_delete | sort }}"
-      - "Note: VLAN deletion happens in cleanup_vlans.yml after interface cleanup"
+      - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{
+        vlan_changes.vlans_to_create | map(attribute='vid') | list | sort }}"
+      - "VLANs to delete (later): {{ vlan_changes.vlans_to_delete | length }} -
+        {{ vlan_changes.vlans_to_delete | sort }}"
+      - "Note: VLAN deletion happens in cleanup_vlans.yml after interface
+        cleanup"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Create VLANs
@@ -35,6 +38,7 @@
     vlan_id: "{{ item.vid }}"
     name: "{{ item.name }}"
     description: "{{ item.description | default(omit) }}"
+    ip_igmp_snooping: "{{ item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
     state: create
   loop: "{{ vlan_changes.vlans_to_create }}"
   loop_control:
@@ -42,6 +46,24 @@
   when:
     - vlan_changes.vlans_to_create | length > 0
     - item.vid >= 2 and item.vid <= 4094 # Only create valid VLAN IDs
+
+# Update IGMP snooping settings on VLANs in use from NetBox
+# This ensures changes to the vlan_ip_igmp_snooping custom field are applied
+# Only applies to VLANs that are actually in use on this device
+# Uses enhanced VLAN facts (when available) to only update VLANs where IGMP settings differ
+- name: Update VLAN IGMP snooping settings
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: "{{ item.vid }}"
+    ip_igmp_snooping: "{{ item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
+    state: update
+  loop: "{{ vlans | get_vlans_needing_igmp_update(vlans_in_use,
+    aoscx_enhanced_vlan_facts | default(none)) }}"
+  loop_control:
+    label: "VLAN {{ item.vid }} - IGMP snooping: {{
+      item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
+  when:
+    - vlans | length > 0
+    - vlans_in_use.vids | length > 0
 
 # NOTE: VLAN deletion is handled in cleanup_vlans.yml task
 # This runs AFTER interface cleanup to ensure VLANs are not in use

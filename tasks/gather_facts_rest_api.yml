@@ -150,9 +150,12 @@
 
 # Query VLANs (full mode only)
 # Note: Using depth=2 to get full VLAN data (depth=1 may return URIs only)
+# Include IGMP attributes for intelligent IGMP snooping configuration
 - name: Query VLANs via REST API
   ansible.builtin.uri:
-    url: "{{ _rest_api_base }}/system/vlans?depth=2"
+    url: "{{ _rest_api_base
+      }}/system/vlans?attributes=mgmd_oper_version,mgmd_enable_status,mgmd_enab\
+      le,mgmd_igmp_version,mgmd_mld_version&depth=2"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
@@ -335,6 +338,13 @@
   tags:
     - always
 
+# Store raw VLAN facts including IGMP settings for intelligent configuration
+- name: Store enhanced VLAN facts
+  ansible.builtin.set_fact:
+    aoscx_enhanced_vlan_facts: "{{ _rest_vlans.json }}"
+  tags:
+    - always
+
 # Transform REST API responses to ansible_facts format.
 # IMPORTANT: Do NOT set ansible_aoscx_rest_version here!
 # pyaoscx modules require ansible_aoscx_rest_version: 10.09 (max supported).
@@ -379,6 +389,7 @@
         'Interfaces found: ' ~ (ansible_facts.network_resources.interfaces | length),
         'VLANs found: ' ~ (ansible_facts.network_resources.vlans | length),
         'Enhanced interface facts: ' ~ (aoscx_enhanced_interface_facts | length),
+        'Enhanced VLAN facts: ' ~ (aoscx_enhanced_vlan_facts | length),
         'EVPN facts available: ' ~ (aoscx_evpn_facts is defined),
         'VNI facts available: ' ~ (aoscx_vni_facts is defined)
       ] }}

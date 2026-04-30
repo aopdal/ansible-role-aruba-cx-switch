@@ -7,7 +7,6 @@ vlan {{ vlan.vid }}
     name {{ vlan.name | default('VLAN' + vlan.vid | string) }}
 {%       if vlan.custom_fields.vlan_ip_igmp_snooping is defined and vlan.custom_fields.vlan_ip_igmp_snooping == true %}
     ip igmp snooping enable
-    ip igmp snooping version 2
 {%       endif %}
 {%     endif %}
 {%   endfor %}

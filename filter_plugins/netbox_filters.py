@@ -25,6 +25,7 @@ from netbox_filters_lib.vlan_filters import (
     extract_vxlan_mappings,
     get_vlans_in_use,
     get_vlans_needing_changes,
+    get_vlans_needing_igmp_update,
     get_vlan_interfaces,
     parse_evpn_evi_output,
 )
@@ -86,6 +87,7 @@ class FilterModule:
             "extract_vxlan_mappings": extract_vxlan_mappings,
             "get_vlans_in_use": get_vlans_in_use,
             "get_vlans_needing_changes": get_vlans_needing_changes,
+            "get_vlans_needing_igmp_update": get_vlans_needing_igmp_update,
             "get_vlan_interfaces": get_vlan_interfaces,
             "parse_evpn_evi_output": parse_evpn_evi_output,
             "extract_interface_vrfs": extract_interface_vrfs,

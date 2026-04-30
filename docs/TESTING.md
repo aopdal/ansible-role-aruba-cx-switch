@@ -18,7 +18,7 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 
 This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
 
-1. ✅ **Python Unit Tests** (`pytest`) - 298 tests for filter plugins — see [UNIT_TESTING.md](UNIT_TESTING.md)
+1. ✅ **Python Unit Tests** (`pytest`) - 309 tests for filter plugins — see [UNIT_TESTING.md](UNIT_TESTING.md)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
 3. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
 4. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
@@ -380,7 +380,7 @@ Located in: `tests/unit/`
 
 **NEW**: Comprehensive unit tests for custom filter plugins using pytest.
 
-The role includes **124 unit tests** covering all custom Ansible filters:
+The role includes **309 unit tests** covering all custom Ansible filters:
 
 ```bash
 # Run all unit tests
@@ -399,13 +399,16 @@ pytest tests/unit/ -m utils      # Utility function tests
 ```
 
 **Test Coverage**:
-- `test_l3_config_helpers.py` - 28 tests for L3 configuration optimization
-- `test_utils.py` - 19 tests for utility functions
-- `test_vlan_filters.py` - VLAN lifecycle management
-- `test_vrf_filters.py` - VRF operations
-- `test_interface_filters.py` - Interface categorization
-- `test_comparison.py` - State comparison logic
-- `test_ospf_filters.py` - OSPF configuration
+- `test_l3_config_helpers.py` - 56 tests for L3 configuration optimization
+- `test_bgp_filters.py` - 41 tests for BGP session enrichment and policy collection
+- `test_vlan_filters.py` - 40 tests for VLAN lifecycle management (incl. IGMP snooping)
+- `test_interface_change_detection.py` - 31 tests for NetBox vs device change detection
+- `test_utils.py` - 30 tests for utility functions
+- `test_interface_filters.py` - 28 tests for interface categorization
+- `test_vrf_filters.py` - 26 tests for VRF operations
+- `test_rest_api_transforms.py` - 25 tests for REST API data normalization
+- `test_comparison.py` - 17 tests for state comparison logic
+- `test_ospf_filters.py` - 15 tests for OSPF configuration
 
 **Configuration**: `pytest.ini` defines test discovery, markers, and coverage settings
 

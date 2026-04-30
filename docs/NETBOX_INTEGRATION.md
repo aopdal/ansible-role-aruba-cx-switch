@@ -30,6 +30,7 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | `device_evpn` | Boolean | Device | Yes (for EVPN) | Enable/disable EVPN configuration and cleanup | `configure_evpn.yml`, `cleanup_evpn.yml` |
 | `device_vxlan` | Boolean | Device | Yes (for VXLAN) | Enable/disable VXLAN configuration and cleanup | `configure_vxlan.yml`, `cleanup_vxlan.yml` |
 | `device_vsx` | Boolean | Device | Yes (for VSX) | Enable/disable VSX configuration | `configure_vsx.yml` |
+| `vlan_ip_igmp_snooping` | Boolean | VLAN | No | Enable/disable IGMP snooping per VLAN | `configure_vlans.yml` |
 
 ### Creating Custom Fields in NetBox
 
@@ -151,6 +152,49 @@ Customization → Custom Fields → Add
 ├─ Content Types: dcim | device
 ├─ Label: Enable VSX
 └─ Default: ☐ (unchecked)
+```
+
+#### 7. vlan_ip_igmp_snooping (Boolean)
+
+```
+Name: vlan_ip_igmp_snooping
+Type: Boolean
+Object Type: ipam > vlan
+Label: Enable IGMP Snooping
+Description: Enable IGMP snooping on this VLAN
+Default: false
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: vlan_ip_igmp_snooping
+├─ Type: Boolean
+├─ Content Types: ipam | vlan
+├─ Label: Enable IGMP Snooping
+└─ Default: ☐ (unchecked)
+```
+
+**Purpose:** Controls IGMP snooping configuration per VLAN. When enabled, the VLAN will listen for IGMP membership reports and only forward multicast traffic to ports that have requested it. This reduces unnecessary multicast flooding and improves network efficiency.
+
+**Behavior:**
+- Only applies to VLANs that are in use on interfaces
+- Intelligent state comparison (when `aoscx_gather_facts_rest_api: true`)
+- Only updates VLANs where IGMP setting differs from current device state
+- Skips VLANs not assigned to any interface (no unnecessary configuration)
+
+**Example:**
+
+```yaml
+# VLAN 100 - Server VLAN with multicast traffic
+custom_fields:
+  vlan_ip_igmp_snooping: true
+
+# VLAN 200 - Management VLAN without multicast
+custom_fields:
+  vlan_ip_igmp_snooping: false  # or omit field
 ```
 
 ### Custom Field Usage Patterns
