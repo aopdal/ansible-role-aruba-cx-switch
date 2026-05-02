@@ -155,10 +155,10 @@ Update the relevant topic page when you touch its area:
 | DNS / NTP / banner / timezone                 | [docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md), [docs/DNS_CONFIGURATION.md](docs/DNS_CONFIGURATION.md) |
 | Filter plugins                                | [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md), [docs/FILTER_PLUGINS_REUSE.md](docs/FILTER_PLUGINS_REUSE.md) |
 | NetBox custom fields / config context         | [docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md)                                     |
-| Tag-driven inclusion / new tag                | [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md), [docs/TAG_DEPENDENT_TESTING.md](docs/TAG_DEPENDENT_TESTING.md) |
+| Tag-driven inclusion / new tag                | [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md), [docs/TESTING.md](docs/TESTING.md) (Tag-Dependent Task Testing section) |
 | Performance / fact gathering                  | [docs/PERFORMANCE_OPTIMIZATION.md](docs/PERFORMANCE_OPTIMIZATION.md), [docs/ANSIBLE_CACHE_DIRECTORY.md](docs/ANSIBLE_CACHE_DIRECTORY.md) |
 | Templates                                     | [docs/TEMPLATE_CONFIGURATION.md](docs/TEMPLATE_CONFIGURATION.md)                             |
-| Testing infra                                 | [docs/TESTING.md](docs/TESTING.md), [docs/UNIT_TESTING.md](docs/UNIT_TESTING.md), [docs/TESTING_ENVIRONMENT.md](docs/TESTING_ENVIRONMENT.md) |
+| Testing infra                                 | [docs/TESTING.md](docs/TESTING.md) (single consolidated guide — includes unit tests, lab setup, scripts, tag tests) |
 | Releases                                      | [CHANGELOG.md](CHANGELOG.md), [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)             |
 
 If a feature has no existing doc, add a new page under `docs/` and link it

@@ -1,6 +1,6 @@
 # Testing Scripts
 
-> **Documentation has moved** — see [docs/TESTING_SCRIPTS.md](../docs/TESTING_SCRIPTS.md) for the full guide.
+> **Documentation has moved** — see [docs/TESTING.md](../docs/TESTING.md#testing-scripts) for the full guide.
 
 Scripts in this directory:
 

@@ -101,9 +101,7 @@ nav:
                             - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
                   - BGP: BGP_CONFIGURATION.md
                   - OSPF: OSPF_CONFIGURATION.md
-                  - Tag-Dependent Tasks:
-                            - Overview: TAG_DEPENDENT_INCLUDES.md
-                            - Testing: TAG_DEPENDENT_TESTING.md
+                  - Tag-Dependent Tasks: TAG_DEPENDENT_INCLUDES.md
         - Development:
                   - Quick Start: QUICKSTART.md
                   - Requirements: REQUIREMENTS.md
@@ -114,10 +112,6 @@ nav:
                   - BGP EVPN Fabric: examples/bgp-evpn-fabric.md
         - Testing:
                   - Testing Guide: TESTING.md
-                  - Unit Testing: UNIT_TESTING.md
-                  - Testing Scripts: TESTING_SCRIPTS.md
-                  - Quick Start: TESTING_QUICK_START.md
-                  - Environment: TESTING_ENVIRONMENT.md
                   - .ansible/ Directory: ANSIBLE_CACHE_DIRECTORY.md
         - Reference:
                   - Quick Reference: QUICK_REFERENCE.md

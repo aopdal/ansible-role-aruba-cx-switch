@@ -50,9 +50,10 @@ This section covers using the role for network configuration. For development se
 ### Prerequisites
 
 1. **NetBox** - Install and configure NetBox with your network devices
-2. **Ansible** - Version 2.18
-3. **Python libraries** - See [Requirements](#requirements) below
-4. **Network access** - Connectivity to your Aruba switches and NetBox API
+2. **Ansible-core** - `>=2.18.0,<2.19.0` (Ansible 2.18.x)
+3. **Python** - 3.12
+4. **Python libraries** - See [Requirements](#requirements) below
+5. **Network access** - Connectivity to your Aruba switches and NetBox API
 
 ### Quick Start
 
@@ -86,22 +87,22 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **VXLAN Configuration** - Overlay networks with VNI mapping and cleanup
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
+- ✅ **IGMP Snooping** - Implemented pr. VLAN (using default version 3)
 - ❌ **STP** - on roadmap
 - ❌ **BFD** - on roadmap
-- ❌ **IGMP Snooping** - on roadmap
 - ❌ **DHCP relay IPv4** - on roadmap
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
-- ❌ **DHCP Snooping** - Not desided
+- ❌ **DHCP Snooping** - on Roadmap
 - ❌ **IPv6 SLAAC** - on roadmap
 - ❌ **Loop protection** - on roadmap
 - ❌ **ACL** - on roadmap
-- ❌ **QoS** - not on roadmap
 - ❌ **Logging** - on roadmap
 - ❌ **SNMP** - on roadmap
 - ❌ **Static routing** - on roadmap
 - ❌ **L3 VNI** - on roadmap
 - ❌ **Multicast routing** - not on roadmap
+- ❌ **QoS** - not on roadmap
 
 ## Advanced L3 Interface Features
 
@@ -286,7 +287,7 @@ For contributors and developers:
     - Local development environment setup
     - Testing and code standards
 
-- **[docs/TESTING_ENVIRONMENT.md](TESTING_ENVIRONMENT.md)** - Integration testing guide
+- **[docs/TESTING.md](TESTING.md)** - Consolidated testing guide (unit tests, lab setup, integration, scripts, tag tests)
 
 ### Documentation Site
 
@@ -777,10 +778,10 @@ Both modes use `configure_l2_interfaces.yml` which intelligently handles standar
 
 This role includes comprehensive testing. For detailed testing information, see:
 
-- **[docs/DEVELOPMENT.md](DEVELOPMENT.md)** - Unit tests and development testing
-- **[docs/TESTING_ENVIRONMENT.md](TESTING_ENVIRONMENT.md)** - Integration testing setup
-- **tests/unit/README.md** - Unit test documentation
-- **testing-scripts/README.md** - Testing scripts usage
+- **[docs/TESTING.md](TESTING.md)** - Consolidated testing guide (unit tests, lab setup, integration, scripts, tag tests)
+- **[docs/DEVELOPMENT.md](DEVELOPMENT.md)** - Development setup and workflow
+- **tests/unit/README.md** - Pointer to unit-test section
+- **testing-scripts/README.md** - Pointer to scripts section
 
 ## License
 

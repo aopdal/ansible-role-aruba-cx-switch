@@ -1,6 +1,6 @@
 # Filter Plugin Unit Tests
 
-> **Documentation has moved** — see [docs/UNIT_TESTING.md](../../docs/UNIT_TESTING.md) for the full guide.
+> **Documentation has moved** — see [docs/TESTING.md](../../docs/TESTING.md#filter-plugin-unit-tests) for the full guide.
 
 Run the test suite with:
 

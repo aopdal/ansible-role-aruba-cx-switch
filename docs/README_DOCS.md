@@ -100,7 +100,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - Behavior matrix for different tag combinations
     - Safety improvements for daily operations
 
-- **[TAG_DEPENDENT_TESTING.md](TAG_DEPENDENT_TESTING.md)** - Testing tag-dependent tasks
+- **[TAG_DEPENDENT_TESTING](TESTING.md#tag-dependent-task-testing)** - Testing tag-dependent tasks (now a section of `TESTING.md`)
 
 ## Development
 
@@ -117,9 +117,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 ## Testing
 
-- **[TESTING.md](TESTING.md)** - General testing documentation
-- **[TESTING_ENVIRONMENT.md](TESTING_ENVIRONMENT.md)** - Comprehensive integration testing guide
-- **[TESTING_QUICK_START.md](TESTING_QUICK_START.md)** - 30-minute quick start for testing
+- **[TESTING.md](TESTING.md)** - Consolidated testing guide (unit tests, lab setup, helper scripts, tag-dependent tests)
 
 ## Reference
 
@@ -136,8 +134,3 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 - **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** - How to use MkDocs
 - **[DOCS_SYNC_WORKFLOW.md](DOCS_SYNC_WORKFLOW.md)** - How README.md syncs to docs/
-
-## Internal Documentation
-
-- **[DOCUMENTATION_INTEGRATION.md](DOCUMENTATION_INTEGRATION.md)** - Documentation integration details
-- **[VERIFICATION_CHECKLIST.md](VERIFICATION_CHECKLIST.md)** - Final verification checklist

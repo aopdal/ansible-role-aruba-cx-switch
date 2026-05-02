@@ -24,8 +24,8 @@ Thank you for your interest in contributing! This document provides guidelines a
 ### Prerequisites
 
 - Git
-- Python 3.9+
-- Ansible 2.14+
+- Python 3.12
+- Ansible-core 2.18 (`>=2.18.0,<2.19.0`)
 - Docker (for Molecule tests)
 - Basic understanding of Ansible roles and network automation
 
