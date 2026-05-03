@@ -62,7 +62,7 @@ You have two options for setting up your development environment:
 
 **Requirements:**
 
-- Python 3.9 or higher
+- Python 3.12
 - Python venv module
 - Git
 - Docker (optional, for Molecule tests)
@@ -119,11 +119,11 @@ deactivate
 
 The dev container includes:
 
-**Base Image:** Python 3.11 (Debian-based)
+**Base Image:** Python 3.12 (Debian-based)
 
 **Installed Tools:**
 
-- Python 3.11 with pip
+- Python 3.12 with pip
 - Ansible and ansible-lint
 - yamllint
 - molecule with Docker driver

@@ -1,7 +1,7 @@
 # Testing Requirements for ansible-role-aruba-cx-switch
 
 # Ansible and collections
-ansible-core>=2.16,<2.19
+ansible-core>=2.18.0,<2.19.0
 ansible-lint>=6.22.0
 
 # Molecule for role testing

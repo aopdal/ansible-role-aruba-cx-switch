@@ -395,5 +395,5 @@ route-map contexts.
 
 - [Filter Plugins Overview](../FILTER_PLUGINS.md)
 - [VRF Filters](vrf_filters.md) - VRF extraction and management
-- [Interface Categorization](interface_categorization.md) - Interface categorization
+- [Interface Filters](interface_filters.md) - Interface categorization
 - [BGP Configuration Guide](../BGP_CONFIGURATION.md) - NetBox BGP plugin integration and full BGP setup

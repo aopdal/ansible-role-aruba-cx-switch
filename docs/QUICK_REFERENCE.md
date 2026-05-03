@@ -254,12 +254,12 @@ ansible-lint path/to/playbook.yml
 black filter_plugins/
 ```
 
-### Running Tests for Specific Ansible Version
+### Running Tests for a Specific Ansible Version
 
 ```bash
-# In CI, tests run on 2.14, 2.15, 2.16 automatically
-# Locally with specific version:
-pip install ansible-core==2.15.0
+# CI pins ansible-core to 2.18.x
+# Locally:
+pip install 'ansible-core>=2.18.0,<2.19.0'
 ansible-playbook tests/test.yml --syntax-check
 ```
 

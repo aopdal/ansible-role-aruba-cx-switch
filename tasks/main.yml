@@ -4,9 +4,10 @@
 - name: "[DEPRECATED] aoscx_fast_mode is deprecated and has no effect"
   ansible.builtin.debug:
     msg: >-
-      WARNING: aoscx_fast_mode is deprecated and will be removed in a future version.
-      It caused more API calls (not fewer) due to missing device state for change detection.
-      For faster fact gathering, use: aoscx_gather_facts_rest_api: true
+      WARNING: aoscx_fast_mode is deprecated and will be removed in a future
+      version. It caused more API calls (not fewer) due to missing device state
+      for change detection. For faster fact gathering, use:
+      aoscx_gather_facts_rest_api: true
   when: aoscx_fast_mode | default(false) | bool
   tags:
     - always
@@ -74,6 +75,37 @@
     - base_config
     - system
 
+- name: Include Anycast Gateway configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_anycast_gateway.yml
+    apply:
+      tags:
+        - icmp_redirect
+        - base_config
+        - system
+  when: custom_fields.device_anycast_gateway | default(false) | bool
+  tags:
+    - icmp_redirect
+    - base_config
+    - system
+
+# VRFs should be configured before L3 interfaces, NTP, and DNS
+# (NTP and DNS may reference a VRF that must already exist)
+- name: Include VRF configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_vrfs.yml
+    apply:
+      tags:
+        - vrfs
+        - layer3
+        - routing
+  when: aoscx_configure_vrfs | bool
+  tags:
+    - vrfs
+    - layer3
+    - routing
+
+# NTP and DNS run AFTER VRFs because they can be bound to a VRF
 - name: Include NTP configuration tasks
   ansible.builtin.include_tasks:
     file: configure_ntp.yml
@@ -101,35 +133,6 @@
     - dns
     - base_config
     - system
-
-- name: Include Anycast Gateway configuration tasks
-  ansible.builtin.include_tasks:
-    file: configure_anycast_gateway.yml
-    apply:
-      tags:
-        - icmp_redirect
-        - base_config
-        - system
-  when: custom_fields.device_anycast_gateway | default(false) | bool
-  tags:
-    - icmp_redirect
-    - base_config
-    - system
-
-# VRFs should be configured before L3 interfaces
-- name: Include VRF configuration tasks
-  ansible.builtin.include_tasks:
-    file: configure_vrfs.yml
-    apply:
-      tags:
-        - vrfs
-        - layer3
-        - routing
-  when: aoscx_configure_vrfs | bool
-  tags:
-    - vrfs
-    - layer3
-    - routing
 
 # ============================================================================
 # VLAN Analysis (must run BEFORE VLAN/EVPN/VXLAN configuration)
@@ -198,9 +201,8 @@
         - layer3
   when:
     - aoscx_configure_physical_interfaces | bool or
-      aoscx_configure_lag_interfaces | bool or
-      aoscx_configure_mclag_interfaces | bool or
-      aoscx_configure_l2_interfaces | bool or
+      aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces
+      | bool or aoscx_configure_l2_interfaces | bool or
       aoscx_configure_l3_interfaces | bool
   tags:
     - interfaces
@@ -270,8 +272,10 @@
         - mclag_interfaces
         - lag_assignment
   when:
-    - aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces | bool
-    - interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length > 0
+    - aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces
+      | bool
+    - interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none)
+      | list | length > 0
   tags:
     - interfaces
     - lag_interfaces
@@ -304,7 +308,8 @@
   when:
     - aoscx_configure_ospf | bool
     - custom_fields.device_ospf | default(false) | bool
-    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
+    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
+      ansible_run_tags"
   tags:
     - ospf
     - routing
@@ -466,7 +471,8 @@
   when:
     - aoscx_configure_bgp | bool
     - custom_fields.device_bgp | default(false) | bool
-    - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
+    - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
+      ansible_run_tags"
   tags:
     - bgp
     - routing
@@ -482,7 +488,8 @@
   when:
     - aoscx_configure_vsx | bool
     - custom_fields.device_vsx | default(false) | bool
-    - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in ansible_run_tags"
+    - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in
+      ansible_run_tags"
   tags:
     - vsx
     - ha

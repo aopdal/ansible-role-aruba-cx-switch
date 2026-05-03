@@ -91,7 +91,7 @@ graph TB
 
 ## Prerequisites
 
-1. **Ansible 2.18** with required collections:
+1. **Ansible-core 2.18** with required collections:
 
    ```bash
    ansible-galaxy install -r requirements.yml

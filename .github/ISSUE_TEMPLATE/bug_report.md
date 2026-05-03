@@ -22,7 +22,7 @@ assignees: ''
 3.
 
 ## Environment
-- **Ansible Version**: <!-- e.g., 2.15.0 -->
+- **Ansible Version**: <!-- e.g., 2.18.0 -->
 - **Python Version**: <!-- e.g., 3.12.0 -->
 - **OS**: <!-- e.g., Ubuntu 24.04 -->
 - **Role Version**: <!-- e.g., v1.0.0 or commit hash -->
