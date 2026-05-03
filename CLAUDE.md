@@ -59,22 +59,59 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
    when `aoscx_gather_facts_rest_api: true`).
 2. Optional template-based config generation
    (`aoscx_generate_template_config`).
-3. Base system: banner → timezone → NTP → DNS → anycast gateway.
-4. VRFs (must precede L3).
-5. **VLAN change identification** (`identify_vlan_changes.yml`) — sets
+3. Base system (no VRF dependency): banner → timezone → anycast gateway.
+4. **VRFs** — must precede anything that can reference a VRF (L3 interfaces,
+   NTP, DNS, OSPF, BGP).
+5. VRF-dependent base services: NTP → DNS (both can be bound to a VRF, so
+   the VRF must exist first).
+6. **VLAN change identification** (`identify_vlan_changes.yml`) — sets
    `vlans`, `vlans_in_use`, `vlan_changes`. Required by all VLAN/EVPN/VXLAN
    tasks.
-6. VLAN configuration.
-7. **Interface change identification** (`identify_interface_changes.yml`) —
+7. VLAN configuration.
+8. **Interface change identification** (`identify_interface_changes.yml`) —
    sets `interface_changes` (categorised: physical / lag / mclag / l2 / l3 /
    no_changes). Required by all interface tasks.
-8. Interfaces: physical → LAG → MCLAG → assign-to-LAG → L2 → OSPF → L3.
-9. EVPN, VXLAN.
-10. **Idempotent cleanup** (only when `aoscx_idempotent_mode: true`):
+9. Interfaces: physical → LAG → MCLAG → assign-to-LAG → L2 → OSPF → L3.
+10. EVPN, VXLAN.
+11. **Idempotent cleanup** (only when `aoscx_idempotent_mode: true`):
     re-gather facts → re-identify VLAN changes → cleanup EVPN → VXLAN →
     VLANs.
-11. BGP, VSX.
-12. `aoscx_config: save_when: modified` if `aoscx_save_config`.
+12. BGP, VSX.
+13. `aoscx_config: save_when: modified` if `aoscx_save_config`.
+
+### Feature-dependency ordering rule
+
+When adding or moving a feature in `tasks/main.yml`, **verify its
+dependencies and place it after every prerequisite**. A feature `B` depends
+on feature `A` if any of the following is true:
+
+- `B` references an object that `A` creates (e.g. NTP/DNS bound to a VRF;
+  L3 interface attached to a VRF; SVI/anycast under a VLAN; BGP using a
+  loopback as router-id; EVPN referencing a VLAN; VXLAN referencing a VLAN
+  and a loopback source).
+- `B` reads facts that only become accurate after `A` has run (e.g. cleanup
+  steps that re-gather facts after configuration).
+- `B`'s change-detection task (`identify_*_changes.yml`) depends on data
+  produced by `A`.
+
+Existing dependency chains to preserve:
+
+| Feature           | Depends on                                                  |
+| ----------------- | ----------------------------------------------------------- |
+| NTP, DNS          | VRFs                                                        |
+| L3 interfaces     | VRFs, physical/LAG interfaces                               |
+| SVIs / anycast    | VLANs                                                       |
+| LAG member assign | LAG / MCLAG creation, physical interfaces                   |
+| OSPF, BGP         | VRFs, L3 interfaces (loopbacks for router-id / peering)     |
+| EVPN              | VLANs                                                       |
+| VXLAN             | VLANs, loopback (source-interface)                          |
+| VSX               | MCLAG, ISL/keepalive interfaces                             |
+| Cleanup tasks     | Re-gathered facts AFTER all configuration tasks             |
+| `save_when`       | Last (after every change)                                   |
+
+If a new feature has no dependencies, place it in the base-system block.
+Otherwise document the dependency in a comment above the include and
+update the table above in the same change.
 
 Many tasks also gate on **NetBox custom fields** on the device:
 `device_ospf`, `device_bgp`, `device_vsx`, `device_evpn`, `device_vxlan`,
