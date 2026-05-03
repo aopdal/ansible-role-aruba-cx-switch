@@ -1,6 +1,7 @@
 ---
 site_name: Aruba CX Switch Ansible Role
-site_description: Production-ready Ansible role for managing Aruba CX switches with NetBox integration
+site_description: Production-ready Ansible role for managing Aruba CX switches
+        with NetBox integration
 site_author: aopdal
 # site_url: https://aopdal.github.io/ansible-role-aruba-cx-switch  # Uncomment when repo is public
 site_url: ""
@@ -48,7 +49,7 @@ markdown_extensions:
                   custom_fences:
                           - name: mermaid
                             class: mermaid
-                            format: !!python/name:pymdownx.superfences.fence_code_format
+                            format: !!python/name:pymdownx.superfences.fence_code_format ""
         - pymdownx.highlight:
                   anchor_linenums: true
         - pymdownx.inlinehilite

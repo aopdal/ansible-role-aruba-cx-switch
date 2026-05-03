@@ -4,9 +4,10 @@
 - name: "[DEPRECATED] aoscx_fast_mode is deprecated and has no effect"
   ansible.builtin.debug:
     msg: >-
-      WARNING: aoscx_fast_mode is deprecated and will be removed in a future version.
-      It caused more API calls (not fewer) due to missing device state for change detection.
-      For faster fact gathering, use: aoscx_gather_facts_rest_api: true
+      WARNING: aoscx_fast_mode is deprecated and will be removed in a future
+      version. It caused more API calls (not fewer) due to missing device state
+      for change detection. For faster fact gathering, use:
+      aoscx_gather_facts_rest_api: true
   when: aoscx_fast_mode | default(false) | bool
   tags:
     - always
@@ -200,9 +201,8 @@
         - layer3
   when:
     - aoscx_configure_physical_interfaces | bool or
-      aoscx_configure_lag_interfaces | bool or
-      aoscx_configure_mclag_interfaces | bool or
-      aoscx_configure_l2_interfaces | bool or
+      aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces
+      | bool or aoscx_configure_l2_interfaces | bool or
       aoscx_configure_l3_interfaces | bool
   tags:
     - interfaces
@@ -272,8 +272,10 @@
         - mclag_interfaces
         - lag_assignment
   when:
-    - aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces | bool
-    - interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length > 0
+    - aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces
+      | bool
+    - interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none)
+      | list | length > 0
   tags:
     - interfaces
     - lag_interfaces
@@ -306,7 +308,8 @@
   when:
     - aoscx_configure_ospf | bool
     - custom_fields.device_ospf | default(false) | bool
-    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
+    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
+      ansible_run_tags"
   tags:
     - ospf
     - routing
@@ -468,7 +471,8 @@
   when:
     - aoscx_configure_bgp | bool
     - custom_fields.device_bgp | default(false) | bool
-    - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
+    - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
+      ansible_run_tags"
   tags:
     - bgp
     - routing
@@ -484,7 +488,8 @@
   when:
     - aoscx_configure_vsx | bool
     - custom_fields.device_vsx | default(false) | bool
-    - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in ansible_run_tags"
+    - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in
+      ansible_run_tags"
   tags:
     - vsx
     - ha
