@@ -571,15 +571,15 @@ Idempotency comparison for port-access (device-profile) configuration
     - Compare the desired `port_access` config_context against
       `aoscx_port_access_facts` (REST API fact gathering) and return only
       the items that need to be configured.
-    - Compares LLDP/MAC group match-sets (sequence-number agnostic), role
+    - Compares LLDP group match-sets (sequence-number agnostic), role
       attributes (`description`, `poe_priority`, `trust_mode` vs REST
       `qos_trust_mode`, `vlan_trunk_native`/`vlan_access` vs `vlan_tag`,
       `vlan_trunk_allowed` range expansion vs `vlan_trunks` list), and
       device-profile associations (`enable`, `associate_role`,
-      `associate_lldp_group`, `associate_mac_group`).
-    - Returns: Dict with `lldp_groups`, `mac_groups`, `roles`,
-      `device_profiles` lists. When current facts are missing, returns
-      every desired item (safe fallback).
+      `associate_lldp_group`).
+    - Returns: Dict with `lldp_groups`, `roles`, `device_profiles` lists.
+      When current facts are missing, returns every desired item (safe
+      fallback).
 
 ### `comparison.py` - State Comparison
 NetBox vs device state comparison (2 filters, 295 lines):

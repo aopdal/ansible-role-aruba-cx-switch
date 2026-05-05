@@ -1,11 +1,10 @@
 """
-Identify orphaned port-access objects (device-profiles, roles, lldp-groups, mac-groups)
+Identify orphaned port-access objects (device-profiles, roles, lldp-groups)
 
 Returns a dict with keys:
 - device_profiles: list of orphaned device-profile names
 - roles: list of orphaned role names
 - lldp_groups: list of orphaned lldp-group names
-- mac_groups: list of orphaned mac-group names
 
 Args:
     desired: NetBox config_context['port_access'] dict
@@ -16,7 +15,7 @@ Orphan = present on device but not in NetBox.
 
 
 def port_access_orphans(desired, current):
-    out = {k: [] for k in ("device_profiles", "roles", "lldp_groups", "mac_groups")}
+    out = {k: [] for k in ("device_profiles", "roles", "lldp_groups")}
     if not isinstance(current, dict):
         return out
     if not isinstance(desired, dict):

@@ -12,10 +12,9 @@ DESIRED_FULL = {
     "lldp_groups": [
         {
             "name": "AP-group",
-            "match": [{"seq": 10, "sys_name": "lab-sw01"}],
+            "match": [{"seq": 10, "sysname": "lab-sw01"}],
         }
     ],
-    "mac_groups": [],
     "roles": [
         {
             "name": "LAB-SW01",
@@ -39,7 +38,6 @@ CURRENT_MATCHING = {
             "name": "LAB-SW",
             "enable": True,
             "lldp_groups": {"AP-group": {"name": "AP-group"}},
-            "mac_groups": {},
             "role": {"LAB-SW01": {"name": "LAB-SW01"}},
         }
     },
@@ -61,11 +59,10 @@ CURRENT_MATCHING = {
         "AP-group": {
             "name": "AP-group",
             "entries": {
-                "10": {"match_type": "sys-name", "sys_name": "lab-sw01"}
+                "10": {"match_type": "sys-name", "system_name": "lab-sw01"}
             },
         }
     },
-    "mac_groups": {},
 }
 
 
@@ -79,7 +76,6 @@ class TestSteadyState:
         result = port_access_diff(DESIRED_FULL, CURRENT_MATCHING)
         assert result == {
             "lldp_groups": [],
-            "mac_groups": [],
             "roles": [],
             "device_profiles": [],
         }
@@ -234,7 +230,7 @@ class TestDeviceProfileDiff:
 
 
 # ---------------------------------------------------------------------------
-# LLDP / MAC group diffs
+# LLDP group diffs
 # ---------------------------------------------------------------------------
 
 
@@ -246,7 +242,7 @@ class TestLldpGroupDiff:
                 "AP-group": {
                     "name": "AP-group",
                     "entries": {
-                        "10": {"match_type": "sys-name", "sys_name": "different"}
+                        "10": {"match_type": "sys-name", "system_name": "different"}
                     },
                 }
             },
@@ -262,7 +258,7 @@ class TestLldpGroupDiff:
                 "AP-group": {
                     "name": "AP-group",
                     "entries": {
-                        "100": {"match_type": "sys-name", "sys_name": "lab-sw01"}
+                        "100": {"match_type": "sys-name", "system_name": "lab-sw01"}
                     },
                 }
             },
@@ -277,7 +273,7 @@ class TestLldpGroupDiff:
                 "AP-group": {
                     "name": "AP-group",
                     "entries": {
-                        "10": {"match_type": "sys-name", "sys_name": "lab-sw01"},
+                        "10": {"match_type": "sys-name", "system_name": "lab-sw01"},
                         "20": {"match_type": "vendor-oui", "vendor_oui": "001122"},
                     },
                 }
@@ -307,7 +303,6 @@ class TestSafeFallback:
         result = port_access_diff(None, CURRENT_MATCHING)
         assert result == {
             "lldp_groups": [],
-            "mac_groups": [],
             "roles": [],
             "device_profiles": [],
         }
