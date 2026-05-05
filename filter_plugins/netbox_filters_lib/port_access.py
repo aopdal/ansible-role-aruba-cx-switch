@@ -59,8 +59,8 @@ def _normalise_match_entry(entry):
     Normalise an LLDP/MAC group match entry to (match_type, value) tuple.
 
     Accepts:
-    - Desired-side dicts (NetBox config_context) with short keys like
-      ``vendor_oui``, ``sys_name``, ``mac_oui``.
+    - Desired-side dicts (NetBox config_context) with keys matching device
+      CLI names: ``vendor-oui``, ``sysname``, ``sys-desc``.
     - Device-side dicts from REST ``/system/device_profiles?depth=5``,
       whose ``lldp_groups[*].entries[<seq>]`` dicts use the long REST
       field names ``system_name``, ``system_description`` and the
@@ -73,19 +73,17 @@ def _normalise_match_entry(entry):
     if not isinstance(entry, dict):
         return None
 
-    # Desired-side / REST-side: scan known fields for the first non-null
-    # value. Both shapes use the same field name for ``vendor_oui``; the
-    # other LLDP keys differ between sides (sys_name vs system_name etc.)
-    # so list both spellings.
+    # Desired-side / REST-side: scan known fields for the first non-null value.
+    # NetBox schema uses device CLI names (vendor-oui, sysname, sys-desc).
+    # REST API returns vendor_oui (underscore) and system_name/system_description,
+    # so both spellings are listed.
     for key, mtype in (
+        ("vendor-oui", "vendor-oui"),
         ("vendor_oui", "vendor-oui"),
-        ("chassis_id", "chassis-id"),
-        ("sys_name", "sys-name"),
+        ("sysname", "sys-name"),
         ("system_name", "sys-name"),
-        ("sys_desc", "sys-desc"),
+        ("sys-desc", "sys-desc"),
         ("system_description", "sys-desc"),
-        ("mac_oui", "mac-oui"),
-        ("mac", "mac"),
     ):
         value = entry.get(key)
         if value not in (None, ""):
@@ -129,15 +127,6 @@ def _entries_match_set(entries):
 
 def _lldp_group_matches(desired, current):
     """Return True when device LLDP group entry-set equals desired."""
-    if not isinstance(current, dict):
-        return False
-    return _entries_match_set(desired.get("match")) == _entries_match_set(
-        current.get("entries") or current.get("match") or []
-    )
-
-
-def _mac_group_matches(desired, current):
-    """Return True when device MAC group entry-set equals desired."""
     if not isinstance(current, dict):
         return False
     return _entries_match_set(desired.get("match")) == _entries_match_set(
@@ -221,12 +210,6 @@ def _device_profile_matches(desired, current):
         ):
             return False
 
-    if "associate_mac_group" in desired:
-        if _norm_str(desired.get("associate_mac_group")) != _norm_str(
-            _single_key(current, "mac_groups")
-        ):
-            return False
-
     return True
 
 
@@ -237,7 +220,6 @@ def _device_profile_matches(desired, current):
 
 _OBJECT_KINDS = (
     ("lldp_groups", _lldp_group_matches),
-    ("mac_groups", _mac_group_matches),
     ("roles", _role_matches),
     ("device_profiles", _device_profile_matches),
 )
@@ -250,15 +232,15 @@ def port_access_diff(desired, current):
 
     Args:
         desired: ``port_access`` dict from NetBox config_context, with any
-            of the keys ``lldp_groups``, ``mac_groups``, ``roles``,
-            ``device_profiles``. Each value is a list of object dicts.
+            of the keys ``lldp_groups``, ``roles``, ``device_profiles``.
+            Each value is a list of object dicts.
         current: ``aoscx_port_access_facts`` dict from
             ``gather_facts_rest_api.yml``, with the keys ``device_profiles``,
-            ``roles``, ``lldp_groups``, ``mac_groups`` (each a REST payload
-            keyed by object name). May be ``None`` or empty.
+            ``roles``, ``lldp_groups`` (each a REST payload keyed by object
+            name). May be ``None`` or empty.
 
     Returns:
-        dict with the same four keys as the input. Each value is the list of
+        dict with the same three keys as the input. Each value is the list of
         desired items that differ from the device or are missing entirely.
         Items that already match are omitted, so the configure tasks skip
         them and avoid the SSH round-trip.
@@ -270,7 +252,6 @@ def port_access_diff(desired, current):
     if not isinstance(desired, dict):
         return {
             "lldp_groups": [],
-            "mac_groups": [],
             "roles": [],
             "device_profiles": [],
         }
@@ -329,9 +310,9 @@ def port_access_facts_from_device_profiles(profiles_payload):
     Flatten ``/system/device_profiles?depth=4`` REST payload into the
     ``aoscx_port_access_facts`` shape expected by ``port_access_diff``.
 
-    The depth=4 response nests each profile's ``role``, ``lldp_groups`` and
-    ``mac_groups`` inline, so a single REST call is enough to compare every
-    object kind. This filter merges those nested dicts up to the top level.
+    The depth=4 response nests each profile's ``role`` and ``lldp_groups``
+    inline, so a single REST call is enough to compare every object kind.
+    This filter merges those nested dicts up to the top level.
 
     Args:
         profiles_payload: dict keyed by profile name, e.g.
@@ -340,17 +321,15 @@ def port_access_facts_from_device_profiles(profiles_payload):
             ``None`` / non-dict / empty inputs return empty sub-dicts.
 
     Returns:
-        dict with keys ``device_profiles``, ``roles``, ``lldp_groups``,
-        ``mac_groups``. Each value is a flat dict keyed by object name. If
-        the same role/group name appears under multiple profiles the last
-        one wins (the device guarantees uniqueness, so this is just a
-        defensive merge).
+        dict with keys ``device_profiles``, ``roles``, ``lldp_groups``.
+        Each value is a flat dict keyed by object name. If the same
+        role/group name appears under multiple profiles the last one wins
+        (the device guarantees uniqueness, so this is just a defensive merge).
     """
     out = {
         "device_profiles": {},
         "roles": {},
         "lldp_groups": {},
-        "mac_groups": {},
     }
     if not isinstance(profiles_payload, dict):
         return out
@@ -363,7 +342,6 @@ def port_access_facts_from_device_profiles(profiles_payload):
         for src_key, dst_key in (
             ("role", "roles"),
             ("lldp_groups", "lldp_groups"),
-            ("mac_groups", "mac_groups"),
         ):
             sub = profile.get(src_key)
             if isinstance(sub, dict):

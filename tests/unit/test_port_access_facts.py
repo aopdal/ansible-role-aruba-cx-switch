@@ -25,7 +25,6 @@ DEPTH5_PAYLOAD = {
                 },
             }
         },
-        "mac_groups": {},
         "role": {
             "LAB-SW01": {
                 "name": "LAB-SW01",
@@ -56,7 +55,6 @@ DEPTH5_PAYLOAD = {
                 },
             }
         },
-        "mac_groups": {},
         "role": {
             "Lab-IAP-role": {
                 "name": "Lab-IAP-role",
@@ -78,10 +76,9 @@ DESIRED = {
     "lldp_groups": [
         {
             "name": "Lab-IAP-group",
-            "match": [{"seq": 10, "vendor_oui": "000b86"}],
+            "match": [{"seq": 10, "vendor-oui": "000b86"}],
         }
     ],
-    "mac_groups": [],
     "roles": [
         {
             "name": "Lab-IAP-role",
@@ -110,16 +107,10 @@ DESIRED = {
 
 def test_flatten_basic():
     facts = port_access_facts_from_device_profiles(DEPTH5_PAYLOAD)
-    assert set(facts.keys()) == {
-        "device_profiles",
-        "roles",
-        "lldp_groups",
-        "mac_groups",
-    }
+    assert set(facts.keys()) == {"device_profiles", "roles", "lldp_groups"}
     assert set(facts["device_profiles"].keys()) == {"LAB-SW", "Lab-IAP-prof"}
     assert set(facts["roles"].keys()) == {"LAB-SW01", "Lab-IAP-role"}
     assert set(facts["lldp_groups"].keys()) == {"AP-group", "Lab-IAP-group"}
-    assert facts["mac_groups"] == {}
 
 
 def test_flatten_handles_none():
@@ -127,7 +118,6 @@ def test_flatten_handles_none():
         "device_profiles": {},
         "roles": {},
         "lldp_groups": {},
-        "mac_groups": {},
     }
 
 
@@ -151,7 +141,6 @@ def test_diff_with_depth5_payload_only_flags_poe_priority():
     facts = port_access_facts_from_device_profiles(DEPTH5_PAYLOAD)
     diff = port_access_diff(DESIRED, facts)
     assert diff["lldp_groups"] == []  # vendor_oui matches
-    assert diff["mac_groups"] == []
     assert diff["device_profiles"] == []  # associations match
     assert len(diff["roles"]) == 1
     assert diff["roles"][0]["name"] == "Lab-IAP-role"
@@ -164,18 +153,17 @@ def test_diff_with_depth5_steady_state():
     diff = port_access_diff(DESIRED, facts)
     assert diff == {
         "lldp_groups": [],
-        "mac_groups": [],
         "roles": [],
         "device_profiles": [],
     }
 
 
-def test_diff_lldp_sys_name_match_via_system_name_key():
-    """REST returns 'system_name'; desired uses 'sys_name'. Should match."""
+def test_diff_lldp_sysname_match_via_system_name_key():
+    """REST returns 'system_name'; desired uses 'sysname'. Should match."""
     desired = {
         "lldp_groups": [
             {"name": "AP-group",
-             "match": [{"seq": 10, "sys_name": "lab-sw01"}]}
+             "match": [{"seq": 10, "sysname": "lab-sw01"}]}
         ],
     }
     facts = port_access_facts_from_device_profiles(DEPTH5_PAYLOAD)
@@ -189,7 +177,7 @@ def test_diff_lldp_sys_desc_match_via_system_description_key():
             "G1": {"name": "G1", "entries": {
                 "10": {"system_description": "ArubaOS"}}}}}}
     desired = {"lldp_groups": [
-        {"name": "G1", "match": [{"seq": 10, "sys_desc": "ArubaOS"}]}]}
+        {"name": "G1", "match": [{"seq": 10, "sys-desc": "ArubaOS"}]}]}
     facts = port_access_facts_from_device_profiles(payload)
     diff = port_access_diff(desired, facts)
     assert diff["lldp_groups"] == []

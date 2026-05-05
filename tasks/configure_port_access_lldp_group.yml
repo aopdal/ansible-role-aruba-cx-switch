@@ -14,14 +14,12 @@
       {%- set out = [] -%}
       {%- for m in pa_lldp_group.match | default([]) -%}
       {%-   set seq = m.seq | default(loop.index * 10) -%}
-      {%-   if m.vendor_oui is defined -%}
-      {%-     set _ = out.append('seq ' ~ seq ~ ' match vendor-oui ' ~ m.vendor_oui) -%}
-      {%-   elif m.chassis_id is defined -%}
-      {%-     set _ = out.append('seq ' ~ seq ~ ' match chassis-id ' ~ m.chassis_id) -%}
-      {%-   elif m.sys_name is defined -%}
-      {%-     set _ = out.append('seq ' ~ seq ~ ' match sys-name ' ~ m.sys_name) -%}
-      {%-   elif m.sys_desc is defined -%}
-      {%-     set _ = out.append('seq ' ~ seq ~ ' match sys-desc ' ~ m.sys_desc) -%}
+      {%-   if m['vendor-oui'] is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match vendor-oui ' ~ m['vendor-oui']) -%}
+      {%-   elif m.sysname is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match sysname ' ~ m.sysname) -%}
+      {%-   elif m['sys-desc'] is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match sys-desc ' ~ m['sys-desc']) -%}
       {%-   endif -%}
       {%- endfor -%}
       {{ out }}

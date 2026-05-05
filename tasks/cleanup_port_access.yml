@@ -1,12 +1,11 @@
 ---
-# Cleanup orphaned port-access device-profiles, roles, lldp-groups, and mac-groups
+# Cleanup orphaned port-access device-profiles, roles, and lldp-groups
 # Only runs when aoscx_idempotent_mode is true and aoscx_configure_port_access is true
 #
 # Removal order (reverse of config):
 #   1. device-profiles  (must go first - references roles and groups)
 #   2. roles
 #   3. lldp-groups
-#   4. mac-groups
 
 - name: Identify orphaned port-access objects
   ansible.builtin.set_fact:
@@ -62,22 +61,6 @@
     - aoscx_idempotent_mode | bool
     - aoscx_configure_port_access | bool
     - aoscx_port_access_orphans.lldp_groups | length > 0
-  vars:
-    ansible_connection: network_cli
-  tags:
-    - port_access
-    - cleanup
-    - idempotent
-
-- name: Remove orphaned port-access mac-groups
-  arubanetworks.aoscx.aoscx_config:
-    lines:
-      - "no port-access mac-group {{ item }}"
-  loop: "{{ aoscx_port_access_orphans.mac_groups | default([]) }}"
-  when:
-    - aoscx_idempotent_mode | bool
-    - aoscx_configure_port_access | bool
-    - aoscx_port_access_orphans.mac_groups | length > 0
   vars:
     ansible_connection: network_cli
   tags:
