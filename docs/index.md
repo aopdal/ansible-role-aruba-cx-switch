@@ -88,6 +88,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **Idempotent Mode** - Removes configurations not in NetBox
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
 - ✅ **IGMP Snooping** - Implemented pr. VLAN (using default version 3)
+- ✅ **Port Profiles** - Configure port-access profiles
 - ❌ **STP** - on roadmap
 - ❌ **BFD** - on roadmap
 - ❌ **DHCP relay IPv4** - on roadmap
