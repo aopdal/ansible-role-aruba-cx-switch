@@ -1,0 +1,107 @@
+
+{# ============================================================================
+   Port-access (device-profile) configuration
+
+   Renders LLDP groups, MAC groups, roles and device-profiles from the
+   `port_access` config_context dict (NetBox).
+
+   Expected schema (top-level `port_access` key from config_context):
+
+     port_access:
+       lldp_groups:
+         - name: <str>
+           match:
+             - { seq: <int>, vendor_oui: <str> }
+             - { seq: <int>, chassis_id: <str> }
+             - { seq: <int>, sys_name: <str> }
+             - { seq: <int>, sys_desc: <str> }
+       mac_groups:
+         - name: <str>
+           match:
+             - { seq: <int>, mac_oui: <str> }
+       roles:
+         - name: <str>
+           description: <str>
+           poe_priority: low|high|critical
+           trust_mode: dscp|cos|none
+           vlan_trunk_native: <int|str>
+           vlan_trunk_allowed: <int|str>   # supports "11", "11,13", "11-13"
+           vlan_access: <int|str>
+       device_profiles:
+         - name: <str>
+           enable: true|false
+           associate_role: <role-name>
+           associate_lldp_group: <lldp-group-name>
+           associate_mac_group: <mac-group-name>
+============================================================================ #}
+{% if port_access is defined and port_access %}
+!
+{% for grp in port_access.lldp_groups | default([]) %}
+port-access lldp-group {{ grp.name }}
+{%   for m in grp.match | default([]) %}
+{%     set seq = m.seq | default(loop.index * 10) %}
+{%     if m.vendor_oui is defined %}
+    seq {{ seq }} match vendor-oui {{ m.vendor_oui }}
+{%     elif m.chassis_id is defined %}
+    seq {{ seq }} match chassis-id {{ m.chassis_id }}
+{%     elif m.sys_name is defined %}
+    seq {{ seq }} match sys-name {{ m.sys_name }}
+{%     elif m.sys_desc is defined %}
+    seq {{ seq }} match sys-desc {{ m.sys_desc }}
+{%     endif %}
+{%   endfor %}
+!
+{% endfor %}
+{% for grp in port_access.mac_groups | default([]) %}
+port-access mac-group {{ grp.name }}
+{%   for m in grp.match | default([]) %}
+{%     set seq = m.seq | default(loop.index * 10) %}
+{%     if m.mac_oui is defined %}
+    seq {{ seq }} match mac-oui {{ m.mac_oui }}
+{%     elif m.mac is defined %}
+    seq {{ seq }} match mac {{ m.mac }}
+{%     endif %}
+{%   endfor %}
+!
+{% endfor %}
+{% for role in port_access.roles | default([]) %}
+port-access role {{ role.name }}
+{%   if role.description is defined %}
+    description {{ role.description }}
+{%   endif %}
+{%   if role.poe_priority is defined %}
+    poe-priority {{ role.poe_priority }}
+{%   endif %}
+{%   if role.trust_mode is defined %}
+    trust-mode {{ role.trust_mode }}
+{%   endif %}
+{%   if role.vlan_access is defined %}
+    vlan access {{ role.vlan_access }}
+{%   endif %}
+{%   if role.vlan_trunk_native is defined %}
+    vlan trunk native {{ role.vlan_trunk_native }}
+{%   endif %}
+{%   if role.vlan_trunk_allowed is defined %}
+    vlan trunk allowed {{ role.vlan_trunk_allowed }}
+{%   endif %}
+!
+{% endfor %}
+{% for prof in port_access.device_profiles | default([]) %}
+port-access device-profile {{ prof.name }}
+{%   if prof.enable | default(true) %}
+    enable
+{%   else %}
+    disable
+{%   endif %}
+{%   if prof.associate_role is defined %}
+    associate role {{ prof.associate_role }}
+{%   endif %}
+{%   if prof.associate_lldp_group is defined %}
+    associate lldp-group {{ prof.associate_lldp_group }}
+{%   endif %}
+{%   if prof.associate_mac_group is defined %}
+    associate mac-group {{ prof.associate_mac_group }}
+{%   endif %}
+!
+{% endfor %}
+{% endif %}

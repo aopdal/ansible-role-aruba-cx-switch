@@ -20,6 +20,16 @@
 # - aoscx_enhanced_interface_facts (raw REST API response)
 # - aoscx_evpn_facts (when EVPN enabled)
 # - aoscx_vni_facts (when VXLAN enabled)
+# - aoscx_port_access_facts (when port_access is defined in the device's
+#   NetBox config_context). Built from a single REST call to
+#   /system/device_profiles?depth=5, then flattened by the
+#   port_access_facts_from_device_profiles filter into:
+#     {
+#       'device_profiles': <full payload, dict keyed by profile name>,
+#       'roles':           <flattened dict keyed by role name>,
+#       'lldp_groups':     <flattened dict keyed by lldp-group name>,
+#       'mac_groups':      <flattened dict keyed by mac-group name>
+#     }
 #
 # Output facts (enhanced-only mode):
 # - aoscx_enhanced_interface_facts (raw REST API response)
@@ -235,6 +245,32 @@
   tags:
     - always
 
+# Query port-access (device-profile) configuration via REST API.
+# Gated so we never query when port-access is not in scope for the device.
+# A single GET on /system/device_profiles?depth=5 returns each profile with
+# its associated role, lldp_groups (including expanded match entries), and
+# mac_groups inline. The port_access_facts_from_device_profiles filter then
+# flattens the response into the {device_profiles, roles, lldp_groups,
+# mac_groups} shape that port_access_diff expects - so one REST call
+# replaces four. (depth=4 leaves lldp/mac entry values as URI strings;
+# depth=5 expands them to {seq, vendor_oui|mac_oui|...} dicts.)
+- name: Query port-access device-profiles via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/device_profiles?attributes=&depth=5"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [ 200, 400, 404 ]
+    return_content: true
+  register: _rest_port_access_profiles
+  delegate_to: localhost
+  when:
+    - aoscx_configure_port_access | default(true) | bool
+    - (port_access | default({})) | length > 0
+  tags:
+    - always
+
 # Query OSPF interface facts (optional, when OSPF is configured on the device)
 # Skipped unless both aoscx_configure_ospf and custom_fields.device_ospf are true.
 # Determines which interfaces are already registered in each OSPF area so that
@@ -381,6 +417,27 @@
   tags:
     - always
 
+# Aggregate port-access facts. Only set when port-access fact gathering ran.
+# The depth=4 device_profiles response is the single source - flatten it
+# into {device_profiles, roles, lldp_groups, mac_groups} for the diff
+# filter. When the endpoint returned non-200 (400/404 on firmware that
+# doesn't expose it) the filter degrades to all-empty sub-dicts and
+# port_access_diff falls back to "push everything".
+- name: Set port-access facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_port_access_facts: >-
+      {{ ((_rest_port_access_profiles.json | default({}))
+            if (_rest_port_access_profiles is defined
+                  and _rest_port_access_profiles.status == 200)
+            else {})
+         | port_access_facts_from_device_profiles }}
+  when:
+    - aoscx_configure_port_access | default(true) | bool
+    - (port_access | default({})) | length > 0
+    - _rest_port_access_profiles is defined
+  tags:
+    - always
+
 - name: Debug - Show REST API facts summary
   ansible.builtin.debug:
     msg: >-
@@ -391,7 +448,8 @@
         'Enhanced interface facts: ' ~ (aoscx_enhanced_interface_facts | length),
         'Enhanced VLAN facts: ' ~ (aoscx_enhanced_vlan_facts | length),
         'EVPN facts available: ' ~ (aoscx_evpn_facts is defined),
-        'VNI facts available: ' ~ (aoscx_vni_facts is defined)
+        'VNI facts available: ' ~ (aoscx_vni_facts is defined),
+        'Port-access facts available: ' ~ (aoscx_port_access_facts is defined)
       ] }}
   when:
     - aoscx_debug | default(false) | bool

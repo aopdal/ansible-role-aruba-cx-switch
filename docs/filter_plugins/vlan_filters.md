@@ -341,7 +341,7 @@ VXLAN requires mapping VLAN IDs to VNI (VXLAN Network Identifier) values. This f
 
 ---
 
-### 5. `get_vlans_in_use(interfaces, vlan_interfaces=None)`
+### 5. `get_vlans_in_use(interfaces, vlan_interfaces=None, port_access=None)`
 
 Extracts comprehensive VLAN details with full metadata from interfaces.
 
@@ -353,6 +353,12 @@ Provides detailed VLAN information including both IDs and full VLAN objects with
 
 - **interfaces** (list): List of interface objects from NetBox
 - **vlan_interfaces** (list, optional): List of VLAN/SVI interfaces to also process
+- **port_access** (dict, optional): `port_access` dict from NetBox
+  config_context. VLAN IDs referenced by `port_access.roles[*]`
+  (`vlan_trunk_native`, `vlan_trunk_allowed`, `vlan_access`) are added to
+  the in-use set so the VLANs get created on the device and are protected
+  from idempotent cleanup. Range/list syntax is supported (e.g.
+  `"11-13"`, `"11,13,15-20"`).
 
 #### Returns
 
@@ -399,6 +405,36 @@ Provides detailed VLAN information including both IDs and full VLAN objects with
   set_fact:
     all_vlans: "{{ interfaces | get_vlans_in_use(vlan_intfs) }}"
 ```
+
+**Include VLANs referenced by port-access roles (config_context):**
+```yaml
+- name: Get all VLANs including those referenced by port-access roles
+  set_fact:
+    all_vlans: "{{ interfaces | get_vlans_in_use(
+                    vlan_intfs | default([]),
+                    port_access | default({})
+                  ) }}"
+```
+
+Given the following `port_access` config_context:
+
+```json
+{
+  "port_access": {
+    "roles": [
+      {
+        "name": "Lab-IAP-role",
+        "vlan_trunk_native": 11,
+        "vlan_trunk_allowed": "11-13"
+      }
+    ]
+  }
+}
+```
+
+VLAN IDs `11`, `12`, and `13` are added to `vids` and resolved against the
+NetBox-provided VLAN list, so they are auto-created on the device and
+protected from deletion in idempotent mode.
 
 **Use VLAN Metadata:**
 ```yaml
@@ -769,7 +805,85 @@ L2VNI : 10100020
 
 ---
 
-## See Also
+## Port-Access Helpers
+
+Two helpers expose the VLAN-ID parsing/extraction logic that backs
+`get_vlans_in_use`'s `port_access` argument. They are useful when building
+diffs, validation rules, or render filters for the port-access feature.
+
+### `extract_port_access_vlan_ids(port_access)`
+
+Extracts every VLAN ID referenced by port-access roles in a `port_access`
+config_context dict.
+
+#### Parameters
+
+- **port_access** (dict | None): `port_access` dict from NetBox
+  config_context. Walks `port_access.roles[*]` and reads
+  `vlan_trunk_native`, `vlan_trunk_allowed`, and `vlan_access`.
+
+#### Returns
+
+Sorted list of unique VLAN IDs (1-4094). Returns `[]` for `None`, missing
+`roles`, or roles without VLAN fields.
+
+#### Example
+
+```yaml
+- name: Show VLANs referenced by port-access roles
+  ansible.builtin.debug:
+    msg: "{{ port_access | default({}) | extract_port_access_vlan_ids }}"
+```
+
+Given:
+
+```json
+{
+  "port_access": {
+    "roles": [
+      { "name": "Lab-IAP-role", "vlan_trunk_native": 11, "vlan_trunk_allowed": "11-13" },
+      { "name": "Printer-role", "vlan_access": 50 }
+    ]
+  }
+}
+```
+
+Returns: `[11, 12, 13, 50]`
+
+---
+
+### `parse_vlan_id_spec(spec)`
+
+Parses a VLAN-ID specification into a sorted list of unique integers.
+
+#### Parameters
+
+- **spec** (int | str | list | tuple | None): Accepts:
+    - `int` (e.g. `11`)
+    - `str`: comma-separated list with optional ranges
+      (`"11"`, `"11,13"`, `"11-13"`, `"11,13,15-20"`). Whitespace is tolerated.
+    - `list`/`tuple` of any of the above (recursed)
+
+#### Returns
+
+Sorted list of unique VLAN IDs (1-4094). Reverse ranges are normalised
+(`"15-13"` → `[13, 14, 15]`). Out-of-range and non-numeric tokens are
+skipped silently (with debug output).
+
+#### Examples
+
+| Input | Output |
+|---|---|
+| `11` | `[11]` |
+| `"11,13,15"` | `[11, 13, 15]` |
+| `"11-13"` | `[11, 12, 13]` |
+| `"11,13,15-20"` | `[11, 13, 15, 16, 17, 18, 19, 20]` |
+| `[11, "13-14"]` | `[11, 13, 14]` |
+| `"0,1,4094,4095"` | `[1, 4094]` |
+
+---
+
+
 
 - [Filter Plugins Overview](../FILTER_PLUGINS.md)
 - [Utils Module](utils.md) - Debug and utility functions

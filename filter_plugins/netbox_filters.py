@@ -20,6 +20,7 @@ if _filter_dir not in sys.path:
 from netbox_filters_lib.utils import collapse_vlan_list, select_interfaces_to_configure
 from netbox_filters_lib.vlan_filters import (
     extract_vlan_ids,
+    extract_port_access_vlan_ids,
     filter_vlans_in_use,
     extract_evpn_vlans,
     extract_vxlan_mappings,
@@ -28,6 +29,7 @@ from netbox_filters_lib.vlan_filters import (
     get_vlans_needing_igmp_update,
     get_vlan_interfaces,
     parse_evpn_evi_output,
+    parse_vlan_id_spec,
 )
 from netbox_filters_lib.vrf_filters import (
     extract_interface_vrfs,
@@ -69,6 +71,11 @@ from netbox_filters_lib.bgp_filters import (
     get_bgp_session_vrf_info,
     collect_ebgp_vrf_policy_config,
 )
+from netbox_filters_lib.port_access import (
+    port_access_diff,
+    port_access_facts_from_device_profiles,
+)
+from netbox_filters_lib.port_access_orphans import port_access_orphans
 
 # fmt: on
 
@@ -82,6 +89,8 @@ class FilterModule:
             "collapse_vlan_list": collapse_vlan_list,
             "select_interfaces_to_configure": select_interfaces_to_configure,
             "extract_vlan_ids": extract_vlan_ids,
+            "extract_port_access_vlan_ids": extract_port_access_vlan_ids,
+            "parse_vlan_id_spec": parse_vlan_id_spec,
             "filter_vlans_in_use": filter_vlans_in_use,
             "extract_evpn_vlans": extract_evpn_vlans,
             "extract_vxlan_mappings": extract_vxlan_mappings,
@@ -116,4 +125,8 @@ class FilterModule:
             # BGP helpers
             "get_bgp_session_vrf_info": get_bgp_session_vrf_info,
             "collect_ebgp_vrf_policy_config": collect_ebgp_vrf_policy_config,
+            # Port-access
+            "port_access_diff": port_access_diff,
+            "port_access_facts_from_device_profiles": port_access_facts_from_device_profiles,
+            "port_access_orphans": port_access_orphans,
         }

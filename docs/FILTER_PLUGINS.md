@@ -407,9 +407,28 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
     - Extract VXLAN VNI to VLAN mappings for VXLAN configuration
     - Returns: List of dicts with `vni` and `vlan` keys
 
-- **`get_vlans_in_use(interfaces, vlan_interfaces=None)`**
+- **`get_vlans_in_use(interfaces, vlan_interfaces=None, port_access=None)`**
     - Get comprehensive VLAN details with full metadata
+    - Optional `port_access` argument: a `port_access` dict from NetBox
+      config_context. VLAN IDs referenced by `port_access.roles[*]` via
+      `vlan_trunk_native`, `vlan_trunk_allowed`, or `vlan_access` are merged
+      into `vids` so the VLANs get created on the device and protected from
+      idempotent cleanup. Range/list syntax is supported (e.g. `"11-13"`,
+      `"11,13,15-20"`).
     - Returns: Dict with `vids` (sorted list of VLAN IDs) and `vlans` (list of VLAN objects)
+
+- **`extract_port_access_vlan_ids(port_access)`**
+    - Extract every VLAN ID referenced by port-access roles in a
+      `port_access` config_context dict (`vlan_trunk_native`,
+      `vlan_trunk_allowed`, `vlan_access`).
+    - Returns: Sorted list of unique VLAN IDs (1-4094)
+
+- **`parse_vlan_id_spec(spec)`**
+    - Parse a VLAN-ID specification into a sorted list of unique integers.
+    - Accepts `int`, `str` (`"11"`, `"11,13"`, `"11-13"`,
+      `"11,13,15-20"`), or list/tuple of these. Whitespace tolerated;
+      reverse ranges normalised; out-of-range and non-numeric tokens skipped.
+    - Returns: Sorted list of unique VLAN IDs (1-4094)
 
 - **`get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None)`**
     - Determine which VLANs need to be added or removed
@@ -542,6 +561,25 @@ BGP session enrichment with VRF and address-family metadata (2 filters):
     - Build AOS-CX CLI commands for route-maps and prefix lists from NetBox BGP plugin data
     - Route-map entries use `route-map NAME permit seq INDEX` syntax
     - Returns: Dict with `prefix_lists` and `route_map_rules` lists
+
+### `port_access.py` - Port-Access Diff
+
+Idempotency comparison for port-access (device-profile) configuration
+(1 filter):
+
+- **`port_access_diff(desired, current)`**
+    - Compare the desired `port_access` config_context against
+      `aoscx_port_access_facts` (REST API fact gathering) and return only
+      the items that need to be configured.
+    - Compares LLDP/MAC group match-sets (sequence-number agnostic), role
+      attributes (`description`, `poe_priority`, `trust_mode` vs REST
+      `qos_trust_mode`, `vlan_trunk_native`/`vlan_access` vs `vlan_tag`,
+      `vlan_trunk_allowed` range expansion vs `vlan_trunks` list), and
+      device-profile associations (`enable`, `associate_role`,
+      `associate_lldp_group`, `associate_mac_group`).
+    - Returns: Dict with `lldp_groups`, `mac_groups`, `roles`,
+      `device_profiles` lists. When current facts are missing, returns
+      every desired item (safe fallback).
 
 ### `comparison.py` - State Comparison
 NetBox vs device state comparison (2 filters, 295 lines):

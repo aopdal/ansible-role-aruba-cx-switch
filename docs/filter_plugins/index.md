@@ -73,7 +73,7 @@ Configuration building and helper functions:
 ### VLAN Operations
 
 **[VLAN Filters](vlan_filters.md)** - Complete VLAN lifecycle management
-**Filters**: 8
+**Filters**: 10
 
 Most comprehensive module handling:
 - VLAN ID extraction from interfaces
@@ -82,13 +82,16 @@ Most comprehensive module handling:
 - Idempotent VLAN change detection
 - VLAN interface (SVI) identification
 - EVPN EVI output parsing
+- Port-access role VLAN extraction (config_context)
 
 **Key Filters:**
 - `extract_vlan_ids()` - Get all VLAN IDs in use
-- `get_vlans_in_use()` - Comprehensive VLAN details
+- `get_vlans_in_use()` - Comprehensive VLAN details (incl. port-access)
 - `get_vlans_needing_changes()` - Idempotent change detection
 - `extract_evpn_vlans()` - EVPN-enabled VLANs
 - `extract_vxlan_mappings()` - VNI-to-VLAN mappings
+- `extract_port_access_vlan_ids()` - VLANs referenced by port-access roles
+- `parse_vlan_id_spec()` - Parse `"11-13"` / `"11,13,15-20"` syntax
 
 ---
 
@@ -347,15 +350,17 @@ Converts raw Aruba AOS-CX REST API responses into the format expected by `aoscx_
 - `get_interface_vrf(interface)` - Extract VRF name
 - `build_l3_config_lines(item, type, vrf_type, l3_counters_enable, ospf_process_id)` - Build all config commands for an interface
 
-#### VLAN Filters (8)
+#### VLAN Filters (10)
 - `extract_vlan_ids(interfaces)` - Extract VLAN IDs
 - `filter_vlans_in_use(vlans, interfaces)` - Filter to used VLANs
 - `extract_evpn_vlans(vlans, interfaces, check_noevpn)` - EVPN VLANs
 - `extract_vxlan_mappings(vlans, interfaces, use_l2vpn_id)` - VXLAN mappings
-- `get_vlans_in_use(interfaces, vlan_interfaces)` - Comprehensive VLAN data
+- `get_vlans_in_use(interfaces, vlan_interfaces, port_access)` - Comprehensive VLAN data (includes port-access role VLANs)
 - `get_vlans_needing_changes(device_vlans, vlans_in_use, facts)` - Change detection
 - `get_vlan_interfaces(interfaces)` - Extract SVIs
 - `parse_evpn_evi_output(output)` - Parse show command
+- `extract_port_access_vlan_ids(port_access)` - VLANs from port-access roles
+- `parse_vlan_id_spec(spec)` - Parse VLAN range/list syntax
 
 #### VRF Filters (6)
 - `extract_interface_vrfs(interfaces)` - Extract VRF names
@@ -514,7 +519,7 @@ EOF
 
 | Module | Filters | Description |
 |--------|---------|-------------|
-| **vlan_filters.py** | 8 | VLAN lifecycle management |
+| **vlan_filters.py** | 10 | VLAN lifecycle management (incl. port-access) |
 | **vrf_filters.py** | 6 | VRF operations and route targets |
 | **l3_config_helpers.py** | 6 | L3 configuration optimization |
 | **ospf_filters.py** | 4 | OSPF configuration |
@@ -525,7 +530,7 @@ EOF
 | **interface_change_detection.py** | 1 | Change detection and idempotency |
 | **interface_ip_processing.py** | 1 | IP address matching |
 | **bgp_filters.py** | 1 | BGP session enrichment |
-| **Total** | **38** | 11 modules across 2 plugin files |
+| **Total** | **40** | 11 modules across 2 plugin files |
 
 ---
 

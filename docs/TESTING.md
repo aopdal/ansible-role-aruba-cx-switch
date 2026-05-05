@@ -23,7 +23,7 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 
 This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
 
-1. ✅ **Python Unit Tests** (`pytest`) - 309 tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
+1. ✅ **Python Unit Tests** (`pytest`) - 365 tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
 3. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
 4. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
@@ -66,6 +66,11 @@ This role includes comprehensive CI/CD testing infrastructure with **8 layers of
 4. **Test Playbooks**
     - `tests/test.yml` - Main test playbook with comprehensive mock data
     - `tests/integration.yml` - Integration test scenarios
+    - `tests/test_base_config.yml` - Base system config tests
+    - `tests/test_dns_config.yml` - DNS configuration tests
+    - `tests/test_lag_order.yml` - LAG ordering tests
+    - `tests/test_real_data.yml` - Real-device data tests
+    - `tests/test_tags.yml` - Tag-dependent task tests
     - `tests/inventory` - Test inventory file
 
 5. **Developer Tools**
@@ -91,6 +96,11 @@ ansible-role-aruba-cx-switch/
 ├── tests/
 │   ├── test.yml                      # Main test
 │   ├── integration.yml               # Integration tests
+│   ├── test_base_config.yml          # Base config tests
+│   ├── test_dns_config.yml           # DNS tests
+│   ├── test_lag_order.yml            # LAG ordering tests
+│   ├── test_real_data.yml            # Real-device data tests
+│   ├── test_tags.yml                 # Tag-dependent task tests
 │   └── inventory                     # Test inventory
 ├── .ansible-lint                     # Ansible linting rules
 ├── .yamllint                         # YAML linting rules
@@ -385,7 +395,7 @@ Located in: `tests/unit/`
 
 **NEW**: Comprehensive unit tests for custom filter plugins using pytest.
 
-The role includes **309 unit tests** covering all custom Ansible filters:
+The role includes **365 unit tests** covering all custom Ansible filters:
 
 ```bash
 # Run all unit tests
@@ -412,8 +422,12 @@ pytest tests/unit/ -m utils      # Utility function tests
 - `test_interface_filters.py` - 28 tests for interface categorization
 - `test_vrf_filters.py` - 26 tests for VRF operations
 - `test_rest_api_transforms.py` - 25 tests for REST API data normalization
+- `test_port_access_vlans.py` - 25 tests for port-access VLAN extraction
+- `test_port_access_diff.py` - 20 tests for port-access diff (desired vs device state)
 - `test_comparison.py` - 17 tests for state comparison logic
 - `test_ospf_filters.py` - 15 tests for OSPF configuration
+- `test_port_access_facts.py` - 8 tests for port-access REST API fact flattening
+- `test_port_access_orphans.py` - 3 tests for orphaned port-access object detection
 
 **Configuration**: `pytest.ini` defines test discovery, markers, and coverage settings
 
@@ -1954,7 +1968,11 @@ tests/unit/
 ├── test_l3_config_helpers.py         # L3 configuration helper tests
 ├── test_ospf_filters.py              # OSPF filter tests
 ├── test_bgp_filters.py               # BGP filter tests
-└── test_rest_api_transforms.py       # REST API transform tests
+├── test_rest_api_transforms.py       # REST API transform tests
+├── test_port_access_diff.py          # Port-access diff (desired vs device state)
+├── test_port_access_facts.py         # Port-access REST API fact flattening
+├── test_port_access_orphans.py       # Orphaned port-access object detection
+└── test_port_access_vlans.py         # Port-access VLAN extraction
 ```
 
 ### Test Fixtures

@@ -44,8 +44,26 @@
 
 - name: Calculate VLANs currently in use by interfaces
   ansible.builtin.set_fact:
-    vlans_in_use: "{{ interfaces | get_vlans_in_use(vlan_interfaces | default([])) }}"
-  when: interfaces is defined
+    vlans_in_use: >-
+      {{ interfaces | get_vlans_in_use(
+           vlan_interfaces | default([]),
+           port_access | default({})
+         ) }}
+  when:
+    - interfaces is defined
+    - not (aoscx_configure_vlans_all | default(false) | bool)
+
+- name: Treat all NetBox-available VLANs as in use (aoscx_configure_vlans_all=true)
+  ansible.builtin.set_fact:
+    vlans_in_use:
+      vids: >-
+        {{ vlans | default([])
+             | map(attribute='vid')
+             | select('integer')
+             | unique | sort | list }}
+      vlans: "{{ vlans | default([]) }}"
+  when:
+    - aoscx_configure_vlans_all | default(false) | bool
 
 - name: Determine VLAN changes needed
   ansible.builtin.set_fact:
@@ -55,8 +73,16 @@
   ansible.builtin.debug:
     msg:
       - "=== VLAN Analysis (identify_vlan_changes.yml) ==="
+      - >-
+        Mode:
+        {{ 'configure-all (aoscx_configure_vlans_all=true)'
+           if (aoscx_configure_vlans_all | default(false) | bool)
+           else 'in-use (interfaces + port-access)' }}
       - "VLANs available from NetBox: {{ vlans | length }}"
       - "VLANs in use on interfaces: {{ vlans_in_use.vids | length }} - {{ vlans_in_use.vids | sort }}"
+      - >-
+        VLANs referenced by port-access roles:
+        {{ (port_access | default({})) | extract_port_access_vlan_ids }}
       - "VLANs to create: {{ vlan_changes.vlans_to_create | length }} - {{ vlan_changes.vlans_to_create | map(attribute='vid') | list | sort }}"
       - "VLANs to delete: {{ vlan_changes.vlans_to_delete | length }} - {{ vlan_changes.vlans_to_delete | sort }}"
       - "VLANs in use (protected from deletion): {{ vlan_changes.vlans_in_use | length }}"

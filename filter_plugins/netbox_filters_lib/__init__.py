@@ -14,6 +14,7 @@ from .utils import (
 )
 from .vlan_filters import (
     extract_vlan_ids,
+    extract_port_access_vlan_ids,
     filter_vlans_in_use,
     extract_evpn_vlans,
     extract_vxlan_mappings,
@@ -21,6 +22,7 @@ from .vlan_filters import (
     get_vlans_needing_changes,
     get_vlan_interfaces,
     parse_evpn_evi_output,
+    parse_vlan_id_spec,
 )
 from .vrf_filters import (
     extract_interface_vrfs,
@@ -62,6 +64,10 @@ from .l3_config_helpers import (
     group_interface_ips,
     build_l3_config_lines,
 )
+from .port_access import (
+    port_access_diff,
+    port_access_facts_from_device_profiles,
+)
 
 __all__ = [
     # Utilities
@@ -72,6 +78,7 @@ __all__ = [
     "populate_ip_changes",
     # VLAN filters
     "extract_vlan_ids",
+    "extract_port_access_vlan_ids",
     "filter_vlans_in_use",
     "extract_evpn_vlans",
     "extract_vxlan_mappings",
@@ -79,6 +86,7 @@ __all__ = [
     "get_vlans_needing_changes",
     "get_vlan_interfaces",
     "parse_evpn_evi_output",
+    "parse_vlan_id_spec",
     # VRF filters
     "extract_interface_vrfs",
     "filter_vrfs_in_use",
@@ -111,4 +119,7 @@ __all__ = [
     "get_interface_vrf",
     "group_interface_ips",
     "build_l3_config_lines",
+    # Port-access
+    "port_access_diff",
+    "port_access_facts_from_device_profiles",
 ]

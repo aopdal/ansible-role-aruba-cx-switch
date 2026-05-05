@@ -1,0 +1,161 @@
+---
+# Configure port-access (device-profile) on AOS-CX switches
+#
+# Renders LLDP groups, MAC groups, port-access roles and device-profiles
+# from the `port_access` config_context dict (NetBox) and pushes them via
+# arubanetworks.aoscx.aoscx_config (network_cli connection - matches the
+# convention used by configure_vxlan.yml etc.).
+#
+# Schema (top-level `port_access` key from config_context):
+#
+#   port_access:
+#     lldp_groups:
+#       - name: Lab-IAP-group
+#         match:
+#           - { seq: 10, vendor_oui: "000b86" }
+#     mac_groups:
+#       - name: Printers
+#         match:
+#           - { seq: 10, mac_oui: "001b78" }
+#     roles:
+#       - name: Lab-IAP-role
+#         description: Aruba IAP
+#         poe_priority: high
+#         trust_mode: dscp
+#         vlan_trunk_native: 11
+#         vlan_trunk_allowed: "11-13"
+#     device_profiles:
+#       - name: Lab-IAP-prof
+#         enable: true
+#         associate_role: Lab-IAP-role
+#         associate_lldp_group: Lab-IAP-group
+#
+# Auto-enabled when NetBox config_context provides a `port_access` dict
+# for the device (gate enforced in tasks/main.yml).
+#
+# Configuration order matters - device-profiles reference roles and
+# lldp/mac groups; roles can reference VLANs - so:
+#   1. lldp-group
+#   2. mac-group
+#   3. role
+#   4. device-profile
+
+- name: configure_port_access | Skip when port_access not provided
+  ansible.builtin.debug:
+    msg: "No port_access in config_context for {{ inventory_hostname }} - skipping"
+  when:
+    - port_access is not defined or port_access | length == 0
+    - aoscx_debug | default(false) | bool
+
+- name: configure_port_access | Display summary
+  ansible.builtin.debug:
+    msg:
+      - "=== Port-Access Configuration ==="
+      - "Device: {{ inventory_hostname }}"
+      - "LLDP groups: {{ port_access.lldp_groups | default([]) | length }}"
+      - "MAC groups: {{ port_access.mac_groups | default([]) | length }}"
+      - "Roles: {{ port_access.roles | default([]) | length }}"
+      - "Device-profiles: {{ port_access.device_profiles | default([]) | length }}"
+  when:
+    - port_access is defined and port_access | length > 0
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+
+# ----------------------------------------------------------------------------
+# Diff against device state (when REST API facts are available)
+# ----------------------------------------------------------------------------
+# Computes the subset of desired objects that need to be configured. When
+# aoscx_port_access_facts is unset (e.g. aoscx_gather_facts_rest_api is
+# false, or no `port_access` was present in config_context at fact gather
+# time) the filter returns every desired item, so behaviour falls back to
+# the previous "always push" mode.
+- name: configure_port_access | Compute diff vs device state
+  ansible.builtin.set_fact:
+    port_access_changes: >-
+      {{ (port_access | default({}))
+         | port_access_diff(aoscx_port_access_facts | default({})) }}
+  when: port_access is defined and port_access | length > 0
+
+- name: configure_port_access | Show diff summary
+  ansible.builtin.debug:
+    msg:
+      - "=== Port-Access Diff (only items needing configuration) ==="
+      - >-
+        Comparison against device facts:
+        {{ 'available' if aoscx_port_access_facts is defined
+           else 'NOT available - falling back to push-everything mode' }}
+      - >-
+        LLDP groups to configure:
+        {{ port_access_changes.lldp_groups | length }}/{{ port_access.lldp_groups | default([]) | length }}
+        - {{ port_access_changes.lldp_groups | map(attribute='name') | list }}
+      - >-
+        MAC groups to configure:
+        {{ port_access_changes.mac_groups | length }}/{{ port_access.mac_groups | default([]) | length }}
+        - {{ port_access_changes.mac_groups | map(attribute='name') | list }}
+      - >-
+        Roles to configure:
+        {{ port_access_changes.roles | length }}/{{ port_access.roles | default([]) | length }}
+        - {{ port_access_changes.roles | map(attribute='name') | list }}
+      - >-
+        Device-profiles to configure:
+        {{ port_access_changes.device_profiles | length }}/{{ port_access.device_profiles | default([]) | length }}
+        - {{ port_access_changes.device_profiles | map(attribute='name') | list }}
+  when:
+    - port_access is defined and port_access | length > 0
+    - port_access_changes is defined
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+
+# ----------------------------------------------------------------------------
+# 1. LLDP groups
+# ----------------------------------------------------------------------------
+- name: configure_port_access | Configure each port-access lldp-group
+  ansible.builtin.include_tasks: configure_port_access_lldp_group.yml
+  loop: "{{ port_access_changes.lldp_groups | default([]) }}"
+  loop_control:
+    loop_var: pa_lldp_group
+    label: "{{ inventory_hostname }} lldp-group {{ pa_lldp_group.name }}"
+  when:
+    - port_access is defined and port_access | length > 0
+    - port_access_changes is defined
+    - port_access_changes.lldp_groups | length > 0
+
+# ----------------------------------------------------------------------------
+# 2. MAC groups
+# ----------------------------------------------------------------------------
+- name: configure_port_access | Configure each port-access mac-group
+  ansible.builtin.include_tasks: configure_port_access_mac_group.yml
+  loop: "{{ port_access_changes.mac_groups | default([]) }}"
+  loop_control:
+    loop_var: pa_mac_group
+    label: "{{ inventory_hostname }} mac-group {{ pa_mac_group.name }}"
+  when:
+    - port_access is defined and port_access | length > 0
+    - port_access_changes is defined
+    - port_access_changes.mac_groups | length > 0
+
+# ----------------------------------------------------------------------------
+# 3. Roles
+# ----------------------------------------------------------------------------
+- name: configure_port_access | Configure each port-access role
+  ansible.builtin.include_tasks: configure_port_access_role.yml
+  loop: "{{ port_access_changes.roles | default([]) }}"
+  loop_control:
+    loop_var: pa_role
+    label: "{{ inventory_hostname }} role {{ pa_role.name }}"
+  when:
+    - port_access is defined and port_access | length > 0
+    - port_access_changes is defined
+    - port_access_changes.roles | length > 0
+
+# ----------------------------------------------------------------------------
+# 4. Device-profiles
+# ----------------------------------------------------------------------------
+- name: configure_port_access | Configure each port-access device-profile
+  ansible.builtin.include_tasks: configure_port_access_device_profile.yml
+  loop: "{{ port_access_changes.device_profiles | default([]) }}"
+  loop_control:
+    loop_var: pa_profile
+    label: "{{ inventory_hostname }} device-profile {{ pa_profile.name }}"
+  when:
+    - port_access is defined and port_access | length > 0
+    - port_access_changes is defined
+    - port_access_changes.device_profiles | length > 0

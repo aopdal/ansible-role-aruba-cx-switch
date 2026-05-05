@@ -1,0 +1,28 @@
+---
+# Configure a single port-access lldp-group.
+# Required loop var: pa_lldp_group (dict with .name and .match list)
+
+- name: "configure_port_access | Push lldp-group {{ pa_lldp_group.name }}"
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - "port-access lldp-group {{ pa_lldp_group.name }}"
+    lines: "{{ _pa_lldp_group_cli_lines }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+    _pa_lldp_group_cli_lines: >-
+      {%- set out = [] -%}
+      {%- for m in pa_lldp_group.match | default([]) -%}
+      {%-   set seq = m.seq | default(loop.index * 10) -%}
+      {%-   if m.vendor_oui is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match vendor-oui ' ~ m.vendor_oui) -%}
+      {%-   elif m.chassis_id is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match chassis-id ' ~ m.chassis_id) -%}
+      {%-   elif m.sys_name is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match sys-name ' ~ m.sys_name) -%}
+      {%-   elif m.sys_desc is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match sys-desc ' ~ m.sys_desc) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ out }}
+  when: pa_lldp_group.match | default([]) | length > 0
