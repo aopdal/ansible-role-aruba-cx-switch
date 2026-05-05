@@ -156,6 +156,14 @@ rejected by lint / review.
 - L3 interfaces use `aoscx_config` (not `aoscx_l3_interface`) so that
   `ip mtu` and `l3-counters` can be set. Do not "simplify" back to
   `aoscx_l3_interface` — capability would regress.
+- **`when` conditions must resolve to a boolean.** Ansible 2.19 deprecates
+  evaluating dicts/lists as booleans in `when`. Never write `- my_dict` or
+  `and my_dict` to test non-emptiness; use `my_dict | length > 0` (or
+  `== 0` for the inverse). Same rule for lists. Booleans and integers are
+  fine with `| bool` / direct comparison.
+- **Filter plugins are called with pipe syntax, not `lookup()`.** Use
+  `{{ value | my_filter(arg) }}` in `set_fact`. `lookup()` is for lookup
+  plugins only — using it on a filter plugin silently returns nothing.
 
 ### 4.3 Filter plugins
 
