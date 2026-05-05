@@ -1,0 +1,33 @@
+---
+# Configure a single port-access role.
+# Required loop var: pa_role (dict)
+
+- name: "configure_port_access | Push role {{ pa_role.name }}"
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - "port-access role {{ pa_role.name }}"
+    lines: "{{ _pa_role_cli_lines }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+    _pa_role_cli_lines: >-
+      {%- set out = [] -%}
+      {%- if pa_role.description is defined -%}
+      {%-   set _ = out.append('description ' ~ pa_role.description) -%}
+      {%- endif -%}
+      {%- if pa_role.poe_priority is defined -%}
+      {%-   set _ = out.append('poe-priority ' ~ pa_role.poe_priority) -%}
+      {%- endif -%}
+      {%- if pa_role.trust_mode is defined -%}
+      {%-   set _ = out.append('trust-mode ' ~ pa_role.trust_mode) -%}
+      {%- endif -%}
+      {%- if pa_role.vlan_access is defined -%}
+      {%-   set _ = out.append('vlan access ' ~ pa_role.vlan_access) -%}
+      {%- endif -%}
+      {%- if pa_role.vlan_trunk_native is defined -%}
+      {%-   set _ = out.append('vlan trunk native ' ~ pa_role.vlan_trunk_native) -%}
+      {%- endif -%}
+      {%- if pa_role.vlan_trunk_allowed is defined -%}
+      {%-   set _ = out.append('vlan trunk allowed ' ~ pa_role.vlan_trunk_allowed) -%}
+      {%- endif -%}
+      {{ out }}

@@ -18,8 +18,22 @@ This task sets the following facts used by all downstream tasks:
 | Fact | Description | Used By |
 |------|-------------|---------|
 | `vlans` | VLANs available from NetBox (desired state) | All VLAN-related tasks |
-| `vlans_in_use` | VLANs currently in use on interfaces | configure_vlans.yml, configure_evpn.yml, configure_vxlan.yml |
+| `vlans_in_use` | VLANs currently in use on interfaces (or all NetBox VLANs when `aoscx_configure_vlans_all=true`) | configure_vlans.yml, configure_evpn.yml, configure_vxlan.yml |
 | `vlan_changes` | VLANs to create/delete based on analysis | configure_vlans.yml, cleanup_*.yml |
+
+### Configure-All Mode (`aoscx_configure_vlans_all`)
+
+By default, `vlans_in_use` is built from VLANs referenced by interfaces
+(untagged/tagged) and by port-access roles in `port_access` config_context.
+Set `aoscx_configure_vlans_all: true` to instead treat **every** VLAN that
+NetBox returns for the device as "in use". This:
+
+- Skips interface scanning for VLAN usage.
+- Creates every NetBox-scoped VLAN on the device.
+- Protects every NetBox-scoped VLAN from idempotent cleanup.
+
+Typical use: access/edge switches where the VLAN catalog should always
+match NetBox regardless of current port assignments.
 
 ### Task Execution Order
 

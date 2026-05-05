@@ -279,6 +279,9 @@ Config context provides **configuration data** for features. This is JSON data a
 | | `vsx_keepalive_peer` | String | VSX peer keepalive IP address | ✅ Active |
 | | `vsx_keepalive_src` | String | Source IP for keepalive | ✅ Active |
 | | `vsx_keepalive_vrf` | String | VRF for keepalive (default: mgmt) | ✅ Active |
+| **Port-Access** | `port_access.roles[*].vlan_trunk_native` | Int / String | Native VLAN for a port-access role. VLAN IDs are auto-added to the device's VLAN create list. | ✅ Active |
+| | `port_access.roles[*].vlan_trunk_allowed` | Int / String | Trunk-allowed VLANs. Supports range/list syntax: `11`, `"11,13"`, `"11-13"`, `"11,13,15-20"`. Expanded VIDs are auto-added to the device's VLAN create list and protected from idempotent deletion. | ✅ Active |
+| | `port_access.roles[*].vlan_access` | Int / String | Access VLAN for a port-access role (alternative shorthand). Same VLAN auto-creation behaviour. | ✅ Active |
 
 ### Base System Config Context Examples
 
@@ -339,6 +342,56 @@ Ansible access:
 - `dns.domain`
 - `dns.servers`
 - `dns.hosts`
+
+
+### Port-Access Config Context
+
+Port-access roles, LLDP groups, and device-profiles are defined under a
+top-level `port_access` key. VLAN IDs referenced by any role's
+`vlan_trunk_native`, `vlan_trunk_allowed`, or `vlan_access` field are
+automatically added to the device's VLAN-create list and protected from
+idempotent deletion. Range and list syntax is supported.
+
+```json
+{
+  "port_access": {
+    "lldp_groups": [
+      {
+        "name": "Lab-IAP-group",
+        "match": [
+          { "seq": 10, "vendor_oui": "000b86" }
+        ]
+      }
+    ],
+    "roles": [
+      {
+        "name": "Lab-IAP-role",
+        "description": "Aruba IAP",
+        "poe_priority": "high",
+        "trust_mode": "dscp",
+        "vlan_trunk_native": 11,
+        "vlan_trunk_allowed": "11-13"
+      }
+    ],
+    "device_profiles": [
+      {
+        "name": "Lab-IAP-prof",
+        "enable": true,
+        "associate_role": "Lab-IAP-role",
+        "associate_lldp_group": "Lab-IAP-group"
+      }
+    ]
+  }
+}
+```
+
+Ansible access: `port_access`, `port_access.roles`,
+`port_access.lldp_groups`, `port_access.device_profiles`.
+
+> The referenced VLANs (`11`, `12`, `13` in the example above) must exist
+> in NetBox and be scoped to the device. If a referenced VID is missing
+> from NetBox the role will log a warning during VLAN change identification:
+> `VLAN X is in use but not available in NetBox for this device!`
 
 
 ### Config Context Hierarchy
@@ -746,6 +799,13 @@ curl -H "Authorization: Token $TOKEN" \
 **VSX (Stable):**
 
 - `vsx_system_mac`, `vsx_role`, `vsx_isl_ports`, `vsx_keepalive_peer`, `vsx_keepalive_src`, `vsx_keepalive_vrf`
+
+**Port-Access (Stable):**
+
+- `port_access.lldp_groups`, `port_access.roles`, `port_access.device_profiles`
+- VLAN IDs referenced via `vlan_trunk_native` / `vlan_trunk_allowed` /
+  `vlan_access` are auto-created and protected from idempotent cleanup
+  (range/list syntax supported, e.g. `"11-13"`, `"11,13,15-20"`).
 
 ### NetBox Objects
 

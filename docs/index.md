@@ -342,6 +342,11 @@ aoscx_configure_ospf: true
 # Idempotent mode - removes configs not in NetBox
 aoscx_idempotent_mode: false
 
+# Configure ALL NetBox-scoped VLANs on the device, regardless of whether
+# they are currently used by an interface or port-access role.
+# Useful for access/edge switches.
+aoscx_configure_vlans_all: false
+
 # Save configuration after changes
 aoscx_save_config: true
 

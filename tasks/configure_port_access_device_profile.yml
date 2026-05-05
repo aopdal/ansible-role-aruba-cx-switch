@@ -1,0 +1,29 @@
+---
+# Configure a single port-access device-profile.
+# Required loop var: pa_profile (dict)
+
+- name: "configure_port_access | Push device-profile {{ pa_profile.name }}"
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - "port-access device-profile {{ pa_profile.name }}"
+    lines: "{{ _pa_profile_cli_lines }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+    _pa_profile_cli_lines: >-
+      {%- set out = [] -%}
+      {%- if pa_profile.enable | default(true) -%}
+      {%-   set _ = out.append('enable') -%}
+      {%- else -%}
+      {%-   set _ = out.append('disable') -%}
+      {%- endif -%}
+      {%- if pa_profile.associate_role is defined -%}
+      {%-   set _ = out.append('associate role ' ~ pa_profile.associate_role) -%}
+      {%- endif -%}
+      {%- if pa_profile.associate_lldp_group is defined -%}
+      {%-   set _ = out.append('associate lldp-group ' ~ pa_profile.associate_lldp_group) -%}
+      {%- endif -%}
+      {%- if pa_profile.associate_mac_group is defined -%}
+      {%-   set _ = out.append('associate mac-group ' ~ pa_profile.associate_mac_group) -%}
+      {%- endif -%}
+      {{ out }}

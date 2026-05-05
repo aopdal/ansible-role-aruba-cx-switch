@@ -156,13 +156,113 @@ def extract_vxlan_mappings(vlans, interfaces, use_l2vpn_id=True):
     return mappings
 
 
-def get_vlans_in_use(interfaces, vlan_interfaces=None):
+def parse_vlan_id_spec(spec):
+    """
+    Parse a VLAN-ID specification into a sorted list of unique integers.
+
+    Accepts:
+    - int (e.g. 11)
+    - str: comma-separated list with optional ranges (e.g. "11", "11,13",
+      "11-13", "11,13,15-20"). Whitespace is tolerated.
+    - list/tuple of any of the above (recursed)
+
+    Returns:
+        Sorted list of unique VLAN IDs (1-4094). Invalid tokens are skipped
+        with a debug message.
+    """
+    vids = set()
+
+    if spec is None:
+        return []
+
+    if isinstance(spec, bool):
+        # bool is a subclass of int - reject explicitly to avoid 0/1 surprises
+        return []
+
+    if isinstance(spec, int):
+        if 1 <= spec <= 4094:
+            vids.add(spec)
+        return sorted(vids)
+
+    if isinstance(spec, (list, tuple)):
+        for item in spec:
+            vids.update(parse_vlan_id_spec(item))
+        return sorted(vids)
+
+    if not isinstance(spec, str):
+        _debug(f"parse_vlan_id_spec: unsupported type {type(spec).__name__}")
+        return []
+
+    for token in spec.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "-" in token:
+            try:
+                start_s, end_s = token.split("-", 1)
+                start = int(start_s.strip())
+                end = int(end_s.strip())
+            except ValueError:
+                _debug(f"parse_vlan_id_spec: invalid range '{token}'")
+                continue
+            if start > end:
+                start, end = end, start
+            for vid in range(start, end + 1):
+                if 1 <= vid <= 4094:
+                    vids.add(vid)
+        else:
+            try:
+                vid = int(token)
+            except ValueError:
+                _debug(f"parse_vlan_id_spec: invalid VLAN id '{token}'")
+                continue
+            if 1 <= vid <= 4094:
+                vids.add(vid)
+
+    return sorted(vids)
+
+
+def extract_port_access_vlan_ids(port_access):
+    """
+    Extract all VLAN IDs referenced by port-access roles.
+
+    Looks at every role's ``vlan_trunk_native`` and ``vlan_trunk_allowed``
+    fields and expands range/list syntax (e.g. "11-13", "11,13,15-20").
+
+    Args:
+        port_access: ``port_access`` dict from NetBox config_context, or None.
+
+    Returns:
+        Sorted list of unique VLAN IDs referenced by any role.
+    """
+    if not port_access or not isinstance(port_access, dict):
+        return []
+
+    vids = set()
+    for role in port_access.get("roles") or []:
+        if not isinstance(role, dict):
+            continue
+        vids.update(parse_vlan_id_spec(role.get("vlan_trunk_native")))
+        vids.update(parse_vlan_id_spec(role.get("vlan_trunk_allowed")))
+        # Also accept untagged/tagged shorthand for parity with NetBox
+        # interface fields, in case users prefer those names.
+        vids.update(parse_vlan_id_spec(role.get("vlan_access")))
+
+    return sorted(vids)
+
+
+def get_vlans_in_use(interfaces, vlan_interfaces=None, port_access=None):
     """
     Extract all VLANs that are in use on interfaces
 
     Args:
         interfaces: List of interface objects from NetBox
         vlan_interfaces: Optional list of VLAN/SVI interfaces
+        port_access: Optional ``port_access`` dict from NetBox config_context.
+            VLAN IDs referenced by port-access roles
+            (``vlan_trunk_native`` / ``vlan_trunk_allowed``) are added to the
+            in-use set so they are created on the device and protected from
+            deletion in idempotent mode.
 
     Returns:
         Dict with:
@@ -219,6 +319,15 @@ def get_vlans_in_use(interfaces, vlan_interfaces=None):
                 if vid is not None:
                     vids_in_use.add(vid)
                     vlans_in_use[vid] = vlan_obj
+
+    # Merge VLAN IDs referenced by port-access roles (config_context).
+    # Only the VID is added here; the full VLAN object is resolved later from
+    # the NetBox-provided VLAN list in get_vlans_needing_changes().
+    pa_vids = extract_port_access_vlan_ids(port_access)
+    if pa_vids:
+        _debug(f"Adding {len(pa_vids)} VLANs from port-access roles: {pa_vids}")
+        for vid in pa_vids:
+            vids_in_use.add(vid)
 
     result = {"vids": sorted(list(vids_in_use)), "vlans": list(vlans_in_use.values())}
 

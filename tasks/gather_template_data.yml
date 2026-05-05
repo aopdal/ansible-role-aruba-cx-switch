@@ -25,6 +25,7 @@
   when:
     - has_device_facts | bool
     - interfaces is defined
+    - not (aoscx_configure_vlans_all | default(false) | bool)
 
 # ============================================================================
 # PATH 2: WITHOUT device facts (no interfaces available)
@@ -76,6 +77,18 @@
   ansible.builtin.set_fact:
     vlans_available: []
   when: vlans_available is not defined
+
+- name: Treat all NetBox-available VLANs as in use for template (aoscx_configure_vlans_all=true)
+  ansible.builtin.set_fact:
+    vlans_in_use_facts:
+      vids: >-
+        {{ vlans_available
+             | map(attribute='vid')
+             | select('integer')
+             | unique | sort | list }}
+      vlans: "{{ vlans_available }}"
+  when:
+    - aoscx_configure_vlans_all | default(false) | bool
 
 # Get VRF details from NetBox using pynetbox
 - name: Get VRF details from NetBox (only if VRFs in use)

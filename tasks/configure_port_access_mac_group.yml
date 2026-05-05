@@ -1,0 +1,24 @@
+---
+# Configure a single port-access mac-group.
+# Required loop var: pa_mac_group (dict with .name and .match list)
+
+- name: "configure_port_access | Push mac-group {{ pa_mac_group.name }}"
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - "port-access mac-group {{ pa_mac_group.name }}"
+    lines: "{{ _pa_mac_group_cli_lines }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+    _pa_mac_group_cli_lines: >-
+      {%- set out = [] -%}
+      {%- for m in pa_mac_group.match | default([]) -%}
+      {%-   set seq = m.seq | default(loop.index * 10) -%}
+      {%-   if m.mac_oui is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match mac-oui ' ~ m.mac_oui) -%}
+      {%-   elif m.mac is defined -%}
+      {%-     set _ = out.append('seq ' ~ seq ~ ' match mac ' ~ m.mac) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ out }}
+  when: pa_mac_group.match | default([]) | length > 0

@@ -31,8 +31,30 @@ aoscx_configure_ospf: true
 aoscx_configure_bgp: false
 aoscx_configure_vsx: false
 
+# Port-access / device-profile feature.
+# Renders port-access lldp-groups, mac-groups, roles and device-profiles
+# from the `port_access` config_context dict (NetBox). Auto-skipped when
+# the device has no `port_access` key in its config_context, so this can
+# stay enabled globally.
+aoscx_configure_port_access: true
+
 # Idempotency mode - when true, removes configs not in NetBox
 aoscx_idempotent_mode: false
+
+# Configure ALL VLANs available for the device from NetBox, regardless of
+# whether they are currently used by an interface or port-access role.
+# When true:
+#   - Skips the "VLANs in use on interfaces" detection
+#   - Treats every VLAN returned by NetBox for this device as "in use"
+#   - All NetBox-scoped VLANs are created on the device
+#   - All NetBox-scoped VLANs are protected from idempotent cleanup
+# When false (default):
+#   - Only VLANs referenced by an interface (untagged/tagged) or by a
+#     port-access role are created; the rest can be cleaned up in
+#     idempotent mode.
+# Useful for access/edge switches where the catalog of VLANs scoped to the
+# device should always exist regardless of current interface usage.
+aoscx_configure_vlans_all: false
 
 # Force L2 interface configuration - bypasses change detection
 # When true: Configures ALL L2 interfaces from NetBox regardless of current state

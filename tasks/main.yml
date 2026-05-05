@@ -297,6 +297,46 @@
     - l2_interfaces
     - layer2
 
+# Port-access (device-profile) - depends on VLANs (roles reference VLAN IDs)
+# and on L2 interfaces (port-access objects are switch-global but typically
+# applied on access ports). Auto-enabled when NetBox config_context
+# provides a `port_access` dict for the device.
+- name: Include port-access (device-profile) configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_port_access.yml
+    apply:
+      tags:
+        - port_access
+        - device_profile
+        - layer2
+  when:
+    - aoscx_configure_port_access | bool
+    - port_access is defined
+    - port_access | length > 0
+  tags:
+    - port_access
+    - device_profile
+    - layer2
+
+# Port-access cleanup (idempotent mode only, after configuration)
+- name: Include port-access cleanup tasks
+  ansible.builtin.include_tasks:
+    file: cleanup_port_access.yml
+    apply:
+      tags:
+        - port_access
+        - cleanup
+        - idempotent
+  when:
+    - aoscx_configure_port_access | bool
+    - aoscx_idempotent_mode | bool
+    - port_access is defined
+    - port_access | length > 0
+  tags:
+    - port_access
+    - cleanup
+    - idempotent
+
 - name: Include OSPF configuration tasks
   ansible.builtin.include_tasks:
     file: configure_ospf.yml
