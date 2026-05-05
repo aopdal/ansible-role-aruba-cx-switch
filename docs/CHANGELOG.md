@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New filter `port_access_diff(desired, current)` that compares the
+  desired `port_access` config_context against `aoscx_port_access_facts`
+  (REST API fact gathering) and returns only the items that need to be
+  configured. Compares LLDP/MAC group match-sets (sequence-number
+  agnostic), role attributes (`description`, `poe_priority`, `trust_mode`
+  vs REST `qos_trust_mode`, `vlan_trunk_native`/`vlan_access` vs
+  `vlan_tag`, `vlan_trunk_allowed` range expansion vs `vlan_trunks`
+  list), and device-profile associations (`enable`, `associate_role`,
+  `associate_lldp_group`, `associate_mac_group`). When facts are missing
+  the filter falls back to "push everything", so behaviour is unchanged
+  for users who haven't enabled REST API fact gathering. 20 unit tests.
+- `tasks/configure_port_access.yml` now consumes `port_access_diff` and
+  loops only over the items that differ - skipping unneeded SSH
+  connections and CLI pushes when the device already matches NetBox.
+  A new debug summary prints `<changed>/<total>` per object kind.
+- REST API fact gathering for port-access objects. When
+  `aoscx_gather_facts_rest_api: true` and the device has a `port_access`
+  dict in its NetBox config_context, a single GET to
+  `/system/device_profiles?depth=5` returns every device-profile with its
+  associated role, lldp-groups (with expanded match entries) and
+  mac-groups inline. The new
+  `port_access_facts_from_device_profiles` filter flattens that response
+  into the `aoscx_port_access_facts` shape (`device_profiles`, `roles`,
+  `lldp_groups`, `mac_groups`) used by `port_access_diff`. Replaces the
+  earlier four separate REST queries; queries are skipped entirely on
+  devices with no `port_access` config_context.
+- The `port_access_diff` LLDP/MAC match comparison now also recognises
+  the device-side REST field names (`system_name`, `system_description`,
+  `sequence_number`) so depth=5 payloads diff correctly against
+  desired-side keys (`sys_name`, `sys_desc`, `seq`).
+- Port-access (device-profile) configuration. New tasks
+  `tasks/configure_port_access.yml` (orchestrator) plus per-object
+  includes `configure_port_access_lldp_group.yml`,
+  `configure_port_access_mac_group.yml`,
+  `configure_port_access_role.yml`,
+  `configure_port_access_device_profile.yml`. Renders LLDP groups, MAC
+  groups, port-access roles and port-access device-profiles from the
+  `port_access` config_context dict and pushes via
+  `arubanetworks.aoscx.aoscx_config` (network_cli). New variable
+  `aoscx_configure_port_access` (default `true`); auto-skipped on devices
+  whose NetBox config_context has no `port_access` dict (no custom field
+  required). Wired into `tasks/main.yml` after L2 interfaces, before
+  OSPF. Tags: `port_access`, `device_profile`, `layer2`.
+- New template `templates/port_access.j2` rendering AOS-CX
+  `port-access lldp-group`, `port-access mac-group`, `port-access role` and
+  `port-access device-profile` blocks from the `port_access`
+  config_context dict. Included from `templates/aoscx.j2` between the
+  management interface and LAG interface sections (used when
+  `aoscx_generate_template_config: true`).
+- New variable `aoscx_configure_vlans_all` (default `false`). When set to
+  `true`, the role skips the "VLANs in use on interfaces" detection and
+  treats every VLAN that NetBox returns for the device as in use, so all
+  NetBox-scoped VLANs are created on the device and protected from
+  idempotent cleanup. Useful for access/edge switches.
+- VLAN change identification now includes VLAN IDs referenced by
+  `port_access` roles in NetBox config_context (`vlan_trunk_native`,
+  `vlan_trunk_allowed`, `vlan_access`). These VLANs are auto-created on the
+  device and protected from idempotent cleanup. Range and list syntax
+  (e.g. `"11-13"`, `"11,13,15-20"`) is supported.
+- New filters: `extract_port_access_vlan_ids`, `parse_vlan_id_spec`.
+- `get_vlans_in_use` accepts a third optional `port_access` argument
+  (backward compatible).
+
 ## [0.10.6] - 2026-05-03
 
 ### Fixed
