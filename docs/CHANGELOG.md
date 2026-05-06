@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-05-06
+
+### Added
+
+- ssh server in default VRF (for management vlan)
+- https server in default VRF (for management vlan)
+- added defaut gateway in default vrf based on management VLAN ip address
+
 ## [0.11.1] - 2026-05-05
 
 ### Fixed

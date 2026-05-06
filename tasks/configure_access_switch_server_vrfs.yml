@@ -1,0 +1,32 @@
+# code: language=ansible
+---
+# Configure ssh server vrf default and https-server vrf default on
+# access-switch devices.
+#
+# These services are always present on the mgmt VRF (system.j2 / https.j2
+# generate those lines). This task adds the default-VRF binding so that
+# in-band management and REST API calls work on access-switches.
+#
+# Gate: device_roles first element (case-insensitive) == 'access-switch'
+
+- name: configure_access_switch_server_vrfs | Configure ssh server vrf default
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - ssh server vrf default
+    match: line
+  vars:
+    ansible_connection: network_cli
+  when:
+    - device_roles | default([]) | length > 0
+    - (device_roles | default([]) | first | lower) == 'access-switch'
+
+- name: configure_access_switch_server_vrfs | Configure https-server vrf default
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - https-server vrf default
+    match: line
+  vars:
+    ansible_connection: network_cli
+  when:
+    - device_roles | default([]) | length > 0
+    - (device_roles | default([]) | first | lower) == 'access-switch'

@@ -359,7 +359,9 @@ idempotent deletion. Range and list syntax is supported.
       {
         "name": "Lab-IAP-group",
         "match": [
-          { "seq": 10, "vendor_oui": "000b86" }
+          { "seq": 10, "vendor-oui": "000b86" },
+          { "seq": 20, "sys-desc": "Aruba" },
+          { "seq": 30, "sysname": "LAB-AP" }
         ]
       }
     ],
