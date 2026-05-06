@@ -37,6 +37,12 @@ aoscx_configure_vsx: false
 # whose device_roles contains 'access-switch'.
 aoscx_configure_access_switch_server_vrfs: true
 
+# Configure ip route 0.0.0.0/0 (default gateway) on access-switch devices.
+# The gateway is derived from the device's primary_ip4 (set by the NetBox
+# inventory plugin): the first usable host in the same subnet. Skipped when
+# device_roles does not contain 'access-switch' or primary_ip4 is undefined.
+aoscx_configure_access_switch_default_gateway: true
+
 # Port-access / device-profile feature.
 # Renders port-access lldp-groups, mac-groups, roles and device-profiles
 # from the `port_access` config_context dict (NetBox). Auto-skipped when
