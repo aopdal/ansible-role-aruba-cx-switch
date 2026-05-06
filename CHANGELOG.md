@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-05-06
+
+### Added
+
+- configuration task for defult gateway for mgmt vlan
+
 ## [0.11.2] - 2026-05-06
 
 ### Added

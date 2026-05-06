@@ -92,6 +92,8 @@
     aoscx_configure_ospf: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_bgp: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_vsx: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_access_switch_server_vrfs: false  # Disabled - no AOS-CX modules in test env
+    aoscx_configure_access_switch_default_gateway: false  # Disabled - no AOS-CX modules in test env
     aoscx_save_config: false
     aoscx_debug: true
 

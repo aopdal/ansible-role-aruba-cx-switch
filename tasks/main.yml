@@ -103,6 +103,22 @@
     - base_config
     - system
 
+# Default gateway for access-switches: ip route 0.0.0.0/0 derived from primary_ip4.
+# No VRF dependency (default VRF only); placed in base-system block.
+- name: Include access-switch default gateway configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_access_switch_default_gateway.yml
+    apply:
+      tags:
+        - default_gateway
+        - base_config
+        - system
+  when: aoscx_configure_access_switch_default_gateway | bool
+  tags:
+    - default_gateway
+    - base_config
+    - system
+
 # VRFs should be configured before L3 interfaces, NTP, and DNS
 # (NTP and DNS may reference a VRF that must already exist)
 - name: Include VRF configuration tasks

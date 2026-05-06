@@ -1,0 +1,42 @@
+# code: language=ansible
+---
+# Configure a default gateway (ip route 0.0.0.0/0) on access-switch devices.
+#
+# The gateway is the first usable IP in the same subnet as the device's
+# primary_ip4, matching the same derivation used in templates/gateway.j2:
+# find the interface address whose prefix contains primary_ip4, then
+# take the first usable host in that prefix.
+#
+# Gate: device_roles first element (case-insensitive) == 'access-switch'
+#       and primary_ip4 must be defined (set by the NetBox inventory plugin).
+
+- name: configure_access_switch_default_gateway | Compute default gateway from
+    primary IP
+  ansible.builtin.set_fact:
+    _aoscx_default_gateway: >-
+      {{ (interfaces | default([])
+          | map(attribute='ip_addresses') | flatten
+          | selectattr('address', 'match', primary_ip4 ~ '/')
+          | map(attribute='address') | first | default(primary_ip4))
+          | ansible.utils.ipaddr('first_usable') }}
+  when:
+    - device_roles | default([]) | length > 0
+    - (device_roles | default([]) | first | lower) == 'access-switch'
+    - primary_ip4 is defined
+    - primary_ip4 | length > 0
+
+- name: configure_access_switch_default_gateway | Configure ip route 0.0.0.0/0
+    default gateway
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "ip route 0.0.0.0/0 {{ _aoscx_default_gateway }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+  when:
+    - device_roles | default([]) | length > 0
+    - (device_roles | default([]) | first | lower) == 'access-switch'
+    - primary_ip4 is defined
+    - primary_ip4 | length > 0
+    - _aoscx_default_gateway is defined
+    - _aoscx_default_gateway | length > 0
