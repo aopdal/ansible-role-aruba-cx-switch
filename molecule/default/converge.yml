@@ -11,6 +11,7 @@
 
     # Mock device data
     device_id: 1
+    device_roles: []
     # ansible_network_os removed to avoid network fact gathering
 
     # Mock custom fields

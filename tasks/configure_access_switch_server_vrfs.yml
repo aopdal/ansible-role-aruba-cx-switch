@@ -17,6 +17,7 @@
   vars:
     ansible_connection: network_cli
   when:
+    - device_roles | default([]) | length > 0
     - (device_roles | default([]) | first | lower) == 'access-switch'
 
 - name: configure_access_switch_server_vrfs | Configure https-server vrf default
@@ -27,4 +28,5 @@
   vars:
     ansible_connection: network_cli
   when:
+    - device_roles | default([]) | length > 0
     - (device_roles | default([]) | first | lower) == 'access-switch'
