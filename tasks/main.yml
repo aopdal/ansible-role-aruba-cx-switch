@@ -89,6 +89,20 @@
     - base_config
     - system
 
+- name: Include access-switch server VRF configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_access_switch_server_vrfs.yml
+    apply:
+      tags:
+        - server_vrfs
+        - base_config
+        - system
+  when: aoscx_configure_access_switch_server_vrfs | bool
+  tags:
+    - server_vrfs
+    - base_config
+    - system
+
 # VRFs should be configured before L3 interfaces, NTP, and DNS
 # (NTP and DNS may reference a VRF that must already exist)
 - name: Include VRF configuration tasks

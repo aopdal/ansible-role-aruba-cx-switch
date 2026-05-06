@@ -1,3 +1,6 @@
 
 https-server vrf mgmt
+{% if (device_roles | default([]) | first | lower) == 'access-switch' %}
+https-server vrf default
+{% endif %}
 https-server rest access-mode read-write

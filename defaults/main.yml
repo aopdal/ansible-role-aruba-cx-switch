@@ -31,6 +31,12 @@ aoscx_configure_ospf: true
 aoscx_configure_bgp: false
 aoscx_configure_vsx: false
 
+# Configure ssh server vrf default and https-server vrf default on access-switch
+# devices. These services are always enabled on the mgmt VRF; this adds the
+# default VRF so that in-band management and REST API calls work for devices
+# whose device_roles contains 'access-switch'.
+aoscx_configure_access_switch_server_vrfs: true
+
 # Port-access / device-profile feature.
 # Renders port-access lldp-groups, mac-groups, roles and device-profiles
 # from the `port_access` config_context dict (NetBox). Auto-skipped when
