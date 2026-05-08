@@ -76,6 +76,7 @@
     # REST API version settings (for reference, not used in tests)
     ansible_aoscx_rest_version: 10.09  # pyaoscx max version
     aoscx_rest_api_version: "10.17"  # Direct REST API version
+    aoscx_configure_hostname: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_banner: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_ntp: false  # Disabled - no AOS-CX modules in test env
     aoscx_configure_timezone: false  # Disabled - no AOS-CX modules in test env
