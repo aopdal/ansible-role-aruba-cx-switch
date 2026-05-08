@@ -42,7 +42,7 @@
     msg: "No port_access in config_context for {{ inventory_hostname }} - skipping"
   when:
     - port_access is not defined or port_access | length == 0
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
 
 - name: configure_port_access | Display summary
   ansible.builtin.debug:

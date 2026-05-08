@@ -28,7 +28,7 @@
         | rejectattr('custom_fields.if_mclag') | list | length }}
       - "LAGs needing changes: {{ interface_changes.lag | default([]) | length }}"
       - "LAGs needing changes: {{ interface_changes.lag | default([]) | map(attribute='name') | list }}"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # Create LAG interfaces and set basic configuration (only those needing changes)
 - name: configure_lag_interfaces | Configure LAG interface description (only those needing changes)
@@ -109,4 +109,4 @@
       - "LAG Configuration Summary:"
       - "Regular LAG interfaces configured"
       - "Physical interfaces in LAG: {{ interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none) | list | length }}"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1

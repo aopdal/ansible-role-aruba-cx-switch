@@ -52,7 +52,7 @@
     url: "https://{{ _rest_host }}/rest/v1/firmware"
     method: GET
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200 ]
+    status_code: [200]
     return_content: true
   register: _rest_firmware
   delegate_to: localhost
@@ -96,7 +96,8 @@
       'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,' ~
       'other_config,routing,vrf' }}"
     _rest_interface_ospf_attrs: "ospf_if_type,ospf_auth_type"
-    _rest_interface_vsx_attrs: "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_i\
+    _rest_interface_vsx_attrs:
+      "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_i\
       p6,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6"
   tags:
     - always
@@ -121,7 +122,7 @@
       - "Device VSX enabled: {{ custom_fields.device_vsx | default(false) }}"
       - "Interface attributes to query: {{ _rest_interface_attrs }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
   tags:
     - always
 
@@ -134,7 +135,7 @@
       username: "{{ _rest_user }}"
       password: "{{ _rest_password }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200 ]
+    status_code: [200]
     return_content: true
   register: _rest_login
   delegate_to: localhost
@@ -151,7 +152,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200 ]
+    status_code: [200]
     return_content: true
   register: _rest_interfaces
   delegate_to: localhost
@@ -170,7 +171,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200 ]
+    status_code: [200]
     return_content: true
   register: _rest_vlans
   delegate_to: localhost
@@ -186,7 +187,7 @@
       - "VLAN response (first 500 chars): {{ _rest_vlans.json | string |
         truncate(500) }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - _rest_vlans is defined
   tags:
     - always
@@ -199,7 +200,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200, 404 ]
+    status_code: [200, 404]
     return_content: true
   register: _rest_evpn
   delegate_to: localhost
@@ -217,7 +218,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200, 404 ]
+    status_code: [200, 404]
     return_content: true
   register: _rest_evpn_vlans
   delegate_to: localhost
@@ -235,7 +236,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200, 404 ]
+    status_code: [200, 404]
     return_content: true
   register: _rest_vnis
   delegate_to: localhost
@@ -261,7 +262,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200, 400, 404 ]
+    status_code: [200, 400, 404]
     return_content: true
   register: _rest_port_access_profiles
   delegate_to: localhost
@@ -309,7 +310,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200, 404 ]
+    status_code: [200, 404]
     return_content: true
   loop: "{{ _ospf_queries | default([]) }}"
   loop_control:
@@ -360,7 +361,7 @@
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
     validate_certs: "{{ _rest_validate_certs }}"
-    status_code: [ 200, 204 ]
+    status_code: [200, 204]
   delegate_to: localhost
   no_log: true
   tags:
@@ -452,6 +453,6 @@
         'Port-access facts available: ' ~ (aoscx_port_access_facts is defined)
       ] }}
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
   tags:
     - always

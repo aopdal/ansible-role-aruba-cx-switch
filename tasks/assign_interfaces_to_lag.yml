@@ -22,7 +22,7 @@
         | selectattr('lag', '!=', none) | list | length }}
       - "Physical interfaces needing LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
       - "Assignments: {{ interface_changes.lag_members | default([]) | map(attribute='name') | list | join(', ') }}"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # Assign physical interfaces to LAG (only those needing changes)
 - name: assign_interfaces_to_lag | Assign physical interfaces to LAG (only those needing changes)
@@ -47,4 +47,4 @@
         {{ interfaces | selectattr('lag', 'defined')
         | selectattr('lag', '!=', none) | list | length }}
       - "Physical interfaces that received LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1

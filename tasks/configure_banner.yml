@@ -14,7 +14,7 @@
     msg:
       - "Configuring banner on {{ inventory_hostname }}"
       - "MOTD: {{ motd | default('Not configured') }}"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: configure_banner | Add or Update Login Banner
   arubanetworks.aoscx.aoscx_banner:
