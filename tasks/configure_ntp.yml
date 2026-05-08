@@ -28,7 +28,7 @@
       - "Configuring NTP on {{ inventory_hostname }}"
       - "NTP VRF: {{ ntp_vrf | default('Not configured') }}"
       - "NTP servers: {{ ntp_servers | default([]) | length }} configured"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: configure_ntp | Configure preferred NTP servers
   arubanetworks.aoscx.aoscx_config:

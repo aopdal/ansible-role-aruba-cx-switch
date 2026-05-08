@@ -36,7 +36,7 @@
     - name: Debug BGP plugin status
       ansible.builtin.debug:
         msg: "NetBox BGP plugin: {{ 'Available ✓' if netbox_bgp_plugin_available else 'Not available' }}"
-      when: aoscx_debug | default(false) | bool
+      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
 
 # Derive VRF and address-family for each session by looking up the local IP
 # on the device's interfaces (provided by the NetBox inventory plugin).
@@ -116,7 +116,7 @@
       - "First policy rule: {{ netbox_policy_rules_all | default([]) | first | default('none') }}"
       - "First prefix list rule: {{ netbox_prefix_list_rules_all | default([]) | first | default('none') }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - netbox_bgp_plugin_available | default(false)
     - netbox_policy_rules_all is defined or netbox_prefix_list_rules_all is defined
 
@@ -145,7 +145,7 @@
           map('selectattr', 'key', 'in', ['name', '_vrf', '_af']) |
           list
         }}
-  when: aoscx_debug | default(false) | bool
+  when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
 
 - name: Debug BGP configuration
   ansible.builtin.debug:
@@ -154,7 +154,7 @@
       - "Plugin Sessions: {{ device_bgp_sessions | default([]) | length }}"
       - "Custom Field BGP Enabled: {{ custom_fields.device_bgp | default(false) }}"
       - "Custom Field Router ID: {{ custom_fields.device_bgp_routerid | default('not set') }}"
-  when: aoscx_debug | default(false) | bool
+  when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
 
 # ============================================================================
 # BGP Router Process Configuration
@@ -686,7 +686,7 @@
         msg:
           - "VRFs checked: {{ _bgp_vrfs_to_check }}"
           - "Stale BGP neighbors to remove: {{ _bgp_stale_neighbors }}"
-      when: aoscx_debug | default(false) | bool
+      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
 
     - name: Remove stale BGP neighbors from device
       arubanetworks.aoscx.aoscx_command:
@@ -723,7 +723,7 @@
         Route Reflector: {{ 'Yes (all neighbors are RR clients)' if ((device_roles | default([])
         | first | lower) in ['spine', 'route-reflector', 'rr']) else 'No' }}
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0

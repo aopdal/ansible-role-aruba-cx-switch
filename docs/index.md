@@ -656,6 +656,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 ### Configuration Tags
 
 - `template_config`, `base_config` - Template-based configuration generation (starting point)
+- `hostname`, `base_config`, `system` - Hostname configuration
 - `banner`, `base_config`, `system` - Banner configuration
 - `timezone`, `base_config`, `system` - Timezone configuration
 - `ntp`, `base_config`, `system` - NTP configuration

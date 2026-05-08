@@ -47,6 +47,20 @@
     - base_config
 
 # Base system configurations should be applied early
+- name: Include hostname configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_hostname.yml
+    apply:
+      tags:
+        - hostname
+        - base_config
+        - system
+  when: aoscx_configure_hostname | bool
+  tags:
+    - hostname
+    - base_config
+    - system
+
 - name: Include banner configuration tasks
   ansible.builtin.include_tasks:
     file: configure_banner.yml

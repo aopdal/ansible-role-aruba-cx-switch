@@ -17,7 +17,7 @@
     msg:
       - "Configuring timezone on {{ inventory_hostname }}"
       - "Timezone: {{ timezone | default('Not configured') }}"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: configure_timezone | Configure timezone
   arubanetworks.aoscx.aoscx_config:

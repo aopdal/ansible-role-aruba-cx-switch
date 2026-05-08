@@ -1,0 +1,31 @@
+
+{% if dns_domain_name is defined or dns_mgmt_nameservers is defined or dns_domain_list is defined or dns_host_v4_address_mapping is defined or dns_name_servers is defined %}
+{% if dns_domain_name is defined %}
+ip dns domain-name {{ dns_domain_name }}{% if dns_vrf is defined %} vrf {{ dns_vrf }}{% endif %}
+
+{% endif %}
+{% if dns_domain_list is defined %}
+{%   for key in dns_domain_list | list | sort %}
+ip dns domain-list {{ dns_domain_list[key] }}{% if dns_vrf is defined %} vrf {{ dns_vrf }}{% endif %}
+
+{%   endfor %}
+{% endif %}
+{% if dns_mgmt_nameservers is defined %}
+{%   for key in dns_mgmt_nameservers | list | sort %}
+ip dns name-server {{ dns_mgmt_nameservers[key] }} vrf mgmt
+{%   endfor %}
+{% endif %}
+{% if dns_name_servers is defined %}
+{%   for vrf_name, servers in dns_name_servers.items() %}
+{%     for key in servers | list | sort %}
+ip dns name-server {{ servers[key] }} vrf {{ vrf_name }}
+{%     endfor %}
+{%   endfor %}
+{% endif %}
+{% if dns_host_v4_address_mapping is defined %}
+{%   for hostname, ip in dns_host_v4_address_mapping.items() %}
+ip dns host {{ ip }} {{ hostname }}
+{%   endfor %}
+{% endif %}
+!
+{% endif %}

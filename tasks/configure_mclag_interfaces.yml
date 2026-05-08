@@ -18,10 +18,10 @@
     msg:
       - "Configuring MCLAG interfaces"
       - "Total MCLAGs from NetBox: {{ interfaces | selectattr('custom_fields.if_mclag', 'defined') |
-          selectattr('custom_fields.if_mclag', 'equalto', true) | list | length }}"
+        selectattr('custom_fields.if_mclag', 'equalto', true) | list | length }}"
       - "MCLAGs needing changes: {{ interface_changes.mclag | default([]) | length }}"
       - "MCLAGs needing changes: {{ interface_changes.mclag | default([]) | map(attribute='name') | list }}"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # Note: MCLAG interfaces use "multi-chassis" keyword and are part of VSX configuration
 # This task provides basic interface configuration, but full MCLAG setup
@@ -105,4 +105,4 @@
       - "MCLAG Configuration Summary:"
       - "MCLAG interfaces configured"
       - "Note: Full MCLAG functionality requires VSX domain configuration"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1

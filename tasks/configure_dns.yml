@@ -23,7 +23,7 @@
       - "DNS nameservers VRFs: {{ dns_name_servers | default({}) | list | join(', ') }}"
       - "Domain list: {{ dns_domain_list | default({}) | length }} domains"
       - "Host mappings: {{ dns_host_v4_address_mapping | default({}) | length }} entries"
-  when: aoscx_debug | bool
+  when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: configure_dns | Configure DNS settings
   arubanetworks.aoscx.aoscx_dns:

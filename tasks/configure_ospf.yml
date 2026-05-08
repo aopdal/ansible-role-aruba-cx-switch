@@ -199,4 +199,4 @@
       - "Total OSPF Areas configured: {{ ospf_config.vrfs |
         map(attribute='areas') | map('default', []) | map('length') | sum }}"
       - "OSPF Interfaces configured: {{ ospf_interfaces | length }}"
-  when: aoscx_debug | bool or ansible_verbosity >= 0
+  when: aoscx_debug | bool or ansible_verbosity >= 1

@@ -29,7 +29,7 @@
       - "Sample interface from device facts:"
       - "{{ ansible_facts.network_resources.interfaces | dict2items | first }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - ansible_facts is defined
     - ansible_facts.network_resources is defined
     - ansible_facts.network_resources.interfaces is defined
@@ -43,7 +43,7 @@
       - "{{ ansible_facts.network_resources.interfaces['1/1/5'] | default('NOT
         FOUND') }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - ansible_facts is defined
     - ansible_facts.network_resources is defined
     - ansible_facts.network_resources.interfaces is defined
@@ -59,7 +59,7 @@
         selectattr('key', 'match', '^vlan') | list | first | default('No VLAN
         interfaces found') }}
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - ansible_facts is defined
     - ansible_facts.network_resources is defined
     - ansible_facts.network_resources.interfaces is defined
@@ -77,7 +77,7 @@
       - "Enhanced interfaces count: {{ aoscx_enhanced_interface_facts |
         default({}) | length }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
   tags:
     - always
 
@@ -92,7 +92,7 @@
       - "vlan11 ip6_addresses: {{ (aoscx_enhanced_interface_facts['vlan11'] |
         default({})).get('ip6_addresses', 'NOT FOUND') }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - aoscx_enhanced_interface_facts is defined
     - aoscx_enhanced_interface_facts | length > 0
   tags:
@@ -108,7 +108,7 @@
         ansible_facts.network_resources.interfaces['lag250'] | default('NOT
         FOUND') }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - ansible_facts is defined
     - ansible_facts.network_resources is defined
     - ansible_facts.network_resources.interfaces is defined
@@ -122,7 +122,7 @@
       - "lag250 NetBox: {{ interfaces | selectattr('name', 'equalto', 'lag250')
         | first | default('NOT FOUND') }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - interfaces is defined
   tags:
     - always
@@ -174,7 +174,7 @@
       - "Interfaces not needing changes: {{ interface_changes.no_changes |
         default([]) | length }}"
   when:
-    - aoscx_debug | default(false) | bool
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - interface_changes is defined
   tags:
     - always
@@ -189,7 +189,8 @@
       - interface_changes.l2 is defined
       - interface_changes.l3 is defined
       - interface_changes.no_changes is defined
-    fail_msg: "ERROR: Interface change analysis failed - interface_changes fact not
+    fail_msg:
+      "ERROR: Interface change analysis failed - interface_changes fact not
       properly set"
     success_msg: "Interface change analysis completed successfully"
   tags:

@@ -71,7 +71,7 @@
           - "net_interfaces type: {{ ansible_facts.net_interfaces | type_debug if 'net_interfaces' in ansible_facts else 'N/A' }}"
       when:
         - interface_changes.l2 is defined
-        - aoscx_debug | bool
+        - aoscx_debug | bool or ansible_verbosity >= 1
 
     - name: Analyze interfaces for L2 configuration changes
       ansible.builtin.set_fact:

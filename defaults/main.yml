@@ -13,6 +13,7 @@ aoscx_gather_facts: true
 aoscx_debug: false
 
 # Configuration options
+aoscx_configure_hostname: true
 aoscx_configure_banner: true
 aoscx_configure_ntp: true
 aoscx_configure_timezone: true
