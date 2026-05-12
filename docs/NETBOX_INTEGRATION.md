@@ -31,6 +31,10 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | `device_vxlan` | Boolean | Device | Yes (for VXLAN) | Enable/disable VXLAN configuration and cleanup | `configure_vxlan.yml`, `cleanup_vxlan.yml` |
 | `device_vsx` | Boolean | Device | Yes (for VSX) | Enable/disable VSX configuration | `configure_vsx.yml` |
 | `vlan_ip_igmp_snooping` | Boolean | VLAN | No | Enable/disable IGMP snooping per VLAN | `configure_vlans.yml` |
+| `if_stp_bpdu_filter` | Boolean | Interface | No | Enable/disable BPDU filter on an L2 interface | `configure_stp.yml` |
+| `if_stp_bpdu_guard` | Boolean | Interface | No | Enable/disable BPDU guard on an L2 interface | `configure_stp.yml` |
+| `if_stp_edge_port` | Boolean | Interface | No | Set port-type admin-edge (PortFast equivalent) | `configure_stp.yml` |
+| `if_stp_root_guard` | Boolean | Interface | No | Enable/disable Root Guard on an L2 interface | `configure_stp.yml` |
 
 ### Creating Custom Fields in NetBox
 
@@ -197,6 +201,151 @@ custom_fields:
   vlan_ip_igmp_snooping: false  # or omit field
 ```
 
+#### 8. if_stp_bpdu_filter (Boolean — Interface)
+
+```
+Name: if_stp_bpdu_filter
+Type: Boolean
+Object Type: dcim > interface
+Label: STP BPDU Filter
+Description: Enable BPDU filter on this L2 interface (spanning-tree bpdu-filter)
+Default: null (not set — leave device as-is)
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: if_stp_bpdu_filter
+├─ Type: Boolean
+├─ Content Types: dcim | interface
+├─ Label: STP BPDU Filter
+└─ Default: — (null, unset)
+```
+
+**Purpose:** When `true`, configures `spanning-tree bpdu-filter` on the interface — BPDUs are neither sent nor received. When `false`, configures `no spanning-tree bpdu-filter`. When null (unset), the device setting is left unchanged.
+
+#### 9. if_stp_bpdu_guard (Boolean — Interface)
+
+```
+Name: if_stp_bpdu_guard
+Type: Boolean
+Object Type: dcim > interface
+Label: STP BPDU Guard
+Description: Enable BPDU guard on this L2 interface (spanning-tree bpdu-guard)
+Default: null (not set — leave device as-is)
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: if_stp_bpdu_guard
+├─ Type: Boolean
+├─ Content Types: dcim | interface
+├─ Label: STP BPDU Guard
+└─ Default: — (null, unset)
+```
+
+**Purpose:** When `true`, configures `spanning-tree bpdu-guard` on the interface — if a BPDU is received the port is error-disabled. Recommended on access ports facing end-hosts. When `false`, configures `no spanning-tree bpdu-guard`.
+
+#### 10. if_stp_edge_port (Boolean — Interface)
+
+```
+Name: if_stp_edge_port
+Type: Boolean
+Object Type: dcim > interface
+Label: STP Edge Port (PortFast)
+Description: Set port-type admin-edge on this L2 interface (spanning-tree port-type admin-edge)
+Default: null (not set — leave device as-is)
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: if_stp_edge_port
+├─ Type: Boolean
+├─ Content Types: dcim | interface
+├─ Label: STP Edge Port (PortFast)
+└─ Default: — (null, unset)
+```
+
+**Purpose:** When `true`, configures `spanning-tree port-type admin-edge` — the port transitions directly to forwarding without going through listening/learning states (equivalent to PortFast). Recommended on access ports facing end-hosts. When `false`, configures `no spanning-tree port-type admin-edge`.
+
+#### 11. if_stp_root_guard (Boolean — Interface)
+
+```
+Name: if_stp_root_guard
+Type: Boolean
+Object Type: dcim > interface
+Label: STP Root Guard
+Description: Enable Root Guard on this L2 interface (spanning-tree root-guard)
+Default: null (not set — leave device as-is)
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: if_stp_root_guard
+├─ Type: Boolean
+├─ Content Types: dcim | interface
+├─ Label: STP Root Guard
+└─ Default: — (null, unset)
+```
+
+**Purpose:** When `true`, configures `spanning-tree root-guard` on the interface — prevents the port from becoming a root port, protecting the STP topology. Use on ports facing downstream switches that should never become the root bridge path. When `false`, configures `no spanning-tree root-guard`.
+
+**STP interface custom field semantics summary:**
+
+| Value | Behavior |
+|-------|----------|
+| `true` | Apply the enable command (e.g. `spanning-tree bpdu-guard`) |
+| `false` | Apply the disable command (e.g. `no spanning-tree bpdu-guard`) |
+| null / not set | Leave device setting unchanged — no command pushed |
+
+Change detection uses `aoscx_enhanced_interface_facts[name].stp_config` (requires `aoscx_gather_facts_rest_api: true`). Only interfaces where at least one value differs are touched.
+
+**Example — access port facing end-hosts:**
+
+```yaml
+# NetBox interface custom fields
+custom_fields:
+  if_stp_bpdu_guard: true
+  if_stp_edge_port: true
+  if_stp_bpdu_filter: null   # leave as-is
+  if_stp_root_guard: null    # leave as-is
+```
+
+Produces:
+
+```
+interface 1/1/5
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+```
+
+**Example — uplink port facing another switch:**
+
+```yaml
+custom_fields:
+  if_stp_root_guard: true
+  if_stp_bpdu_guard: false
+```
+
+Produces:
+
+```
+interface 1/1/49
+    spanning-tree root-guard
+    no spanning-tree bpdu-guard
+```
+
 ### Custom Field Usage Patterns
 
 #### Per-Device Control
@@ -279,6 +428,9 @@ Config context provides **configuration data** for features. This is JSON data a
 | | `vsx_keepalive_peer` | String | VSX peer keepalive IP address | ✅ Active |
 | | `vsx_keepalive_src` | String | Source IP for keepalive | ✅ Active |
 | | `vsx_keepalive_vrf` | String | VRF for keepalive (default: mgmt) | ✅ Active |
+| **STP (MSTP)** | `mstp_config_name` | String | MSTP region name (`spanning-tree config-name`) | ✅ Active |
+| | `mstp_config_revision` | Integer | MSTP revision number, default 0 (`spanning-tree config-revision`) | ✅ Active |
+| | `mstp_priority` | Integer | Bridge priority, e.g. 4096 (`spanning-tree priority`) — optional | ✅ Active |
 | **Port-Access** | `port_access.roles[*].vlan_trunk_native` | Int / String | Native VLAN for a port-access role. VLAN IDs are auto-added to the device's VLAN create list. | ✅ Active |
 | | `port_access.roles[*].vlan_trunk_allowed` | Int / String | Trunk-allowed VLANs. Supports range/list syntax: `11`, `"11,13"`, `"11-13"`, `"11,13,15-20"`. Expanded VIDs are auto-added to the device's VLAN create list and protected from idempotent deletion. | ✅ Active |
 | | `port_access.roles[*].vlan_access` | Int / String | Access VLAN for a port-access role (alternative shorthand). Same VLAN auto-creation behaviour. | ✅ Active |
@@ -343,6 +495,48 @@ Ansible access:
 - `dns.servers`
 - `dns.hosts`
 
+
+### STP (MSTP) Config Context
+
+Global spanning-tree settings are applied by `configure_stp.yml` when
+`mstp_config_name` is defined. All switches that participate in
+the same MSTP region must share the same `mstp_config_name` and
+`mstp_config_revision`.
+
+```json
+{
+  "mstp_config_name": "CORP-SWITCHES",
+  "mstp_config_revision": 1,
+  "mstp_priority": 4096
+}
+```
+
+Ansible access: `mstp_config_name`, `mstp_config_revision`, `mstp_priority`
+
+| Key | Required | Type | Default | AOS-CX command |
+|-----|----------|------|---------|----------------|
+| `mstp_config_name` | Yes (to activate global STP) | String | — | `spanning-tree config-name <name>` |
+| `mstp_config_revision` | No | Integer | `0` | `spanning-tree config-revision <rev>` |
+| `mstp_priority` | No | Integer | device default | `spanning-tree priority <priority>` |
+
+**Valid priority values:** 0, 4096, 8192, 12288, 16384, 20480, 24576, 28672, 32768, 36864, 40960, 45056, 49152, 53248, 57344, 61440.
+
+**Typical hierarchy placement:** Define `mstp_config_name` and `mstp_config_revision` at the **site** level (all switches in a site share the same region). Override `mstp_priority` at the **device** or **device-role** level to control root bridge election.
+
+```json
+// Site config_context — all switches in the site
+{
+  "mstp_config_name": "SITE-A",
+  "mstp_config_revision": 2
+}
+```
+
+```json
+// Device config_context — root bridge candidate
+{
+  "mstp_priority": 4096
+}
+```
 
 ### Port-Access Config Context
 
@@ -782,21 +976,43 @@ curl -H "Authorization: Token $TOKEN" \
 
 ## Summary
 
-### Custom Fields (5 total)
+### Custom Fields (11 total)
 
-| Field | Type | Purpose |
-|-------|------|---------|
-| `device_bgp` | Boolean | Enable BGP |
-| `device_bgp_routerid` | Text | BGP Router ID (config_context mode) |
-| `device_evpn` | Boolean | Enable EVPN |
-| `device_vxlan` | Boolean | Enable VXLAN |
-| `device_vsx_enabled` | Boolean | Enable VSX |
+**Device-level (Boolean):**
+
+| Field | Purpose |
+|-------|---------|
+| `device_anycast_gateway` | Enable Anycast Gateway global settings |
+| `device_bgp` | Enable BGP |
+| `device_bgp_routerid` | BGP Router ID (Text, config_context mode) |
+| `device_evpn` | Enable EVPN |
+| `device_vxlan` | Enable VXLAN |
+| `device_vsx` | Enable VSX |
+
+**VLAN-level (Boolean):**
+
+| Field | Purpose |
+|-------|---------|
+| `vlan_ip_igmp_snooping` | Enable IGMP snooping per VLAN |
+
+**Interface-level (Boolean — L2 interfaces only, null = leave unchanged):**
+
+| Field | AOS-CX command |
+|-------|----------------|
+| `if_stp_bpdu_filter` | `spanning-tree bpdu-filter` |
+| `if_stp_bpdu_guard` | `spanning-tree bpdu-guard` |
+| `if_stp_edge_port` | `spanning-tree port-type admin-edge` |
+| `if_stp_root_guard` | `spanning-tree root-guard` |
 
 ### Config Context Keys
 
 **Base System (Stable):**
 
 - `motd`, `timezone`, `ntp.servers`, `dns.domain`, `dns.servers`
+
+**STP / MSTP (Stable):**
+
+- `mstp_config_name` (required to activate), `mstp_config_revision` (default 0), `mstp_priority` (optional)
 
 **VSX (Stable):**
 
@@ -831,6 +1047,6 @@ curl -H "Authorization: Token $TOKEN" \
 ## Related Documentation
 
 - [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md) - Base system configuration details
-- [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP configuration
 - [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP configuration and netbox-bgp plugin details
 - [EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md) - EVPN/VXLAN with L2VPNs
+- [L2_INTERFACE_MODES.md](L2_INTERFACE_MODES.md) - L2 interface configuration modes and STP interface settings

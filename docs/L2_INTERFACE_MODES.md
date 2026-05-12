@@ -268,3 +268,73 @@ Physical interfaces needing changes: 3  [1/1/1, 1/1/2, 1/1/5]
 L2 interfaces needing changes: 5
 Interfaces not needing changes: 42
 ```
+
+---
+
+## STP Interface Configuration
+
+Spanning Tree Protocol settings on L2 interfaces are managed by
+`tasks/configure_stp.yml`, which runs after `configure_l2_interfaces.yml`
+(the interfaces must already exist before STP settings can be applied).
+
+### Enabling / disabling
+
+```yaml
+aoscx_configure_stp: true   # default
+```
+
+Set to `false` to skip STP configuration entirely for a device or group.
+
+### NetBox custom fields
+
+Set the following custom fields on each **interface** in NetBox:
+
+| Custom field | Type | AOS-CX command applied |
+|---|---|---|
+| `if_stp_bpdu_filter` | Boolean | `spanning-tree bpdu-filter` |
+| `if_stp_bpdu_guard` | Boolean | `spanning-tree bpdu-guard` |
+| `if_stp_edge_port` | Boolean | `spanning-tree port-type admin-edge` |
+| `if_stp_root_guard` | Boolean | `spanning-tree root-guard` |
+
+Leave a field as **null / not set** in NetBox to leave the device setting unchanged.
+Set it to `true` to enable and `false` to disable (emits the `no spanning-tree …` form).
+
+Only L2 interfaces (mode = access, tagged, or tagged-all) are processed.
+Routed/L3 interfaces are skipped automatically.
+
+### Change detection
+
+When `aoscx_gather_facts_rest_api: true` and `aoscx_configure_stp: true`, the
+REST API interface query includes `stp_config` at `depth=2`.  The
+`stp_interface_changes` filter compares each NetBox custom field against the
+corresponding device field and returns only the commands that differ.
+
+Without REST API facts the role pushes all NetBox-defined STP settings
+unconditionally — AOS-CX STP commands are idempotent so this is safe.
+
+### Global MSTP configuration
+
+Global spanning-tree settings are applied from the device's NetBox
+config_context when `mstp_config_name` is defined:
+
+| config_context key | AOS-CX command |
+|---|---|
+| `mstp_config_name` (**required**) | `spanning-tree config-name <name>` |
+| `mstp_config_revision` (default: 0) | `spanning-tree config-revision <rev>` |
+| `mstp_priority` (optional) | `spanning-tree priority <priority>` |
+
+Example config_context in NetBox:
+
+```json
+{
+  "mstp_config_name": "CORP-SWITCHES",
+  "mstp_config_revision": 1,
+  "mstp_priority": 4096
+}
+```
+
+### Running only STP tasks
+
+```bash
+ansible-playbook configure_aoscx.yml -t stp
+```

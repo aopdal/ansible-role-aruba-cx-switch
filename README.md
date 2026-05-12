@@ -664,6 +664,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `icmp_redirect`, `base_config`, `system` - ICMP redirect configuration (required for Anycast Gateway)
 - `vrfs`, `layer3`, `routing` - VRF configuration
 - `vlans`, `layer2` - VLAN configuration
+- `stp`, `layer2` - Spanning tree configuration
 - `interfaces`, `physical_interfaces`, `layer1` - Physical interface configuration
 - `interfaces`, `lag_interfaces`, `layer2` - LAG interface configuration
 - `interfaces`, `mclag_interfaces` - MCLAG interface configuration

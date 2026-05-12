@@ -1,0 +1,85 @@
+---
+# Configure STP (Spanning Tree Protocol) — global and per-interface settings
+#
+# Global STP (MSTP): reads mstp_config_name, mstp_priority, and
+# mstp_config_revision from the device's NetBox config_context.
+# Applied only when mstp_config_name is defined.
+#
+# Interface STP: configures bpdu-filter, bpdu-guard, root-guard, and
+# port-type admin-edge on L2 interfaces (access / tagged / tagged-all)
+# from four NetBox custom fields per interface:
+#   if_stp_bpdu_filter  — spanning-tree bpdu-filter
+#   if_stp_bpdu_guard   — spanning-tree bpdu-guard
+#   if_stp_edge_port    — spanning-tree port-type admin-edge
+#   if_stp_root_guard   — spanning-tree root-guard
+#
+# Change detection: compares NetBox desired state against
+# aoscx_enhanced_interface_facts[name].stp_config (requires
+# aoscx_gather_facts_rest_api: true and aoscx_configure_stp: true so that
+# stp_config is included in the REST API interface query).
+# When REST API facts are unavailable all NetBox-defined settings are pushed
+# unconditionally — this is safe because AOS-CX STP commands are idempotent.
+#
+# Dependencies: L2 interface configuration (configure_l2_interfaces) must run
+# first so that the interfaces already exist on the switch.
+
+# ============================================================================
+# Global STP (MSTP) configuration
+# ============================================================================
+
+# Build the ordered list of global spanning-tree CLI lines.
+# mstp_priority is optional; mstp_config_revision defaults to 0.
+- name: Build global MSTP configuration lines
+  ansible.builtin.set_fact:
+    _stp_global_lines: >-
+      {%- set lines = ['spanning-tree'] -%}
+      {%- if mstp_priority is defined -%}
+        {%- set _ = lines.append('spanning-tree priority ' ~
+          mstp_priority) -%}
+      {%- endif -%}
+      {%- set _ = lines.append('spanning-tree config-name ' ~
+        mstp_config_name) -%}
+      {%- set _ = lines.append('spanning-tree config-revision ' ~
+        (mstp_config_revision | default(0))) -%}
+      {{ lines }}
+  when:
+    - mstp_config_name is defined
+
+- name: Apply global STP (MSTP) configuration
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ _stp_global_lines }}"
+  when:
+    - mstp_config_name is defined
+    - _stp_global_lines is defined
+    - _stp_global_lines | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+# ============================================================================
+# Interface STP configuration
+# ============================================================================
+
+- name: Build STP interface change list
+  ansible.builtin.set_fact:
+    _stp_interface_changes: >-
+      {{ interfaces | default([]) |
+         stp_interface_changes(aoscx_enhanced_interface_facts | default({})) }}
+
+- name: Debug - Show STP interface changes
+  ansible.builtin.debug:
+    msg:
+      - "=== STP Interface Configuration ==="
+      - "Interfaces needing STP changes: {{ _stp_interface_changes | length }}"
+      - "Interfaces: {{ _stp_interface_changes | map(attribute='name') | list }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Apply STP configuration to interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item.lines }}"
+    parents: "interface {{ item.name | replace('lag', 'lag ') }}"
+  loop: "{{ _stp_interface_changes }}"
+  loop_control:
+    label: "Interface {{ item.name }}: {{ item.lines | join(', ') }}"
+  when: _stp_interface_changes | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"

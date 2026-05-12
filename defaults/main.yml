@@ -69,6 +69,17 @@ aoscx_idempotent_mode: false
 # device should always exist regardless of current interface usage.
 aoscx_configure_vlans_all: false
 
+# Configure STP (Spanning Tree Protocol) settings.
+# When true:
+#   - Global MSTP settings are applied from config_context (mstp_config_name,
+#     mstp_priority, mstp_config_revision) when mstp_config_name is defined.
+#   - Per-interface STP settings are applied for L2 interfaces that have one or
+#     more of the following NetBox custom fields set:
+#     if_stp_bpdu_filter, if_stp_bpdu_guard, if_stp_edge_port, if_stp_root_guard
+#   - stp_config is included in the REST API interface attribute query
+#     (aoscx_gather_facts_rest_api: true) for change detection.
+aoscx_configure_stp: true
+
 # Force L2 interface configuration - bypasses change detection
 # When true: Configures ALL L2 interfaces from NetBox regardless of current state
 # Useful for:
