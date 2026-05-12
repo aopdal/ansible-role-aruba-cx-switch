@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- STP interface configuration: new `configure_stp.yml` task applies per-interface spanning-tree settings (`bpdu-filter`, `bpdu-guard`, `port-type admin-edge`, `root-guard`) from NetBox custom fields (`if_stp_bpdu_filter`, `if_stp_bpdu_guard`, `if_stp_edge_port`, `if_stp_root_guard`). Change detection uses REST API `stp_config` facts so only differing settings are pushed.
+- Global MSTP configuration in `configure_stp.yml`: applies `spanning-tree config-name`, `config-revision`, and optional `priority` from `config_context` when `mstp_config_name` is defined.
+- New `aoscx_configure_stp` variable (default: `true`) to enable/disable all STP tasks. Supports the `stp` tag for targeted runs.
+- REST API fact gathering now includes `stp_config` (depth=2) in the interface attribute query when `aoscx_configure_stp: true`, exposing per-interface STP state via `aoscx_enhanced_interface_facts`.
+- New `stp_interface_changes` filter in `filter_plugins/netbox_filters_lib/stp.py` — pure function comparing NetBox desired state against device `stp_config` facts; returns only the interfaces and CLI lines that need to change.
+
 ## [0.11.4] - 2026-05-08
 
 ### Added
