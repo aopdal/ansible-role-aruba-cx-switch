@@ -89,6 +89,8 @@ def rest_api_to_aoscx_interfaces(rest_data):
             "vrf": intf_data.get("vrf"),
             # Other config (contains additional settings)
             "other_config": intf_data.get("other_config", {}),
+            # STP per-interface configuration (admin_edge_port_enable, bpdu_filter_enable, etc.)
+            "stp_config": intf_data.get("stp_config") or {},
         }
 
     return result

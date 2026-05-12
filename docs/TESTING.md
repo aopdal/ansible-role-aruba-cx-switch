@@ -23,7 +23,7 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 
 This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
 
-1. ✅ **Python Unit Tests** (`pytest`) - 365 tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
+1. ✅ **Python Unit Tests** (`pytest`) - 387 tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
 3. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
 4. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
@@ -395,7 +395,7 @@ Located in: `tests/unit/`
 
 **NEW**: Comprehensive unit tests for custom filter plugins using pytest.
 
-The role includes **365 unit tests** covering all custom Ansible filters:
+The role includes **387 unit tests** covering all custom Ansible filters:
 
 ```bash
 # Run all unit tests
@@ -423,6 +423,7 @@ pytest tests/unit/ -m utils      # Utility function tests
 - `test_vrf_filters.py` - 26 tests for VRF operations
 - `test_rest_api_transforms.py` - 25 tests for REST API data normalization
 - `test_port_access_vlans.py` - 25 tests for port-access VLAN extraction
+- `test_stp_filters.py` - 23 tests for STP interface change detection
 - `test_port_access_diff.py` - 20 tests for port-access diff (desired vs device state)
 - `test_comparison.py` - 17 tests for state comparison logic
 - `test_ospf_filters.py` - 15 tests for OSPF configuration
@@ -1969,6 +1970,7 @@ tests/unit/
 ├── test_ospf_filters.py              # OSPF filter tests
 ├── test_bgp_filters.py               # BGP filter tests
 ├── test_rest_api_transforms.py       # REST API transform tests
+├── test_stp_filters.py               # STP interface change detection tests
 ├── test_port_access_diff.py          # Port-access diff (desired vs device state)
 ├── test_port_access_facts.py         # Port-access REST API fact flattening
 ├── test_port_access_orphans.py       # Orphaned port-access object detection
@@ -2083,6 +2085,14 @@ ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l new-switch
 ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l problematic-switch -t interfaces
 ```
 
+#### Scenario 5: Apply STP Settings Only
+
+```bash
+## Configure spanning-tree settings (global MSTP + per-interface bpdu-guard / edge-port / root-guard)
+## without touching VLANs, interfaces, or routing protocols
+ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l access-switches -t stp
+```
+
 ### Verification Script
 
 Create a test script to verify tag behavior:
@@ -2111,7 +2121,12 @@ else
 fi
 echo
 
-echo "3. Testing no tags (should show everything):"
+echo "3. Testing -t stp (should show STP tasks only):"
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t stp --list-tasks | grep -E "STP|spanning" \
+    && echo "✅ PASS: STP tasks included" || echo "❌ FAIL: No STP tasks found"
+echo
+
+echo "4. Testing no tags (should show everything):"
 ALL_COUNT=$(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" --list-tasks | grep -E "(OSPF|BGP|VSX)" | wc -l)
 if [ "$ALL_COUNT" -eq 3 ]; then
     echo "✅ PASS: All high-impact tasks included"

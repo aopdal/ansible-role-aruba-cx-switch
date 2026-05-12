@@ -341,6 +341,22 @@
     - l2_interfaces
     - layer2
 
+# STP interface configuration: depends on L2 interfaces (interfaces must exist
+# before per-interface spanning-tree settings can be applied).
+# Also applies global MSTP settings from config_context when mstp_config_name
+# is defined.
+- name: Include STP configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_stp.yml
+    apply:
+      tags:
+        - stp
+        - layer2
+  when: aoscx_configure_stp | bool
+  tags:
+    - stp
+    - layer2
+
 # Port-access (device-profile) - depends on VLANs (roles reference VLAN IDs)
 # and on L2 interfaces (port-access objects are switch-global but typically
 # applied on access ports). Auto-enabled when NetBox config_context

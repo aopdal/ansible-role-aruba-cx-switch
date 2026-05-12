@@ -162,7 +162,7 @@ interface {{ intf.name }}
 {%           endif %}
 {%         endif %}
 {%       endif %}
-{%       if config_context.mstp_config_name is defined %}
+{%       if mstp_config_name is defined %}
 {%         if intf.custom_fields.if_stp_bpdu_guard %}
    spanning-tree bpdu-guard
 {%         endif %}

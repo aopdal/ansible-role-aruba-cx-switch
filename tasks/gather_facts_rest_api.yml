@@ -99,6 +99,8 @@
     _rest_interface_vsx_attrs:
       "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_i\
       p6,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6"
+    # stp_config is a nested dict; depth=2 expands it into full key/value pairs
+    _rest_interface_stp_attrs: "stp_config"
   tags:
     - always
 
@@ -108,7 +110,8 @@
       {{ _rest_interface_base_attrs }}{% if custom_fields.device_ospf |
       default(false) | bool %},{{ _rest_interface_ospf_attrs }}{% endif %}{% if
       custom_fields.device_vsx | default(false) | bool %},{{
-      _rest_interface_vsx_attrs }}{% endif %}
+      _rest_interface_vsx_attrs }}{% endif %}{% if aoscx_configure_stp |
+      default(true) | bool %},{{ _rest_interface_stp_attrs }}{% endif %}
   tags:
     - always
 
@@ -120,6 +123,7 @@
       - "REST API base URL: {{ _rest_api_base }}"
       - "Device OSPF enabled: {{ custom_fields.device_ospf | default(false) }}"
       - "Device VSX enabled: {{ custom_fields.device_vsx | default(false) }}"
+      - "STP configuration enabled: {{ aoscx_configure_stp | default(true) }}"
       - "Interface attributes to query: {{ _rest_interface_attrs }}"
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1

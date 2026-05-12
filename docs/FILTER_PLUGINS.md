@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **37 custom filters** organized into 11 modules across 2 plugin files. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, BGP session enrichment, REST API data normalization, and state comparison between NetBox (source of truth) and device facts.
+This library provides **38 custom filters** organized into 12 modules across 2 plugin files. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, BGP session enrichment, REST API data normalization, STP interface change detection, and state comparison between NetBox (source of truth) and device facts.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
@@ -310,13 +310,17 @@ filter_plugins/
     ├── interface_ip_processing.py       # IP address matching (106 lines)
     ├── interface_change_detection.py    # Change detection & idempotency (814 lines)
     ├── comparison.py                    # State comparison (295 lines)
-    └── ospf_filters.py                  # OSPF operations (138 lines)
+    ├── ospf_filters.py                  # OSPF operations (138 lines)
+    └── stp.py                           # STP interface change detection (1 filter)
 ```
 
 **Recent Updates** (January 2025):
 - Added `l3_config_helpers.py` module for L3 configuration optimization (5 filters)
 - Enhanced `utils.py` with IP address extraction helpers (2 new functions)
 - Updated `interface_change_detection.py` with bug fix for VLAN IPv4 address configuration
+
+**Recent Updates** (May 2026):
+- Added `stp.py` module: `stp_interface_changes` filter compares NetBox interface STP custom fields against REST API `stp_config` facts and returns only the interfaces and CLI commands that need to change
 
 **Note**: The `interface_filters.py` module was split into three focused modules in November 2025:
 - `interface_categorization.py` - Interface type and VLAN mode categorization
@@ -581,6 +585,34 @@ Idempotency comparison for port-access (device-profile) configuration
       When current facts are missing, returns every desired item (safe
       fallback).
 
+### `stp.py` - STP Interface Change Detection
+
+Per-interface STP configuration change detection (1 filter):
+
+- **`stp_interface_changes(interfaces, enhanced_facts)`**
+    - Compare NetBox interface STP custom fields against device `stp_config` facts
+      from `aoscx_enhanced_interface_facts` (populated by `gather_facts_rest_api.yml`
+      when `aoscx_gather_facts_rest_api: true` and `aoscx_configure_stp: true`).
+    - Only L2 interfaces (mode defined) are considered; routed interfaces are ignored.
+    - Custom field values of `None` (not set in NetBox) are skipped — the device
+      setting is left unchanged for that field.
+    - NetBox custom field → `stp_config` device field → AOS-CX CLI command mapping:
+
+      | Custom field | Device field | Enable command |
+      |---|---|---|
+      | `if_stp_bpdu_filter` | `bpdu_filter_enable` | `spanning-tree bpdu-filter` |
+      | `if_stp_bpdu_guard` | `bpdu_guard_enable` | `spanning-tree bpdu-guard` |
+      | `if_stp_edge_port` | `admin_edge_port_enable` | `spanning-tree port-type admin-edge` |
+      | `if_stp_root_guard` | `root_guard_enable` | `spanning-tree root-guard` |
+
+    - When desired differs from current, the enable command or its `no` prefix is added.
+    - When `enhanced_facts` is empty or the interface is absent, all device fields
+      default to `False` — any NetBox `True` value produces the enable command.
+    - Parameters:
+        - `interfaces`: List of NetBox interface dicts
+        - `enhanced_facts`: `aoscx_enhanced_interface_facts` dict (keyed by interface name)
+    - Returns: List of `{"name": str, "lines": [str]}` — only interfaces with changes.
+
 ### `comparison.py` - State Comparison
 NetBox vs device state comparison (2 filters, 295 lines):
 
@@ -751,6 +783,23 @@ All filters are available through the standard Ansible filter syntax:
     # Returns: VRF name or "default"
 ```
 
+### STP Interface Configuration
+
+```yaml
+# Build list of L2 interfaces that need STP changes
+# (compares NetBox custom fields against aoscx_enhanced_interface_facts[name].stp_config)
+- set_fact:
+    stp_changes: "{{ interfaces | stp_interface_changes(aoscx_enhanced_interface_facts | default({})) }}"
+    # Returns: [{"name": "1/1/5", "lines": ["spanning-tree bpdu-guard", "spanning-tree port-type admin-edge"]}, ...]
+    # Only interfaces where at least one field differs are included.
+
+# Apply commands (used by configure_stp.yml)
+- arubanetworks.aoscx.aoscx_config:
+    lines: "{{ item.lines }}"
+    parents: "interface {{ item.name }}"
+  loop: "{{ stp_changes }}"
+```
+
 ### State Comparison
 
 ```yaml
@@ -905,6 +954,7 @@ All filters are available through the standard Ansible filter syntax:
     - BGP operations → `bgp_filters.py`
     - L3 configuration helpers → `l3_config_helpers.py`
     - General utilities → `utils.py`
+    - STP operations → `stp.py`
 
 2. **Write your function** with proper docstring:
    ```python
@@ -1007,7 +1057,8 @@ netbox_filters.py (main entry point)
     ├── interface_change_detection.py → utils
     ├── l3_config_helpers.py → utils
     ├── comparison.py → utils
-    └── ospf_filters.py → utils
+    ├── ospf_filters.py → utils
+    └── stp.py (no dependencies)
 ```
 
 ### Performance Considerations
@@ -1019,9 +1070,9 @@ netbox_filters.py (main entry point)
 
 ## Statistics
 
-- **Total Filters**: 37
-- **Total Lines**: ~3,100 (including docstrings and comments)
-- **Modules**: 11 (10 feature modules + 1 utility)
+- **Total Filters**: 38
+- **Total Lines**: ~3,165 (including docstrings and comments)
+- **Modules**: 12 (11 feature modules + 1 utility)
 - **Test Coverage**: Used in production for 100+ switches
 - **Code Quality**: Pylint score 9.30/10
 
@@ -1039,7 +1090,8 @@ netbox_filters.py (main entry point)
 | `ospf_filters.py` | 4 | 138 | OSPF configuration |
 | `bgp_filters.py` | 2 | 350 | BGP session enrichment |
 | `interface_ip_processing.py` | 1 | 106 | IP address matching |
-| **Total** | **37** | **~3,100** | **11 modules** |
+| `stp.py` | 1 | ~65 | STP interface change detection |
+| **Total** | **38** | **~3,165** | **12 modules** |
 
 ## Migration Guide
 
