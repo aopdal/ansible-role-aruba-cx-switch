@@ -89,7 +89,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **NetBox Integration** - Uses NetBox as single source of truth
 - ✅ **IGMP Snooping** - Implemented pr. VLAN (using default version 3)
 - ✅ **Port Profiles** - Configure port-access profiles
-- ❌ **STP** - on roadmap
+- ✅ **STP** - Global and interface config
 - ❌ **BFD** - on roadmap
 - ❌ **DHCP relay IPv4** - on roadmap
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
