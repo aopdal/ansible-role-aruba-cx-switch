@@ -146,8 +146,13 @@ def _role_matches(desired, current):
     - vlan_trunk_native (REST: vlan_tag, when vlan_mode in
       'native-tagged'/'native-untagged')
     - vlan_trunk_allowed -> expanded into a set, compared to vlan_trunks
+
+    Roles with ``extra_lines`` always return False (force push) because
+    arbitrary CLI lines cannot be compared against REST API fields.
     """
     if not isinstance(current, dict):
+        return False
+    if desired.get("extra_lines"):
         return False
 
     desired_native = _norm_int(desired.get("vlan_trunk_native"))

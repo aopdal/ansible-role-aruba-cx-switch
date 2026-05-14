@@ -319,3 +319,52 @@ class TestSafeFallback:
         desired = {"roles": [{"description": "no name"}]}
         result = port_access_diff(desired, {"roles": {"X": {}}})
         assert len(result["roles"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# extra_lines: roles with arbitrary CLI lines are always pushed
+# ---------------------------------------------------------------------------
+
+
+class TestRoleExtraLines:
+    def test_extra_lines_forces_push_even_when_structured_fields_match(self):
+        desired = {
+            **DESIRED_FULL,
+            "roles": [
+                {
+                    **DESIRED_FULL["roles"][0],
+                    "extra_lines": ["reauth-period 3600"],
+                }
+            ],
+        }
+        result = port_access_diff(desired, CURRENT_MATCHING)
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_empty_extra_lines_does_not_force_push(self):
+        desired = {
+            **DESIRED_FULL,
+            "roles": [
+                {
+                    **DESIRED_FULL["roles"][0],
+                    "extra_lines": [],
+                }
+            ],
+        }
+        result = port_access_diff(desired, CURRENT_MATCHING)
+        assert result["roles"] == []
+
+    def test_multiple_extra_lines_all_force_push(self):
+        desired = {
+            **DESIRED_FULL,
+            "roles": [
+                {
+                    **DESIRED_FULL["roles"][0],
+                    "extra_lines": [
+                        "reauth-period 3600",
+                        "cached-reauth-period 86400",
+                    ],
+                }
+            ],
+        }
+        result = port_access_diff(desired, CURRENT_MATCHING)
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]

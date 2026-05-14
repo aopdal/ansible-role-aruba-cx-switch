@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-05-14
+
+### Added
+
+- Port-access roles now support an optional `extra_lines` list in the NetBox config_context schema. Lines are appended verbatim to the `port-access role` CLI block, enabling any AOS-CX role attribute without requiring code changes. Roles that include `extra_lines` always push (REST API diff is bypassed for that role, since arbitrary CLI cannot be compared against structured facts).
+
 ## [0.12.0] - 2026-05-12
 
 ### Added

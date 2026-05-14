@@ -661,7 +661,9 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `timezone`, `base_config`, `system` - Timezone configuration
 - `ntp`, `base_config`, `system` - NTP configuration
 - `dns`, `base_config`, `system` - DNS configuration
-- `icmp_redirect`, `base_config`, `system` - ICMP redirect configuration (required for Anycast Gateway)
+- `icmp_redirect`, `base_config`, `system` - ICMP redirect / Anycast Gateway prerequisite
+- `server_vrfs`, `base_config`, `system` - Access-switch server VRF configuration
+- `default_gateway`, `base_config`, `system` - Access-switch default gateway configuration
 - `vrfs`, `layer3`, `routing` - VRF configuration
 - `vlans`, `layer2` - VLAN configuration
 - `stp`, `layer2` - Spanning tree configuration
@@ -670,30 +672,31 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `interfaces`, `mclag_interfaces` - MCLAG interface configuration
 - `interfaces`, `lag_interfaces`, `mclag_interfaces`, `lag_assignment` - LAG member assignment
 - `interfaces`, `l2_interfaces`, `layer2` - L2 interface configuration (access/trunk)
-- `interfaces`, `l3_interfaces`, `layer3` - L3 interface configuration (IP addresses)
-- `loopback`, `layer3` - Loopback interface configuration
+- `interfaces`, `l3_interfaces`, `layer3` - L3 interface configuration (IP addresses, including loopbacks)
+- `port_access`, `device_profile`, `layer2` - Port-access role/device-profile configuration
 - `evpn`, `overlay` - EVPN configuration
 - `vxlan`, `overlay` - VXLAN configuration
 - `evpn`, `overlay`, `cleanup`, `idempotent` - EVPN cleanup (idempotent mode only)
 - `vxlan`, `overlay`, `cleanup`, `idempotent` - VXLAN cleanup (idempotent mode only)
 - `vlans`, `layer2`, `cleanup`, `idempotent` - VLAN cleanup (idempotent mode only)
+- `port_access`, `cleanup`, `idempotent` - Port-access orphan cleanup (idempotent mode only)
 - `ospf`, `routing`, `layer3` - OSPF configuration (tag-dependent)
 - `bgp`, `routing`, `layer3` - BGP configuration (tag-dependent)
 - `vsx`, `ha` - VSX configuration (tag-dependent)
-- `save`, `config` - Save configuration
+- `always`, `save`, `config` - Save configuration (runs on every play due to `always`)
 
 ### Aggregate Tags
 
-- `base_config` - All base system configuration (banner, timezone, NTP, DNS)
+- `base_config` - All base system configuration (template gen, hostname, banner, timezone, NTP, DNS, icmp_redirect, server_vrfs, default_gateway)
 - `layer1` - Physical interface configuration
-- `layer2` - All L2 configuration (VLANs + L2 interfaces + LAG)
-- `layer3` - All L3 configuration (VRFs + L3 interfaces + loopbacks + routing)
+- `layer2` - All L2 configuration (VLANs, L2 interfaces, LAG, STP, port-access)
+- `layer3` - All L3 configuration (VRFs, L3 interfaces/loopbacks, OSPF, BGP)
 - `interfaces` - All interface configuration (physical, LAG, MCLAG, L2, L3)
-- `routing` - All routing protocol configuration (OSPF, BGP)
+- `routing` - All routing protocol configuration (VRFs, OSPF, BGP)
 - `overlay` - All overlay configuration (EVPN, VXLAN)
 - `cleanup` - All cleanup tasks (idempotent mode only)
 - `idempotent` - All idempotent cleanup tasks
-- `system` - All system configuration (banner, timezone, NTP, DNS)
+- `system` - All system configuration (hostname, banner, timezone, NTP, DNS, icmp_redirect, server_vrfs, default_gateway)
 - `vsx` - VSX/MCLAG configuration
 - `ha` - High availability configuration (VSX)
 
