@@ -546,6 +546,9 @@ top-level `port_access` key. VLAN IDs referenced by any role's
 automatically added to the device's VLAN-create list and protected from
 idempotent deletion. Range and list syntax is supported.
 
+Roles that include `extra_lines` always push, this is a way to support
+more parameters without needing to rewrite the code.
+
 ```json
 {
   "port_access": {
@@ -563,6 +566,9 @@ idempotent deletion. Range and list syntax is supported.
       {
         "name": "Lab-IAP-role",
         "description": "Aruba IAP",
+           "extra_lines": [
+              "stp-admin-edge-port"
+           ],
         "poe_priority": "high",
         "trust_mode": "dscp",
         "vlan_trunk_native": 11,

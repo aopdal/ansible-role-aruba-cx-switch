@@ -22,6 +22,10 @@
 #         trust_mode: dscp
 #         vlan_trunk_native: 11
 #         vlan_trunk_allowed: "11-13"
+#         extra_lines:           # optional: raw CLI lines appended verbatim
+#           - "reauth-period 3600"
+#           - "cached-reauth-period 86400"
+#         # Note: roles with extra_lines always push (REST diff is bypassed).
 #     device_profiles:
 #       - name: Lab-IAP-prof
 #         enable: true

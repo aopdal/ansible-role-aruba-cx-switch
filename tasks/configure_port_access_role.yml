@@ -30,4 +30,7 @@
       {%- if pa_role.vlan_trunk_allowed is defined -%}
       {%-   set _ = out.append('vlan trunk allowed ' ~ pa_role.vlan_trunk_allowed) -%}
       {%- endif -%}
+      {%- for line in pa_role.extra_lines | default([]) -%}
+      {%-   set _ = out.append(line) -%}
+      {%- endfor -%}
       {{ out }}
