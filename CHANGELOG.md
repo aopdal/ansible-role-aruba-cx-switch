@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **netbox-routing plugin support for BGP** (`aoscx_bgp_plugin: "netbox-routing"`). The new
+  `netbox-routing` plugin (`/api/plugins/routing/`) uses a router → scope → peer hierarchy
+  with explicit VRF assignment on the scope object. Set `aoscx_bgp_plugin: "netbox-routing"` to
+  use it; the legacy `"netbox-bgp"` remains the default for backwards compatibility.
+- New `normalize_routing_plugin_peers` filter: normalises raw netbox-routing API data (routers,
+  scopes, peers, address families, peer-address-families, route-maps) into the same session shape
+  used by the rest of the BGP task pipeline, so all downstream tasks are unchanged.
+- New `collect_ebgp_vrf_policy_config_routing` filter: collects route-map and prefix-list
+  configuration from netbox-routing objects. Supports `sequence` (vs `index`), `set` dict
+  (vs `set_actions`), unified `match_prefix_list` list, AF inference from prefix content
+  (`:` → IPv6), and `le`/`ge` fields.
+
 ## [0.12.1] - 2026-05-14
 
 ### Added

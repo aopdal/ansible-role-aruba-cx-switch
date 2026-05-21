@@ -69,7 +69,9 @@ from netbox_filters_lib.l3_config_helpers import (
 )
 from netbox_filters_lib.bgp_filters import (
     get_bgp_session_vrf_info,
+    normalize_routing_plugin_peers,
     collect_ebgp_vrf_policy_config,
+    collect_ebgp_vrf_policy_config_routing,
 )
 from netbox_filters_lib.port_access import (
     port_access_diff,
@@ -125,7 +127,9 @@ class FilterModule:
             "build_l3_config_lines": build_l3_config_lines,
             # BGP helpers
             "get_bgp_session_vrf_info": get_bgp_session_vrf_info,
+            "normalize_routing_plugin_peers": normalize_routing_plugin_peers,
             "collect_ebgp_vrf_policy_config": collect_ebgp_vrf_policy_config,
+            "collect_ebgp_vrf_policy_config_routing": collect_ebgp_vrf_policy_config_routing,
             # Port-access
             "port_access_diff": port_access_diff,
             "port_access_facts_from_device_profiles": port_access_facts_from_device_profiles,

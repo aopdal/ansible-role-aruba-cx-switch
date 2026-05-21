@@ -95,7 +95,11 @@ aoscx_force_l2_config: false
 aoscx_fast_mode: false
 
 # NetBox BGP plugin settings
-aoscx_use_netbox_bgp_plugin: true # Query the netbox-bgp plugin for BGP sessions; set false to disable BGP configuration
+# Select which NetBox BGP plugin to query.
+#   "netbox-bgp"     : legacy plugin (/api/plugins/bgp/)  — default for existing installs
+#   "netbox-routing" : newer plugin  (/api/plugins/routing/bgp/) — replaces netbox-bgp
+aoscx_bgp_plugin: "netbox-bgp"
+aoscx_use_netbox_bgp_plugin: true # Set false to disable BGP configuration entirely (both plugins)
 aoscx_netbox_validate_certs: true # Validate SSL certificates when querying NetBox API
 aoscx_no_log: true # Set to false to show sensitive data in logs (not recommended)
 

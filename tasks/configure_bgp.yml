@@ -1,15 +1,186 @@
 ---
-# Configure BGP using the netbox-bgp plugin
+# Configure BGP using a NetBox BGP plugin.
 #
-# Data Source: netbox-bgp plugin (via pynetbox API)
+# Supported backends (aoscx_bgp_plugin):
+#   "netbox-bgp"     : legacy plugin  (/api/plugins/bgp/session/)
+#   "netbox-routing" : newer plugin   (/api/plugins/routing/bgp/)
+#
 # Set aoscx_use_netbox_bgp_plugin: false to disable BGP configuration entirely.
 #
 # Route Reflector Configuration:
 # Automatically configured if device role is 'spine', 'route-reflector', or 'rr'.
 # All BGP neighbors become RR clients.
 
+# ============================================================================
+# netbox-routing: fetch all BGP objects once (server-side filters are broken
+# in this plugin — all filtering is done client-side by the filter plugin).
+# ============================================================================
+
+- name: Fetch BGP data from netbox-routing plugin
+  when:
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-routing'
+  delegate_to: localhost
+  run_once: true
+  block:
+    - name: Query netbox-routing BGP routers
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/bgp/router/?limit=0"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_routers_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query netbox-routing BGP scopes
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/bgp/scope/?limit=0"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_scopes_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query netbox-routing BGP peers
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/bgp/peer/?limit=0"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_peers_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query netbox-routing BGP address-families
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/bgp/address-family/?limit=0"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_afs_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query netbox-routing BGP peer address-families
+      ansible.builtin.uri:
+        url: >-
+          {{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/bgp/peer-address-family/?limit=0
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_peer_afs_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query netbox-routing route-maps
+      ansible.builtin.uri:
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/objects/route-map/?limit=0"
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_route_maps_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query netbox-routing route-map entries
+      ansible.builtin.uri:
+        url: >-
+          {{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/objects/route-map-entry/?limit=0
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_rm_entries_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Query netbox-routing prefix-list entries
+      ansible.builtin.uri:
+        url: >-
+          {{ lookup('env', 'NETBOX_API') }}/api/plugins/routing/objects/prefix-list-entry/?limit=0
+        method: GET
+        headers:
+          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
+          Content-Type: "application/json"
+        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
+        status_code: [200, 404]
+        return_content: true
+      register: _nb_routing_pl_entries_raw
+      no_log: "{{ aoscx_no_log | default(false) }}"
+
+    - name: Set netbox-routing global facts
+      ansible.builtin.set_fact:
+        _nb_routing_available: "{{ _nb_routing_routers_raw.status == 200 }}"
+        _nb_routing_routers: "{{ _nb_routing_routers_raw.json.results | default([]) }}"
+        _nb_routing_scopes: "{{ _nb_routing_scopes_raw.json.results | default([]) }}"
+        _nb_routing_peers: "{{ _nb_routing_peers_raw.json.results | default([]) }}"
+        _nb_routing_afs: "{{ _nb_routing_afs_raw.json.results | default([]) }}"
+        _nb_routing_peer_afs: "{{ _nb_routing_peer_afs_raw.json.results | default([]) }}"
+        _nb_routing_route_maps: "{{ _nb_routing_route_maps_raw.json.results | default([]) }}"
+        _nb_routing_rm_entries: "{{ _nb_routing_rm_entries_raw.json.results | default([]) }}"
+        _nb_routing_pl_entries: "{{ _nb_routing_pl_entries_raw.json.results | default([]) }}"
+
+    - name: Debug netbox-routing plugin status
+      ansible.builtin.debug:
+        msg: >-
+          netbox-routing plugin: {{ 'Available' if _nb_routing_available else 'Not available' }}
+          — {{ _nb_routing_routers | length }} routers,
+          {{ _nb_routing_peers | length }} peers,
+          {{ _nb_routing_route_maps | length }} route-maps
+      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+
+# ============================================================================
+# netbox-routing: per-device normalisation
+# ============================================================================
+
+- name: Normalise netbox-routing BGP peers for this device
+  ansible.builtin.set_fact:
+    device_bgp_sessions: >-
+      {{ _nb_routing_routers | default([]) |
+         normalize_routing_plugin_peers(
+           _nb_routing_scopes   | default([]),
+           _nb_routing_peers    | default([]),
+           _nb_routing_afs      | default([]),
+           _nb_routing_peer_afs | default([]),
+           _nb_routing_route_maps | default([]),
+           inventory_hostname
+         ) }}
+    netbox_bgp_plugin_available: "{{ _nb_routing_available | default(false) }}"
+  when:
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-routing'
+    - _nb_routing_available | default(false)
+
+# ============================================================================
+# netbox-bgp: fetch sessions (legacy plugin)
+# ============================================================================
+
 - name: Get BGP sessions from NetBox BGP plugin
-  when: aoscx_use_netbox_bgp_plugin | default(true) | bool
+  when:
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-bgp'
   delegate_to: localhost
   block:
     - name: Query NetBox BGP plugin for sessions for this device
@@ -38,15 +209,30 @@
         msg: "NetBox BGP plugin: {{ 'Available ✓' if netbox_bgp_plugin_available else 'Not available' }}"
       when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
 
-# Derive VRF and address-family for each session by looking up the local IP
-# on the device's interfaces (provided by the NetBox inventory plugin).
-# Sessions on a non-default VRF interface are placed under 'bgp_vrf_sessions';
-# all other sessions (loopbacks / default VRF) go to 'bgp_global_sessions'.
-- name: Enrich BGP sessions with VRF and address-family info
+# ============================================================================
+# VRF / AF enrichment
+# ============================================================================
+
+# netbox-bgp: derive VRF from local_address → interface lookup.
+# netbox-routing: _vrf and _af are already set by normalize_routing_plugin_peers.
+- name: Enrich BGP sessions with VRF and address-family info (netbox-bgp)
   ansible.builtin.set_fact:
     device_bgp_sessions_enriched: >-
       {{ device_bgp_sessions | get_bgp_session_vrf_info(interfaces | default([])) }}
   when:
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-bgp'
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+
+# netbox-routing peers are already enriched; alias to keep downstream consistent.
+- name: Set enriched BGP sessions alias (netbox-routing)
+  ansible.builtin.set_fact:
+    device_bgp_sessions_enriched: "{{ device_bgp_sessions }}"
+  when:
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-routing'
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
@@ -61,9 +247,15 @@
     - device_bgp_sessions_enriched is defined
     - device_bgp_sessions_enriched | length > 0
 
+# ============================================================================
+# Policy / route-map data
+# ============================================================================
+
+# netbox-bgp: fetch routing-policy-rule and prefix-list-rule
 - name: Get BGP routing policy rules and prefix list rules from NetBox BGP plugin
   when:
-    - aoscx_use_netbox_bgp_plugin | default(true) | bool
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-bgp'
     - netbox_bgp_plugin_available | default(false)
     - bgp_vrf_sessions is defined
     - bgp_vrf_sessions | length > 0
@@ -102,25 +294,18 @@
         netbox_prefix_list_rules_all: "{{ netbox_prefix_list_rules_raw.json.results | default([]) }}"
       run_once: true
 
-- name: Debug raw routing policy and prefix list rule data
+- name: Debug raw routing policy and prefix list rule data (netbox-bgp)
   ansible.builtin.debug:
     msg:
       - "Policy rules count: {{ netbox_policy_rules_all | default([]) | length }}"
       - "Prefix list rules count: {{ netbox_prefix_list_rules_all | default([]) | length }}"
-      - >-
-        First policy rule keys: {{
-          (netbox_policy_rules_all | default([]) | first).keys() | list
-          if netbox_policy_rules_all | default([]) | length > 0
-          else 'no rules'
-        }}
-      - "First policy rule: {{ netbox_policy_rules_all | default([]) | first | default('none') }}"
-      - "First prefix list rule: {{ netbox_prefix_list_rules_all | default([]) | first | default('none') }}"
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-bgp'
     - netbox_bgp_plugin_available | default(false)
     - netbox_policy_rules_all is defined or netbox_prefix_list_rules_all is defined
 
-- name: Collect routing policy config data for eBGP VRF sessions
+- name: Collect routing policy config data for eBGP VRF sessions (netbox-bgp)
   ansible.builtin.set_fact:
     bgp_ebgp_policy_data: >-
       {{ bgp_vrf_sessions | default([]) |
@@ -129,6 +314,23 @@
            netbox_prefix_list_rules_all | default([])
          ) }}
   when:
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-bgp'
+    - netbox_bgp_plugin_available | default(false)
+    - bgp_vrf_sessions is defined
+    - bgp_vrf_sessions | length > 0
+
+- name: Collect route-map config data for eBGP VRF sessions (netbox-routing)
+  ansible.builtin.set_fact:
+    bgp_ebgp_policy_data: >-
+      {{ bgp_vrf_sessions | default([]) |
+         collect_ebgp_vrf_policy_config_routing(
+           _nb_routing_rm_entries | default([]),
+           _nb_routing_pl_entries | default([])
+         ) }}
+  when:
+    - aoscx_use_netbox_bgp_plugin | bool
+    - aoscx_bgp_plugin | default('netbox-bgp') == 'netbox-routing'
     - netbox_bgp_plugin_available | default(false)
     - bgp_vrf_sessions is defined
     - bgp_vrf_sessions | length > 0
@@ -151,6 +353,7 @@
   ansible.builtin.debug:
     msg:
       - "Device: {{ inventory_hostname }}"
+      - "Plugin: {{ aoscx_bgp_plugin | default('netbox-bgp') }}"
       - "Plugin Sessions: {{ device_bgp_sessions | default([]) | length }}"
       - "Custom Field BGP Enabled: {{ custom_fields.device_bgp | default(false) }}"
       - "Custom Field Router ID: {{ custom_fields.device_bgp_routerid | default('not set') }}"
@@ -177,7 +380,7 @@
 # BGP EVPN Neighbors Configuration
 # ============================================================================
 
-- name: Configure BGP EVPN neighbors from netbox-bgp plugin
+- name: Configure BGP EVPN neighbors from netbox BGP plugin
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -202,7 +405,7 @@
 # BGP IPv4 Unicast Neighbors
 # ============================================================================
 
-- name: Configure BGP IPv4 unicast neighbors from netbox-bgp plugin
+- name: Configure BGP IPv4 unicast neighbors from netbox BGP plugin
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -224,7 +427,7 @@
     ansible_connection: network_cli
 
 # ============================================================================
-# BGP Routing Policies and Prefix Lists (from netbox-bgp plugin, IPv4 only)
+# BGP Routing Policies and Prefix Lists
 # ============================================================================
 # Prefix lists and route-maps are global (not VRF-scoped) on AOS-CX.
 # They must be configured before any BGP neighbor or VRF statements
@@ -296,17 +499,12 @@
     ansible_connection: network_cli
 
 # ============================================================================
-# BGP VRF Neighbors (from netbox-bgp plugin)
+# BGP VRF Neighbors
 # ============================================================================
-# Sessions whose local_address is assigned to an interface in a non-default VRF
-# are configured here under the matching VRF context inside 'router bgp'.
-#
-# The VRF and address-family are derived automatically:
-#   local_address IP → interface in NetBox → interface VRF
-#   IPv4 address → address-family ipv4 unicast
-#   IPv6 address → address-family ipv6 unicast
+# Sessions whose _vrf != 'default' are configured here under the matching
+# VRF context inside 'router bgp'.
 
-- name: Configure BGP VRF iBGP neighbors from netbox-bgp plugin (with next-hop-self)
+- name: Configure BGP VRF iBGP neighbors from netbox BGP plugin (with next-hop-self)
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -332,7 +530,7 @@
   vars:
     ansible_connection: network_cli
 
-- name: Configure BGP VRF eBGP neighbors from netbox-bgp plugin
+- name: Configure BGP VRF eBGP neighbors from netbox BGP plugin
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -529,9 +727,9 @@
 # BGP Route Reflector Settings
 # ============================================================================
 # If device role is "spine", automatically configure all BGP neighbors as
-# route-reflector clients. This is common in spine-leaf EVPN architectures.
+# route-reflector clients. Common in spine-leaf EVPN architectures.
 
-- name: Configure BGP route reflector settings from netbox-bgp plugin (spine role)
+- name: Configure BGP route reflector settings from netbox BGP plugin (spine role)
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -550,7 +748,7 @@
   vars:
     ansible_connection: network_cli
 
-- name: Configure BGP IPv4 unicast route reflector settings from netbox-bgp plugin (spine role)
+- name: Configure BGP IPv4 unicast route reflector settings from netbox BGP plugin (spine role)
   arubanetworks.aoscx.aoscx_command:
     commands:
       - configure terminal
@@ -574,9 +772,7 @@
 # BGP Stale Neighbor Cleanup (idempotent mode)
 # ============================================================================
 # Removes BGP neighbors present on the device but absent from NetBox.
-# Only runs when aoscx_idempotent_mode is true and the NetBox BGP plugin is
-# available.  Uses the REST API to read the current device neighbor table and
-# compares it per-VRF against the desired set from NetBox.
+# Only runs when aoscx_idempotent_mode is true and a BGP plugin is available.
 
 - name: Remove stale BGP neighbors (idempotent mode)
   when:
@@ -611,8 +807,6 @@
       delegate_to: localhost
       no_log: "{{ aoscx_no_log | default(true) }}"
 
-    # Build the list of VRFs to check: always include default, plus any custom
-    # VRFs referenced by bgp_vrf_sessions.
     - name: Build list of BGP VRFs and local ASN for cleanup queries
       ansible.builtin.set_fact:
         _bgp_local_asn: "{{ device_bgp_sessions[0].local_as.asn }}"
@@ -620,8 +814,6 @@
           {{ ['default']
              + (bgp_vrf_sessions | default([]) | map(attribute='_vrf') | unique | list) }}
 
-    # Query each VRF's BGP neighbor table.  404 means the BGP router / VRF
-    # does not exist on the device for that ASN — those are skipped silently.
     - name: Query device BGP neighbors per VRF via REST API
       ansible.builtin.uri:
         url: >-
@@ -650,9 +842,6 @@
       delegate_to: localhost
       no_log: true
 
-    # For each VRF, compare device neighbors against NetBox-desired neighbors
-    # (i.e., remote_address IPs from sessions enriched with the same _vrf).
-    # Sessions in the default VRF use _vrf == 'default'.
     - name: Identify stale BGP neighbors to remove
       ansible.builtin.set_fact:
         _bgp_stale_neighbors: >-
@@ -709,19 +898,15 @@
 - name: Display BGP configuration summary
   ansible.builtin.debug:
     msg:
-      - "=== BGP Configuration (netbox-bgp plugin) ==="
+      - "=== BGP Configuration ==="
       - "Device: {{ inventory_hostname }}"
+      - "Plugin: {{ aoscx_bgp_plugin | default('netbox-bgp') }}"
       - "Device Role: {{ device_roles | default([]) | first | default('not set') }}"
       - "Local AS: {{ device_bgp_sessions[0].local_as.asn }}"
       - "Router ID: {{ device_bgp_sessions[0].local_address.address.split('/')[0] }}"
       - "Total Sessions: {{ device_bgp_sessions | length }}"
       - "Global Sessions (EVPN/default VRF): {{ bgp_global_sessions | default([]) | length }}"
       - "VRF Sessions: {{ bgp_vrf_sessions | default([]) | length }}"
-      - "Active Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'active') | list | length }}"
-      - "Planned Sessions: {{ device_bgp_sessions | selectattr('status.value', 'equalto', 'planned') | list | length }}"
-      - >-
-        Route Reflector: {{ 'Yes (all neighbors are RR clients)' if ((device_roles | default([])
-        | first | lower) in ['spine', 'route-reflector', 'rr']) else 'No' }}
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - netbox_bgp_plugin_available | default(false)

@@ -101,13 +101,35 @@ Both conditions must be `true` for BGP to be configured on a device.
 
 ---
 
-### NetBox BGP Plugin
+### NetBox BGP Plugins
 
-The [netbox-bgp](https://github.com/netbox-community/netbox-bgp) plugin provides structured BGP
-data models and is the recommended approach over `config_context`. The use of `config_context` is not
-supported by this role.
+The role requires one of two structured BGP plugins. The use of `config_context` for BGP data is
+not supported.
 
-#### Why Use the Plugin?
+#### netbox-bgp (legacy, default)
+
+The [netbox-bgp](https://github.com/netbox-community/netbox-bgp) plugin. Set
+`aoscx_bgp_plugin: "netbox-bgp"` (or leave at default).
+
+#### netbox-routing (newer)
+
+The [netbox-routing](https://github.com/netbox-community/netbox-routing) plugin. Set
+`aoscx_bgp_plugin: "netbox-routing"`.
+
+```bash
+pip install netbox-routing
+
+# Enable in NetBox configuration
+PLUGINS = ['netbox_routing']
+
+echo "netbox-routing" >> /opt/netbox/local_requirements.txt
+cd /opt/netbox/netbox && python3 manage.py migrate
+sudo systemctl restart netbox
+```
+
+---
+
+#### Why Use a Plugin?
 
 | Feature | config_context | netbox-bgp plugin |
 |---------|---------------|-------------------|
@@ -213,6 +235,58 @@ for session in response.json()["results"]:
     print(f"Remote AS: {session['remote_as']['asn']}")
     print(f"Status: {session['status']['value']}")
 ```
+
+---
+
+## Plugin Selection
+
+The role supports two NetBox BGP plugins. Choose one via `aoscx_bgp_plugin`.
+
+| Value | Plugin | API Base Path |
+|-------|--------|---------------|
+| `"netbox-bgp"` (default) | [netbox-bgp](https://github.com/netbox-community/netbox-bgp) | `/api/plugins/bgp/` |
+| `"netbox-routing"` | [netbox-routing](https://github.com/netbox-community/netbox-routing) | `/api/plugins/routing/` |
+
+```yaml
+# defaults/main.yml (or group_vars)
+aoscx_bgp_plugin: "netbox-bgp"       # legacy plugin — default for existing installs
+# aoscx_bgp_plugin: "netbox-routing" # newer plugin — set when migrating
+aoscx_use_netbox_bgp_plugin: true     # set false to disable BGP configuration entirely
+```
+
+Both plugins produce the same normalised session shape consumed by the rest of the BGP task
+pipeline, so all device configuration tasks are identical regardless of which plugin is active.
+
+### netbox-routing Data Model
+
+netbox-routing uses a three-level hierarchy instead of a flat `session` object:
+
+```
+bgp/router      — BGP process (ASN, assigned_object → device or interface)
+  └─ bgp/scope  — Router + VRF context (vrf: null = default, or named VRF object)
+       └─ bgp/peer            — Peer entry (source IP, peer IP, remote AS)
+            └─ bgp/peer-address-family  — Per-AF settings (route-maps per direction)
+```
+
+Route-maps and prefix-lists share the `/api/plugins/routing/objects/prefix-list/` namespace.
+Use `/api/plugins/routing/objects/route-map/` to list route-map objects specifically.
+
+**Key differences from netbox-bgp:**
+
+| Aspect | netbox-bgp | netbox-routing |
+|--------|-----------|----------------|
+| VRF binding | Inferred from `local_address` interface | Explicit `scope.vrf` object |
+| Address families | Implicit (all sessions = all AFs) | Per-scope AF objects + per-peer AF settings |
+| Route-map ref in session | FK dict `{id, name}` in policies | Integer ID in `peer-address-family.routemap_in/out` |
+| Prefix-list rule field | `index` | `sequence` |
+| Route-map rule field | `index` + `set_actions{}` | `sequence` + `set{}` |
+| Match prefix-list | `match_ip_address` / `match_ipv6_address` separate | `match_prefix_list[]` unified |
+| le/ge support | Not available | `le` and `ge` fields |
+| Server-side filters | Work correctly | Ignored — fetch all, filter client-side |
+
+**Note on address families:** Data migrated from netbox-bgp does not include an `l2vpn-evpn` AF
+entry. Until explicit AF objects are created in netbox-routing, peers whose scope has
+`vrf == null` (global/default VRF) are treated as EVPN peers (same as legacy behaviour).
 
 ---
 
@@ -580,9 +654,9 @@ compose:
 
 ## Custom Filter Plugins
 
-Two filters in `filter_plugins/netbox_filters_lib/bgp_filters.py` handle BGP data enrichment.
+Four filters in `filter_plugins/netbox_filters_lib/bgp_filters.py` handle BGP data enrichment.
 
-### `get_bgp_session_vrf_info(sessions, interfaces)`
+### `get_bgp_session_vrf_info(sessions, interfaces)` — netbox-bgp
 
 Enriches each BGP session with `_vrf` and `_af` by looking up the session's `local_address`
 against device interface IPs in NetBox.
@@ -597,7 +671,36 @@ Returns each session with:
 - `_vrf`: VRF name (or `"default"` for loopbacks/default VRF interfaces)
 - `_af`: `"ipv4"` or `"ipv6"`
 
-### `collect_ebgp_vrf_policy_config(sessions, policy_rules, prefix_list_rules)`
+### `normalize_routing_plugin_peers(routers, scopes, peers, address_families, peer_address_families, route_maps, device_name)` — netbox-routing
+
+Normalises raw netbox-routing API collections into the same session shape used by the rest of
+the BGP task pipeline. All seven lists are the full API responses (server-side filters are
+unreliable in netbox-routing; filtering is done client-side).
+
+```yaml
+- name: Normalize netbox-routing peers for this device
+  ansible.builtin.set_fact:
+    device_bgp_sessions: >-
+      {{ _nb_routing_routers.results |
+         normalize_routing_plugin_peers(
+           _nb_routing_scopes.results,
+           _nb_routing_peers.results,
+           _nb_routing_afs.results,
+           _nb_routing_peer_afs.results,
+           _nb_routing_route_maps.results,
+           inventory_hostname
+         ) }}
+```
+
+Returns a list of sessions with the same shape as netbox-bgp sessions:
+- `local_address`, `remote_address`: IP address strings
+- `local_as`, `remote_as`: dicts with `asn` key
+- `_vrf`: VRF name (scope's `vrf.name`, or `"default"` for global scope)
+- `_af`: `"ipv4"` or `"ipv6"` (from the peer-address-family object, or derived from IP)
+- `import_policies`, `export_policies`: lists of route-map name strings
+- `status`: `"active"` (disabled peers are excluded)
+
+### `collect_ebgp_vrf_policy_config(sessions, policy_rules, prefix_list_rules)` — netbox-bgp
 
 Collects routing policies and prefix lists referenced by session `import_policies` /
 `export_policies`. Returns pre-built AOS-CX CLI command lists.
@@ -634,6 +737,44 @@ Returns:
       ]
     }
   ]
+}
+```
+
+### `collect_ebgp_vrf_policy_config_routing(sessions, route_map_entries, prefix_list_entries)` — netbox-routing
+
+Same purpose as `collect_ebgp_vrf_policy_config` but consumes netbox-routing objects.
+
+Key differences from the netbox-bgp version:
+- Uses `sequence` (not `index`) for ordering
+- Uses `set{}` dict (not `set_actions{}`)
+- `match_prefix_list[]` is a unified list (no separate IPv4/IPv6 match fields)
+- AF is inferred from prefix content (`:` in the prefix string → IPv6)
+- Supports `le` and `ge` fields on prefix-list entries
+
+```yaml
+- name: Collect eBGP VRF routing policies (netbox-routing)
+  ansible.builtin.set_fact:
+    bgp_policy_data: >-
+      {{ bgp_vrf_sessions |
+         collect_ebgp_vrf_policy_config_routing(
+           _nb_routing_rm_entries.results | default([]),
+           _nb_routing_pl_entries.results | default([])
+         ) }}
+  when: aoscx_bgp_plugin == 'netbox-routing'
+```
+
+Returns the same data shape as `collect_ebgp_vrf_policy_config`, with `le` / `ge` added to
+prefix-list rule dicts when present:
+
+```python
+{
+  "prefix_lists": [
+    {
+      "name": "LAB-BLUE-IPV4",
+      "rules": [{"index": 10, "action": "permit", "prefix": "172.27.4.0/24", "le": 32}]
+    }
+  ],
+  "route_map_rules": [...]
 }
 ```
 
