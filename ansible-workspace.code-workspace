@@ -7,6 +7,10 @@
         {
             "name": "🧪 Test Environment",
             "path": "/workspaces/aruba-role-testing"
+        },
+        {
+            "name": "🧪 IKTNH Environment",
+            "path": "/workspaces/iktnh-ansible"
         }
     ],
     "settings": {
