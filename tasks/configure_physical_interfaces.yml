@@ -139,6 +139,19 @@
         | list
       }}
 
+# Interfaces that are already enabled but still have pending changes (e.g. MTU, description).
+# These were excluded from physical_interfaces_to_enable because their admin state is
+# already correct, but they still need to be configured (e.g. LAG member with custom MTU).
+- name: Build list of already-enabled interfaces needing configuration (MTU, description)
+  ansible.builtin.set_fact:
+    physical_interfaces_already_up_needing_update: >-
+      {{
+        interface_changes.physical | default([])
+        | selectattr('enabled', 'equalto', true)
+        | selectattr('name', 'in', already_enabled_interfaces | default([]))
+        | list
+      }}
+
 - name: Debug - Show physical interfaces to enable
   ansible.builtin.debug:
     msg:
@@ -154,6 +167,9 @@
         | map(attribute='name') | list }}
       - "Parent interfaces needing enable: {{ parents_needing_enable | default([]) | map(attribute='name') | list }}"
       - "Total interfaces to enable (final): {{ physical_interfaces_to_enable | map(attribute='name') | list }}"
+      - >-
+        Already-enabled interfaces needing update (MTU/description):
+        {{ physical_interfaces_already_up_needing_update | default([]) | map(attribute='name') | list }}
   when:
     - aoscx_debug | bool or ansible_verbosity >= 1
 
@@ -204,6 +220,22 @@
     - already_enabled_interfaces | default([]) | length > 0
     - item.name != "mgmt"
 
+# Configure interfaces that are already enabled (admin state already correct) but still
+# need other settings updated (e.g. MTU, description). This handles LAG members and
+# other interfaces that the enable tasks skip because bond_status.state is already up.
+- name: Update already-enabled physical interfaces (MTU, description)
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: true
+    description: "{{ item.description | default('') }}"
+    mtu: "{{ item.mtu if (item.mtu is defined and item.mtu is not none) else omit }}"
+  loop: "{{ physical_interfaces_already_up_needing_update | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when:
+    - physical_interfaces_already_up_needing_update | default([]) | length > 0
+    - item.name != "mgmt"
+
 - name: Debug - Physical interface configuration summary
   ansible.builtin.debug:
     msg:
@@ -223,6 +255,9 @@
         | selectattr('enabled', 'equalto', false)
         | selectattr('name', 'in', already_enabled_interfaces | default([]))
         | list | length }}
+      - >-
+        Already-enabled interfaces needing update (MTU/description):
+        {{ physical_interfaces_already_up_needing_update | default([]) | length }}
       - >-
         AP_Aruba interfaces in enable list:
         {{ physical_interfaces_to_enable | default([])
