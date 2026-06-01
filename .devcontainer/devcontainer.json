@@ -8,7 +8,8 @@
   },
   "mounts": [
     "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
-    "source=${localEnv:HOME}/code/aruba-role-testing,target=/workspaces/aruba-role-testing,type=bind"
+    "source=${localEnv:HOME}/code/aruba-role-testing,target=/workspaces/aruba-role-testing,type=bind",
+    "source=${localEnv:HOME}/code/iktnh-ansible,target=/workspaces/iktnh-ansible,type=bind"
   ],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
