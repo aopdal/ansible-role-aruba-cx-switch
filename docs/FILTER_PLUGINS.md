@@ -373,16 +373,21 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
     - Extract VRF name from interface object with safe fallback
     - Returns: VRF name or "default"
 
-- **`group_interface_ips(interface_ip_list)`**
+- **`group_interface_ips(interface_ip_list, ospf_facts=None, ospf_process_id=1)`**
     - Group flat per-IP items into per-interface items for use with `build_l3_config_lines`
     - Filters to `_needs_add=True`, sorts addresses (regular-before-anycast, IPv4 before IPv6)
+    - Includes an interface with no `_needs_add` IPs when any of the following is true:
+        - The interface has `if_ip_ospf_1_area` set AND it is not yet in the correct OSPF area (or `ospf_facts` is `None`)
+        - `_ip_changes.dhcp_relay_change` is `True` (set by change detection when DHCP relay servers differ)
     - Returns: List of `{interface_name, interface, addresses}` dicts
 
-- **`build_l3_config_lines(item, interface_type, vrf_type, l3_counters_enable=True, ospf_process_id=1)`**
+- **`build_l3_config_lines(item, interface_type, vrf_type, l3_counters_enable=True, ospf_process_id=1, ip_helper_addresses=None)`**
     - Build complete L3 configuration command list for a single interface
     - `item` is a per-interface grouped dict from `group_interface_ips()` with an `addresses` list
     - Handles all IPs (IPv4 + IPv6, anycast gateways) in a single call — each per-interface command (vrf attach, ip mtu, l3-counters, OSPF) emitted exactly once
     - OSPF interface config from `custom_fields.if_ip_ospf_1_area` / `if_ip_ospf_network`
+    - When `ip_helper_addresses` is provided and the interface has `custom_fields.if_ip_helper=True`, emits `ip helper-address <ip>` lines (one per server, ordered by string index key) after all IP/anycast lines and before `l3-counters`
+    - Servers are looked up by the interface VRF name in `ip_helper_addresses` (a dict keyed by VRF, values are `{"0": "ip", "1": "ip", ...}`)
     - Returns: List of configuration commands
 
 **Key Benefits**:
@@ -528,28 +533,33 @@ IP address to interface matching and anycast gateway processing (1 filter, 106 l
 
 NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
 
-- **`get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts=None)`**
+- **`get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts=None, dhcp_relay_facts=None, ip_helper_addresses=None)`**
     - Compare NetBox interface configuration with device state
     - Implements granular change detection for:
       - Physical properties (enabled/disabled, description, MTU)
       - LAG membership
       - L2 VLAN configuration
       - L3 IP addresses (IPv4 with specific address tracking; IPv6 with full comparison when `enhanced_facts` is provided, otherwise reference only)
+      - DHCP relay / ip helper-address (when `dhcp_relay_facts` and `ip_helper_addresses` are both provided; otherwise conservative — always marks as needing change when `if_ip_helper=True`)
     - Parameters:
       - `interfaces`: List of NetBox interface objects
       - `device_facts`: Device facts dict (from `aoscx_facts` / `ansible_facts`)
       - `enhanced_facts`: Optional dict of enhanced interface data from `aoscx_enhanced_interface_facts` (populated by `tasks/gather_facts_rest_api.yml` when `aoscx_gather_facts_rest_api: true`). Provides actual IPv6 addresses and VSX virtual IPs for accurate comparison instead of URL references.
+      - `dhcp_relay_facts`: Optional dict keyed by interface name with a sorted list of currently configured relay server IPs. Produced by `rest_api_to_aoscx_dhcp_relays` from `GET /system/dhcp_relays?depth=2`. When provided (with `ip_helper_addresses`), enables idempotent DHCP relay comparison.
+      - `ip_helper_addresses`: Optional dict keyed by VRF name with `{str_index: ip}` dicts (from `ip_helper_addresses` config context). Used together with `dhcp_relay_facts`.
     - Returns: Dict with categorized interfaces:
       - `physical`: Physical interfaces needing changes
       - `lag`: LAG interfaces needing changes
       - `mclag`: MCLAG interfaces needing changes
       - `l2`: L2 interfaces needing VLAN changes
-      - `l3`: L3 interfaces needing IP address changes
+      - `l3`: L3 interfaces needing IP address or DHCP relay changes
       - `lag_members`: Physical interfaces needing LAG assignment changes
       - `no_changes`: Interfaces that don't need any changes
     - Adds `_ip_changes` dict to L3 interfaces containing:
       - `ipv4_to_add`: List of specific IPv4 addresses needing configuration
-      - `ipv6_addresses`: List of IPv6 addresses needing configuration (all addresses when enhanced facts are absent; only addresses needing addition when enhanced facts are available)
+      - `ipv6_addresses`: List of IPv6 addresses needing configuration (all when enhanced facts are absent; only additions when enhanced facts are available)
+      - `dhcp_relay_change`: `True` when DHCP relay configuration needs to be pushed (set in all relay-change branches so `group_interface_ips` includes the interface even when no IPs need adding)
+      - `dhcp_relay_to_remove`: Sorted list of relay server IPs present on the device but absent from NetBox (requires `dhcp_relay_facts`). Used by the "Remove stale ip helper-address entries" task.
     - See "L3 Interface IP Address Idempotency" section for performance details
 
 ### `bgp_filters.py` - BGP Session Enrichment
@@ -759,12 +769,21 @@ All filters are available through the standard Ansible filter syntax:
 - set_fact:
     grouped: "{{ l3_interfaces.physical_custom_vrf | group_interface_ips }}"
     # Returns: [{interface_name: '1/1/1', interface: {...}, addresses: [{address, ip_role, anycast_mac}]}]
+    # Interfaces with _ip_changes.dhcp_relay_change=True are also included even with no IPs to add
 
 # Build all L3 configuration lines for a grouped interface item
 - set_fact:
     config_lines: "{{ item | build_l3_config_lines('physical', 'custom', true) }}"
     # Returns: ['vrf attach CUST-A', 'ip address 10.1.1.1/24', 'ip mtu 9000', 'l3-counters']
     # With OSPF: also emits 'ip ospf 1 area 0.0.0.0', 'ip ospf network point-to-point'
+
+# Build config with DHCP relay (ip helper-address)
+- set_fact:
+    config_lines: "{{ item | build_l3_config_lines('vlan', 'custom', true, 1, ip_helper_addresses) }}"
+    # When item.interface.custom_fields.if_ip_helper=True and ip_helper_addresses has
+    # an entry for the interface VRF, emits lines such as:
+    # ['vrf attach lab-blue', 'ip address 172.27.4.1/27', 'ip helper-address 172.16.3.10',
+    #  'ip helper-address 172.16.3.11', 'l3-counters']
 
 # Format interface names
 - set_fact:
@@ -1080,12 +1099,12 @@ netbox_filters.py (main entry point)
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| `interface_change_detection.py` | 1 | 814 | Change detection & idempotency |
+| `interface_change_detection.py` | 1 | 814 | Change detection & idempotency (incl. DHCP relay) |
 | `vlan_filters.py` | 8 | 454 | VLAN lifecycle management |
 | `comparison.py` | 2 | 295 | State comparison logic |
 | `interface_categorization.py` | 2 | 294 | Interface categorization |
 | `vrf_filters.py` | 6 | 191 | VRF operations |
-| `l3_config_helpers.py` | 6 | 181 | L3 configuration optimization |
+| `l3_config_helpers.py` | 6 | 181 | L3 configuration optimization (incl. ip helper-address) |
 | `utils.py` | 5 | 176 | Helper functions |
 | `ospf_filters.py` | 4 | 138 | OSPF configuration |
 | `bgp_filters.py` | 2 | 350 | BGP session enrichment |

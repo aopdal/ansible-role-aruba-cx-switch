@@ -211,6 +211,55 @@ def rest_api_to_aoscx_vnis(rest_data):
     return result
 
 
+def rest_api_to_aoscx_dhcp_relays(rest_data):
+    """Transform DHCP relay REST API response into a per-interface lookup dict.
+
+    The REST API /system/dhcp_relays?depth=2 returns entries keyed by
+    "vrf_name,interface_name". This function flattens them into a dict keyed
+    by interface name with a sorted list of IPv4 unicast server addresses as
+    the value.
+
+    Args:
+        rest_data: Dict from REST API /system/dhcp_relays?depth=2
+                   Key format: "vrf_name,interface_name"
+                   Example::
+
+                       {
+                         "lab-blue,vlan101": {
+                           "ipv4_ucast_server": ["172.16.3.10", "172.16.3.11"],
+                           "port": {"vlan101": "/rest/..."},
+                           "vrf":  {"lab-blue": "/rest/..."}
+                         }
+                       }
+
+    Returns:
+        Dict keyed by interface name, value is a sorted list of IPv4 server
+        addresses.  Example: ``{"vlan101": ["172.16.3.10", "172.16.3.11"]}``
+    """
+    if not isinstance(rest_data, dict):
+        return {}
+
+    result = {}
+    for _key, relay_data in rest_data.items():
+        if not isinstance(relay_data, dict):
+            continue
+        # The interface name is the key inside the "port" dict.
+        port_dict = relay_data.get("port", {})
+        if not isinstance(port_dict, dict):
+            continue
+        for intf_name in port_dict.keys():
+            ipv4_servers = relay_data.get("ipv4_ucast_server", [])
+            if not isinstance(ipv4_servers, list):
+                continue
+            existing = result.get(intf_name, [])
+            for server in ipv4_servers:
+                if server and server not in existing:
+                    existing.append(server)
+            result[intf_name] = sorted(existing)
+
+    return result
+
+
 class FilterModule:
     """Ansible filter plugin for REST API data transformation."""
 
@@ -221,4 +270,5 @@ class FilterModule:
             "rest_api_to_aoscx_vlans": rest_api_to_aoscx_vlans,
             "rest_api_to_aoscx_evpn_vlans": rest_api_to_aoscx_evpn_vlans,
             "rest_api_to_aoscx_vnis": rest_api_to_aoscx_vnis,
+            "rest_api_to_aoscx_dhcp_relays": rest_api_to_aoscx_dhcp_relays,
         }

@@ -35,6 +35,7 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | `if_stp_bpdu_guard` | Boolean | Interface | No | Enable/disable BPDU guard on an L2 interface | `configure_stp.yml` |
 | `if_stp_edge_port` | Boolean | Interface | No | Set port-type admin-edge (PortFast equivalent) | `configure_stp.yml` |
 | `if_stp_root_guard` | Boolean | Interface | No | Enable/disable Root Guard on an L2 interface | `configure_stp.yml` |
+| `if_ip_helper` | Boolean | Interface | No | Enable DHCP relay (`ip helper-address`) on an L3 interface | `configure_l3_interfaces.yml` |
 
 ### Creating Custom Fields in NetBox
 
@@ -344,6 +345,52 @@ Produces:
 interface 1/1/49
     spanning-tree root-guard
     no spanning-tree bpdu-guard
+```
+
+#### 12. if_ip_helper (Boolean — Interface)
+
+```
+Name: if_ip_helper
+Type: Boolean
+Object Type: dcim > interface
+Label: IP Helper Address
+Description: Enable DHCP relay (ip helper-address) on this L3 interface
+Default: false
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: if_ip_helper
+├─ Type: Boolean
+├─ Content Types: dcim | interface
+├─ Label: IP Helper Address
+└─ Default: — (null / false)
+```
+
+**Purpose:** When `true`, the role configures `ip helper-address` lines on the interface for each relay server defined in the `ip_helper_addresses` config context key. The servers are looked up by the interface's VRF name. When `false` (or unset), any relay servers already configured on the device are removed.
+
+Requires `aoscx_gather_facts_rest_api: true` for idempotent comparison (otherwise the role conservatively pushes on every run). The `ip_helper_addresses` config context key must also be defined — see [Config Context: ip_helper_addresses](#ip_helper_addresses) below.
+
+**Example — SVI that should relay DHCP to a central server:**
+
+```yaml
+# NetBox interface custom fields
+custom_fields:
+  if_ip_helper: true
+```
+
+Combined with the `ip_helper_addresses` config context (VRF `lab-blue`), this produces:
+
+```
+interface vlan101
+    vrf attach lab-blue
+    ip address 172.27.4.1/27
+    ip helper-address 172.16.3.10
+    ip helper-address 172.16.3.11
+    l3-counters
 ```
 
 ### Custom Field Usage Patterns
@@ -1010,6 +1057,12 @@ curl -H "Authorization: Token $TOKEN" \
 | `if_stp_edge_port` | `spanning-tree port-type admin-edge` |
 | `if_stp_root_guard` | `spanning-tree root-guard` |
 
+**Interface-level (Boolean — L3 interfaces):**
+
+| Field | AOS-CX command | Notes |
+|-------|----------------|-------|
+| `if_ip_helper` | `ip helper-address <ip>` | Servers come from `ip_helper_addresses` config context, keyed by interface VRF |
+
 ### Config Context Keys
 
 **Base System (Stable):**
@@ -1023,6 +1076,44 @@ curl -H "Authorization: Token $TOKEN" \
 **VSX (Stable):**
 
 - `vsx_system_mac`, `vsx_role`, `vsx_isl_ports`, `vsx_keepalive_peer`, `vsx_keepalive_src`, `vsx_keepalive_vrf`
+
+**DHCP Relay (Stable):**
+
+- `ip_helper_addresses` — dict keyed by VRF name; each value is a string-indexed dict of relay server IPs
+
+<a name="ip_helper_addresses"></a>
+
+#### ip_helper_addresses
+
+Defines the DHCP relay servers per VRF. Used together with the `if_ip_helper` interface custom field to configure `ip helper-address` on L3 interfaces.
+
+The top-level key is the **VRF name** as it appears on the switch (must match the interface VRF in NetBox). The value is a dict where the keys are string indices (`"0"`, `"1"`, …) and the values are relay server IP addresses. The index order controls the order in which `ip helper-address` commands are pushed.
+
+```json
+{
+    "ip_helper_addresses": {
+        "lab-blue": {
+            "0": "172.16.3.10",
+            "1": "172.16.3.11"
+        },
+        "lab-green": {
+            "0": "172.16.3.12",
+            "1": "172.16.3.13",
+            "2": "172.16.3.14"
+        }
+    }
+}
+```
+
+**Typical placement:** Site or device-role config context, so all leaf switches in a site share the same relay targets. Override at the device level when a specific switch needs different servers.
+
+**How it works:**
+
+1. Set `if_ip_helper: true` on each interface (SVI, LAG, or physical) that should relay DHCP.
+2. Define `ip_helper_addresses` in config context for the device, keyed by the interface's VRF name.
+3. The role reads the VRF from the NetBox interface object (not the IP address) and looks up the matching entry.
+4. With `aoscx_gather_facts_rest_api: true`, the role compares expected vs. device-configured servers and only pushes when there is a difference. Servers present on the device but absent from NetBox are removed with `no ip helper-address <ip>`.
+5. Without REST API facts, the role always pushes the full helper-address set (conservative mode).
 
 **Port-Access (Stable):**
 

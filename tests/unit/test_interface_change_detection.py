@@ -61,7 +61,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["physical"]) == 1
         assert result["physical"][0]["name"] == "1/1/1"
 
@@ -86,7 +87,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["no_changes"]) == 1
         assert result["no_changes"][0]["name"] == "1/1/1"
 
@@ -109,7 +111,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["physical"]) == 1
 
     def test_description_mismatch(self):
@@ -132,7 +135,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["physical"]) == 1
 
     def test_mtu_mismatch(self):
@@ -155,7 +159,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["physical"]) == 1
 
     def test_vlan_interface_not_on_device(self):
@@ -172,7 +177,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 "interfaces": {}  # VLAN interface doesn't exist
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["l3"]) == 1
         assert result["l3"][0]["name"] == "vlan100"
 
@@ -192,7 +198,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 "interfaces": {}  # LAG doesn't exist
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["lag"]) == 1
         assert result["lag"][0]["name"] == "lag1"
 
@@ -217,7 +224,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         # Should be in both lag_members and physical
         assert len(result["lag_members"]) == 1
         assert len(result["physical"]) == 1
@@ -244,7 +252,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["l2"]) == 1
 
     def test_ip_address_changes(self):
@@ -269,7 +278,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["l3"]) == 1
         # Check that _ip_changes is populated
         assert "_ip_changes" in result["l3"][0]
@@ -291,7 +301,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["no_changes"]) == 1
         assert result["no_changes"][0]["name"] == "mgmt"
 
@@ -312,7 +323,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["no_changes"]) == 1
 
     def test_mclag_interface_categorization(self):
@@ -332,7 +344,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 "interfaces": {}  # LAG doesn't exist
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["mclag"]) == 1
         assert result["mclag"][0]["name"] == "lag1"
 
@@ -360,7 +373,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 }
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["l2"]) == 1
 
     def test_loopback_interface(self):
@@ -377,7 +391,8 @@ class TestGetInterfacesNeedingConfigChanges:
                 "interfaces": {}  # Loopback doesn't exist
             }
         }
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
         assert len(result["l3"]) == 1
         assert result["l3"][0]["name"] == "loopback0"
 
@@ -473,7 +488,8 @@ class TestEnhancedFacts:
         device_facts = self._device_facts_with_url_ref()
 
         # No enhanced facts passed
-        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
 
         assert len(result["l3"]) == 1
 
@@ -534,11 +550,15 @@ class TestEnhancedFacts:
                 "vrf": {"name": "lab-blue"},
                 "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
                 "ip_addresses": [
-                    {"address": "172.27.4.2/27", "role": None, "vrf": {"name": "lab-blue"}},
-                    {"address": "172.27.4.1/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
-                    {"address": "2001:db8:1000:10::2/64", "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.2/27", "role": None,
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.1/27", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:10::2/64",
+                        "role": None, "vrf": {"name": "lab-blue"}},
                     # Only fe80::1 in NetBox — 2001:db8:1000:10::1 was replaced with link-local
-                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "fe80::1/64", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
                 ],
             }
         ]
@@ -589,10 +609,14 @@ class TestEnhancedFacts:
                 "vrf": {"name": "lab-blue"},
                 "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
                 "ip_addresses": [
-                    {"address": "172.27.4.2/27", "role": None, "vrf": {"name": "lab-blue"}},
-                    {"address": "172.27.4.1/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
-                    {"address": "2001:db8:1000:10::2/64", "role": None, "vrf": {"name": "lab-blue"}},
-                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.2/27", "role": None,
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.1/27", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:10::2/64",
+                        "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "fe80::1/64", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
                 ],
             }
         ]
@@ -638,10 +662,14 @@ class TestEnhancedFacts:
                 "vrf": {"name": "lab-blue"},
                 "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
                 "ip_addresses": [
-                    {"address": "172.27.4.34/27", "role": None, "vrf": {"name": "lab-blue"}},
-                    {"address": "172.27.4.33/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
-                    {"address": "2001:db8:1000:11::2/64", "role": None, "vrf": {"name": "lab-blue"}},
-                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.34/27", "role": None,
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.33/27", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:11::2/64",
+                        "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "fe80::1/64", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
                 ],
             }
         ]
@@ -662,7 +690,8 @@ class TestEnhancedFacts:
             }
         }
 
-        result = get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts)
         l3_intfs = result.get("l3", [])
         vlan102 = next((i for i in l3_intfs if i["name"] == "vlan102"), None)
         assert vlan102 is not None, "vlan102 should need changes"
@@ -680,10 +709,14 @@ class TestEnhancedFacts:
                 "vrf": {"name": "lab-blue"},
                 "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
                 "ip_addresses": [
-                    {"address": "172.27.4.2/27", "role": None, "vrf": {"name": "lab-blue"}},
-                    {"address": "172.27.4.1/27", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
-                    {"address": "2001:db8:1000:10::2/64", "role": None, "vrf": {"name": "lab-blue"}},
-                    {"address": "fe80::1/64", "role": {"value": "anycast"}, "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.2/27", "role": None,
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "172.27.4.1/27", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
+                    {"address": "2001:db8:1000:10::2/64",
+                        "role": None, "vrf": {"name": "lab-blue"}},
+                    {"address": "fe80::1/64", "role": {"value": "anycast"},
+                        "vrf": {"name": "lab-blue"}},
                 ],
             }
         ]
@@ -704,7 +737,8 @@ class TestEnhancedFacts:
             }
         }
 
-        result = get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts)
         # Interface may still be in l3 for other reasons, but link_local_ipv6_to_add must be absent
         for intf in result.get("l3", []) + result.get("no_changes", []):
             if intf["name"] == "vlan101":
@@ -720,7 +754,8 @@ class TestEnhancedFacts:
                 "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
                 "ip_addresses": [
                     {"address": "2001:db8:1000:12::2/64", "role": None},
-                    {"address": "2001:db8:1000:12::1/64", "role": {"value": "anycast"}},
+                    {"address": "2001:db8:1000:12::1/64",
+                        "role": {"value": "anycast"}},
                 ],
             }
         ]
@@ -739,7 +774,8 @@ class TestEnhancedFacts:
             }
         }
 
-        result = get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts)
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts)
         for intf in result.get("l3", []) + result.get("no_changes", []):
             if intf["name"] == "vlan103":
                 ip_changes = intf.get("_ip_changes", {})
@@ -783,7 +819,8 @@ class TestEnhancedFacts:
         # Interface needs no changes so _ip_changes may not even be set
         for intf in result.get("l3", []) + result.get("no_changes", []):
             if intf["name"] == "vlan10":
-                assert intf.get("_ip_changes", {}).get("ipv6_to_remove", []) == []
+                assert intf.get("_ip_changes", {}).get(
+                    "ipv6_to_remove", []) == []
 
     def test_stale_ipv6_all_ipv6_removed_interface_still_has_ipv4(self):
         """All IPv6 removed from NetBox but device still has them; interface retains IPv4.
@@ -821,6 +858,278 @@ class TestEnhancedFacts:
             interfaces, device_facts, enhanced_facts
         )
 
-        assert len(result["l3"]) == 1, "Interface should need changes (stale IPv6 to remove)"
+        assert len(
+            result["l3"]) == 1, "Interface should need changes (stale IPv6 to remove)"
         ip_changes = result["l3"][0].get("_ip_changes", {})
         assert "2001:db8::1/64" in ip_changes.get("ipv6_to_remove", [])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DHCP relay / ip helper-address change detection
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _vlan_intf_with_helper(name, vrf_name, if_ip_helper=True):
+    """Helper: minimal NetBox VLAN interface with ip_helper custom field."""
+    return {
+        "name": name,
+        "type": {"value": "virtual", "label": "Virtual"},
+        "enabled": True,
+        "description": "",
+        "mtu": None,
+        "lag": None,
+        "mode": None,
+        "mgmt_only": False,
+        "custom_fields": {"if_ip_helper": if_ip_helper},
+        "vrf": {"name": vrf_name, "id": 1},
+        "ip_addresses": [
+            {"address": "10.0.0.1/24", "role": None, "family": {"value": 4}},
+        ],
+        "tagged_vlans": [],
+        "untagged_vlan": {"vid": 100},
+    }
+
+
+def _device_facts_for(intf_name, ip="10.0.0.1/24"):
+    return {
+        "network_resources": {
+            "interfaces": {
+                intf_name: {
+                    "admin": "up",
+                    "ip4_address": ip,
+                    "ip6_addresses": {},
+                }
+            }
+        }
+    }
+
+
+_IP_HELPER_ADDRESSES = {
+    "lab-blue": {"0": "172.16.3.10", "1": "172.16.3.11"},
+    "lab-green": {"0": "172.16.3.12", "1": "172.16.3.13"},
+}
+
+
+class TestDhcpRelayChangeDetection:
+    """Tests for DHCP relay / ip helper-address change detection."""
+
+    def test_no_change_when_helpers_match(self):
+        """Interface skips L3 push when device relay servers match NetBox config."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.10", "172.16.3.11"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["no_changes"]) == 1
+        assert len(result["l3"]) == 0
+
+    def test_change_when_helpers_differ(self):
+        """Interface is pushed when device relay servers differ from NetBox config."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.99"]}  # wrong server
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+
+    def test_change_when_helpers_missing_from_device(self):
+        """Interface is pushed when device has no relays but NetBox wants some."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {}  # no relays on device
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+
+    def test_change_when_no_relay_facts_available(self):
+        """Conservative: interface always pushed when dhcp_relay_facts is None."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=None,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+
+    def test_no_helper_flag_and_no_device_relays_no_change(self):
+        """No change when if_ip_helper=False and device has no relays."""
+        iface = _vlan_intf_with_helper(
+            "vlan101", "lab-blue", if_ip_helper=False)
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["no_changes"]) == 1
+        assert len(result["l3"]) == 0
+
+    def test_stale_relay_triggers_change(self):
+        """Interface is pushed when if_ip_helper=False but device has stale relays."""
+        iface = _vlan_intf_with_helper(
+            "vlan101", "lab-blue", if_ip_helper=False)
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.10"]}  # stale
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+
+    def test_uses_interface_vrf_not_ip_vrf(self):
+        """Relay comparison uses the interface VRF, not the IP address VRF."""
+        iface = _vlan_intf_with_helper("vlan201", "lab-green")
+        device_facts = _device_facts_for("vlan201")
+        # Device has the lab-green helpers, not lab-blue ones
+        dhcp_relay_facts = {"vlan201": ["172.16.3.12", "172.16.3.13"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["no_changes"]) == 1
+        assert len(result["l3"]) == 0
+
+    def test_dhcp_relay_change_flag_set_on_mismatch(self):
+        """_ip_changes['dhcp_relay_change'] is True when relay servers differ."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.99"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+        assert result["l3"][0].get("_ip_changes", {}).get(
+            "dhcp_relay_change") is True
+
+    def test_dhcp_relay_change_flag_set_when_no_facts(self):
+        """_ip_changes['dhcp_relay_change'] is True when dhcp_relay_facts is None."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=None,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+        assert result["l3"][0].get("_ip_changes", {}).get(
+            "dhcp_relay_change") is True
+
+    def test_dhcp_relay_change_flag_set_on_stale_relay(self):
+        """_ip_changes['dhcp_relay_change'] is True when stale relays need removal."""
+        iface = _vlan_intf_with_helper(
+            "vlan101", "lab-blue", if_ip_helper=False)
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.10"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+        assert result["l3"][0].get("_ip_changes", {}).get(
+            "dhcp_relay_change") is True
+
+    def test_dhcp_relay_change_flag_not_set_when_match(self):
+        """_ip_changes['dhcp_relay_change'] is absent/False when relay already correct."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.10", "172.16.3.11"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["no_changes"]) == 1
+        # Flag must not be set on interfaces that went to no_changes
+        flag = result["no_changes"][0].get(
+            "_ip_changes", {}).get("dhcp_relay_change")
+        assert not flag
+
+    def test_dhcp_relay_to_remove_contains_stale_ips(self):
+        """dhcp_relay_to_remove holds only the IPs present on device but not in NetBox."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        # Device has an extra stale server (.99) alongside one correct one
+        dhcp_relay_facts = {"vlan101": ["172.16.3.10", "172.16.3.99"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+        to_remove = result["l3"][0].get(
+            "_ip_changes", {}).get("dhcp_relay_to_remove", [])
+        assert to_remove == ["172.16.3.99"]
+
+    def test_dhcp_relay_to_remove_not_set_when_only_adding(self):
+        """dhcp_relay_to_remove is absent when device has no extra IPs (only missing ones)."""
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {}  # device has no relays at all — only need to add
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+        to_remove = result["l3"][0].get(
+            "_ip_changes", {}).get("dhcp_relay_to_remove", [])
+        assert to_remove == []
+
+    def test_dhcp_relay_to_remove_all_when_if_ip_helper_false(self):
+        """All device relays go in dhcp_relay_to_remove when if_ip_helper=False."""
+        iface = _vlan_intf_with_helper(
+            "vlan101", "lab-blue", if_ip_helper=False)
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.10", "172.16.3.11"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["l3"]) == 1
+        to_remove = result["l3"][0].get(
+            "_ip_changes", {}).get("dhcp_relay_to_remove", [])
+        assert sorted(to_remove) == ["172.16.3.10", "172.16.3.11"]

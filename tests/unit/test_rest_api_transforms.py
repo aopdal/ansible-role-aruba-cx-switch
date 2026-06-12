@@ -7,6 +7,7 @@ from rest_api_transforms import (
     rest_api_to_aoscx_vlans,
     rest_api_to_aoscx_evpn_vlans,
     rest_api_to_aoscx_vnis,
+    rest_api_to_aoscx_dhcp_relays,
 )
 
 
@@ -301,3 +302,91 @@ class TestRestApiToAoscxVnis:
         }
         result = rest_api_to_aoscx_vnis(rest_data)
         assert len(result) == 3
+
+
+class TestRestApiToAoscxDhcpRelays:
+    """Tests for rest_api_to_aoscx_dhcp_relays function"""
+
+    _SAMPLE = {
+        "lab-blue,vlan101": {
+            "ipv4_ucast_server": ["172.16.3.10", "172.16.3.11"],
+            "ipv6_ucast_server": [],
+            "port": {"vlan101": "/rest/v10.16/system/interfaces/vlan101"},
+            "vrf": {"lab-blue": "/rest/v10.16/system/vrfs/lab-blue"},
+        }
+    }
+
+    def test_basic_conversion(self):
+        """Basic relay entry is keyed by interface name"""
+        result = rest_api_to_aoscx_dhcp_relays(self._SAMPLE)
+        assert "vlan101" in result
+        assert result["vlan101"] == ["172.16.3.10", "172.16.3.11"]
+
+    def test_servers_are_sorted(self):
+        """Servers are returned in sorted order"""
+        rest_data = {
+            "lab-blue,vlan101": {
+                "ipv4_ucast_server": ["172.16.3.11", "172.16.3.10"],
+                "port": {"vlan101": "/rest/v10.16/system/interfaces/vlan101"},
+            }
+        }
+        result = rest_api_to_aoscx_dhcp_relays(rest_data)
+        assert result["vlan101"] == ["172.16.3.10", "172.16.3.11"]
+
+    def test_multiple_interfaces(self):
+        """Multiple relay entries produce separate interface keys"""
+        rest_data = {
+            "lab-blue,vlan101": {
+                "ipv4_ucast_server": ["172.16.3.10"],
+                "port": {"vlan101": "/rest/v10.16/system/interfaces/vlan101"},
+            },
+            "lab-green,vlan201": {
+                "ipv4_ucast_server": ["172.16.3.12", "172.16.3.13"],
+                "port": {"vlan201": "/rest/v10.16/system/interfaces/vlan201"},
+            },
+        }
+        result = rest_api_to_aoscx_dhcp_relays(rest_data)
+        assert result["vlan101"] == ["172.16.3.10"]
+        assert result["vlan201"] == ["172.16.3.12", "172.16.3.13"]
+
+    def test_empty_server_list(self):
+        """Entry with empty ipv4_ucast_server is included as empty list"""
+        rest_data = {
+            "lab-blue,vlan101": {
+                "ipv4_ucast_server": [],
+                "port": {"vlan101": "/rest/v10.16/system/interfaces/vlan101"},
+            }
+        }
+        result = rest_api_to_aoscx_dhcp_relays(rest_data)
+        assert result["vlan101"] == []
+
+    def test_missing_port_key_skipped(self):
+        """Entry without port dict is skipped"""
+        rest_data = {
+            "lab-blue,vlan101": {
+                "ipv4_ucast_server": ["172.16.3.10"],
+                # no "port" key
+            }
+        }
+        result = rest_api_to_aoscx_dhcp_relays(rest_data)
+        assert len(result) == 0
+
+    def test_empty_input(self):
+        """Empty input returns empty dict"""
+        assert rest_api_to_aoscx_dhcp_relays({}) == {}
+
+    def test_non_dict_input(self):
+        """Non-dict input returns empty dict"""
+        assert rest_api_to_aoscx_dhcp_relays(None) == {}
+        assert rest_api_to_aoscx_dhcp_relays([]) == {}
+
+    def test_duplicate_servers_deduplicated(self):
+        """Duplicate server addresses are deduplicated"""
+        rest_data = {
+            "lab-blue,vlan101": {
+                "ipv4_ucast_server": ["172.16.3.10", "172.16.3.10"],
+                "port": {"vlan101": "/rest/v10.16/system/interfaces/vlan101"},
+            }
+        }
+        result = rest_api_to_aoscx_dhcp_relays(rest_data)
+        assert result["vlan101"] == ["172.16.3.10"]

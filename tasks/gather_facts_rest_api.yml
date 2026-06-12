@@ -357,6 +357,37 @@
   tags:
     - always
 
+# Query DHCP relay facts (optional, when ip_helper_addresses is defined for the device)
+# Used by interface change detection to determine if ip helper-address configuration
+# has already been applied, avoiding unnecessary pushes.
+#
+# Output: aoscx_dhcp_relay_facts = { interface_name: [server1, server2, ...] }
+# Example: { "vlan101": ["172.16.3.10", "172.16.3.11"] }
+- name: Query DHCP relay facts from REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/dhcp_relays?attributes=&depth=2"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  register: _rest_dhcp_relays
+  delegate_to: localhost
+  when: ip_helper_addresses | default({}) | length > 0
+  tags:
+    - always
+
+- name: Build DHCP relay facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_dhcp_relay_facts: "{{ _rest_dhcp_relays.json | rest_api_to_aoscx_dhcp_relays }}"
+  when:
+    - ip_helper_addresses | default({}) | length > 0
+    - _rest_dhcp_relays is not skipped
+    - _rest_dhcp_relays.status == 200
+  tags:
+    - always
+
 # Logout to clean up session
 - name: Logout from AOS-CX REST API
   ansible.builtin.uri:

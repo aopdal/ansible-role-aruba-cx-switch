@@ -38,8 +38,10 @@ class TestFormatInterfaceName:
 
     def test_subinterface(self):
         """Test sub-interface name formatting (passed through unchanged)"""
-        assert format_interface_name("1/1/3.2000", "subinterface") == "1/1/3.2000"
-        assert format_interface_name("1/1/1.100", "subinterface") == "1/1/1.100"
+        assert format_interface_name(
+            "1/1/3.2000", "subinterface") == "1/1/3.2000"
+        assert format_interface_name(
+            "1/1/1.100", "subinterface") == "1/1/1.100"
 
 
 class TestIsIPv4Address:
@@ -62,7 +64,8 @@ class TestIsIPv4Address:
         """Test invalid address formats - simple colon check"""
         # Note: is_ipv4_address uses simple ":" check, not full validation
         assert is_ipv4_address("192.168.1.1") is True  # No colon = IPv4
-        assert is_ipv4_address("not-an-ip") is True  # No colon = treated as IPv4
+        # No colon = treated as IPv4
+        assert is_ipv4_address("not-an-ip") is True
         assert is_ipv4_address("") is True  # Empty string has no colon
 
     def test_none_value(self):
@@ -264,7 +267,8 @@ class TestGroupInterfaceIps:
                   "address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None,
                   "_needs_add": False}]
         # Device has 1/1/18 in area 0.0.0.0 but NetBox wants 0.0.0.1
-        ospf_facts = {"default": {"1": {"0.0.0.0": {"1/1/18": {"ospf_if_type": None}}}}}
+        ospf_facts = {"default": {
+            "1": {"0.0.0.0": {"1/1/18": {"ospf_if_type": None}}}}}
         result = group_interface_ips(items, ospf_facts=ospf_facts)
         assert len(result) == 1  # wrong area → include for reconfiguration
 
@@ -275,7 +279,8 @@ class TestGroupInterfaceIps:
                                 "custom_fields": {"if_ip_ospf_1_area": "0.0.0.0"}},
                   "address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None,
                   "_needs_add": False}]
-        ospf_facts = {"BLUE": {"1": {"0.0.0.0": {"1/1/5": {"ospf_if_type": None}}}}}
+        ospf_facts = {
+            "BLUE": {"1": {"0.0.0.0": {"1/1/5": {"ospf_if_type": None}}}}}
         result = group_interface_ips(items, ospf_facts=ospf_facts)
         assert result == []  # already in correct area under BLUE VRF
 
@@ -371,10 +376,14 @@ class TestBuildL3ConfigLines:
         item = _make_item(
             {"vrf": {"name": "lab-blue"}, "mtu": 9198},
             [
-                {"address": "172.27.4.225/27",      "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
-                {"address": "172.27.4.226/27",      "ip_role": None,      "anycast_mac": None},
-                {"address": "2001:db8:1000:17::1",   "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
-                {"address": "2001:db8:1000:17::2/64","ip_role": None,      "anycast_mac": None},
+                {"address": "172.27.4.225/27",      "ip_role": "anycast",
+                    "anycast_mac": "00:00:00:01:00:01"},
+                {"address": "172.27.4.226/27",
+                    "ip_role": None,      "anycast_mac": None},
+                {"address": "2001:db8:1000:17::1",   "ip_role": "anycast",
+                    "anycast_mac": "00:00:00:01:00:01"},
+                {"address": "2001:db8:1000:17::2/64",
+                    "ip_role": None,      "anycast_mac": None},
             ],
         )
         lines = build_l3_config_lines(item, "vlan", "custom", True)
@@ -397,20 +406,28 @@ class TestBuildL3ConfigLines:
         assert "ipv6 address 2001:db8:1000:17::2/64" in lines
         # Order: vrf -> ip mtu -> regular IPv4 -> anycast IPv4 -> regular IPv6 -> anycast IPv6 -> l3-counters
         assert lines.index("vrf attach lab-blue") < lines.index("ip mtu 9198")
-        assert lines.index("ip mtu 9198") < lines.index("ip address 172.27.4.226/27")
-        assert lines.index("ip address 172.27.4.226/27") < lines.index("active-gateway ip mac 00:00:00:01:00:01")
-        assert lines.index("ipv6 address 2001:db8:1000:17::2/64") < lines.index("active-gateway ipv6 mac 00:00:00:01:00:01")
-        assert lines.index("active-gateway ipv6 2001:db8:1000:17::1") < lines.index("l3-counters")
+        assert lines.index("ip mtu 9198") < lines.index(
+            "ip address 172.27.4.226/27")
+        assert lines.index(
+            "ip address 172.27.4.226/27") < lines.index("active-gateway ip mac 00:00:00:01:00:01")
+        assert lines.index("ipv6 address 2001:db8:1000:17::2/64") < lines.index(
+            "active-gateway ipv6 mac 00:00:00:01:00:01")
+        assert lines.index(
+            "active-gateway ipv6 2001:db8:1000:17::1") < lines.index("l3-counters")
 
     def test_vlan_link_local_anycast_gateway(self):
         """Link-local IPv6 anycast generates 'ipv6 address link-local' before active-gateway"""
         item = _make_item(
             {"vrf": {"name": "lab-blue"}},
             [
-                {"address": "172.27.4.2/27",          "ip_role": None,      "anycast_mac": None},
-                {"address": "172.27.4.1/27",          "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
-                {"address": "2001:db8:1000:10::2/64", "ip_role": None,      "anycast_mac": None},
-                {"address": "fe80::1/64",             "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
+                {"address": "172.27.4.2/27",
+                    "ip_role": None,      "anycast_mac": None},
+                {"address": "172.27.4.1/27",          "ip_role": "anycast",
+                    "anycast_mac": "00:00:00:01:00:01"},
+                {"address": "2001:db8:1000:10::2/64",
+                    "ip_role": None,      "anycast_mac": None},
+                {"address": "fe80::1/64",             "ip_role": "anycast",
+                    "anycast_mac": "00:00:00:01:00:01"},
             ],
         )
         lines = build_l3_config_lines(item, "vlan", "custom", True)
@@ -421,7 +438,8 @@ class TestBuildL3ConfigLines:
         assert "active-gateway ipv6 mac 00:00:00:01:00:01" in lines
         assert "active-gateway ipv6 fe80::1" in lines
         # link-local address command must appear before active-gateway commands
-        assert lines.index("ipv6 address link-local fe80::1/64") < lines.index("active-gateway ipv6 mac 00:00:00:01:00:01")
+        assert lines.index("ipv6 address link-local fe80::1/64") < lines.index(
+            "active-gateway ipv6 mac 00:00:00:01:00:01")
         # Global-unicast anycast does NOT get an extra 'ipv6 address link-local' line
         assert "ipv6 address link-local 2001:db8" not in " ".join(lines)
 
@@ -430,8 +448,10 @@ class TestBuildL3ConfigLines:
         item = _make_item(
             {},
             [
-                {"address": "2001:db8:1000:17::1",    "ip_role": "anycast", "anycast_mac": "00:00:00:01:00:01"},
-                {"address": "2001:db8:1000:17::2/64", "ip_role": None,      "anycast_mac": None},
+                {"address": "2001:db8:1000:17::1",    "ip_role": "anycast",
+                    "anycast_mac": "00:00:00:01:00:01"},
+                {"address": "2001:db8:1000:17::2/64",
+                    "ip_role": None,      "anycast_mac": None},
             ],
         )
         lines = build_l3_config_lines(item, "vlan", "default", False)
@@ -512,20 +532,23 @@ class TestBuildL3ConfigLines:
         lines = build_l3_config_lines(item, "physical", "custom", True)
 
         assert lines[0] == "vrf attach TEST"
-        assert lines.index("ip mtu 9000") < lines.index("ip address 10.0.0.1/24")
+        assert lines.index("ip mtu 9000") < lines.index(
+            "ip address 10.0.0.1/24")
         assert lines[-1] == "l3-counters"
 
     def test_subinterface_with_encapsulation(self):
         """Sub-interface generates dot1q encapsulation before other lines"""
         item = _make_item(
-            {"tagged_vlans": [{"vid": 100}], "mtu": None, "_name": "1/1/3.100"},
+            {"tagged_vlans": [{"vid": 100}],
+                "mtu": None, "_name": "1/1/3.100"},
             [{"address": "10.0.0.1/30", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "subinterface", "default", True)
 
         assert "encapsulation dot1q 100" in lines
         assert "ip address 10.0.0.1/30" in lines
-        assert lines.index("encapsulation dot1q 100") < lines.index("ip address 10.0.0.1/30")
+        assert lines.index("encapsulation dot1q 100") < lines.index(
+            "ip address 10.0.0.1/30")
 
     def test_subinterface_without_tagged_vlans(self):
         """Sub-interface without tagged VLANs has no encapsulation"""
@@ -541,26 +564,30 @@ class TestBuildL3ConfigLines:
     def test_subinterface_with_custom_vrf(self):
         """Sub-interface: encapsulation comes before vrf attach"""
         item = _make_item(
-            {"tagged_vlans": [{"vid": 200}], "vrf": {"name": "CUST-A"}, "mtu": None},
+            {"tagged_vlans": [{"vid": 200}], "vrf": {
+                "name": "CUST-A"}, "mtu": None},
             [{"address": "192.168.1.1/30", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "subinterface", "custom", False)
 
         assert "encapsulation dot1q 200" in lines
         assert "vrf attach CUST-A" in lines
-        assert lines.index("encapsulation dot1q 200") < lines.index("vrf attach CUST-A")
+        assert lines.index("encapsulation dot1q 200") < lines.index(
+            "vrf attach CUST-A")
 
     def test_ospf_interface_config(self):
         """OSPF area and network type emitted after l3-counters"""
         item = _make_item(
-            {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.0", "if_ip_ospf_network": "point-to-point"}, "mtu": 9198},
+            {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.0",
+                               "if_ip_ospf_network": "point-to-point"}, "mtu": 9198},
             [{"address": "172.27.250.2/31", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "physical", "default", True)
 
         assert "ip ospf 1 area 0.0.0.0" in lines
         assert "ip ospf network point-to-point" in lines
-        assert lines.index("l3-counters") < lines.index("ip ospf 1 area 0.0.0.0")
+        assert lines.index(
+            "l3-counters") < lines.index("ip ospf 1 area 0.0.0.0")
 
     def test_ospf_custom_process_id(self):
         """OSPF process ID is configurable"""
@@ -568,7 +595,8 @@ class TestBuildL3ConfigLines:
             {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.1", "if_ip_ospf_network": None}},
             [{"address": "10.0.0.1/30", "ip_role": None, "anycast_mac": None}],
         )
-        lines = build_l3_config_lines(item, "physical", "default", True, ospf_process_id=2)
+        lines = build_l3_config_lines(
+            item, "physical", "default", True, ospf_process_id=2)
 
         assert "ip ospf 2 area 0.0.0.1" in lines
 
@@ -596,7 +624,8 @@ class TestBuildL3ConfigLines:
     def test_loopback_skips_ospf_network_type(self):
         """Loopback interfaces never emit ip ospf network even when set in NetBox"""
         item = _make_item(
-            {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.0", "if_ip_ospf_network": "loopback"}},
+            {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.0",
+                               "if_ip_ospf_network": "loopback"}},
             [{"address": "172.27.252.0/32", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "loopback", "default", True)
@@ -608,10 +637,226 @@ class TestBuildL3ConfigLines:
         """IPv6 anycast gateway command strips prefix length"""
         item = _make_item(
             {},
-            [{"address": "2001:db8:cafe::1/128", "ip_role": "anycast", "anycast_mac": "02:01:00:00:02:00"}],
+            [{"address": "2001:db8:cafe::1/128", "ip_role": "anycast",
+                "anycast_mac": "02:01:00:00:02:00"}],
         )
         lines = build_l3_config_lines(item, "vlan", "default", False)
 
         assert "active-gateway ipv6 mac 02:01:00:00:02:00" in lines
         assert "active-gateway ipv6 2001:db8:cafe::1" in lines
         assert not any("/128" in line for line in lines)
+
+
+class TestBuildL3ConfigLinesIpHelper:
+    """Tests for ip helper-address support in build_l3_config_lines"""
+
+    _HELPERS = {
+        "lab-blue": {"0": "172.16.3.10", "1": "172.16.3.11"},
+        "lab-green": {"0": "172.16.3.12", "1": "172.16.3.13"},
+    }
+
+    def test_helper_addresses_emitted_when_flag_true(self):
+        """ip helper-address lines emitted for each address in the interface VRF"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_ip_helper": True},
+            },
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=self._HELPERS
+        )
+
+        assert "ip helper-address 172.16.3.10" in lines
+        assert "ip helper-address 172.16.3.11" in lines
+
+    def test_helper_addresses_ordered_by_index(self):
+        """Helper addresses are emitted in index-sort order"""
+        helpers = {"lab-blue": {"1": "172.16.3.11", "0": "172.16.3.10"}}
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_ip_helper": True},
+            },
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=helpers
+        )
+        helper_lines = [l for l in lines if l.startswith("ip helper-address")]
+        assert helper_lines == [
+            "ip helper-address 172.16.3.10", "ip helper-address 172.16.3.11"]
+
+    def test_helper_addresses_use_interface_vrf_not_ip_vrf(self):
+        """Helpers come from the interface VRF, not from the IP address VRF"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-green"},
+                "custom_fields": {"if_ip_helper": True},
+            },
+            [{"address": "172.27.5.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=self._HELPERS
+        )
+
+        assert "ip helper-address 172.16.3.12" in lines
+        assert "ip helper-address 172.16.3.13" in lines
+        assert not any("172.16.3.10" in l for l in lines)
+
+    def test_no_helper_addresses_when_flag_false(self):
+        """No ip helper-address lines when if_ip_helper is False"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_ip_helper": False},
+            },
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=self._HELPERS
+        )
+
+        assert not any("helper-address" in l for l in lines)
+
+    def test_no_helper_addresses_when_flag_none(self):
+        """No ip helper-address lines when if_ip_helper is None"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_ip_helper": None},
+            },
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=self._HELPERS
+        )
+
+        assert not any("helper-address" in l for l in lines)
+
+    def test_no_helper_addresses_when_ip_helper_addresses_not_provided(self):
+        """No helper-address lines when ip_helper_addresses is omitted"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_ip_helper": True},
+            },
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "custom", True)
+
+        assert not any("helper-address" in l for l in lines)
+
+    def test_no_helper_addresses_when_vrf_not_in_dict(self):
+        """No helper-address lines when interface VRF has no entry in ip_helper_addresses"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-red"},
+                "custom_fields": {"if_ip_helper": True},
+            },
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=self._HELPERS
+        )
+
+        assert not any("helper-address" in l for l in lines)
+
+    def test_helper_addresses_appear_before_l3_counters(self):
+        """ip helper-address lines appear before l3-counters"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_ip_helper": True},
+            },
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=self._HELPERS
+        )
+
+        helper_idx = max(i for i, l in enumerate(
+            lines) if l.startswith("ip helper-address"))
+        l3c_idx = lines.index("l3-counters")
+        assert helper_idx < l3c_idx
+
+    def test_helper_addresses_appear_after_ip_addresses(self):
+        """ip helper-address lines appear after ip address lines"""
+        item = _make_item(
+            {
+                "vrf": {"name": "lab-blue"},
+                "custom_fields": {"if_ip_helper": True},
+            },
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(
+            item, "vlan", "custom", True, ip_helper_addresses=self._HELPERS
+        )
+
+        ip_addr_idx = lines.index("ip address 172.27.4.1/27")
+        first_helper_idx = next(i for i, l in enumerate(
+            lines) if l.startswith("ip helper-address"))
+        assert ip_addr_idx < first_helper_idx
+
+
+class TestGroupInterfaceIpsDhcpRelayChange:
+    """Tests for group_interface_ips including interfaces with only DHCP relay changes."""
+
+    def _make_item(self, interface_obj, needs_add=False):
+        """Build a minimal per-IP item with given interface dict."""
+        return {
+            "interface_name": interface_obj.get("name", "vlan101"),
+            "interface": interface_obj,
+            "address": "10.0.0.1/24",
+            "ip_role": None,
+            "anycast_mac": None,
+            "_needs_add": needs_add,
+        }
+
+    def test_includes_interface_with_dhcp_relay_change_flag(self):
+        """Interface flagged dhcp_relay_change=True is included even when no IPs need adding."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"dhcp_relay_change": True, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert result[0]["interface_name"] == "vlan101"
+        # No IPs need adding — addresses list is empty but interface is still included
+        assert result[0]["addresses"] == []
+
+    def test_omits_interface_without_dhcp_relay_change_flag(self):
+        """Interface with no flag and _needs_add=False is still omitted."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_dhcp_relay_change_false_does_not_include(self):
+        """Explicit dhcp_relay_change=False does not cause inclusion."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"dhcp_relay_change": False, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_dhcp_relay_change_combined_with_ip_add(self):
+        """Interface with both a relay change and an IP to add is included with the address."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"dhcp_relay_change": True},
+            "custom_fields": {},
+        }, needs_add=True)
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert len(result[0]["addresses"]) == 1
+
+    def test_dhcp_relay_change_missing_ip_changes_dict(self):
+        """Interface without _ip_changes at all is not included when _needs_add=False."""
+        item = self._make_item({"name": "vlan101", "custom_fields": {}})
+        assert group_interface_ips([item]) == []

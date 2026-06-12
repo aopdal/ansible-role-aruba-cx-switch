@@ -57,7 +57,7 @@
       interface_name: "{{ item.0.name }}"
       interface_type: "{{ item.0.type.value if item.0.type is defined and item.0.type.value is defined else 'unknown' }}"
       address: "{{ item.1.address }}"
-      vrf: "{{ item.1.vrf.name if item.1.vrf is defined and item.1.vrf.name is defined else 'default' }}"
+      vrf: "{{ item.0.vrf.name if item.0.vrf is defined and item.0.vrf.name is defined else 'default' }}"
       description: "{{ item.0.description | default('') }}"
       enabled: "{{ item.0.enabled | default(true) }}"
       # IP address role (e.g., "anycast")
@@ -266,6 +266,32 @@
   when: >-
     (item._ip_changes is defined) and
     (item._ip_changes.ipv6_to_remove | default([]) | length > 0)
+
+# Remove stale DHCP relay / ip helper-address entries.
+# Requires aoscx_gather_facts_rest_api: true so dhcp_relay_facts are available.
+# Removals are issued before the main L3 config (which adds correct helpers),
+# so the device never holds old and new entries simultaneously.
+- name: Remove stale ip helper-address entries
+  arubanetworks.aoscx.aoscx_config:
+    lines: >-
+      {{
+        item._ip_changes.dhcp_relay_to_remove
+          | map('regex_replace', '^(.*)$', 'no ip helper-address \1') | list
+      }}
+    parents: >-
+      interface {{ item.name | format_interface_name(
+        'lag' if (item.type is defined and item.type.value is defined and item.type.value == 'lag')
+        else ('vlan' if 'vlan' in item.name.lower()
+        else ('loopback' if 'loopback' in item.name.lower() else 'physical'))
+      ) }}
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+  loop: "{{ interface_changes.l3 | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.name }} remove helpers: {{ item._ip_changes.dhcp_relay_to_remove | default([]) }}"
+  when: >
+    (item._ip_changes is defined) and
+    (item._ip_changes.dhcp_relay_to_remove | default([]) | length > 0)
 
 # Remove stale anycast gateways (configured on device but no longer in NetBox)
 - name: Remove stale anycast gateways

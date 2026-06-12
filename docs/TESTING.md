@@ -414,14 +414,14 @@ pytest tests/unit/ -m utils      # Utility function tests
 ```
 
 **Test Coverage**:
-- `test_l3_config_helpers.py` - 56 tests for L3 configuration optimization
+- `test_l3_config_helpers.py` - 70 tests for L3 configuration optimization (incl. ip helper-address and DHCP relay change flag)
+- `test_interface_change_detection.py` - 45 tests for NetBox vs device change detection (incl. DHCP relay idempotency)
 - `test_bgp_filters.py` - 41 tests for BGP session enrichment and policy collection
 - `test_vlan_filters.py` - 40 tests for VLAN lifecycle management (incl. IGMP snooping)
-- `test_interface_change_detection.py` - 31 tests for NetBox vs device change detection
 - `test_utils.py` - 30 tests for utility functions
 - `test_interface_filters.py` - 28 tests for interface categorization
 - `test_vrf_filters.py` - 26 tests for VRF operations
-- `test_rest_api_transforms.py` - 25 tests for REST API data normalization
+- `test_rest_api_transforms.py` - 33 tests for REST API data normalization (incl. DHCP relay fact transforms)
 - `test_port_access_vlans.py` - 25 tests for port-access VLAN extraction
 - `test_stp_filters.py` - 23 tests for STP interface change detection
 - `test_port_access_diff.py` - 20 tests for port-access diff (desired vs device state)

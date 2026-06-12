@@ -64,7 +64,11 @@ def _normalize_ipv6(addr):
 
 
 def get_interfaces_needing_config_changes(
-    interfaces, device_facts, enhanced_facts=None
+    interfaces,
+    device_facts,
+    enhanced_facts=None,
+    dhcp_relay_facts=None,
+    ip_helper_addresses=None,
 ):
     """
     Compare NetBox interfaces with device facts to identify which interfaces need changes.
@@ -75,6 +79,18 @@ def get_interfaces_needing_config_changes(
         device_facts: Device facts containing current interface state
         enhanced_facts: Optional dict of enhanced interface facts from REST API with depth=2
                        Provides actual IPv6 addresses and VSX virtual IPs for better comparison
+        dhcp_relay_facts: Optional dict keyed by interface name with a sorted list of
+                          currently configured IPv4 DHCP relay (ip helper-address) servers.
+                          Produced by rest_api_to_aoscx_dhcp_relays from
+                          /system/dhcp_relays?depth=2. When provided, the function compares
+                          the desired helper addresses (from ip_helper_addresses) with the
+                          device state and only marks the interface for reconfiguration when
+                          they differ.  When None, any interface with if_ip_helper=True is
+                          always included.
+        ip_helper_addresses: Optional dict keyed by VRF name, value is a dict of
+                             {str_index: ip_address} entries — matches the inventory variable
+                             ``ip_helper_addresses``.  Used together with dhcp_relay_facts to
+                             compute the desired helper server set for an interface.
 
     Returns:
         Dict with categorized interfaces:
@@ -1022,6 +1038,70 @@ def get_interfaces_needing_config_changes(
                 else:
                     # No enhanced facts - store all addresses for reference
                     nb_intf["_ip_changes"]["ipv6_addresses"] = list(nb_ipv6)
+
+        # Check DHCP relay / ip helper-address configuration
+        # When dhcp_relay_facts are available (gathered via REST API), compare the
+        # desired helper servers (from ip_helper_addresses keyed by VRF) with the
+        # currently configured servers to decide whether a push is needed.
+        # Without dhcp_relay_facts, always include interfaces that have if_ip_helper=True
+        # (conservative fall-through — same as the IPv6-without-enhanced-facts path).
+        custom_fields = nb_intf.get("custom_fields") or {}
+        if_ip_helper = custom_fields.get("if_ip_helper", False)
+        if if_ip_helper:
+            if dhcp_relay_facts is not None and ip_helper_addresses is not None:
+                # Derive expected servers from the VRF-keyed inventory dict
+                vrf_obj = nb_intf.get("vrf")
+                vrf_name = (
+                    vrf_obj.get("name")
+                    if isinstance(vrf_obj, dict) and vrf_obj.get("name")
+                    else "default"
+                )
+                vrf_helpers = ip_helper_addresses.get(vrf_name, {})
+                expected_servers = set()
+                if isinstance(vrf_helpers, dict):
+                    expected_servers = set(v for v in vrf_helpers.values() if v)
+                device_servers = set(dhcp_relay_facts.get(intf_name, []))
+                if expected_servers != device_servers:
+                    needs_change = True
+                    if "_ip_changes" not in nb_intf:
+                        nb_intf["_ip_changes"] = {}
+                    nb_intf["_ip_changes"]["dhcp_relay_change"] = True
+                    stale = sorted(device_servers - expected_servers)
+                    if stale:
+                        nb_intf["_ip_changes"]["dhcp_relay_to_remove"] = stale
+                    change_reasons.append(
+                        f"DHCP relay mismatch (wanted: {sorted(expected_servers)}, "
+                        f"device: {sorted(device_servers)})"
+                    )
+                    _debug(
+                        f"DHCP relay diff for {intf_name}: "
+                        f"expected={expected_servers}, device={device_servers}"
+                    )
+                else:
+                    _debug(
+                        f"DHCP relay already correct for {intf_name}: {device_servers}"
+                    )
+            else:
+                # No relay facts — conservatively mark as needing change
+                needs_change = True
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                nb_intf["_ip_changes"]["dhcp_relay_change"] = True
+                change_reasons.append(
+                    "DHCP relay configuration needed (no facts for comparison)"
+                )
+        elif dhcp_relay_facts is not None and dhcp_relay_facts.get(intf_name):
+            # if_ip_helper is False/None but the device has relays configured — stale
+            needs_change = True
+            if "_ip_changes" not in nb_intf:
+                nb_intf["_ip_changes"] = {}
+            nb_intf["_ip_changes"]["dhcp_relay_change"] = True
+            nb_intf["_ip_changes"]["dhcp_relay_to_remove"] = sorted(
+                dhcp_relay_facts[intf_name]
+            )
+            change_reasons.append(
+                f"Stale DHCP relays on device: {dhcp_relay_facts[intf_name]}"
+            )
 
         if needs_change:
             _debug(f"Interface {intf_name} needs changes: {', '.join(change_reasons)}")
