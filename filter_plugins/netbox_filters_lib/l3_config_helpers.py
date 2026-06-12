@@ -103,6 +103,8 @@ def group_interface_ips(
       - ospf_facts is None (no comparison possible — always include), OR
       - The interface is not already registered in the correct OSPF area, OR
       - The interface's OSPF network type does not match the desired type.
+    - The interface has _ip_changes.dhcp_relay_change=True (set by change detection
+      when ip helper-address configuration differs from device state).
 
     Args:
         interface_ip_list: List of per-IP items, each with keys:
@@ -207,19 +209,30 @@ def group_interface_ips(
         else:
             has_ospf_change = False
 
-        if item["addresses"] or has_ospf_change:
+        # Check whether a DHCP relay change was flagged during change detection.
+        # This covers interfaces where ip helper-address is wrong but all IPs are
+        # already on the device (so _needs_add=False for every address).
+        ip_changes = interface_obj.get("_ip_changes", {})
+        has_dhcp_relay_change = bool(
+            ip_changes.get("dhcp_relay_change")
+            if isinstance(ip_changes, dict)
+            else False
+        )
+
+        if item["addresses"] or has_ospf_change or has_dhcp_relay_change:
             item["addresses"].sort(key=_addr_sort_key)
             result.append(item)
 
     return result
 
 
-def build_l3_config_lines(
+def build_l3_config_lines(  # pylint: disable=too-many-arguments
     item,
     interface_type,
     vrf_type,
     l3_counters_enable=True,
     ospf_process_id=1,
+    ip_helper_addresses=None,
 ):
     """
     Build all L3 configuration lines for a single interface.
@@ -239,6 +252,11 @@ def build_l3_config_lines(
         vrf_type: VRF type ('default' or 'custom')
         l3_counters_enable: Whether to emit 'l3-counters' (default: True)
         ospf_process_id: OSPF process ID used in 'ip ospf <id> area' (default: 1)
+        ip_helper_addresses: Dict keyed by VRF name, values are dicts of
+            {str_index: ip_address} (e.g. {"lab-blue": {"0": "1.1.1.1"}}).
+            When provided and the interface has if_ip_helper=True, emits
+            'ip helper-address' lines for each address in the interface's VRF.
+            (default: None — no helper addresses emitted)
 
     Returns:
         List of configuration command strings in AOS-CX CLI syntax
@@ -329,14 +347,28 @@ def build_l3_config_lines(
             f"  Adding IPv6 anycast gateway: {address} (MAC: {addr_item['anycast_mac']})"
         )
 
+    # IP helper addresses — emitted after all IP/anycast lines, before l3-counters
+    custom_fields = interface_obj.get("custom_fields", {})
+    if not isinstance(custom_fields, dict):
+        custom_fields = {}
+    if_ip_helper = custom_fields.get("if_ip_helper", False)
+    if if_ip_helper and ip_helper_addresses and isinstance(ip_helper_addresses, dict):
+        vrf_name = get_interface_vrf(interface_obj)
+        helpers = ip_helper_addresses.get(vrf_name, {})
+        if isinstance(helpers, dict):
+            for idx in sorted(
+                helpers.keys(), key=lambda x: int(x) if str(x).isdigit() else x
+            ):
+                helper_ip = helpers[idx]
+                if helper_ip:
+                    lines.append(f"ip helper-address {helper_ip}")
+                    _debug(f"  Adding IP helper-address: {helper_ip}")
+
     # L3 counters — once per interface (not supported on loopback)
     if l3_counters_enable and interface_type != "loopback":
         lines.append("l3-counters")
 
     # OSPF interface config from NetBox custom fields
-    custom_fields = interface_obj.get("custom_fields", {})
-    if not isinstance(custom_fields, dict):
-        custom_fields = {}
     ospf_area = custom_fields.get("if_ip_ospf_1_area")
     ospf_network = custom_fields.get("if_ip_ospf_network")
     if ospf_area:

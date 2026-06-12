@@ -133,10 +133,13 @@
       {{
         interfaces | get_interfaces_needing_config_changes(
           ansible_facts,
-          aoscx_enhanced_interface_facts | default({})
+          aoscx_enhanced_interface_facts | default({}),
+          aoscx_dhcp_relay_facts | default(none),
+          ip_helper_addresses | default(none)
         )
         if ansible_facts is defined
-        else interfaces | get_interfaces_needing_config_changes({}, {})
+        else interfaces | get_interfaces_needing_config_changes({}, {},
+          none, none)
       }}
   tags:
     - always

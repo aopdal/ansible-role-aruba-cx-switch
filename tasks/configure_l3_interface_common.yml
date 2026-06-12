@@ -29,7 +29,8 @@
 - name: "Configure {{ interface_type }} L3 interfaces ({{ vrf_type }} VRF)"
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ item | build_l3_config_lines(interface_type, vrf_type,
-      aoscx_l3_counters_enable | default(true), ospf_process_id | default(1))
+      aoscx_l3_counters_enable | default(true), ospf_process_id | default(1),
+      ip_helper_addresses | default({}))
       }}"
     parents: "interface {{ item.interface_name |
       format_interface_name(interface_type) }}"

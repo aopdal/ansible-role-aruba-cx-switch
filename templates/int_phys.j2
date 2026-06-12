@@ -102,6 +102,13 @@ interface {{ intf.name }}
 {%         endif %}
 {%       endfor %}
 {%       if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
+{%         if intf.custom_fields.if_ip_helper %}
+{%           set _vrf = (intf.vrf.name | default('default')) | replace('Global', 'default') %}
+{%           set _helpers = (ip_helper_addresses | default({})).get(_vrf, {}) %}
+{%           for idx in _helpers.keys() | sort %}
+   ip helper-address {{ _helpers[idx] }}
+{%           endfor %}
+{%         endif %}
    l3-counters
 {%       endif %}
 {%       if intf.custom_fields.if_ip_ospf_1_area != none %}
@@ -130,9 +137,6 @@ interface {{ intf.name }}
 {%     endif %}
 {%     if intf.parent is none and intf.ip_addresses | length == 0 %}
 {# Physical interface without IP - L2 settings #}
-{%       if intf.custom_fields.if_ip_helper != none %}
-   ip helper-address {{ intf.custom_fields.if_ip_helper }}
-{%       endif %}
 {%       if intf.mode %}
    no routing
 {%         if intf.mode.value == 'access' %}
