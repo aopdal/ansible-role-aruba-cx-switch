@@ -15,6 +15,9 @@
     ansible_network_os: "arubanetworks.aoscx.aoscx"
     device_id: 1
 
+    # Disable fact gathering — no real device is available in CI
+    aoscx_gather_facts: false
+
     # Test data - VRFs
     netbox_vrfs:
       - name: "MGMT"
