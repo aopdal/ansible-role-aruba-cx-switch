@@ -427,8 +427,8 @@ ansible-playbook -i netbox_inventory.yml site.yml
 
 **Required Collections:**
 
-- `arubanetworks.aoscx` >= 4.4.0 - Aruba CX modules
-- `netbox.netbox` >= 3.21.0 - NetBox inventory and modules
+- `arubanetworks.aoscx` >= 4.5.1 - Aruba CX modules
+- `netbox.netbox` >= 3.23.0 - NetBox inventory and modules
 
 **Python Libraries:**
 

@@ -47,8 +47,8 @@ pip install -r requirements.txt
 
 **Contains:**
 
-- `arubanetworks.aoscx` >= 4.4.0 - Aruba AOS-CX modules
-- `netbox.netbox` >= 3.21.0 - NetBox inventory and modules
+- `arubanetworks.aoscx` >= 4.5.1 - Aruba AOS-CX modules
+- `netbox.netbox` >= 3.23.0 - NetBox inventory and modules
 
 **Install:**
 ```bash

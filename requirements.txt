@@ -2,8 +2,8 @@
 # Install with: pip install -r requirements.txt
 
 # Ansible (required to run the role)
-# Pinned to ansible-core 2.18.x; arubanetworks.aoscx collection is not compatible with newer cores
-ansible-core>=2.18.0,<2.19.0
+# Pinned to ansible-core 2.19.x; arubanetworks.aoscx collection is not compatible with newer cores
+ansible-core>=2.19.10,<2.20.0
 
 # Required by arubanetworks.aoscx collection
 paramiko>=2.7.0

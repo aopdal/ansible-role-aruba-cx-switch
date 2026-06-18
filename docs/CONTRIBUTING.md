@@ -25,7 +25,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 - Git
 - Python 3.12
-- Ansible-core 2.18 (`>=2.18.0,<2.19.0`)
+- Ansible-core 2.19 (`>=2.19.10,<2.20.0`)
 - Docker (for Molecule tests)
 - Basic understanding of Ansible roles and network automation
 

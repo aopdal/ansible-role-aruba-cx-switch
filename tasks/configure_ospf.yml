@@ -127,20 +127,18 @@
         md5
       {%- endif -%}
     ospfv2_auth_md5_keys: >-
-      {%- if 'loopback' not in item.interface_name and
+      {{ [{"id": ospf_auth_key_id | default(1) | int,
+           "key": (ospf_auth_keys[item.vrf].secret
+                   if ospf_auth_keys[item.vrf] is mapping
+                   else ospf_auth_keys[item.vrf])}]
+         if ('loopback' not in item.interface_name and
              not item.passive and
              item.auth_enabled and
              ospf_auth_keys is defined and
              ospf_auth_keys.get(item.vrf) is not none and
-             (ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
-              else ospf_auth_keys[item.vrf]) | default('') | length > 0 -%}
-        [{"id": {{ ospf_auth_key_id | default(1) | int }},
-          "key": "{{ (ospf_auth_keys[item.vrf].secret
-                      if ospf_auth_keys[item.vrf] is mapping
-                      else ospf_auth_keys[item.vrf]) }}"}]
-      {%- else -%}
-        {{ omit }}
-      {%- endif -%}
+             ((ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
+               else ospf_auth_keys[item.vrf]) | default('') | length > 0))
+         else omit }}
     state: update
   loop: "{{ _ospf_interface_items | default([]) }}"
   loop_control:
