@@ -152,6 +152,11 @@ jobs:
         run: |
           ansible-galaxy collection install -r requirements.yml
 
+      - name: Make role available under its role name
+        run: |
+          mkdir -p ~/.ansible/roles
+          ln -s "${{ github.workspace }}" ~/.ansible/roles/aruba_cx_switch
+
       - name: Run integration tests
         run: |
           cd tests
