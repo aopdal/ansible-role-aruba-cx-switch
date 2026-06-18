@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-06-17
+
+### Added
+
+- Support for updated Ansible collection for AOS CX to 4.5.1, ugrade Ansible to 2.19.10
+
 ## [0.12.3] - 2026-06-12
 
 ### Added

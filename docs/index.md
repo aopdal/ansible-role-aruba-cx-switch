@@ -50,7 +50,7 @@ This section covers using the role for network configuration. For development se
 ### Prerequisites
 
 1. **NetBox** - Install and configure NetBox with your network devices
-2. **Ansible-core** - `>=2.18.0,<2.19.0` (Ansible 2.18.x)
+2. **Ansible-core** - `>=2.19.10,<2.20.0` (Ansible 2.19.x)
 3. **Python** - 3.12
 4. **Python libraries** - See [Requirements](#requirements) below
 5. **Network access** - Connectivity to your Aruba switches and NetBox API
