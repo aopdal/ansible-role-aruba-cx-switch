@@ -50,7 +50,7 @@ This section covers using the role for network configuration. For development se
 ### Prerequisites
 
 1. **NetBox** - Install and configure NetBox with your network devices
-2. **Ansible-core** - `>=2.18.0,<2.19.0` (Ansible 2.18.x)
+2. **Ansible-core** - `>=2.19.10,<2.20.0` (Ansible 2.19.x)
 3. **Python** - 3.12
 4. **Python libraries** - See [Requirements](#requirements) below
 5. **Network access** - Connectivity to your Aruba switches and NetBox API
@@ -147,8 +147,8 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 
 ```yaml
 collections:
-  - arubanetworks.aoscx >= 4.4.0
-  - netbox.netbox >= 3.21.0
+  - arubanetworks.aoscx >= 4.5.1
+  - netbox.netbox >= 3.23.0
   - ansible.utils >= 2.0.0
 ```
 
@@ -204,9 +204,9 @@ roles:
 
 collections:
   - name: arubanetworks.aoscx
-    version: ">=4.4.0"
+    version: ">=4.5.1"
   - name: netbox.netbox
-    version: ">=3.21.0"
+    version: ">=3.23.0"
 ```
 
 Install with:

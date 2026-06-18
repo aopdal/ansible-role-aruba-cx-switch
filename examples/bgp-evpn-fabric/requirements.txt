@@ -1,7 +1,7 @@
 # Python requirements for aopdal.aruba_cx_switch Ansible role
 # Install with: pip install -r requirements.txt
 
-ansible-core>=2.18.0,<2.19.0
+ansible-core>=2.19.10,<2.20.0
 
 # Required by arubanetworks.aoscx collection
 paramiko>=2.7.0

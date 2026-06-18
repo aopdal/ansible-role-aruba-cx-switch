@@ -259,7 +259,7 @@ black filter_plugins/
 ```bash
 # CI pins ansible-core to 2.18.x
 # Locally:
-pip install 'ansible-core>=2.18.0,<2.19.0'
+pip install 'ansible-core>=2.19.10,<2.20.0'
 ansible-playbook tests/test.yml --syntax-check
 ```
 

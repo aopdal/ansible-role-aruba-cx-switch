@@ -35,7 +35,7 @@ This role includes comprehensive CI/CD testing infrastructure with **8 layers of
 ### Key Benefits
 
 - ✅ **Isolated Environment** - No conflicts with system packages
-- ✅ **Single-version Testing** - Pinned to `ansible-core>=2.18.0,<2.19.0`
+- ✅ **Single-version Testing** - Pinned to `ansible-core>=2.19.10,<2.20.0`
 - ✅ **Automated CI/CD** - Runs on every push/PR
 - ✅ **Pre-commit Hooks** - Catch issues before commit
 - ✅ **Easy Commands** - Simple Makefile interface
@@ -246,7 +246,7 @@ deactivate
 - Python venv module (usually included with Python)
 - Docker (for Molecule tests)
 - Git
-- Ansible-core 2.18 (`>=2.18.0,<2.19.0`, installed in venv)
+- Ansible-core 2.19 (`>=2.19.10,<2.20.0`, installed in venv)
 
 ## Local Testing
 
