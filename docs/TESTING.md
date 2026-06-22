@@ -23,7 +23,7 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 
 This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
 
-1. ✅ **Python Unit Tests** (`pytest`) - 387 tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
+1. ✅ **Python Unit Tests** (`pytest`) - Tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
 3. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
 4. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
@@ -395,7 +395,7 @@ Located in: `tests/unit/`
 
 **NEW**: Comprehensive unit tests for custom filter plugins using pytest.
 
-The role includes **387 unit tests** covering all custom Ansible filters:
+The role includes comprehensive unit tests covering all custom Ansible filters. Run `make test-unit` to see the current test count.
 
 ```bash
 # Run all unit tests
@@ -404,33 +404,34 @@ pytest tests/unit/
 # Run specific test file
 pytest tests/unit/test_l3_config_helpers.py
 
-# Run with coverage
+# Run with coverage report
 pytest tests/unit/ --cov=filter_plugins --cov-report=html
 
-# Run specific test categories
-pytest tests/unit/ -m vlan      # VLAN filter tests
-pytest tests/unit/ -m l3_config  # L3 config helper tests
-pytest tests/unit/ -m utils      # Utility function tests
+# Verbose output with test names
+pytest tests/unit/ -v
 ```
 
-**Test Coverage**:
-- `test_l3_config_helpers.py` - 70 tests for L3 configuration optimization (incl. ip helper-address and DHCP relay change flag)
-- `test_interface_change_detection.py` - 45 tests for NetBox vs device change detection (incl. DHCP relay idempotency)
-- `test_bgp_filters.py` - 41 tests for BGP session enrichment and policy collection
-- `test_vlan_filters.py` - 40 tests for VLAN lifecycle management (incl. IGMP snooping)
-- `test_utils.py` - 30 tests for utility functions
-- `test_interface_filters.py` - 28 tests for interface categorization
-- `test_vrf_filters.py` - 26 tests for VRF operations
-- `test_rest_api_transforms.py` - 33 tests for REST API data normalization (incl. DHCP relay fact transforms)
-- `test_port_access_vlans.py` - 25 tests for port-access VLAN extraction
-- `test_stp_filters.py` - 23 tests for STP interface change detection
-- `test_port_access_diff.py` - 20 tests for port-access diff (desired vs device state)
-- `test_comparison.py` - 17 tests for state comparison logic
-- `test_ospf_filters.py` - 15 tests for OSPF configuration
-- `test_port_access_facts.py` - 8 tests for port-access REST API fact flattening
-- `test_port_access_orphans.py` - 3 tests for orphaned port-access object detection
+**Test Coverage by Module**:
 
-**Configuration**: `pytest.ini` defines test discovery, markers, and coverage settings
+| Module | Purpose |
+|--------|---------|
+| `test_l3_config_helpers.py` | L3 interface configuration (VRF changes, anycast gateways, ip helper-address, DHCP relay) |
+| `test_interface_change_detection.py` | NetBox vs device change detection (IP addresses, VRF, L2/L3 config) |
+| `test_vrf_filters.py` | VRF operations (extraction, filtering, route targets) |
+| `test_bgp_filters.py` | BGP session enrichment and policy collection |
+| `test_vlan_filters.py` | VLAN lifecycle (creation, deletion, IGMP snooping, protection) |
+| `test_interface_filters.py` | Interface categorization and metadata extraction |
+| `test_rest_api_transforms.py` | REST API response normalization (interfaces, VLANs, DHCP relays) |
+| `test_port_access_vlans.py` | Port-access VLAN extraction and validation |
+| `test_stp_filters.py` | STP interface change detection |
+| `test_comparison.py` | State comparison logic (diff detection) |
+| `test_ospf_filters.py` | OSPF configuration validation |
+| `test_port_access_diff.py` | Port-access device state diff |
+| `test_port_access_facts.py` | Port-access REST API fact flattening |
+| `test_port_access_orphans.py` | Orphaned port-access object detection |
+| `test_utils.py` | Utility function helpers |
+
+**Configuration**: `pytest.ini` defines test discovery and coverage settings
 
 ### Molecule Tests (Role Validation)
 

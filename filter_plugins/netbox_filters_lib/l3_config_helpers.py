@@ -285,10 +285,24 @@ def build_l3_config_lines(  # pylint: disable=too-many-arguments
                 _debug(f"  Adding encapsulation: dot1q {vlan_id}")
 
     # VRF attachment — once per interface, not once per IP
+    # Two cases require "vrf attach":
+    #   1. Normal custom-VRF configuration (vrf_type == "custom"): attach the named VRF.
+    #   2. VRF detachment (vrf_type == "default" + _ip_changes.vrf_change=True): the
+    #      interface is being moved from a custom VRF back to the default VRF.
+    #      AOS-CX requires "vrf attach default" explicitly to clear the old VRF; simply
+    #      omitting the command does NOT revert the interface to default.
+    ip_changes = interface_obj.get("_ip_changes", {})
+    vrf_change = bool(
+        ip_changes.get("vrf_change") if isinstance(ip_changes, dict) else False
+    )
     if vrf_type == "custom":
         vrf_name = get_interface_vrf(interface_obj)
         lines.append(f"vrf attach {vrf_name}")
         _debug(f"  Adding VRF attachment: {vrf_name}")
+    elif vrf_change:
+        # Moving from a custom VRF back to default — must explicitly attach default.
+        lines.append("vrf attach default")
+        _debug("  Adding VRF attachment: default (reverting from custom VRF)")
 
     # MTU — before IP addresses (matches device CLI order)
     mtu = interface_obj.get("mtu")

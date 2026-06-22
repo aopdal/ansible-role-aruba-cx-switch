@@ -90,8 +90,8 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **IGMP Snooping** - Implemented pr. VLAN (using default version 3)
 - ✅ **Port Profiles** - Configure port-access profiles
 - ✅ **STP** - Global and interface config
+- ✅ **DHCP relay IPv4** - Configuration pr VRF
 - ❌ **BFD** - on roadmap
-- ❌ **DHCP relay IPv4** - on roadmap
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
 - ❌ **DHCP Snooping** - on Roadmap

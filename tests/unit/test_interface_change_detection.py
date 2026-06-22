@@ -1133,3 +1133,170 @@ class TestDhcpRelayChangeDetection:
         to_remove = result["l3"][0].get(
             "_ip_changes", {}).get("dhcp_relay_to_remove", [])
         assert sorted(to_remove) == ["172.16.3.10", "172.16.3.11"]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# VRF change detection
+# ──────────────────────────────────────────────────────────────────────────────
+
+class TestVrfChangeDetection:
+    """Tests for VRF mismatch detection and full L3 reconfiguration override."""
+
+    def _make_vlan_intf(self, name, vrf_name, ip="10.0.0.1/24"):
+        """Minimal L3 VLAN interface with a VRF and one IPv4 address."""
+        return {
+            "name": name,
+            "type": {"value": "virtual"},
+            "enabled": True,
+            "description": "",
+            "mtu": None,
+            "lag": None,
+            "mode": None,
+            "mgmt_only": False,
+            "custom_fields": {},
+            "vrf": {"name": vrf_name} if vrf_name else None,
+            "ip_addresses": [
+                {"address": ip, "role": None},
+            ],
+            "tagged_vlans": [],
+            "untagged_vlan": None,
+        }
+
+    def _device_facts(self, intf_name, ip="10.0.0.1/24", vrf=None):
+        """Device facts where the interface is already configured."""
+        intf_data = {
+            "admin": "up",
+            "ip4_address": ip,
+            "ip6_addresses": {},
+        }
+        if vrf is not None:
+            intf_data["vrf"] = vrf
+        return {
+            "network_resources": {
+                "interfaces": {intf_name: intf_data}
+            }
+        }
+
+    def test_no_change_when_vrf_matches_enhanced(self):
+        """No change triggered when VRF matches in enhanced facts."""
+        iface = self._make_vlan_intf("vlan10", "lab-blue")
+        device_facts = self._device_facts("vlan10")
+        enhanced_facts = {
+            "vlan10": {
+                "ip4_address": "10.0.0.1/24",
+                "ip6_addresses": {},
+                "vrf": {"lab-blue": "/rest/v10.09/system/vrfs/lab-blue"},
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["no_changes"]) == 1
+        assert len(result["l3"]) == 0
+
+    def test_vrf_change_detected_via_enhanced_facts(self):
+        """VRF mismatch is detected when enhanced facts provide device VRF."""
+        iface = self._make_vlan_intf("vlan10", "lab-blue")
+        device_facts = self._device_facts("vlan10")
+        # Device currently has a different VRF
+        enhanced_facts = {
+            "vlan10": {
+                "ip4_address": "10.0.0.1/24",
+                "ip6_addresses": {},
+                "vrf": {"lab-red": "/rest/v10.09/system/vrfs/lab-red"},
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["l3"]) == 1
+        ip_changes = result["l3"][0].get("_ip_changes", {})
+        assert ip_changes.get("vrf_change") is True
+
+    def test_vrf_change_forces_all_ipv4_to_add(self):
+        """When VRF changes, all IPv4 addresses are included in ipv4_to_add even if
+        they already appear on the device (they will be wiped by the VRF change)."""
+        iface = self._make_vlan_intf("vlan10", "lab-blue", ip="10.0.0.1/24")
+        # Device already has the same IP but wrong VRF
+        device_facts = self._device_facts("vlan10", ip="10.0.0.1/24")
+        enhanced_facts = {
+            "vlan10": {
+                "ip4_address": "10.0.0.1/24",
+                "ip6_addresses": {},
+                "vrf": {"lab-red": "/rest/v10.09/system/vrfs/lab-red"},
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["l3"]) == 1
+        ip_changes = result["l3"][0].get("_ip_changes", {})
+        assert "10.0.0.1/24" in ip_changes.get("ipv4_to_add", [])
+
+    def test_vrf_change_detected_via_standard_facts(self):
+        """VRF mismatch is detected when standard device facts carry VRF data."""
+        iface = self._make_vlan_intf("vlan10", "lab-blue")
+        # Standard facts include VRF as a dict (REST-API style)
+        device_facts = self._device_facts(
+            "vlan10",
+            vrf={"lab-red": "/rest/v10.09/system/vrfs/lab-red"},
+        )
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts
+        )
+        assert len(result["l3"]) == 1
+        ip_changes = result["l3"][0].get("_ip_changes", {})
+        assert ip_changes.get("vrf_change") is True
+
+    def test_no_false_positive_when_vrf_absent_from_facts(self):
+        """No VRF change triggered when device facts carry no VRF data at all."""
+        iface = self._make_vlan_intf("vlan10", "lab-blue")
+        # Standard facts with NO vrf field — common with basic aoscx_facts
+        device_facts = self._device_facts("vlan10")  # vrf=None (absent)
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts
+        )
+        # IP already matches — no change expected despite missing VRF data
+        assert len(result["no_changes"]) == 1
+        assert len(result["l3"]) == 0
+
+    def test_netbox_default_vrf_matches_device_default(self):
+        """Interface with no VRF in NetBox (defaults to 'default') matches
+        a device that explicitly shows the default VRF."""
+        iface = self._make_vlan_intf("vlan10", None)  # no VRF → default
+        device_facts = self._device_facts("vlan10")
+        enhanced_facts = {
+            "vlan10": {
+                "ip4_address": "10.0.0.1/24",
+                "ip6_addresses": {},
+                "vrf": {"default": "/rest/v10.09/system/vrfs/default"},
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["no_changes"]) == 1
+        assert len(result["l3"]) == 0
+
+    def test_vrf_change_detected_default_to_custom_via_enhanced_facts(self):
+        """VRF change is detected when device is in default VRF (vrf=null in REST API)
+        but NetBox assigns a custom VRF. The null REST API value must be treated as
+        'default', not 'no data', so the mismatch triggers vrf_change=True."""
+        iface = self._make_vlan_intf("vlan10", "lab-blue", ip="10.0.0.1/24")
+        device_facts = self._device_facts("vlan10", ip="10.0.0.1/24")
+        # REST API reports vrf=null → interface is in default VRF on device
+        enhanced_facts = {
+            "vlan10": {
+                "ip4_address": "10.0.0.1/24",
+                "ip6_addresses": {},
+                "vrf": None,
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["l3"]) == 1
+        ip_changes = result["l3"][0].get("_ip_changes", {})
+        assert ip_changes.get("vrf_change") is True
+        # All IPs must be in ipv4_to_add (device will wipe L3 on VRF change)
+        assert "10.0.0.1/24" in ip_changes.get("ipv4_to_add", [])
