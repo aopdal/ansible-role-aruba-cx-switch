@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-06-22
+
+### Fixed
+
+- Change of VRF on L3 interfaces is handled correctly.
+
 ## [0.13.0] - 2026-06-17
 
 ### Added
