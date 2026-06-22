@@ -69,25 +69,35 @@
         and item.0.custom_fields.if_anycast_gateway_mac is defined
         else none }}"
       # Track if this specific IP needs to be added (for performance optimization)
+      # VRF-change shortcut: when the interface is moving between VRFs, the switch
+      #   wipes ALL L3 config (including active-gateway/anycast entries). Every
+      #   address — including anycast IPs that are excluded from the ipv4_to_add
+      #   diff list — must be re-applied. Check this flag first.
       # IPv4 Logic:
+      #   0. If vrf_change=True: TRUE (all addresses must be reconfigured)
       #   1. If ipv4_to_add exists: Check if address is in list
       #   2. If _ip_changes exists but no ipv4_to_add: FALSE (checked, no changes needed)
       #   3. If no _ip_changes at all: TRUE (new interface, needs config)
       # IPv6 Logic:
+      #   0. If vrf_change=True: TRUE (all addresses must be reconfigured)
       #   1. If ipv6_to_add exists (from enhanced facts): Check if address is in list
       #   2. If _ip_changes exists but no ipv6_to_add: TRUE (no enhanced facts, configure all)
       #   3. If no _ip_changes at all: TRUE (new interface, needs config)
       _needs_add: >-
         {{
-          item.1.address in item.0._ip_changes.ipv4_to_add
-          if (':' not in item.1.address and item.0._ip_changes is defined and 'ipv4_to_add' in item.0._ip_changes)
+          true
+          if (item.0._ip_changes is defined and item.0._ip_changes.vrf_change | default(false))
           else (
-            false
-            if (':' not in item.1.address and item.0._ip_changes is defined)
+            item.1.address in item.0._ip_changes.ipv4_to_add
+            if (':' not in item.1.address and item.0._ip_changes is defined and 'ipv4_to_add' in item.0._ip_changes)
             else (
-              item.1.address in item.0._ip_changes.ipv6_to_add
-              if (':' in item.1.address and item.0._ip_changes is defined and 'ipv6_to_add' in item.0._ip_changes)
-              else true
+              false
+              if (':' not in item.1.address and item.0._ip_changes is defined)
+              else (
+                item.1.address in item.0._ip_changes.ipv6_to_add
+                if (':' in item.1.address and item.0._ip_changes is defined and 'ipv6_to_add' in item.0._ip_changes)
+                else true
+              )
             )
           )
         }}

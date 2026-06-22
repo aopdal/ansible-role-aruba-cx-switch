@@ -63,6 +63,56 @@ def _normalize_ipv6(addr):
         return (base, addr)
 
 
+def _get_device_vrf_name(device_intf, enhanced_intf=None):
+    """Extract VRF name from device interface facts.
+
+    The REST API (enhanced_intf) always includes a ``vrf`` key:
+    - ``None``  → interface is in the default VRF (AOS-CX returns null for
+      default-VRF interfaces, not the string "default" or a dict)
+    - ``{"name": url}`` → interface is attached to a named custom VRF
+
+    Standard aoscx_facts (device_intf) may *omit* the vrf key entirely when the
+    interface is in the default VRF, so ``None`` there is ambiguous (could mean
+    "default VRF" or "no VRF data at all"). To avoid false positives we return
+    ``None`` for that case and let the caller skip the comparison.
+
+    Args:
+        device_intf: Interface dict from standard device facts.
+        enhanced_intf: Optional interface dict from enhanced REST API facts
+                       (preferred source when available).
+
+    Returns:
+        VRF name string, or ``None`` when only standard facts are available and
+        they carry no VRF data (caller should skip comparison).
+    """
+    # Enhanced REST API facts: the 'vrf' key is always present in the
+    # normalised output from rest_api_transforms.rest_api_to_aoscx_interfaces().
+    # null  → default VRF (no VRF attachment on the device)
+    # dict  → custom VRF, keyed by VRF name
+    if isinstance(enhanced_intf, dict) and "vrf" in enhanced_intf:
+        vrf = enhanced_intf["vrf"]
+        if vrf is None:
+            return "default"
+        if isinstance(vrf, dict):
+            keys = list(vrf.keys())
+            return keys[0] if keys else "default"
+        if isinstance(vrf, str):
+            return vrf or "default"
+
+    # Standard aoscx_facts fallback: vrf=None is ambiguous (no data vs. default).
+    # Only trust a non-None value to avoid false positives.
+    if isinstance(device_intf, dict):
+        vrf = device_intf.get("vrf")
+        if isinstance(vrf, dict):
+            keys = list(vrf.keys())
+            return keys[0] if keys else "default"
+        if isinstance(vrf, str):
+            return vrf or "default"
+
+    # No usable VRF data found — caller should skip comparison.
+    return None
+
+
 def get_interfaces_needing_config_changes(
     interfaces,
     device_facts,
@@ -675,6 +725,32 @@ def get_interfaces_needing_config_changes(
                             f"IPv4={device_vsx_virtual_ip4}, IPv6={device_vsx_virtual_ip6}"
                         )
 
+            # VRF change detection
+            # Changing VRF on an AOS-CX interface removes all L3 configuration.
+            # When a VRF mismatch is detected we must reconfigure ALL L3 parameters
+            # (not just the diff) so nothing is left unconfigured after the VRF change.
+            # Comparison is skipped when neither source provides VRF data, which avoids
+            # false positives when using standard aoscx_facts (no explicit VRF field).
+            vrf_change = False
+            nb_vrf_obj = nb_intf.get("vrf")
+            nb_vrf_name = (
+                nb_vrf_obj.get("name") if isinstance(nb_vrf_obj, dict) else None
+            ) or "default"
+            device_vrf_name = _get_device_vrf_name(device_intf, enhanced_intf)
+            if device_vrf_name is not None and nb_vrf_name != device_vrf_name:
+                vrf_change = True
+                needs_change = True
+                change_reasons.append(
+                    f"VRF mismatch (NB: {nb_vrf_name}, device: {device_vrf_name})"
+                )
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                nb_intf["_ip_changes"]["vrf_change"] = True
+                _debug(
+                    f"VRF change detected for {intf_name}: "
+                    f"NB={nb_vrf_name}, device={device_vrf_name}"
+                )
+
             # Compare the IP addresses
             ipv4_to_add = nb_ipv4 - device_ipv4
             ipv4_to_remove = device_ipv4 - nb_ipv4
@@ -730,6 +806,21 @@ def get_interfaces_needing_config_changes(
                 # rather than actual address data.
                 ipv6_needs_config = len(nb_ipv6) > 0
                 ipv6_to_add = nb_ipv6  # Mark all as needing config
+
+            # When VRF changes, ALL L3 parameters must be reconfigured because
+            # AOS-CX removes all L3 config when the VRF assignment is changed.
+            # Override the diff to include every address from NetBox.
+            if vrf_change:
+                ipv4_to_add = nb_ipv4
+                ipv4_to_remove = set()
+                if nb_ipv6:
+                    ipv6_needs_config = True
+                    ipv6_to_add = nb_ipv6
+                    ipv6_to_remove = set()
+                _debug(
+                    f"VRF change for {intf_name}: forcing full L3 reconfiguration "
+                    f"(IPv4={nb_ipv4}, IPv6={nb_ipv6})"
+                )
 
             if ipv4_to_add or ipv4_to_remove or ipv6_needs_config:
                 needs_change = True

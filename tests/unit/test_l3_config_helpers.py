@@ -646,6 +646,39 @@ class TestBuildL3ConfigLines:
         assert "active-gateway ipv6 2001:db8:cafe::1" in lines
         assert not any("/128" in line for line in lines)
 
+    def test_vrf_change_to_default_emits_vrf_attach_default(self):
+        """Moving an interface from a custom VRF back to default requires 'vrf attach default'"""
+        item = _make_item(
+            {"_ip_changes": {"vrf_change": True}},
+            [{"address": "172.27.4.1/27", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", True)
+
+        assert "vrf attach default" in lines
+        # vrf attach default must come before ip address
+        assert lines.index("vrf attach default") < lines.index(
+            "ip address 172.27.4.1/27")
+
+    def test_no_vrf_attach_default_without_vrf_change(self):
+        """Default-VRF interface with no VRF change should NOT emit 'vrf attach default'"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "physical", "default", True)
+
+        assert not any("vrf attach" in line for line in lines)
+
+    def test_vrf_change_false_no_vrf_attach_default(self):
+        """vrf_change=False in _ip_changes should not trigger 'vrf attach default'"""
+        item = _make_item(
+            {"_ip_changes": {"vrf_change": False}},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "physical", "default", True)
+
+        assert not any("vrf attach" in line for line in lines)
+
 
 class TestBuildL3ConfigLinesIpHelper:
     """Tests for ip helper-address support in build_l3_config_lines"""
