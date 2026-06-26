@@ -7,8 +7,8 @@
 # interface_list is a flat list of per-IP items (from l3_interfaces.<category>).
 # group_interface_ips() groups them by interface, filters to _needs_add=True,
 # and sorts addresses (anycast-before-regular, IPv4 before IPv6) so that
-# build_l3_config_lines() emits all config for an interface in a single call —
-# including IPv4, IPv6, active-gateway, MTU, l3-counters, and OSPF.
+# build_l3_config_lines() emits all base L3 config for an interface in a
+# single call — including IPv4, IPv6, active-gateway, MTU, and l3-counters.
 #
 # Required Parameters:
 #   - interface_list: List of per-IP interface items from l3_interfaces
@@ -22,14 +22,14 @@
 # Uses aoscx_ospf_interface_facts (gathered in gather_facts_rest_api.yml) when available
 # to skip OSPF-only pushes for interfaces that are already in the correct OSPF area.
 #
-# OSPF authentication (md5) is configured separately by configure_ospf.yml using
-# the arubanetworks.aoscx.aoscx_ospf_interface module, so secrets never appear
-# in the lines pushed by aoscx_config and no_log is no longer required here.
+# OSPF interface configuration (area, network, auth, passive) is configured
+# separately by configure_ospf.yml. This task only handles base L3 interface
+# state, so OSPF changes are isolated in one place.
 
 - name: "Configure {{ interface_type }} L3 interfaces ({{ vrf_type }} VRF)"
   arubanetworks.aoscx.aoscx_config:
     lines: "{{ item | build_l3_config_lines(interface_type, vrf_type,
-      aoscx_l3_counters_enable | default(true), ospf_process_id | default(1),
+      aoscx_l3_counters_enable | default(true),
       ip_helper_addresses | default({}))
       }}"
     parents: "interface {{ item.interface_name |

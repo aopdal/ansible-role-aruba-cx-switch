@@ -109,10 +109,8 @@ if_ip_ospf_passive: false              # optional, passive interface (default: f
 if_ip_ospf_auth: true                  # optional, enable auth (default: true)
 ```
 
-The role configures interfaces using the `aoscx_ospf_interface` module
-(REST API-based) for area attachment, network type, and authentication.
-Passive configuration requires CLI commands since the module doesn't
-support it.
+The role configures interfaces using `aoscx_config` (CLI path) for
+area attachment, network type, authentication, and passive mode.
 
 ### Network Types
 
@@ -174,29 +172,27 @@ interface vlan100
 ```
 
 !!! info "Change detection and idempotency"
-    The role uses `aoscx_ospf_interface` (REST API) with `state: update`
-    to handle both new and existing OSPF interface configurations. Area
-    and network type changes are idempotent.
-
-    Passive configuration uses CLI commands (`aoscx_config`) with
-    connection override to `ansible.netcommon.network_cli` since the
-    REST module doesn't support passive interfaces.
+  The role uses CLI commands (`aoscx_config`) for both new and
+  existing OSPF interface configurations. Area/network/auth/passive
+  are applied in a single path with connection override to
+  `ansible.netcommon.network_cli`.
 
 ## Interface MD5 authentication
 
 OSPFv2 supports MD5 message-digest authentication. The role applies
-authentication **per-VRF** using the `aoscx_ospf_interface` module,
-which keeps secrets secure (no cleartext in logs when `no_log: true`
-is active).
+authentication **per-VRF** using CLI interface commands with
+`aoscx_config`. The OSPF interface task runs with `no_log: true`
+to avoid exposing secrets in logs.
 
-### Module-Based Authentication
+### CLI-Based Authentication
 
 The role uses a **unified task approach** that configures area,
-network type, and authentication in a single API call. This ensures:
+network type, and authentication in a single interface command block.
+This ensures:
 
 - **Bidirectional control**: Can enable AND remove authentication
 - **Idempotency**: Works on both new and existing configurations
-- **Security**: Secrets never appear in CLI output
+- **Encrypted support**: Handles both `md5 plaintext` and `md5 ciphertext`
 
 Authentication is applied when ALL conditions are met:
 
@@ -205,8 +201,12 @@ Authentication is applied when ALL conditions are met:
 3. Interface authentication is enabled (`if_ip_ospf_auth != false`)
 4. Auth key exists for the interface's VRF in `ospf_auth_keys`
 
-When any condition fails, the role sets `ospfv2_auth_type: none` to
-explicitly remove authentication if it exists.
+When any condition fails, the role applies:
+
+- `no ip ospf authentication message-digest`
+- `no ip ospf message-digest-key <id>`
+
+to explicitly remove authentication if it exists.
 
 ### Removing Authentication
 
@@ -250,7 +250,7 @@ a plain string (cleartext) or a dict:
 ```yaml
 ospf_auth_keys:
   default:
-    secret: "ChangeMe-DefaultVrfSecret"
+    secret: "ChangeMe-Default"
     encrypted: false        # cleartext, pushed as: md5 <secret>
   tenant_a:
     secret: "$1$mdp$abcdef0123456789abcdef01"
@@ -298,10 +298,10 @@ inventory/
 ```yaml
 vault_ospf_auth_keys:
   default:
-    secret: "ChangeMe-DefaultVrfSecret"
+    secret: "ChangeMe-Default"
     encrypted: false
   mgmt:
-    secret: "ChangeMe-MgmtVrfSecret"
+    secret: "ChangeMe-MgmtVrf"
     encrypted: false
 ```
 
@@ -349,9 +349,8 @@ AOS-CX accepts both `md5 <plaintext>` and `md5 ciphertext <hash>`. The
 
 ### What gets generated
 
-The role configures OSPF authentication via the `aoscx_ospf_interface`
-module (REST API), not CLI commands. For an interface in VRF `tenant_a`
-with area `0.0.0.0`:
+The role configures OSPF authentication via interface CLI commands.
+For an interface in VRF `tenant_a` with area `0.0.0.0`:
 
 **With authentication enabled:**
 
@@ -385,9 +384,9 @@ router ospf 1 vrf tenant_a
 !!! note "Templates vs. Module Configuration"
     The role uses TWO paths for OSPF configuration:
 
-    - **Module-based** (runtime via `aoscx_ospf_interface`): Used when
+    - **CLI task-based** (runtime via `tasks/configure_ospf.yml`): Used when
       managing live devices through Ansible. Secure, idempotent, and
-      supports bidirectional changes.
+      supports bidirectional changes including ciphertext keys.
     - **Template-based** (`templates/int_*.j2`, `templates/ospf.j2`):
       Used for ZTP config generation and migration scenarios where
       devices aren't yet accessible via Ansible API.
@@ -402,8 +401,9 @@ router ospf 1 vrf tenant_a
 always show `changed: true` on the authentication task, even when
 functionally correct.
 
-**Cause:** The `aoscx_ospf_interface` module compares your cleartext
-value against the device's encrypted value and detects a difference.
+**Cause:** The device stores MD5 keys in encrypted form in running
+configuration. Re-applying `md5 plaintext <secret>` can still produce
+cosmetic `changed` on some platforms.
 
 **Workaround:** Use device-encrypted keys in production (see
 [Cleartext now → ciphertext later](#cleartext-now-ciphertext-later)).
@@ -416,11 +416,11 @@ value against the device's encrypted value and detects a difference.
 shows `changed: true` on ALL non-passive interfaces, even those that
 never had `ip ospf passive` configured.
 
-**Cause:** No REST API endpoint exposes the passive state, so the role
-cannot check current config before attempting removal.
+**Cause:** OSPF passive state is reconciled by applying `no ip ospf passive`
+on non-passive interfaces. This can still report `changed` on platforms
+that do not expose a clean pre-check for this state.
 
-**Workaround:** None available. Monitor AOS-CX REST API release notes
-for future `ospf_passive` attribute support.
+**Workaround:** None available.
 
 **Impact:** Cosmetic only — `no ip ospf passive` is idempotent on the
 device (no-op if passive wasn't configured).

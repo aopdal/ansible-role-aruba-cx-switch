@@ -6,13 +6,13 @@
 
 ## What This Module Does (Plain English)
 
-When you assign IP addresses to a switch interface, you need to run several configuration commands: set the IPs, maybe attach a VRF, enable L3 counters, configure the MTU, configure OSPF, etc. The exact commands vary slightly depending on whether it's a physical port, a LAG, a VLAN interface, or a sub-interface.
+When you assign IP addresses to a switch interface, you need to run several configuration commands: set the IPs, maybe attach a VRF, enable L3 counters, configure the MTU, etc. The exact commands vary slightly depending on whether it's a physical port, a LAG, a VLAN interface, or a sub-interface.
 
 This module provides two key filters that work together:
 
 1. **`group_interface_ips`** — groups a flat per-IP list (one item per address) into a per-interface list (one item per interface, with all its addresses). This is the crucial pre-processing step.
 
-2. **`build_l3_config_lines`** — takes a grouped interface item and generates **all** correct configuration commands for that interface in one pass: VRF attachment, all IPv4/IPv6 addresses, anycast gateways, MTU, L3 counters, and OSPF — each emitted exactly once, no matter how many IPs the interface has.
+2. **`build_l3_config_lines`** — takes a grouped interface item and generates **all** correct base L3 configuration commands for that interface in one pass: VRF attachment, all IPv4/IPv6 addresses, anycast gateways, MTU, and L3 counters — each emitted exactly once, no matter how many IPs the interface has.
 
 It also provides small helper filters for common L3 tasks:
 - Formatting interface names (e.g., `lag1` needs to become `lag 1` on AOS-CX)
@@ -29,11 +29,11 @@ The L3 Configuration Helpers module provides specialized filter functions for bu
 
 - **Single source of truth** for L3 configuration logic
 - **Eliminates ~200+ lines** of duplicated task code
-- **No redundant commands** — VRF attach, MTU, L3-counters, OSPF emitted once per interface regardless of how many IPs
-- **OSPF inline** — OSPF interface config included in L3 config lines; no separate OSPF interface task needed
+- **No redundant commands** — VRF attach, MTU, and L3-counters emitted once per interface regardless of how many IPs
+- **Clear separation of concerns** — OSPF interface config is handled in `tasks/configure_ospf.yml`
 - **Unit tested** Python functions vs complex Jinja2 templates
 - **Reusable** across all interface types (physical, LAG, VLAN, sub-interface)
-- **Supports** IPv4, IPv6, VRFs, anycast gateways, and OSPF
+- **Supports** IPv4, IPv6, VRFs, and anycast gateways
 
 ---
 

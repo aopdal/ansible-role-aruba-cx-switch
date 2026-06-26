@@ -208,7 +208,7 @@
       ] -%}
       {%- for items, itype, vrf in categories -%}
         {%- for item in items | group_interface_ips -%}
-          {%- set lines = item | build_l3_config_lines(itype, vrf, aoscx_l3_counters_enable | default(true), ospf_process_id | default(1)) -%}
+          {%- set lines = item | build_l3_config_lines(itype, vrf, aoscx_l3_counters_enable | default(true)) -%}
           {%- set iname = item.interface_name | format_interface_name(itype) -%}
           {%- set _ = result.update({iname: lines}) -%}
         {%- endfor -%}
