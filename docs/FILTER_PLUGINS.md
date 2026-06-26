@@ -381,11 +381,11 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
         - `_ip_changes.dhcp_relay_change` is `True` (set by change detection when DHCP relay servers differ)
     - Returns: List of `{interface_name, interface, addresses}` dicts
 
-- **`build_l3_config_lines(item, interface_type, vrf_type, l3_counters_enable=True, ospf_process_id=1, ip_helper_addresses=None)`**
+- **`build_l3_config_lines(item, interface_type, vrf_type, l3_counters_enable=True, ip_helper_addresses=None)`**
     - Build complete L3 configuration command list for a single interface
     - `item` is a per-interface grouped dict from `group_interface_ips()` with an `addresses` list
-    - Handles all IPs (IPv4 + IPv6, anycast gateways) in a single call — each per-interface command (vrf attach, ip mtu, l3-counters, OSPF) emitted exactly once
-    - OSPF interface config from `custom_fields.if_ip_ospf_1_area` / `if_ip_ospf_network`
+    - Handles all IPs (IPv4 + IPv6, anycast gateways) in a single call — each per-interface command (vrf attach, ip mtu, l3-counters) emitted exactly once
+    - OSPF interface config is handled separately in `tasks/configure_ospf.yml`
     - When `ip_helper_addresses` is provided and the interface has `custom_fields.if_ip_helper=True`, emits `ip helper-address <ip>` lines (one per server, ordered by string index key) after all IP/anycast lines and before `l3-counters`
     - Servers are looked up by the interface VRF name in `ip_helper_addresses` (a dict keyed by VRF, values are `{"0": "ip", "1": "ip", ...}`)
     - Returns: List of configuration commands
@@ -775,11 +775,11 @@ All filters are available through the standard Ansible filter syntax:
 - set_fact:
     config_lines: "{{ item | build_l3_config_lines('physical', 'custom', true) }}"
     # Returns: ['vrf attach CUST-A', 'ip address 10.1.1.1/24', 'ip mtu 9000', 'l3-counters']
-    # With OSPF: also emits 'ip ospf 1 area 0.0.0.0', 'ip ospf network point-to-point'
+    # OSPF interface lines are emitted by tasks/configure_ospf.yml, not here
 
 # Build config with DHCP relay (ip helper-address)
 - set_fact:
-    config_lines: "{{ item | build_l3_config_lines('vlan', 'custom', true, 1, ip_helper_addresses) }}"
+    config_lines: "{{ item | build_l3_config_lines('vlan', 'custom', true, ip_helper_addresses) }}"
     # When item.interface.custom_fields.if_ip_helper=True and ip_helper_addresses has
     # an entry for the interface VRF, emits lines such as:
     # ['vrf attach lab-blue', 'ip address 172.27.4.1/27', 'ip helper-address 172.16.3.10',

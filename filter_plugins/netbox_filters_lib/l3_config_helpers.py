@@ -226,32 +226,30 @@ def group_interface_ips(
     return result
 
 
-def build_l3_config_lines(  # pylint: disable=too-many-arguments
+def build_l3_config_lines(
     item,
     interface_type,
     vrf_type,
     l3_counters_enable=True,
-    ospf_process_id=1,
     ip_helper_addresses=None,
 ):
     """
     Build all L3 configuration lines for a single interface.
 
     Generates a complete, ordered list of CLI configuration commands for the
-    interface. Each per-interface command (vrf attach, ip mtu, l3-counters, OSPF)
+    interface. Each per-interface command (vrf attach, ip mtu, l3-counters)
     is emitted exactly once regardless of how many IP addresses are present.
 
     Args:
         item: Per-interface dict produced by group_interface_ips(), with keys:
             - interface_name: Name of the interface
             - interface: Full NetBox interface object (provides mtu, vrf,
-                         custom_fields for OSPF, tagged_vlans for sub-interfaces)
+                         tagged_vlans for sub-interfaces)
             - addresses: List of {address, ip_role, anycast_mac} dicts
         interface_type: Type of interface ('physical', 'lag', 'vlan',
                         'subinterface', 'loopback')
         vrf_type: VRF type ('default' or 'custom')
         l3_counters_enable: Whether to emit 'l3-counters' (default: True)
-        ospf_process_id: OSPF process ID used in 'ip ospf <id> area' (default: 1)
         ip_helper_addresses: Dict keyed by VRF name, values are dicts of
             {str_index: ip_address} (e.g. {"lab-blue": {"0": "1.1.1.1"}}).
             When provided and the interface has if_ip_helper=True, emits
@@ -381,17 +379,6 @@ def build_l3_config_lines(  # pylint: disable=too-many-arguments
     # L3 counters — once per interface (not supported on loopback)
     if l3_counters_enable and interface_type != "loopback":
         lines.append("l3-counters")
-
-    # OSPF interface config from NetBox custom fields
-    ospf_area = custom_fields.get("if_ip_ospf_1_area")
-    ospf_network = custom_fields.get("if_ip_ospf_network")
-    if ospf_area:
-        lines.append(f"ip ospf {ospf_process_id} area {ospf_area}")
-        _debug(f"  Adding OSPF area: {ospf_area}")
-    # ip ospf network is not applicable to loopback interfaces
-    if ospf_network and interface_type != "loopback":
-        lines.append(f"ip ospf network {ospf_network}")
-        _debug(f"  Adding OSPF network type: {ospf_network}")
 
     _debug(f"  Generated {len(lines)} config lines for {interface_name}")
     return lines

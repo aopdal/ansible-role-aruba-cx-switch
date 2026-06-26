@@ -74,13 +74,7 @@
 - name: Build per-interface OSPF parameter list
   ansible.builtin.set_fact:
     _ospf_interface_items: >-
-      {%- set out = [] -%} {%- set _net_map = {
-        'point-to-point': 'point_to_point',
-        'broadcast': 'broadcast',
-        'nbma': 'nbma',
-        'point-to-multipoint': 'point_to_multipoint',
-        'loopback': 'loopback',
-      } -%} {%- for intf in ospf_interfaces -%}
+      {%- set out = [] -%} {%- for intf in ospf_interfaces -%}
         {%- set vrf_name = ((intf.vrf.name | default('default'))
           if intf.vrf is mapping else 'default') | replace('Global', 'default') -%}
         {%- set area = intf.custom_fields.if_ip_ospf_1_area -%}
@@ -91,55 +85,52 @@
           'interface_name': intf.name,
           'vrf': vrf_name,
           'area_id': area,
-          'network_type': _net_map.get(network),
+          'network_type': network,
           'passive': passive,
           'auth_enabled': auth_enabled,
         }) -%}
       {%- endfor -%} {{ out }}
   when: ospf_interfaces | length > 0
 
-# Configure OSPF on interfaces - unified task for area, network type, and authentication.
-# The module requires auth parameters when auth is already configured, so we always
-# provide them: either enabling MD5 auth or explicitly disabling with 'none'.
-# Authentication is disabled (ospfv2_auth_type: none) when:
-#   - Interface is loopback (never has neighbors)
-#   - Interface is passive (no neighbors, auth irrelevant)
-#   - if_ip_ospf_auth custom field is false (selective auth within VRF)
-#   - No auth key configured for the VRF
+# Configure OSPF on interfaces using CLI so plaintext and ciphertext MD5 keys
+# are handled consistently for all devices.
 - name: Configure OSPF on interfaces (area, network type, and authentication)
-  arubanetworks.aoscx.aoscx_ospf_interface:
-    vrf: "{{ item.vrf }}"
-    version: v2
-    ospf_id: "{{ ospf_config.process_id | int }}"
-    area_id: "{{ item.area_id }}"
-    interface_name: "{{ item.interface_name }}"
-    type: "{{ item.network_type | default(omit) }}"
-    ospfv2_auth_type: >-
-      {%- if 'loopback' in item.interface_name or
-             item.passive or
-             not item.auth_enabled or
-             ospf_auth_keys is not defined or
-             ospf_auth_keys.get(item.vrf) is none or
-             (ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
-              else ospf_auth_keys[item.vrf]) | default('') | length == 0 -%}
-        none
-      {%- else -%}
-        md5
+  arubanetworks.aoscx.aoscx_config:
+    lines: >-
+      {%- set lines = [] -%}
+      {%- set key_id = ospf_auth_key_id | default(1) | int -%}
+      {%- set key_obj = (ospf_auth_keys.get(item.vrf)
+          if ospf_auth_keys is defined else none) -%}
+      {%- set key_secret = ((key_obj.secret if key_obj is mapping else key_obj)
+          | default('')) -%}
+      {%- set key_encrypted = (key_obj.encrypted | default(false) | bool
+          if key_obj is mapping else false) -%}
+      {%- set has_auth_key = key_secret | length > 0 -%}
+      {%- set auth_allowed = ('loopback' not in item.interface_name and
+          not item.passive and item.auth_enabled) -%}
+      {%- set auth_enabled = (auth_allowed and has_auth_key) -%}
+
+      {%- set _ = lines.append('ip ospf ' ~ (ospf_config.process_id | int) ~ ' area ' ~ item.area_id) -%}
+      {%- if item.network_type is defined and item.network_type | length > 0 and
+            item.network_type != 'loopback' -%}
+        {%- set _ = lines.append('ip ospf network ' ~ item.network_type) -%}
       {%- endif -%}
-    ospfv2_auth_md5_keys: >-
-      {{ [{"id": ospf_auth_key_id | default(1) | int,
-           "key": (ospf_auth_keys[item.vrf].secret
-                   if ospf_auth_keys[item.vrf] is mapping
-                   else ospf_auth_keys[item.vrf])}]
-         if ('loopback' not in item.interface_name and
-             not item.passive and
-             item.auth_enabled and
-             ospf_auth_keys is defined and
-             ospf_auth_keys.get(item.vrf) is not none and
-             ((ospf_auth_keys[item.vrf].secret if ospf_auth_keys[item.vrf] is mapping
-               else ospf_auth_keys[item.vrf]) | default('') | length > 0))
-         else omit }}
-    state: update
+
+      {%- if auth_enabled -%}
+        {%- set _ = lines.append('ip ospf authentication message-digest') -%}
+        {%- set _ = lines.append(
+          'ip ospf message-digest-key ' ~ key_id ~ ' md5 ' ~
+          ('ciphertext ' if key_encrypted else 'plaintext ') ~ key_secret
+        ) -%}
+      {%- else -%}
+        {%- set _ = lines.append('no ip ospf authentication message-digest') -%}
+        {%- set _ = lines.append('no ip ospf message-digest-key ' ~ key_id) -%}
+      {%- endif -%}
+      {{ lines }}
+    parents:
+      - "interface {{ item.interface_name }}"
+  vars:
+    ansible_connection: ansible.netcommon.network_cli
   loop: "{{ _ospf_interface_items | default([]) }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }}, area: {{

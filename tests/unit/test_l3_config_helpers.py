@@ -575,8 +575,8 @@ class TestBuildL3ConfigLines:
         assert lines.index("encapsulation dot1q 200") < lines.index(
             "vrf attach CUST-A")
 
-    def test_ospf_interface_config(self):
-        """OSPF area and network type emitted after l3-counters"""
+    def test_ospf_fields_do_not_emit_ospf_lines(self):
+        """OSPF custom fields are ignored by build_l3_config_lines"""
         item = _make_item(
             {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.0",
                                "if_ip_ospf_network": "point-to-point"}, "mtu": 9198},
@@ -584,21 +584,19 @@ class TestBuildL3ConfigLines:
         )
         lines = build_l3_config_lines(item, "physical", "default", True)
 
-        assert "ip ospf 1 area 0.0.0.0" in lines
-        assert "ip ospf network point-to-point" in lines
-        assert lines.index(
-            "l3-counters") < lines.index("ip ospf 1 area 0.0.0.0")
+        assert "l3-counters" in lines
+        assert not any("ip ospf " in line for line in lines)
 
-    def test_ospf_custom_process_id(self):
-        """OSPF process ID is configurable"""
+    def test_ospf_fields_do_not_affect_output(self):
+        """OSPF custom fields have no effect on build_l3_config_lines output"""
         item = _make_item(
             {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.1", "if_ip_ospf_network": None}},
             [{"address": "10.0.0.1/30", "ip_role": None, "anycast_mac": None}],
         )
-        lines = build_l3_config_lines(
-            item, "physical", "default", True, ospf_process_id=2)
+        lines = build_l3_config_lines(item, "physical", "default", True)
 
-        assert "ip ospf 2 area 0.0.0.1" in lines
+        assert "ip address 10.0.0.1/30" in lines
+        assert not any("ip ospf " in line for line in lines)
 
     def test_no_ospf_without_custom_fields(self):
         """No OSPF lines emitted when custom_fields is absent"""
@@ -621,8 +619,8 @@ class TestBuildL3ConfigLines:
         assert "ip address 10.0.0.1/32" in lines
         assert "l3-counters" not in lines
 
-    def test_loopback_skips_ospf_network_type(self):
-        """Loopback interfaces never emit ip ospf network even when set in NetBox"""
+    def test_loopback_with_ospf_fields_emits_no_ospf_lines(self):
+        """Loopback interfaces do not emit any OSPF lines in L3 helper"""
         item = _make_item(
             {"custom_fields": {"if_ip_ospf_1_area": "0.0.0.0",
                                "if_ip_ospf_network": "loopback"}},
@@ -630,8 +628,8 @@ class TestBuildL3ConfigLines:
         )
         lines = build_l3_config_lines(item, "loopback", "default", True)
 
-        assert "ip ospf 1 area 0.0.0.0" in lines
-        assert not any("ospf network" in line for line in lines)
+        assert "ip address 172.27.252.0/32" in lines
+        assert not any("ip ospf " in line for line in lines)
 
     def test_vlan_ipv6_anycast_strips_prefix(self):
         """IPv6 anycast gateway command strips prefix length"""
