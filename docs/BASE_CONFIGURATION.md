@@ -4,12 +4,14 @@ This document describes the base system configuration tasks added to the Aruba C
 
 ## Overview
 
-The role now includes four base system configuration tasks that are executed early in the configuration process:
+The role includes base system configuration tasks that are executed early in the configuration process:
 
-1. **Banner Configuration** (`configure_banner.yml`)
-2. **Timezone Configuration** (`configure_timezone.yml`)
-3. **NTP Configuration** (`configure_ntp.yml`)
-4. **DNS Configuration** (`configure_dns.yml`)
+1. **Banner Configuration** (`configure_banner.yml`) — tags: `banner`, `base_config`, `system`
+2. **Timezone Configuration** (`configure_timezone.yml`) — tags: `timezone`, `base_config`, `system`
+3. **NTP Configuration** (`configure_ntp.yml`) — tags: `ntp`, `services`
+4. **DNS Configuration** (`configure_dns.yml`) — tags: `dns`, `services`
+
+Banner and timezone have no VRF dependency and are tagged `base_config`/`system`. NTP and DNS may reference a VRF (e.g., `mgmt`) and are tagged `services` instead, so that running `-t base_config` does not attempt VRF-dependent configuration.
 
 These tasks are controlled by flags in `defaults/main.yml` and execute before interface configurations.
 
@@ -63,11 +65,11 @@ config_context:
 The base configuration tasks execute in this order within `tasks/main.yml`:
 
 1. Fact gathering (if enabled)
-2. **Banner configuration** ← Base config
-3. **Timezone configuration** ← Base config
-4. **NTP configuration** ← Base config
-5. **DNS configuration** ← Base config
-6. VRF configuration
+2. **Banner configuration** ← Base config (`base_config`, `system`)
+3. **Timezone configuration** ← Base config (`base_config`, `system`)
+4. VRF configuration (`vrfs`, `layer3`, `routing`)
+5. **NTP configuration** ← Services (`ntp`, `services`)
+6. **DNS configuration** ← Services (`dns`, `services`)
 7. VLAN configuration
 8. Physical interfaces
 9. ... (rest of configuration)

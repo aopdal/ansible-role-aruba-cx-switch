@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-06-30
+
+### Changed
+
+- NTP and DNS tags changed from `base_config`/`system` to `services`. These tasks depend on VRFs and could fail when run with `-t base_config` if VRFs were not configured. Use `-t services` (or `-t ntp`/`-t dns`) to target them individually.
+
 ### Fixed
 
 ## [0.13.2] - 2026-06-26
