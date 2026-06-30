@@ -157,7 +157,7 @@ Debug output shows:
 ### Testing EVPN/VXLAN Detection
 
 The role runs `show evpn evi` on the switch and passes the output through the
-`parse_evpn_evi_output` filter plugin (`filter_plugins/netbox_filters_lib/vlan_filters.py`):
+`parse_evpn_evi_output` filter plugin (`netbox_filters_lib/vlan_filters.py`):
 
 ```yaml
 - name: Get existing EVPN/VXLAN configuration

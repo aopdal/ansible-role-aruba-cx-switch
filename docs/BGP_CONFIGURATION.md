@@ -580,7 +580,7 @@ compose:
 
 ## Custom Filter Plugins
 
-Two filters in `filter_plugins/netbox_filters_lib/bgp_filters.py` handle BGP data enrichment.
+Two filters in `netbox_filters_lib/bgp_filters.py` handle BGP data enrichment.
 
 ### `get_bgp_session_vrf_info(sessions, interfaces)`
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-06-30
+
+### Changed
+
+- Moved `netbox_filters_lib/` from `filter_plugins/netbox_filters_lib/` to the role root. Ansible's plugin loader was scanning the subdirectory and emitting warnings for every library module (`No module named 'ansible.plugins.filter.utils'`). No user-facing API change — all filters work identically.
+
 ## [0.13.4] - 2026-06-30
 
 ### Added

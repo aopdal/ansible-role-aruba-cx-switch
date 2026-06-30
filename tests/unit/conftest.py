@@ -5,9 +5,10 @@ import sys
 import os
 from pathlib import Path
 
-# Add filter_plugins to Python path
-filter_plugins_path = Path(__file__).parent.parent.parent / "filter_plugins"
-sys.path.insert(0, str(filter_plugins_path))
+# Add role root (netbox_filters_lib) and filter_plugins (rest_api_transforms) to path
+role_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(role_root))
+sys.path.insert(0, str(role_root / "filter_plugins"))
 
 
 def pytest_configure(config):

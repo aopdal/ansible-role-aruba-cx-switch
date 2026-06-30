@@ -102,7 +102,7 @@ The `get_interface_ip_addresses()` filter has been extended to:
 
 ### Task Logic
 
-The `build_l3_config_lines()` filter (`filter_plugins/netbox_filters_lib/l3_config_helpers.py`) generates all CLI configuration lines for an interface in a single call, including the `active-gateway` commands. It emits lines in the order AOS-CX requires:
+The `build_l3_config_lines()` filter (`netbox_filters_lib/l3_config_helpers.py`) generates all CLI configuration lines for an interface in a single call, including the `active-gateway` commands. It emits lines in the order AOS-CX requires:
 
 1. VRF attachment (once)
 2. Regular IPv4 addresses (`ip address`)
