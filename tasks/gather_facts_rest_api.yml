@@ -169,8 +169,9 @@
 - name: Query VLANs via REST API
   ansible.builtin.uri:
     url: "{{ _rest_api_base
-      }}/system/vlans?attributes=mgmd_oper_version,mgmd_enable_status,mgmd_enab\
-      le,mgmd_igmp_version,mgmd_mld_version&depth=2"
+      }}/system/vlans?attributes=name,description,admin,type,voice,oper_state,\
+      mgmd_oper_version,mgmd_enable_status,mgmd_enable,mgmd_igmp_version,\
+      mgmd_mld_version&depth=2"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"

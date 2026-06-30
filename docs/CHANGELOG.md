@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-06-30
+
+### Added
+
+- New variable `aoscx_configure_icmp_redirect` (default: `true`) to control anycast gateway ICMP redirect configuration. Previously this task was only gated on `custom_fields.device_anycast_gateway` and could not be disabled via role variables.
+
+### Fixed
+
+- REST API VLAN query now includes `name`, `description`, `admin`, `type`, `voice`, and `oper_state` attributes. Previously only `mgmd_*` attributes were requested, causing `rest_api_to_aoscx_vlans` to fall back to default names like `VLAN15` instead of the actual configured names.
+
 ## [0.13.3] - 2026-06-30
 
 ### Changed
