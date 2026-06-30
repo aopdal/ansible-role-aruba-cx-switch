@@ -659,8 +659,8 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `hostname`, `base_config`, `system` - Hostname configuration
 - `banner`, `base_config`, `system` - Banner configuration
 - `timezone`, `base_config`, `system` - Timezone configuration
-- `ntp`, `base_config`, `system` - NTP configuration
-- `dns`, `base_config`, `system` - DNS configuration
+- `ntp`, `services` - NTP configuration (may depend on VRFs)
+- `dns`, `services` - DNS configuration (may depend on VRFs)
 - `icmp_redirect`, `base_config`, `system` - ICMP redirect / Anycast Gateway prerequisite
 - `server_vrfs`, `base_config`, `system` - Access-switch server VRF configuration
 - `default_gateway`, `base_config`, `system` - Access-switch default gateway configuration
@@ -687,7 +687,8 @@ ansible-playbook site.yml -e aoscx_save_config=false
 
 ### Aggregate Tags
 
-- `base_config` - All base system configuration (template gen, hostname, banner, timezone, NTP, DNS, icmp_redirect, server_vrfs, default_gateway)
+- `base_config` - Base system configuration without VRF dependencies (template gen, hostname, banner, timezone, icmp_redirect, server_vrfs, default_gateway)
+- `services` - VRF-dependent services (NTP, DNS)
 - `layer1` - Physical interface configuration
 - `layer2` - All L2 configuration (VLANs, L2 interfaces, LAG, STP, port-access)
 - `layer3` - All L3 configuration (VRFs, L3 interfaces/loopbacks, OSPF, BGP)
@@ -696,7 +697,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `overlay` - All overlay configuration (EVPN, VXLAN)
 - `cleanup` - All cleanup tasks (idempotent mode only)
 - `idempotent` - All idempotent cleanup tasks
-- `system` - All system configuration (hostname, banner, timezone, NTP, DNS, icmp_redirect, server_vrfs, default_gateway)
+- `system` - System configuration without VRF dependencies (hostname, banner, timezone, icmp_redirect, server_vrfs, default_gateway)
 - `vsx` - VSX/MCLAG configuration
 - `ha` - High availability configuration (VSX)
 

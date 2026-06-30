@@ -76,7 +76,8 @@ Tasks that are:
 - **VLANs**: Common day-to-day changes
 - **Interfaces**: Frequent configuration updates
 - **LAGs**: Regular operational changes
-- **Banner/NTP/DNS**: Low-risk base configuration
+- **Banner**: Low-risk base configuration
+- **NTP/DNS**: Tagged `services` (not `base_config`/`system`) because they may depend on VRFs
 
 ## Current Tag-Dependent Tasks
 
@@ -137,7 +138,8 @@ when:
 - **VLANs**: Common day-to-day changes
 - **Interfaces**: Frequent configuration updates
 - **LAGs**: Regular operational changes
-- **Banner/NTP/DNS**: Low-risk base configuration
+- **Banner**: Low-risk base configuration
+- **NTP/DNS**: Tagged `services` (not `base_config`/`system`) because they may depend on VRFs
 
 ## Testing
 
@@ -176,8 +178,11 @@ ansible-playbook configure_aoscx.yml -t vlans
 # Update interfaces - no risk of changing routing
 ansible-playbook configure_aoscx.yml -t interfaces
 
-# Modify base config - no risk of overlay or routing changes
+# Modify base config (hostname, banner, timezone) - no VRF dependency
 ansible-playbook configure_aoscx.yml -t base_config
+
+# Configure NTP/DNS (may depend on VRFs)
+ansible-playbook configure_aoscx.yml -t services
 ```
 
 ### Intentional High-Impact Changes

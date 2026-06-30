@@ -149,20 +149,20 @@
     - layer3
     - routing
 
-# NTP and DNS run AFTER VRFs because they can be bound to a VRF
+# NTP and DNS run AFTER VRFs because they can be bound to a VRF.
+# Tagged 'services' (not 'base_config'/'system') so that running -t base_config
+# does not attempt to configure VRF-dependent services without the VRF present.
 - name: Include NTP configuration tasks
   ansible.builtin.include_tasks:
     file: configure_ntp.yml
     apply:
       tags:
         - ntp
-        - base_config
-        - system
+        - services
   when: aoscx_configure_ntp | bool
   tags:
     - ntp
-    - base_config
-    - system
+    - services
 
 - name: Include DNS configuration tasks
   ansible.builtin.include_tasks:
@@ -170,13 +170,11 @@
     apply:
       tags:
         - dns
-        - base_config
-        - system
+        - services
   when: aoscx_configure_dns | bool
   tags:
     - dns
-    - base_config
-    - system
+    - services
 
 # ============================================================================
 # VLAN Analysis (must run BEFORE VLAN/EVPN/VXLAN configuration)
