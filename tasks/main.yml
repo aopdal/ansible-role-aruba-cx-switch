@@ -97,7 +97,9 @@
         - icmp_redirect
         - base_config
         - system
-  when: custom_fields.device_anycast_gateway | default(false) | bool
+  when:
+    - aoscx_configure_icmp_redirect | bool
+    - custom_fields.device_anycast_gateway | default(false) | bool
   tags:
     - icmp_redirect
     - base_config
