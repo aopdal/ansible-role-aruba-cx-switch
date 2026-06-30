@@ -205,7 +205,7 @@ is_mclag = intf.get("custom_fields", {}).get("your_field_name", False)
 Search for `custom_fields` in the source to find all custom field accesses:
 
 ```bash
-grep -n "custom_fields" filter_plugins/netbox_filters_lib/*.py
+grep -n "custom_fields" netbox_filters_lib/*.py
 ```
 
 ---

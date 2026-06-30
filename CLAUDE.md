@@ -33,9 +33,11 @@ templates/                 # Jinja2 templates for `aoscx_config` / generated
                            # starting-point configs (see configure_*.j2).
 filter_plugins/            # Custom filters used by tasks/templates.
   netbox_filters.py        # Public filter entry points.
-  netbox_filters_lib/      # Implementation modules (vlan, vrf, bgp, ospf,
-                           # interface_*, comparison, l3_config_helpers, …).
   rest_api_transforms.py   # REST-API fact transformations.
+netbox_filters_lib/        # Implementation modules (vlan, vrf, bgp, ospf,
+                           # interface_*, comparison, l3_config_helpers, …).
+                           # Lives outside filter_plugins/ so Ansible's
+                           # plugin loader does not try to load them.
 tests/                     # Ansible test playbooks + tests/unit/ (pytest).
 molecule/default/          # Molecule scenario.
 docs/                      # User + developer docs (mkdocs source). Index in
@@ -152,7 +154,7 @@ rejected by lint / review.
   (notably `aoscx_config` for L3), pre-compare against gathered facts and
   only act on the diff — see `tasks/configure_l3_interface_common.yml` and
   the helpers in
-  [filter_plugins/netbox_filters_lib/l3_config_helpers.py](filter_plugins/netbox_filters_lib/l3_config_helpers.py).
+  [netbox_filters_lib/l3_config_helpers.py](netbox_filters_lib/l3_config_helpers.py).
 - L3 interfaces use `aoscx_config` (not `aoscx_l3_interface`) so that
   `ip mtu` and `l3-counters` can be set. Do not "simplify" back to
   `aoscx_l3_interface` — capability would regress.
@@ -167,7 +169,7 @@ rejected by lint / review.
 
 ### 4.3 Filter plugins
 
-- New filters go in `filter_plugins/netbox_filters_lib/<topic>.py` and are
+- New filters go in `netbox_filters_lib/<topic>.py` and are
   re-exported from `filter_plugins/netbox_filters.py`.
 - Every public filter needs a unit test under `tests/unit/`. Run with
   `make test-unit` or `make test-unit-coverage`.
@@ -318,7 +320,7 @@ When acting on this repo:
 5. **Update `docs/`** in the same change as code — see the table in §4.5.
 6. **Update `CHANGELOG.md`** for any user-visible change.
 7. **Add unit tests** for any new or changed filter in
-   `filter_plugins/netbox_filters_lib/`.
+   `netbox_filters_lib/`.
 8. **Don't reorder `tasks/main.yml`** without an explicit reason; ordering
    is load-bearing (VRFs before L3, VLAN identify before VLAN config,
    cleanup last, save last).

@@ -6,13 +6,13 @@ Custom Ansible filters for NetBox data transformation
 import sys
 import os
 
-# Add the filter_plugins directory to Python path to enable imports
-# This allows the submodule imports to work when installed as a role
-_filter_dir = os.path.dirname(os.path.abspath(__file__))
-if _filter_dir not in sys.path:
-    sys.path.insert(0, _filter_dir)
+# Add the role root directory to Python path so netbox_filters_lib
+# (a sibling of filter_plugins/) can be imported.
+_role_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _role_root not in sys.path:
+    sys.path.insert(0, _role_root)
 
-# Import from the netbox_filters_lib package (subdirectory)
+# Import from the netbox_filters_lib package (role root)
 # These imports must come after sys.path manipulation above
 # pylint: disable=wrong-import-position
 # flake8: noqa: E402

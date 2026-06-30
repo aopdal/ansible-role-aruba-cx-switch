@@ -419,7 +419,7 @@ assert lines.count("l3-counters") == 1
 
 ```bash
 # Validate Python syntax
-python3 -m py_compile filter_plugins/netbox_filters_lib/l3_config_helpers.py
+python3 -m py_compile netbox_filters_lib/l3_config_helpers.py
 
 # Test filter loading
 python3 << 'EOF'

@@ -1028,12 +1028,12 @@ EOF
 
 # Run pre-commit checks
 pre-commit run --files filter_plugins/netbox_filters.py \
-                        filter_plugins/netbox_filters_lib/*.py
+                        netbox_filters_lib/*.py
 
 # Run specific checks
-pylint filter_plugins/netbox_filters_lib/*.py
-black --check filter_plugins/netbox_filters_lib/*.py
-flake8 filter_plugins/netbox_filters_lib/*.py
+pylint netbox_filters_lib/*.py
+black --check netbox_filters_lib/*.py
+flake8 netbox_filters_lib/*.py
 ```
 
 ### Debugging
