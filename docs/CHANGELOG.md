@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.6] - 2026-07-01
+
+### Added
+
+- REST API fact gathering now queries VSX configuration (`/system/vsx`) when `custom_fields.device_vsx` is true. The response is stored as `aoscx_vsx_facts` with `device_role`, `system_mac`, `isl_port`, `keepalive_vrf`, `keepalive_src_ip`, and `keepalive_peer_ip`. Non-VSX devices skip the query entirely.
+- New `vsx_config_diff` filter compares NetBox config_context VSX settings against `aoscx_vsx_facts`. Returns per-field diffs so `configure_vsx.yml` only pushes configuration when the device state differs from the desired state.
+- REST API fact gathering now queries global STP configuration (`/system?attributes=stp_config&depth=1`). The response is stored as `aoscx_stp_global_facts` with `mstp_config_name`, `mstp_config_revision`, `priority`, and other STP settings.
+- New `stp_global_config_diff` filter compares NetBox config_context MSTP settings (`mstp_config_name`, `mstp_config_revision`, `mstp_priority`) against `aoscx_stp_global_facts`. Returns per-field diffs and CLI lines so `configure_stp.yml` only pushes global MSTP configuration when the device state differs. Default priority is 8 when not set in config_context.
+
+### Fixed
+
+- REST API interface fact gathering now includes the `interfaces` attribute (LAG member list). Previously the attribute was missing from the query, causing the LAG membership reverse map to be empty. This made `get_interfaces_needing_config_changes` report all LAG member interfaces as needing reassignment even when correctly configured.
+
 ## [0.13.5] - 2026-06-30
 
 ### Changed
