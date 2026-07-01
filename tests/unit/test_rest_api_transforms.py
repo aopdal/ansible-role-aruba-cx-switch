@@ -115,6 +115,26 @@ class TestRestApiToAoscxInterfaces:
         assert "1/1/2" in result
         assert "vlan10" in result
 
+    def test_lag_interface_members(self):
+        """Test that LAG interface member list is preserved"""
+        rest_data = {
+            "lag10": {
+                "admin": "up",
+                "type": "lag",
+                "interfaces": {
+                    "1/1/1": "/rest/v10.16/system/interfaces/1%2F1%2F1",
+                    "1/1/2": "/rest/v10.16/system/interfaces/1%2F1%2F2",
+                },
+            },
+            "1/1/1": {"admin": "up", "type": "system"},
+            "1/1/2": {"admin": "up", "type": "system"},
+        }
+        result = rest_api_to_aoscx_interfaces(rest_data)
+        assert "lag10" in result
+        assert "1/1/1" in result["lag10"]["interfaces"]
+        assert "1/1/2" in result["lag10"]["interfaces"]
+        assert result["1/1/1"]["interfaces"] == {}
+
 
 class TestRestApiToAoscxVlans:
     """Tests for rest_api_to_aoscx_vlans function"""

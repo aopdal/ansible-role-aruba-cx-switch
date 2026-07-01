@@ -1,15 +1,23 @@
 """
-STP (Spanning Tree Protocol) interface configuration helpers.
+STP (Spanning Tree Protocol) configuration helpers.
 
-Compares NetBox custom field desired state against switch REST API stp_config
-facts and returns per-interface CLI command lists for change-only applies.
+Global MSTP comparison:
+  Compares NetBox config_context (mstp_config_name, mstp_config_revision,
+  mstp_priority) against REST API ``/system?attributes=stp_config&depth=1``
+  response stored as ``aoscx_stp_global_facts``.
 
-NetBox custom field → REST API stp_config field mapping:
-  if_stp_bpdu_filter  → stp_config.bpdu_filter_enable
-  if_stp_bpdu_guard   → stp_config.bpdu_guard_enable
-  if_stp_edge_port    → stp_config.admin_edge_port_enable
-  if_stp_root_guard   → stp_config.root_guard_enable
+Per-interface comparison:
+  Compares NetBox custom field desired state against switch REST API stp_config
+  facts and returns per-interface CLI command lists for change-only applies.
+
+  NetBox custom field → REST API stp_config field mapping:
+    if_stp_bpdu_filter  → stp_config.bpdu_filter_enable
+    if_stp_bpdu_guard   → stp_config.bpdu_guard_enable
+    if_stp_edge_port    → stp_config.admin_edge_port_enable
+    if_stp_root_guard   → stp_config.root_guard_enable
 """
+
+_STP_DEFAULT_PRIORITY = 8
 
 # (netbox_cf_field, device_stp_field, enable_cli_command)
 _STP_FIELD_MAP = [
@@ -22,6 +30,54 @@ _STP_FIELD_MAP = [
     ),
     ("if_stp_root_guard", "root_guard_enable", "spanning-tree root-guard"),
 ]
+
+
+def stp_global_config_diff(desired, facts):
+    """Compare desired global MSTP config against device REST API facts.
+
+    Args:
+        desired: dict with NetBox config_context keys:
+            mstp_config_name, mstp_config_revision, mstp_priority
+        facts: ``aoscx_stp_global_facts`` dict from REST API (the stp_config
+            object from ``/system?attributes=stp_config&depth=1``).
+
+    Returns:
+        dict with:
+            changed (bool): True when at least one field differs.
+            changes (list[dict]): per-field diffs (field, expected, actual).
+            lines (list[str]): CLI lines needed to apply the changes.
+    """
+    if not isinstance(desired, dict):
+        return {"changed": False, "changes": [], "lines": []}
+    if not isinstance(facts, dict):
+        facts = {}
+
+    config_name = desired.get("mstp_config_name")
+    if config_name is None:
+        return {"changed": False, "changes": [], "lines": []}
+
+    config_revision = str(desired.get("mstp_config_revision", 0))
+    priority = str(desired.get("mstp_priority", _STP_DEFAULT_PRIORITY))
+
+    field_map = [
+        ("config_name", config_name, facts.get("mstp_config_name")),
+        ("config_revision", config_revision, str(facts.get("mstp_config_revision", ""))),
+        ("priority", priority, str(facts.get("priority", ""))),
+    ]
+
+    changes = []
+    for field, expected, actual in field_map:
+        if str(expected).lower() != str(actual).lower():
+            changes.append({"field": field, "expected": expected, "actual": actual})
+
+    lines = []
+    if changes:
+        lines.append("spanning-tree")
+        lines.append(f"spanning-tree priority {priority}")
+        lines.append(f"spanning-tree config-name {config_name}")
+        lines.append(f"spanning-tree config-revision {config_revision}")
+
+    return {"changed": len(changes) > 0, "changes": changes, "lines": lines}
 
 
 def stp_interface_changes(interfaces, enhanced_facts):

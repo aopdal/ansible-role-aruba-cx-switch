@@ -20,6 +20,8 @@
 # - aoscx_enhanced_interface_facts (raw REST API response)
 # - aoscx_evpn_facts (when EVPN enabled)
 # - aoscx_vni_facts (when VXLAN enabled)
+# - aoscx_vsx_facts (when device_vsx enabled)
+# - aoscx_stp_global_facts (when aoscx_configure_stp enabled)
 # - aoscx_port_access_facts (when port_access is defined in the device's
 #   NetBox config_context). Built from a single REST call to
 #   /system/device_profiles?depth=5, then flattened by the
@@ -91,7 +93,7 @@
 - name: Set interface attributes to query
   ansible.builtin.set_fact:
     _rest_interface_base_attrs: "{{
-      'name,admin,description,mtu,type,ip4_address,ip6_addresses,' ~
+      'name,admin,description,mtu,type,interfaces,ip4_address,ip6_addresses,' ~
       'ip6_address_link_local,' ~
       'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,' ~
       'other_config,routing,vrf' }}"
@@ -110,8 +112,7 @@
       {{ _rest_interface_base_attrs }}{% if custom_fields.device_ospf |
       default(false) | bool %},{{ _rest_interface_ospf_attrs }}{% endif %}{% if
       custom_fields.device_vsx | default(false) | bool %},{{
-      _rest_interface_vsx_attrs }}{% endif %}{% if aoscx_configure_stp |
-      default(true) | bool %},{{ _rest_interface_stp_attrs }}{% endif %}
+      _rest_interface_vsx_attrs }}{% endif %},{{ _rest_interface_stp_attrs }}
   tags:
     - always
 
@@ -248,6 +249,40 @@
   when:
     - aoscx_configure_vxlan | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
+  tags:
+    - always
+
+# Query global STP configuration from /system?attributes=stp_config
+# Returns mstp_config_name, mstp_config_revision, priority, stp_mode, etc.
+- name: Query global STP configuration via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system?attributes=stp_config&depth=1"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: _rest_stp_global
+  delegate_to: localhost
+  tags:
+    - always
+
+# Query VSX configuration (optional, only when device_vsx is enabled)
+# Not all switch models support VSX (e.g., CX 6000), so gate on the custom field.
+- name: Query VSX configuration via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/vsx?attributes=device_role,isl_port,keepalive_src_ip,keepalive_peer_ip,keepalive_vrf,system_mac&depth=1"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  register: _rest_vsx
+  delegate_to: localhost
+  when:
+    - custom_fields.device_vsx | default(false) | bool
   tags:
     - always
 
@@ -454,6 +489,25 @@
   tags:
     - always
 
+- name: Set VSX facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_vsx_facts: "{{ _rest_vsx.json | default({}) }}"
+  when:
+    - custom_fields.device_vsx | default(false) | bool
+    - _rest_vsx is defined
+    - _rest_vsx.status | default(0) == 200
+  tags:
+    - always
+
+- name: Set global STP facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_stp_global_facts: "{{ (_rest_stp_global.json | default({})).get('stp_config', {}) }}"
+  when:
+    - _rest_stp_global is defined
+    - _rest_stp_global.status | default(0) == 200
+  tags:
+    - always
+
 # Aggregate port-access facts. Only set when port-access fact gathering ran.
 # The depth=4 device_profiles response is the single source - flatten it
 # into {device_profiles, roles, lldp_groups, mac_groups} for the diff
@@ -486,6 +540,7 @@
         'Enhanced VLAN facts: ' ~ (aoscx_enhanced_vlan_facts | length),
         'EVPN facts available: ' ~ (aoscx_evpn_facts is defined),
         'VNI facts available: ' ~ (aoscx_vni_facts is defined),
+        'VSX facts available: ' ~ (aoscx_vsx_facts is defined),
         'Port-access facts available: ' ~ (aoscx_port_access_facts is defined)
       ] }}
   when:

@@ -1,13 +1,13 @@
 ---
 # Configure VSX (Virtual Switching Extension)
 #
-# VSX configuration for Aruba AOS-CX switches enables active-active redundancy
+# Depends on: gather_facts_rest_api.yml (aoscx_vsx_facts)
 # Requirements:
 # - Device custom field: device_vsx (boolean)
 # - Config context VSX settings:
 #   - vsx_system_mac: VSX system MAC address
 #   - vsx_role: primary or secondary
-#   - vsx_isl_ports: ISL (Inter-Switch Link) port
+#   - vsx_isl_lag: ISL (Inter-Switch Link) LAG interface
 #   - vsx_keepalive_peer: IP address of VSX peer keepalive
 #   - vsx_keepalive_src: Source IP for keepalive
 #   - vsx_keepalive_vrf: VRF for keepalive (default: mgmt)
@@ -26,13 +26,40 @@
       - "VSX System MAC: {{ vsx_system_mac | default('not set') }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
+- name: Compare VSX configuration against device facts
+  ansible.builtin.set_fact:
+    vsx_diff: >-
+      {{ {
+        'vsx_role': vsx_role | default(None),
+        'vsx_system_mac': vsx_system_mac | default(None),
+        'vsx_isl_lag': vsx_isl_lag | default(None),
+        'vsx_isl_port': vsx_isl_port | default(None),
+        'vsx_keepalive_vrf': vsx_keepalive_vrf | default(None),
+        'vsx_keepalive_src': vsx_keepalive_src | default(None),
+        'vsx_keepalive_peer': vsx_keepalive_peer | default(None),
+      } | vsx_config_diff(aoscx_vsx_facts | default({})) }}
+  when:
+    - vsx_enabled | bool
+    - vsx_system_mac is defined
+    - vsx_role is defined
+
+- name: Display VSX diff results
+  ansible.builtin.debug:
+    msg:
+      - "VSX changes needed: {{ vsx_diff.changed }}"
+      - "Changes: {{ vsx_diff.changes }}"
+  when:
+    - vsx_diff is defined
+    - aoscx_debug | bool or ansible_verbosity >= 1
+
 - name: Configure VSX
   when:
     - vsx_enabled | bool
     - vsx_system_mac is defined
     - vsx_role is defined
+    - vsx_diff.changed | bool
   block:
-    - name: Configure VSX
+    - name: Apply VSX configuration
       arubanetworks.aoscx.aoscx_vsx:
         system_mac: "{{ vsx_system_mac }}"
         keepalive_vrf: "{{ vsx_keepalive_vrf | default('mgmt') }}"
@@ -49,15 +76,27 @@
     - name: Display VSX configuration summary
       ansible.builtin.debug:
         msg:
-          - "=== VSX Configuration Complete ==="
+          - "=== VSX Configuration Applied ==="
           - "Device: {{ inventory_hostname }}"
           - "System MAC: {{ vsx_system_mac }}"
           - "Role: {{ vsx_role }}"
           - "ISL LAG: {{ vsx_isl_lag | default('lag256') }}"
           - "Keepalive Peer: {{ vsx_keepalive_peer | default('not configured') }}"
+          - "Fields changed: {{ vsx_diff.changes | map(attribute='field') | list }}"
       when: aoscx_debug | bool or ansible_verbosity >= 1
 
-- name: Skip VSX configuration
+- name: Skip VSX - no changes needed
+  ansible.builtin.debug:
+    msg: "VSX configuration on {{ inventory_hostname }} matches NetBox - no changes needed"
+  when:
+    - vsx_enabled | bool
+    - vsx_system_mac is defined
+    - vsx_role is defined
+    - vsx_diff is defined
+    - not (vsx_diff.changed | bool)
+    - aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Skip VSX - not enabled or missing config
   ansible.builtin.debug:
     msg:
       - "VSX configuration skipped for {{ inventory_hostname }}"
