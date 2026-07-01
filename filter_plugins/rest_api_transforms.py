@@ -82,6 +82,7 @@ def rest_api_to_aoscx_interfaces(rest_data):
             "vlan_tag": intf_data.get("vlan_tag"),
             "vlan_trunks": intf_data.get("vlan_trunks", {}),
             # LAG configuration
+            "interfaces": intf_data.get("interfaces", {}),
             "lacp_status": intf_data.get("lacp_status"),
             "bond_status": intf_data.get("bond_status"),
             # Routing and VRF

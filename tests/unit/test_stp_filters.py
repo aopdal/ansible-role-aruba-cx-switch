@@ -2,7 +2,7 @@
 Unit tests for STP (Spanning Tree Protocol) filter functions.
 """
 import pytest
-from netbox_filters_lib.stp import stp_interface_changes
+from netbox_filters_lib.stp import stp_global_config_diff, stp_interface_changes
 
 
 class TestStpInterfaceChanges:
@@ -248,3 +248,120 @@ class TestStpInterfaceChanges:
         }
         result = stp_interface_changes([intf], {})
         assert len(result) == 1
+
+
+class TestStpGlobalConfigDiff:
+    """Tests for stp_global_config_diff filter function."""
+
+    _DESIRED = {
+        "mstp_config_name": "l2-fabric-mstp",
+        "mstp_config_revision": "1",
+        "mstp_priority": "1",
+    }
+
+    _FACTS = {
+        "stp_enable": True,
+        "stp_mode": "mstp",
+        "mstp_config_name": "l2-fabric-mstp",
+        "mstp_config_revision": 1,
+        "priority": 1,
+        "forward_delay": 15,
+        "hello_time": 2,
+        "max_age": 20,
+        "max_hop_count": 20,
+    }
+
+    def test_no_changes_when_matching(self):
+        result = stp_global_config_diff(self._DESIRED, self._FACTS)
+        assert result["changed"] is False
+        assert result["changes"] == []
+        assert result["lines"] == []
+
+    def test_detect_config_name_change(self):
+        facts = {**self._FACTS, "mstp_config_name": "old-name"}
+        result = stp_global_config_diff(self._DESIRED, facts)
+        assert result["changed"] is True
+        fields = [c["field"] for c in result["changes"]]
+        assert "config_name" in fields
+
+    def test_detect_config_revision_change(self):
+        facts = {**self._FACTS, "mstp_config_revision": 0}
+        result = stp_global_config_diff(self._DESIRED, facts)
+        assert result["changed"] is True
+        fields = [c["field"] for c in result["changes"]]
+        assert "config_revision" in fields
+
+    def test_detect_priority_change(self):
+        facts = {**self._FACTS, "priority": 8}
+        result = stp_global_config_diff(self._DESIRED, facts)
+        assert result["changed"] is True
+        fields = [c["field"] for c in result["changes"]]
+        assert "priority" in fields
+
+    def test_generates_cli_lines_on_change(self):
+        facts = {**self._FACTS, "priority": 8}
+        result = stp_global_config_diff(self._DESIRED, facts)
+        assert "spanning-tree" in result["lines"]
+        assert "spanning-tree priority 1" in result["lines"]
+        assert "spanning-tree config-name l2-fabric-mstp" in result["lines"]
+        assert "spanning-tree config-revision 1" in result["lines"]
+
+    def test_empty_facts_all_changed(self):
+        result = stp_global_config_diff(self._DESIRED, {})
+        assert result["changed"] is True
+        assert len(result["changes"]) == 3
+        assert len(result["lines"]) == 4
+
+    def test_none_facts(self):
+        result = stp_global_config_diff(self._DESIRED, None)
+        assert result["changed"] is True
+
+    def test_none_desired(self):
+        result = stp_global_config_diff(None, self._FACTS)
+        assert result["changed"] is False
+
+    def test_empty_desired(self):
+        result = stp_global_config_diff({}, self._FACTS)
+        assert result["changed"] is False
+
+    def test_no_mstp_config_name_skips(self):
+        """Without mstp_config_name, nothing to compare."""
+        desired = {"mstp_priority": "1"}
+        result = stp_global_config_diff(desired, self._FACTS)
+        assert result["changed"] is False
+
+    def test_default_priority_8(self):
+        """When mstp_priority is not set, default to 8."""
+        desired = {"mstp_config_name": "l2-fabric-mstp", "mstp_config_revision": "1"}
+        facts = {**self._FACTS, "priority": 8}
+        result = stp_global_config_diff(desired, facts)
+        assert result["changed"] is False
+
+    def test_default_priority_detects_mismatch(self):
+        """Default priority 8 detects mismatch with device priority 1."""
+        desired = {"mstp_config_name": "l2-fabric-mstp"}
+        facts = {**self._FACTS, "priority": 1}
+        result = stp_global_config_diff(desired, facts)
+        assert result["changed"] is True
+        change = next(c for c in result["changes"] if c["field"] == "priority")
+        assert change["expected"] == "8"
+
+    def test_default_revision_0(self):
+        """When mstp_config_revision is not set, default to 0."""
+        desired = {"mstp_config_name": "test"}
+        facts = {"mstp_config_name": "test", "mstp_config_revision": 0, "priority": 8}
+        result = stp_global_config_diff(desired, facts)
+        assert result["changed"] is False
+
+    def test_string_int_comparison(self):
+        """Config context may have string '1', REST API returns int 1."""
+        desired = {"mstp_config_name": "test", "mstp_config_revision": "1", "mstp_priority": "1"}
+        facts = {"mstp_config_name": "test", "mstp_config_revision": 1, "priority": 1}
+        result = stp_global_config_diff(desired, facts)
+        assert result["changed"] is False
+
+    def test_multiple_changes(self):
+        facts = {"mstp_config_name": "old", "mstp_config_revision": 0, "priority": 8}
+        result = stp_global_config_diff(self._DESIRED, facts)
+        assert result["changed"] is True
+        assert len(result["changes"]) == 3

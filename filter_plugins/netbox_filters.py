@@ -76,7 +76,8 @@ from netbox_filters_lib.port_access import (
     port_access_facts_from_device_profiles,
 )
 from netbox_filters_lib.port_access_orphans import port_access_orphans
-from netbox_filters_lib.stp import stp_interface_changes
+from netbox_filters_lib.stp import stp_global_config_diff, stp_interface_changes
+from netbox_filters_lib.vsx import vsx_config_diff
 
 # fmt: on
 
@@ -131,5 +132,8 @@ class FilterModule:
             "port_access_facts_from_device_profiles": port_access_facts_from_device_profiles,
             "port_access_orphans": port_access_orphans,
             # STP
+            "stp_global_config_diff": stp_global_config_diff,
             "stp_interface_changes": stp_interface_changes,
+            # VSX
+            "vsx_config_diff": vsx_config_diff,
         }
