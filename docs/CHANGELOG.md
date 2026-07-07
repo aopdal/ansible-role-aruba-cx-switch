@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.8] - 2026-07-07
+
+### Fixed
+
+- REST API static route fact gathering (`aoscx_static_route_facts`) no longer requires `aoscx_configure_static_routes: true`. It now only requires `aoscx_gather_facts_rest_api: true` and a non-empty `static_routes` config_context, matching the pattern used by other facts (e.g. VSX, DHCP relay). This unblocks report-only/verification playbooks that gather facts via the role without pushing static route configuration.
+
 ## [0.13.7] - 2026-07-07
 
 ### Added
