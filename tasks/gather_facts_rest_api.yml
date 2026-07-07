@@ -450,7 +450,6 @@
   register: _rest_static_routes
   delegate_to: localhost
   when:
-    - aoscx_configure_static_routes | default(true) | bool
     - (static_routes | default({})) | length > 0
   tags:
     - always
@@ -478,7 +477,6 @@
         {%- endif -%}
       {%- endfor -%} {{ result }}
   when:
-    - aoscx_configure_static_routes | default(true) | bool
     - (static_routes | default({})) | length > 0
     - _rest_static_routes is defined
   tags:
