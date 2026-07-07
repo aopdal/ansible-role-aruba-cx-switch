@@ -8,6 +8,9 @@ vlan {{ vlan.vid }}
 {%       if vlan.custom_fields.vlan_ip_igmp_snooping is defined and vlan.custom_fields.vlan_ip_igmp_snooping == true %}
     ip igmp snooping enable
 {%       endif %}
+{%       if vlan.custom_fields.vlan_voice_vlan is defined and vlan.custom_fields.vlan_voice_vlan == true %}
+    voice
+{%       endif %}
 {%     endif %}
 {%   endfor %}
 !

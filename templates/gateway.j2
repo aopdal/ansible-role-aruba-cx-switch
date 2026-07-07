@@ -6,4 +6,30 @@
      | map(attribute='address') | first | default(primary_ip4) %}
 ip route 0.0.0.0/0 {{ _primary_cidr | ansible.utils.ipaddr('first_usable') }}
 {% endif %}
+{% for vrf_name, routes in (static_routes | default({})).items() %}
+{%   set _vrf_clause = '' if vrf_name in ['default', 'Default', 'Global', 'global', ''] else ' vrf ' ~ vrf_name %}
+{%   for route in routes | default([]) %}
+{%     set _prefix = route.prefix %}
+{%     set _family = 'ipv6' if (_prefix | ansible.utils.ipaddr('version')) == 6 else 'ip' %}
+{%     set _type = route.type | default('forward') %}
+{%     set _distance = route.distance | default(1) %}
+{%     set _distance_clause = '' if _distance == 1 else ' distance ' ~ _distance %}
+{%     if _type == 'blackhole' %}
+{{ _family }} route {{ _prefix }} nullroute{{ _distance_clause }}{{ _vrf_clause }}
+{%     elif _type == 'reject' %}
+{{ _family }} route {{ _prefix }} reject{{ _distance_clause }}{{ _vrf_clause }}
+{%     else %}
+{%       set _nexthop_parts = [] %}
+{%       if route.next_hop_interface is defined and route.next_hop_interface %}
+{%         set _ = _nexthop_parts.append(route.next_hop_interface | replace('lag', 'lag ') | replace('loopback', 'loopback ')) %}
+{%       endif %}
+{%       if route.next_hop is defined and route.next_hop %}
+{%         set _ = _nexthop_parts.append(route.next_hop) %}
+{%       endif %}
+{%       if _nexthop_parts | length > 0 %}
+{{ _family }} route {{ _prefix }} {{ _nexthop_parts | join(' ') }}{{ _distance_clause }}{{ _vrf_clause }}
+{%       endif %}
+{%     endif %}
+{%   endfor %}
+{% endfor %}
 !

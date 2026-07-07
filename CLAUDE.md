@@ -74,12 +74,15 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
    sets `interface_changes` (categorised: physical / lag / mclag / l2 / l3 /
    no_changes). Required by all interface tasks.
 9. Interfaces: physical → LAG → MCLAG → assign-to-LAG → L2 → OSPF → L3.
-10. EVPN, VXLAN.
-11. **Idempotent cleanup** (only when `aoscx_idempotent_mode: true`):
+10. **Static routes** (tag-dependent, like OSPF/BGP — see
+    [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md)).
+11. EVPN, VXLAN.
+12. **Idempotent cleanup** (only when `aoscx_idempotent_mode: true`):
     re-gather facts → re-identify VLAN changes → cleanup EVPN → VXLAN →
-    VLANs.
-12. BGP, VSX.
-13. `aoscx_config: save_when: modified` if `aoscx_save_config`.
+    VLANs. Static route cleanup (delete) is also gated by
+    `aoscx_idempotent_mode` (see `tasks/configure_static_routes.yml`).
+13. BGP, VSX.
+14. `aoscx_config: save_when: modified` if `aoscx_save_config`.
 
 ### Feature-dependency ordering rule
 
@@ -105,6 +108,7 @@ Existing dependency chains to preserve:
 | SVIs / anycast    | VLANs                                                       |
 | LAG member assign | LAG / MCLAG creation, physical interfaces                   |
 | OSPF, BGP         | VRFs, L3 interfaces (loopbacks for router-id / peering)     |
+| Static routes     | VRFs, L3 interfaces (next_hop_interface targets)            |
 | EVPN              | VLANs                                                       |
 | VXLAN             | VLANs, loopback (source-interface)                          |
 | VSX               | MCLAG, ISL/keepalive interfaces                             |
@@ -198,6 +202,7 @@ Update the relevant topic page when you touch its area:
 | L3 / anycast / loopback                       | [docs/ANYCAST_GATEWAY.md](docs/ANYCAST_GATEWAY.md)                                           |
 | BGP                                           | [docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)                                       |
 | OSPF                                          | [docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md)                                     |
+| Static routes                                 | [docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)                   |
 | EVPN / VXLAN                                  | [docs/EVPN_VXLAN_CONFIGURATION.md](docs/EVPN_VXLAN_CONFIGURATION.md)                         |
 | DNS / NTP / banner / timezone                 | [docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md), [docs/DNS_CONFIGURATION.md](docs/DNS_CONFIGURATION.md) |
 | Filter plugins                                | [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md), [docs/FILTER_PLUGINS_REUSE.md](docs/FILTER_PLUGINS_REUSE.md) |

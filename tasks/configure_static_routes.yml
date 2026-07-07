@@ -1,0 +1,67 @@
+---
+# Configure static routes (forward, blackhole, reject) from the NetBox
+# `static_routes` config_context, organised per VRF.
+#
+# Depends on: VRFs (must exist before a route can be attached to them),
+#             L3 interfaces (next_hop_interface must exist on the device
+#             if used), gather_facts_rest_api.yml (aoscx_static_route_facts,
+#             when aoscx_gather_facts_rest_api: true).
+#
+# NetBox config_context shape:
+#   static_routes:
+#     default:
+#       - prefix: "0.0.0.0/0"
+#         type: forward          # forward (default) | blackhole | reject
+#         next_hop: "172.18.17.33"
+#         distance: 1             # optional, default 1
+#
+# See docs/STATIC_ROUTES_CONFIGURATION.md for the full data model.
+#
+# The aoscx_static_route module is not idempotent: pyaoscx always deletes
+# and recreates a route's next-hop (id 0), so every "create" call reports
+# changed: True regardless of an actual diff. Routes are pre-compared
+# against REST API facts (aoscx_static_route_facts) and only pushed when
+# they differ - same pattern used for non-idempotent L3 interface config.
+# Only a single next-hop per prefix is supported (no ECMP).
+#
+# Cleanup (deleting routes present on the device but absent from NetBox)
+# only runs in aoscx_idempotent_mode, and only when REST API facts are
+# available (without facts there is no reliable view of device state to
+# diff against, so nothing is deleted).
+
+- name: Compute static route changes
+  ansible.builtin.set_fact:
+    _static_route_changes: "{{ static_routes | default({}) | get_static_route_changes(aoscx_static_route_facts | default(None)) }}"
+
+- name: Debug - Show static route changes
+  ansible.builtin.debug:
+    msg:
+      - "Routes to create/update: {{ _static_route_changes.routes_to_apply | length }}"
+      - "Routes to delete: {{ _static_route_changes.routes_to_delete | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Create/update static routes
+  arubanetworks.aoscx.aoscx_static_route:
+    vrf_name: "{{ item.vrf_name }}"
+    destination_address_prefix: "{{ item.destination_address_prefix }}"
+    type: "{{ item.type }}"
+    distance: "{{ item.distance }}"
+    next_hop_interface: "{{ item.next_hop_interface | default(omit, true) }}"
+    next_hop_ip_address: "{{ item.next_hop_ip_address | default(omit, true) }}"
+    state: create
+  loop: "{{ _static_route_changes.routes_to_apply }}"
+  loop_control:
+    label: "VRF {{ item.vrf_name }} {{ item.destination_address_prefix }} ({{ item.type }})"
+  when: _static_route_changes.routes_to_apply | length > 0
+
+- name: Remove static routes no longer present in NetBox
+  arubanetworks.aoscx.aoscx_static_route:
+    vrf_name: "{{ item.vrf_name }}"
+    destination_address_prefix: "{{ item.destination_address_prefix }}"
+    state: delete
+  loop: "{{ _static_route_changes.routes_to_delete }}"
+  loop_control:
+    label: "VRF {{ item.vrf_name }} {{ item.destination_address_prefix }}"
+  when:
+    - aoscx_idempotent_mode | bool
+    - _static_route_changes.routes_to_delete | length > 0

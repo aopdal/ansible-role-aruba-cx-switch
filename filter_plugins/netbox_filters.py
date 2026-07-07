@@ -27,6 +27,7 @@ from netbox_filters_lib.vlan_filters import (
     get_vlans_in_use,
     get_vlans_needing_changes,
     get_vlans_needing_igmp_update,
+    get_vlans_needing_voice_update,
     get_vlan_interfaces,
     parse_evpn_evi_output,
     parse_vlan_id_spec,
@@ -78,6 +79,7 @@ from netbox_filters_lib.port_access import (
 from netbox_filters_lib.port_access_orphans import port_access_orphans
 from netbox_filters_lib.stp import stp_global_config_diff, stp_interface_changes
 from netbox_filters_lib.vsx import vsx_config_diff
+from netbox_filters_lib.static_route_filters import get_static_route_changes
 
 # fmt: on
 
@@ -99,6 +101,7 @@ class FilterModule:
             "get_vlans_in_use": get_vlans_in_use,
             "get_vlans_needing_changes": get_vlans_needing_changes,
             "get_vlans_needing_igmp_update": get_vlans_needing_igmp_update,
+            "get_vlans_needing_voice_update": get_vlans_needing_voice_update,
             "get_vlan_interfaces": get_vlan_interfaces,
             "parse_evpn_evi_output": parse_evpn_evi_output,
             "extract_interface_vrfs": extract_interface_vrfs,
@@ -136,4 +139,6 @@ class FilterModule:
             "stp_interface_changes": stp_interface_changes,
             # VSX
             "vsx_config_diff": vsx_config_diff,
+            # Static routes
+            "get_static_route_changes": get_static_route_changes,
         }

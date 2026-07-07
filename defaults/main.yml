@@ -34,6 +34,13 @@ aoscx_configure_ospf: true
 aoscx_configure_bgp: false
 aoscx_configure_vsx: false
 
+# Configure static routes (forward, blackhole, reject) from the
+# `static_routes` NetBox config_context (organised per VRF). Auto-skipped
+# when the device has no `static_routes` key in its config_context. Only
+# a single next-hop per prefix is supported (no ECMP) - a pyaoscx/module
+# limitation. See docs/STATIC_ROUTES_CONFIGURATION.md.
+aoscx_configure_static_routes: true
+
 # Configure ssh server vrf default and https-server vrf default on access-switch
 # devices. These services are always enabled on the mgmt VRF; this adds the
 # default VRF so that in-band management and REST API calls work for devices

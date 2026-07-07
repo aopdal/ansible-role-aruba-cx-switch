@@ -429,6 +429,24 @@
     - l3_interfaces
     - layer3
 
+- name: Include static route configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_static_routes.yml
+    apply:
+      tags:
+        - static_routes
+        - routing
+        - layer3
+  when:
+    - aoscx_configure_static_routes | bool
+    - (static_routes | default({})) | length > 0
+    - "'static_routes' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
+      ansible_run_tags"
+  tags:
+    - static_routes
+    - routing
+    - layer3
+
 - name: Include EVPN configuration tasks
   ansible.builtin.include_tasks:
     file: configure_evpn.yml

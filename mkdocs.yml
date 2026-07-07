@@ -102,6 +102,7 @@ nav:
                             - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
                   - BGP: BGP_CONFIGURATION.md
                   - OSPF: OSPF_CONFIGURATION.md
+                  - Static Routes: STATIC_ROUTES_CONFIGURATION.md
                   - Tag-Dependent Tasks: TAG_DEPENDENT_INCLUDES.md
         - Development:
                   - Quick Start: QUICKSTART.md
