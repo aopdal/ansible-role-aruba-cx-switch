@@ -102,7 +102,7 @@
       {%- set key_obj = (ospf_auth_keys.get(item.vrf)
           if ospf_auth_keys is defined else none) -%}
       {%- set key_secret = ((key_obj.secret if key_obj is mapping else key_obj)
-          | default('')) -%}
+          | default('', true)) -%}
       {%- set key_encrypted = (key_obj.encrypted | default(false) | bool
           if key_obj is mapping else false) -%}
       {%- set has_auth_key = key_secret | length > 0 -%}
