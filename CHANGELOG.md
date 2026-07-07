@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.9] - 2026-07-07
+
+### Fixed
+
+- `tasks/configure_ospf.yml` failed with `object of type 'NoneType' has no len()` when configuring OSPF interfaces without an entry in `ospf_auth_keys` for the interface's VRF (i.e. no authentication configured). Jinja's `default('')` filter only substitutes for undefined values, not `None`, so `key_secret` stayed `None` and the subsequent `| length` check crashed. Fixed by using `default('', true)` to also substitute falsy/`None` values.
+
 ## [0.13.8] - 2026-07-07
 
 ### Fixed
