@@ -1,7 +1,7 @@
 
 {% for intf in interfaces %}
 {%   if 'loopback' in intf.name %}
-interface {{ intf.name }}
+interface {{ intf.name | replace("loopback", "loopback ") }}
 {%     if intf.description != '' %}
    description {{ intf.description }}
 {%     endif %}

@@ -39,6 +39,7 @@
     name: "{{ item.name }}"
     description: "{{ item.description | default(omit) }}"
     ip_igmp_snooping: "{{ item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
+    voice: "{{ item.custom_fields.vlan_voice_vlan | default(false) }}"
     state: create
   loop: "{{ vlan_changes.vlans_to_create }}"
   loop_control:
@@ -61,6 +62,24 @@
   loop_control:
     label: "VLAN {{ item.vid }} - IGMP snooping: {{
       item.custom_fields.vlan_ip_igmp_snooping | default(false) }}"
+  when:
+    - vlans | length > 0
+    - vlans_in_use.vids | length > 0
+
+# Update voice VLAN settings on VLANs in use from NetBox
+# This ensures changes to the vlan_voice_vlan custom field are applied
+# Only applies to VLANs that are actually in use on this device
+# Uses enhanced VLAN facts (when available) to only update VLANs where voice settings differ
+- name: Update VLAN voice settings
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: "{{ item.vid }}"
+    voice: "{{ item.custom_fields.vlan_voice_vlan | default(false) }}"
+    state: update
+  loop: "{{ vlans | get_vlans_needing_voice_update(vlans_in_use,
+    aoscx_enhanced_vlan_facts | default(none)) }}"
+  loop_control:
+    label: "VLAN {{ item.vid }} - voice: {{
+      item.custom_fields.vlan_voice_vlan | default(false) }}"
   when:
     - vlans | length > 0
     - vlans_in_use.vids | length > 0

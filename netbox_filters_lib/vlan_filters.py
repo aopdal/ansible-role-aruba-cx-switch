@@ -710,3 +710,108 @@ def get_vlans_needing_igmp_update(
     )
 
     return vlans_needing_update
+
+
+def get_vlans_needing_voice_update(
+    device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None
+):
+    """
+    Determine which VLANs need voice VLAN configuration updates
+
+    Filters VLANs to only those that:
+    1. Are in use on interfaces
+    2. Have vlan_voice_vlan custom field defined
+    3. Have different voice setting than current device state (when facts available)
+
+    Args:
+        device_vlans: List of VLAN objects available for this device from NetBox
+        vlans_in_use_dict: Dict from get_vlans_in_use() with 'vids' and 'vlans'
+        enhanced_vlan_facts: Optional dict from REST API with current voice state
+                           Format: {"101": {"voice": false, ...}, ...}
+
+    Returns:
+        List of VLAN objects needing voice VLAN configuration updates
+    """
+    vlans_needing_update = []
+
+    # Ensure inputs are valid
+    if not device_vlans:
+        _debug("No device VLANs provided")
+        return vlans_needing_update
+
+    if not vlans_in_use_dict or "vids" not in vlans_in_use_dict:
+        _debug("No VLANs in use provided")
+        return vlans_needing_update
+
+    vids_in_use = set(vlans_in_use_dict["vids"])
+    _debug(f"VLANs in use on interfaces: {sorted(list(vids_in_use))}")
+
+    # Process each VLAN
+    for vlan in device_vlans:
+        if not vlan or not isinstance(vlan, dict):
+            continue
+
+        vid = vlan.get("vid")
+        if vid is None or vid < 2 or vid > 4094:
+            continue
+
+        # Skip if VLAN is not in use
+        if vid not in vids_in_use:
+            _debug(f"VLAN {vid} not in use - skipping voice check")
+            continue
+
+        # Check if voice VLAN custom field is defined
+        custom_fields = vlan.get("custom_fields", {})
+        desired_voice = custom_fields.get("vlan_voice_vlan")
+
+        if desired_voice is None:
+            _debug(f"VLAN {vid} has no vlan_voice_vlan custom field - skipping")
+            continue
+
+        # Convert to boolean
+        desired_voice_bool = bool(desired_voice)
+
+        # If we have enhanced facts, compare current vs desired state
+        if enhanced_vlan_facts and isinstance(enhanced_vlan_facts, dict):
+            vid_str = str(vid)
+
+            if vid_str in enhanced_vlan_facts:
+                vlan_facts = enhanced_vlan_facts[vid_str]
+
+                if isinstance(vlan_facts, dict):
+                    current_voice = vlan_facts.get("voice", False)
+                    current_voice_bool = bool(current_voice)
+
+                    # Only update if different
+                    if desired_voice_bool != current_voice_bool:
+                        vlans_needing_update.append(vlan)
+                        _debug(
+                            f"VLAN {vid} voice needs update: "
+                            f"{current_voice_bool} -> {desired_voice_bool}"
+                        )
+                    else:
+                        _debug(
+                            f"VLAN {vid} voice already correct: {current_voice_bool}"
+                        )
+                    continue
+
+            # If we get here, VLAN not found in enhanced facts
+            # Add it to be safe (assume it needs update)
+            _debug(
+                f"VLAN {vid} not in enhanced facts - assuming needs update "
+                f"to {desired_voice_bool}"
+            )
+            vlans_needing_update.append(vlan)
+        else:
+            # No enhanced facts - assume all VLANs need update
+            _debug(
+                f"No enhanced facts - VLAN {vid} will be updated to {desired_voice_bool}"
+            )
+            vlans_needing_update.append(vlan)
+
+    _debug(
+        f"VLANs needing voice update: {len(vlans_needing_update)} - "
+        f"{[v.get('vid') for v in vlans_needing_update]}"
+    )
+
+    return vlans_needing_update

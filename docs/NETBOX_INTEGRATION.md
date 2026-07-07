@@ -31,6 +31,7 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | `device_vxlan` | Boolean | Device | Yes (for VXLAN) | Enable/disable VXLAN configuration and cleanup | `configure_vxlan.yml`, `cleanup_vxlan.yml` |
 | `device_vsx` | Boolean | Device | Yes (for VSX) | Enable/disable VSX configuration | `configure_vsx.yml` |
 | `vlan_ip_igmp_snooping` | Boolean | VLAN | No | Enable/disable IGMP snooping per VLAN | `configure_vlans.yml` |
+| `vlan_voice_vlan` | Boolean | VLAN | No | Enable/disable voice VLAN per VLAN | `configure_vlans.yml` |
 | `if_stp_bpdu_filter` | Boolean | Interface | No | Enable/disable BPDU filter on an L2 interface | `configure_stp.yml` |
 | `if_stp_bpdu_guard` | Boolean | Interface | No | Enable/disable BPDU guard on an L2 interface | `configure_stp.yml` |
 | `if_stp_edge_port` | Boolean | Interface | No | Set port-type admin-edge (PortFast equivalent) | `configure_stp.yml` |
@@ -202,7 +203,50 @@ custom_fields:
   vlan_ip_igmp_snooping: false  # or omit field
 ```
 
-#### 8. if_stp_bpdu_filter (Boolean — Interface)
+#### 8. vlan_voice_vlan (Boolean)
+
+```
+Name: vlan_voice_vlan
+Type: Boolean
+Object Type: ipam > vlan
+Label: Enable Voice VLAN
+Description: Configure this VLAN as a voice VLAN
+Default: false
+Required: No
+```
+
+**NetBox UI:**
+
+```
+Customization → Custom Fields → Add
+├─ Name: vlan_voice_vlan
+├─ Type: Boolean
+├─ Content Types: ipam | vlan
+├─ Label: Enable Voice VLAN
+└─ Default: ☐ (unchecked)
+```
+
+**Purpose:** Controls voice VLAN configuration per VLAN (AOS-CX `voice` command). This tags the VLAN for voice use so IP phones are properly identified, e.g. via LLDP-MED.
+
+**Behavior:**
+- Only applies to VLANs that are in use on interfaces
+- Intelligent state comparison (when `aoscx_gather_facts_rest_api: true`)
+- Only updates VLANs where the voice setting differs from current device state
+- Skips VLANs not assigned to any interface (no unnecessary configuration)
+
+**Example:**
+
+```yaml
+# VLAN 150 - Voice VLAN for IP phones
+custom_fields:
+  vlan_voice_vlan: true
+
+# VLAN 200 - Management VLAN, not voice
+custom_fields:
+  vlan_voice_vlan: false  # or omit field
+```
+
+#### 9. if_stp_bpdu_filter (Boolean — Interface)
 
 ```
 Name: if_stp_bpdu_filter
@@ -227,7 +271,7 @@ Customization → Custom Fields → Add
 
 **Purpose:** When `true`, configures `spanning-tree bpdu-filter` on the interface — BPDUs are neither sent nor received. When `false`, configures `no spanning-tree bpdu-filter`. When null (unset), the device setting is left unchanged.
 
-#### 9. if_stp_bpdu_guard (Boolean — Interface)
+#### 10. if_stp_bpdu_guard (Boolean — Interface)
 
 ```
 Name: if_stp_bpdu_guard
@@ -252,7 +296,7 @@ Customization → Custom Fields → Add
 
 **Purpose:** When `true`, configures `spanning-tree bpdu-guard` on the interface — if a BPDU is received the port is error-disabled. Recommended on access ports facing end-hosts. When `false`, configures `no spanning-tree bpdu-guard`.
 
-#### 10. if_stp_edge_port (Boolean — Interface)
+#### 11. if_stp_edge_port (Boolean — Interface)
 
 ```
 Name: if_stp_edge_port
@@ -277,7 +321,7 @@ Customization → Custom Fields → Add
 
 **Purpose:** When `true`, configures `spanning-tree port-type admin-edge` — the port transitions directly to forwarding without going through listening/learning states (equivalent to PortFast). Recommended on access ports facing end-hosts. When `false`, configures `no spanning-tree port-type admin-edge`.
 
-#### 11. if_stp_root_guard (Boolean — Interface)
+#### 12. if_stp_root_guard (Boolean — Interface)
 
 ```
 Name: if_stp_root_guard
@@ -347,7 +391,7 @@ interface 1/1/49
     no spanning-tree bpdu-guard
 ```
 
-#### 12. if_ip_helper (Boolean — Interface)
+#### 13. if_ip_helper (Boolean — Interface)
 
 ```
 Name: if_ip_helper
@@ -481,6 +525,7 @@ Config context provides **configuration data** for features. This is JSON data a
 | **Port-Access** | `port_access.roles[*].vlan_trunk_native` | Int / String | Native VLAN for a port-access role. VLAN IDs are auto-added to the device's VLAN create list. | ✅ Active |
 | | `port_access.roles[*].vlan_trunk_allowed` | Int / String | Trunk-allowed VLANs. Supports range/list syntax: `11`, `"11,13"`, `"11-13"`, `"11,13,15-20"`. Expanded VIDs are auto-added to the device's VLAN create list and protected from idempotent deletion. | ✅ Active |
 | | `port_access.roles[*].vlan_access` | Int / String | Access VLAN for a port-access role (alternative shorthand). Same VLAN auto-creation behaviour. | ✅ Active |
+| **Static Routes** | `static_routes.<vrf>[*]` | List (per VRF) | Static routes (forward/blackhole/reject) — see [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md) | ✅ Active |
 
 ### Base System Config Context Examples
 
@@ -642,6 +687,34 @@ Ansible access: `port_access`, `port_access.roles`,
 > from NetBox the role will log a warning during VLAN change identification:
 > `VLAN X is in use but not available in NetBox for this device!`
 
+### Static Routes Config Context
+
+Static routes are defined under a top-level `static_routes` key,
+organised per VRF. Each VRF maps to a list of route objects (`forward`,
+`blackhole`, or `reject`):
+
+```json
+{
+  "static_routes": {
+    "default": [
+      {
+        "prefix": "0.0.0.0/0",
+        "type": "forward",
+        "next_hop": "172.18.17.33"
+      },
+      {
+        "prefix": "203.0.113.0/24",
+        "type": "blackhole"
+      }
+    ]
+  }
+}
+```
+
+Ansible access: `static_routes`, `static_routes.<vrf_name>`.
+
+See [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md) for
+the full field reference, idempotency notes, and cleanup behaviour.
 
 ### Config Context Hierarchy
 
@@ -1047,6 +1120,7 @@ curl -H "Authorization: Token $TOKEN" \
 | Field | Purpose |
 |-------|---------|
 | `vlan_ip_igmp_snooping` | Enable IGMP snooping per VLAN |
+| `vlan_voice_vlan` | Enable voice VLAN per VLAN |
 
 **Interface-level (Boolean — L2 interfaces only, null = leave unchanged):**
 
@@ -1080,6 +1154,12 @@ curl -H "Authorization: Token $TOKEN" \
 **DHCP Relay (Stable):**
 
 - `ip_helper_addresses` — dict keyed by VRF name; each value is a string-indexed dict of relay server IPs
+
+**Static Routes (Stable):**
+
+- `static_routes` — dict keyed by VRF name; each value is a list of route
+  objects (`prefix`, `type`, `next_hop`, `next_hop_interface`, `distance`).
+  See [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md).
 
 <a name="ip_helper_addresses"></a>
 

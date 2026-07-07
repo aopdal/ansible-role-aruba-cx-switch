@@ -424,6 +424,66 @@
   tags:
     - always
 
+# Query static route facts (optional, when static_routes config_context is defined)
+# Used by configure_static_routes.yml to compute the create/update/delete diff,
+# since the aoscx_static_route module is not idempotent (pyaoscx always deletes
+# and recreates the nexthop).
+#
+# Queries one endpoint per VRF referenced in the static_routes config_context:
+#   /system/vrfs/{vrf}/static_routes?attributes=&depth=4
+#
+# Output: aoscx_static_route_facts = { vrf: { prefix: {type, distance,
+#         next_hop_ip_address, next_hop_interface} } }
+# Only nexthop id "0" is read back (single next-hop per prefix, no ECMP).
+- name: Query static route facts from REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/vrfs/{{ item }}/static_routes?attributes=&depth=4"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  loop: "{{ (static_routes | default({})).keys() | list }}"
+  loop_control:
+    label: "VRF {{ item }}"
+  register: _rest_static_routes
+  delegate_to: localhost
+  when:
+    - aoscx_configure_static_routes | default(true) | bool
+    - (static_routes | default({})) | length > 0
+  tags:
+    - always
+
+- name: Build static route facts from REST API responses
+  ansible.builtin.set_fact:
+    aoscx_static_route_facts: >-
+      {%- set result = {} -%}
+      {%- for resp in _rest_static_routes.results | default([]) -%}
+        {%- if resp.status == 200 and resp.json is mapping -%}
+          {%- set vrf_routes = {} -%}
+          {%- for prefix, route_data in resp.json.items() -%}
+            {%- set nexthops = route_data.static_nexthops | default({}) -%}
+            {%- set nh = nexthops.get('0', {}) if nexthops is mapping else {} -%}
+            {%- set port_dict = nh.port | default({}) -%}
+            {%- set next_hop_interface = ((port_dict.keys() | list)[0]) if port_dict is mapping and port_dict | length > 0 else None -%}
+            {%- set _ = vrf_routes.update({prefix: {
+                'type': nh.type | default('forward'),
+                'distance': nh.distance | default(1),
+                'next_hop_ip_address': nh.ip_address | default(None),
+                'next_hop_interface': next_hop_interface,
+            }}) -%}
+          {%- endfor -%}
+          {%- set _ = result.update({resp.item: vrf_routes}) -%}
+        {%- endif -%}
+      {%- endfor -%} {{ result }}
+  when:
+    - aoscx_configure_static_routes | default(true) | bool
+    - (static_routes | default({})) | length > 0
+    - _rest_static_routes is defined
+  tags:
+    - always
+
 # Logout to clean up session
 - name: Logout from AOS-CX REST API
   ansible.builtin.uri:
@@ -541,7 +601,8 @@
         'EVPN facts available: ' ~ (aoscx_evpn_facts is defined),
         'VNI facts available: ' ~ (aoscx_vni_facts is defined),
         'VSX facts available: ' ~ (aoscx_vsx_facts is defined),
-        'Port-access facts available: ' ~ (aoscx_port_access_facts is defined)
+        'Port-access facts available: ' ~ (aoscx_port_access_facts is defined),
+        'Static route facts available: ' ~ (aoscx_static_route_facts is defined)
       ] }}
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1

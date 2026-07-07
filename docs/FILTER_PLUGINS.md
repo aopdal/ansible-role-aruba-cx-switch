@@ -451,6 +451,13 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
     - Only returns VLANs where IGMP setting differs from device
     - Returns: List of VLAN objects needing IGMP snooping updates
 
+- **`get_vlans_needing_voice_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None)`**
+    - Determine which VLANs need voice VLAN configuration updates
+    - Filters to VLANs in use with `vlan_voice_vlan` custom field defined
+    - Compares desired NetBox state vs current device state (when enhanced facts available)
+    - Only returns VLANs where voice setting differs from device
+    - Returns: List of VLAN objects needing voice VLAN updates
+
 - **`get_vlan_interfaces(interfaces)`**
     - Extract VLAN/SVI interfaces (e.g., vlan100, vlan200)
     - Returns: List of VLAN interface objects
@@ -660,6 +667,21 @@ OSPF interface selection and validation (4 filters, 138 lines):
     - Validate OSPF configuration consistency
     - Checks router ID and area definitions
     - Returns: Dict with `valid` boolean, `warnings`, and `errors` lists
+
+### `static_route_filters.py` - Static Route Change Detection
+
+Pre-compares desired static routes (NetBox `static_routes` config context,
+per VRF) against device REST API facts (`aoscx_static_route_facts`),
+since `aoscx_static_route` is not idempotent (pyaoscx always deletes and
+recreates the route's next-hop).
+
+- **`get_static_route_changes(static_routes, static_route_facts=None)`**
+    - Compares desired routes (type, distance, next-hop IP/interface)
+      against current device state per VRF/prefix
+    - When `static_route_facts` is `None` (REST facts unavailable), all
+      desired routes are returned for push and none for deletion
+    - Returns: `{"routes_to_apply": [...], "routes_to_delete": [...]}`
+      — see [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)
 
 ## Usage in Playbooks
 

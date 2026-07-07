@@ -38,7 +38,7 @@ The `aoscx.j2` master template includes:
 14. **int_vxlan.j2** - VXLAN interface configuration
 15. **vsx.j2** - Virtual Switching Extension (VSX) configuration
 16. **ospf.j2** - OSPF routing protocol configuration
-17. **gateway.j2** - EVPN gateway settings
+17. **gateway.j2** - Default gateway (access-switch) and static routes (`ip route`/`ipv6 route`, from the `static_routes` config_context)
 18. **https.j2** - HTTPS/REST API configuration
 
 ## Not Included

@@ -93,6 +93,13 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
   with vault indirection, VRF-name matching rules, and
   cleartext-to-ciphertext migration.
 
+### Static Routes
+
+- **[STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)** - Static route
+  reference: NetBox modelling (`static_routes` config context, per VRF),
+  forward/blackhole/reject route types, change detection and idempotency,
+  cleanup behaviour, and known limitations (no ECMP).
+
 ### Tag-Dependent Configuration
 
 - **[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md)** - Tag-dependent task implementation

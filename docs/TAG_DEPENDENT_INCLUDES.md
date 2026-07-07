@@ -116,6 +116,20 @@ when:
 
 **Reason**: Routing protocol changes are high-impact and could affect network connectivity.
 
+### 4. Static Routes
+
+```yaml
+when:
+  - aoscx_configure_static_routes | bool
+  - (static_routes | default({})) | length > 0
+  - "'static_routes' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
+```
+
+**Reason**: Static route changes (especially to a default route) are
+high-impact and could affect network connectivity, same as OSPF/BGP.
+Cleanup of stale routes is additionally gated by `aoscx_idempotent_mode`
+(see [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)).
+
 ## Tasks That Are NOT Tag-Dependent
 
 ### Cleanup Tasks
