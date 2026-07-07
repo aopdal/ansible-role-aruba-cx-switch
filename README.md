@@ -339,6 +339,7 @@ aoscx_configure_physical_interfaces: true
 aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true  # includes loopback interfaces
 aoscx_configure_ospf: true
+aoscx_configure_static_routes: true
 
 # Idempotent mode - removes configs not in NetBox
 aoscx_idempotent_mode: false
@@ -393,6 +394,29 @@ interface custom fields, per-VRF MD5 authentication with vault
 indirection, cleartext-to-ciphertext migration, and operational
 notes — see [docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md).
 
+### Static Routes Configuration
+
+Static routes (`forward`, `blackhole`, `reject`) are configured from a
+`static_routes` NetBox config_context key, organised per VRF:
+
+```json
+{
+  "static_routes": {
+    "default": [
+      {
+        "prefix": "0.0.0.0/0",
+        "type": "forward",
+        "next_hop": "172.18.17.33"
+      }
+    ]
+  }
+}
+```
+
+Only a single next-hop per prefix is supported (no ECMP). See
+[docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)
+for the complete data model, all route fields, and idempotency notes.
+
 ### Loopback Configuration
 
 Loopback interfaces are automatically detected from NetBox and configured with IP addresses and VRF assignments.
@@ -437,7 +461,7 @@ vrf: default  # or custom VRF name
 Generated configuration:
 
 ```bash
-interface loopback0
+interface loopback 0
   ip address 10.255.255.1/32
 ```
 
@@ -455,10 +479,10 @@ interface loopback0
 
 Generated configuration:
 ```bash
-interface loopback0
+interface loopback 0
   ip address 10.255.255.1/32
 
-interface loopback1
+interface loopback 1
   vrf attach customer_a
   ip address 192.168.1.1/32
 ```
