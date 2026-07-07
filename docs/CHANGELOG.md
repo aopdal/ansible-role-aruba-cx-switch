@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.7] - 2026-07-07
+
+### Added
+
+- New static route management, configured from a `static_routes` NetBox config_context key (organised per VRF, JSON data model documented in [docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)). Supports `forward`, `blackhole`, and `reject` route types via `arubanetworks.aoscx.aoscx_static_route`. New `aoscx_configure_static_routes` variable (default `true`), new `tasks/configure_static_routes.yml` (tag-dependent like OSPF/BGP — requires `static_routes`, `routing`, or `all` tag), and a new `get_static_route_changes` filter that pre-compares desired routes against REST API facts (`aoscx_static_route_facts`, gathered when `aoscx_gather_facts_rest_api: true`) since the underlying module is not idempotent. Cleanup of stale routes only runs in `aoscx_idempotent_mode`. Only a single next-hop per prefix is supported (no ECMP). `templates/gateway.j2` (ZTP/template-based config generation) also renders `static_routes` as `ip route`/`ipv6 route` CLI lines, auto-detecting the address family per prefix and emitting `nullroute`/`reject`/`distance`/`vrf` clauses as needed.
+- New `vlan_voice_vlan` NetBox VLAN custom field. When `true`, `configure_vlans.yml` sets `voice: true` on `aoscx_vlan` (AOS-CX `voice` command) at creation, and updates in-use VLANs whose voice setting differs from the current device state. New `get_vlans_needing_voice_update` filter mirrors `get_vlans_needing_igmp_update`, comparing against the `voice` attribute in `aoscx_enhanced_vlan_facts`. The template-based config generator (`templates/vlan.j2`) also emits `voice` when the custom field is set.
+
+### Fixed
+
+- `templates/int_loopback.j2` (template-based config generation) generated `interface loopback0` instead of `interface loopback 0`. AOS-CX requires a space between `loopback` and the interface number, the same as `vlan` and `lag` interfaces (which already inserted the space correctly).
+
 ## [0.13.6] - 2026-07-01
 
 ### Added
