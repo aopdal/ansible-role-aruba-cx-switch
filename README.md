@@ -91,6 +91,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **Port Profiles** - Configure port-access profiles
 - ✅ **STP** - Global and interface config
 - ✅ **DHCP relay IPv4** - Configuration pr VRF
+- ✅ **Static routing** - Forward, blackhole, and reject routes per VRF
 - ❌ **BFD** - on roadmap
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
@@ -100,7 +101,6 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ❌ **ACL** - on roadmap
 - ❌ **Logging** - on roadmap
 - ❌ **SNMP** - on roadmap
-- ❌ **Static routing** - on roadmap
 - ❌ **L3 VNI** - on roadmap
 - ❌ **Multicast routing** - not on roadmap
 - ❌ **QoS** - not on roadmap
@@ -706,6 +706,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `port_access`, `cleanup`, `idempotent` - Port-access orphan cleanup (idempotent mode only)
 - `ospf`, `routing`, `layer3` - OSPF configuration (tag-dependent)
 - `bgp`, `routing`, `layer3` - BGP configuration (tag-dependent)
+- `static_routes`, `routing`, `layer3` - Static route configuration (tag-dependent)
 - `vsx`, `ha` - VSX configuration (tag-dependent)
 - `always`, `save`, `config` - Save configuration (runs on every play due to `always`)
 
@@ -717,7 +718,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `layer2` - All L2 configuration (VLANs, L2 interfaces, LAG, STP, port-access)
 - `layer3` - All L3 configuration (VRFs, L3 interfaces/loopbacks, OSPF, BGP)
 - `interfaces` - All interface configuration (physical, LAG, MCLAG, L2, L3)
-- `routing` - All routing protocol configuration (VRFs, OSPF, BGP)
+- `routing` - All routing protocol configuration (VRFs, OSPF, BGP, static routes)
 - `overlay` - All overlay configuration (EVPN, VXLAN)
 - `cleanup` - All cleanup tasks (idempotent mode only)
 - `idempotent` - All idempotent cleanup tasks
@@ -731,6 +732,7 @@ Some tasks only run when explicitly requested with specific tags:
 
 - **OSPF** - Requires `--tags ospf`, `--tags routing`, or no tags (full run)
 - **BGP** - Requires `--tags bgp`, `--tags routing`, or no tags (full run)
+- **Static routes** - Requires `--tags static_routes`, `--tags routing`, or no tags (full run)
 - **VSX** - Requires `--tags vsx`, `--tags ha`, or no tags (full run)
 
 ## VRF Handling
