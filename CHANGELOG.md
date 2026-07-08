@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.11] - 2026-07-08
+
+### Fixed
+
+- Update docs regarding ospf configuration
+- Remove fail settings in ospf template
+
 ## [0.13.10] - 2026-07-08
 
 ### Fixed
