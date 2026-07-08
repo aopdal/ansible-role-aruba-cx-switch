@@ -31,13 +31,13 @@ The `aoscx.j2` master template includes:
 7. **stp.j2** - Spanning Tree Protocol settings
 8. **int_mgmt.j2** - Management interface configuration
 9. **system_interface_group.j2** - System interface groups
-10. **int_lag.j2** - LAG (Link Aggregation) interface configuration
-11. **int_phys.j2** - Physical interface settings
+10. **int_lag.j2** - LAG (Link Aggregation) interface configuration, including per-interface OSPF area/network type/authentication
+11. **int_phys.j2** - Physical interface settings, including per-interface OSPF area/network type/authentication
 12. **int_loopback.j2** - Loopback interface configuration
-13. **int_vlan.j2** - VLAN SVI interface configuration
+13. **int_vlan.j2** - VLAN SVI interface configuration, including per-interface OSPF area/network type/authentication
 14. **int_vxlan.j2** - VXLAN interface configuration
 15. **vsx.j2** - Virtual Switching Extension (VSX) configuration
-16. **ospf.j2** - OSPF routing protocol configuration
+16. **ospf.j2** - OSPF router instance and area configuration (`router ospf`/`area`; authentication is interface-level, see `int_phys.j2`/`int_lag.j2`/`int_vlan.j2`)
 17. **gateway.j2** - Default gateway (access-switch) and static routes (`ip route`/`ipv6 route`, from the `static_routes` config_context)
 18. **https.j2** - HTTPS/REST API configuration
 

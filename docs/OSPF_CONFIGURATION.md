@@ -371,15 +371,25 @@ interface 1/1/10
    # No authentication commands
 ```
 
-The OSPF router configuration (from `templates/ospf.j2`) includes
-area-level authentication for ZTP/template-based deployments:
+For ZTP/template-based deployments, per-interface authentication is
+rendered by `templates/int_phys.j2`, `templates/int_lag.j2`, and
+`templates/int_vlan.j2` (loopbacks are excluded, matching the runtime
+task's `'loopback' not in item.interface_name` check). Each mirrors
+the same `ospf_auth_keys[vrf]` lookup and plaintext/ciphertext handling
+as `tasks/configure_ospf.yml`:
 
 ```text
-router ospf 1 vrf tenant_a
-    router-id 10.0.0.1
-    area 0.0.0.0
-    area 0.0.0.0 authentication message-digest
+interface 1/1/10
+   ip ospf 1 area 0.0.0.0
+   ip ospf network point-to-point
+   ip ospf authentication message-digest
+   ip ospf message-digest-key 1 md5 ciphertext $1$mdp$abcdef...
 ```
+
+AOS-CX does not support area-level `authentication message-digest` —
+only interface-level. `templates/ospf.j2` (the OSPF router/area
+template) therefore only renders `router ospf`/`area` statements and
+does not attempt authentication.
 
 !!! note "Templates vs. Module Configuration"
     The role uses TWO paths for OSPF configuration:
@@ -387,9 +397,10 @@ router ospf 1 vrf tenant_a
     - **CLI task-based** (runtime via `tasks/configure_ospf.yml`): Used when
       managing live devices through Ansible. Secure, idempotent, and
       supports bidirectional changes including ciphertext keys.
-    - **Template-based** (`templates/int_*.j2`, `templates/ospf.j2`):
-      Used for ZTP config generation and migration scenarios where
-      devices aren't yet accessible via Ansible API.
+    - **Template-based** (`templates/int_phys.j2`, `templates/int_lag.j2`,
+      `templates/int_vlan.j2`, `templates/ospf.j2`): Used for ZTP config
+      generation and migration scenarios where devices aren't yet
+      accessible via Ansible API.
 
     Both paths generate the same final configuration.
 
