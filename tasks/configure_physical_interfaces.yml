@@ -236,6 +236,60 @@
     - physical_interfaces_already_up_needing_update | default([]) | length > 0
     - item.name != "mgmt"
 
+# Sub-interfaces (dot1q VLAN-tagged L3 interfaces) require their parent physical
+# interface to be in routed mode. Some hardware/firmware defaults physical ports
+# to L2 (switching) mode, which blocks sub-interface encapsulation until "routing"
+# is explicitly enabled on the parent. Compared against device facts so this is
+# only pushed when the parent is not already routed.
+- name: Determine parent interfaces of sub-interfaces already in routed mode
+  ansible.builtin.set_fact:
+    subinterface_parents_already_routed: >-
+      {{
+        ansible_facts.network_resources.interfaces | default({})
+        | dict2items
+        | selectattr('value.routing', 'defined')
+        | selectattr('value.routing', 'equalto', true)
+        | map(attribute='key')
+        | list
+      }}
+  when:
+    - subinterface_parent_names | default([]) | length > 0
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+
+- name: Set empty already-routed list if no device facts available
+  ansible.builtin.set_fact:
+    subinterface_parents_already_routed: []
+  when: subinterface_parents_already_routed is not defined
+
+- name: Build list of sub-interface parents needing routing mode enabled
+  ansible.builtin.set_fact:
+    subinterface_parents_needing_routing: >-
+      {{
+        interfaces
+        | selectattr('name', 'in', subinterface_parent_names | default([]))
+        | rejectattr('name', 'in', subinterface_parents_already_routed)
+        | list
+      }}
+  when: subinterface_parent_names | default([]) | length > 0
+
+- name: Set empty routing list if no sub-interface parents
+  ansible.builtin.set_fact:
+    subinterface_parents_needing_routing: []
+  when: subinterface_parent_names | default([]) | length == 0
+
+- name: Enable routed mode on parent interfaces of sub-interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - routing
+    parents: "interface {{ item.name }}"
+  loop: "{{ subinterface_parents_needing_routing }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: subinterface_parents_needing_routing | default([]) | length > 0
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
 - name: Debug - Physical interface configuration summary
   ansible.builtin.debug:
     msg:
@@ -248,6 +302,7 @@
       - "Physical interfaces from CHANGE LIST: {{ interface_changes.physical | default([]) | length }}"
       - "Parent interfaces identified: {{ subinterface_parent_names | default([]) | length }}"
       - "Parent interfaces already up (skipped): {{ (subinterface_parent_names | default([]) | length) - (parents_needing_enable | default([]) | length) }}"
+      - "Parent interfaces needing routing mode enabled: {{ subinterface_parents_needing_routing | default([]) | map(attribute='name') | list }}"
       - "Physical interfaces WILL BE ENABLED (not already up): {{ physical_interfaces_to_enable | default([]) | length }}"
       - >-
         Physical interfaces WILL BE DISABLED (currently up, need down):

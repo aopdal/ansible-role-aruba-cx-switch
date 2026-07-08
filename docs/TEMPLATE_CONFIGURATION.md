@@ -31,8 +31,8 @@ The `aoscx.j2` master template includes:
 7. **stp.j2** - Spanning Tree Protocol settings
 8. **int_mgmt.j2** - Management interface configuration
 9. **system_interface_group.j2** - System interface groups
-10. **int_lag.j2** - LAG (Link Aggregation) interface configuration, including per-interface OSPF area/network type/authentication
-11. **int_phys.j2** - Physical interface settings, including per-interface OSPF area/network type/authentication
+10. **int_lag.j2** - LAG (Link Aggregation) interface configuration, including per-interface OSPF area/network type/authentication. LAG interfaces with an IP address are automatically put into routed mode (`routing`), since some platforms default LAGs to L2 (switching) mode.
+11. **int_phys.j2** - Physical interface settings, including per-interface OSPF area/network type/authentication. Physical interfaces that are the parent of a dot1q sub-interface are automatically put into routed mode (`routing`), since some hardware/firmware defaults physical ports to L2 (switching) mode and sub-interfaces require the parent to be routed.
 12. **int_loopback.j2** - Loopback interface configuration
 13. **int_vlan.j2** - VLAN SVI interface configuration, including per-interface OSPF area/network type/authentication
 14. **int_vxlan.j2** - VXLAN interface configuration

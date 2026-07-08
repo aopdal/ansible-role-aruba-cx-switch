@@ -15,6 +15,8 @@ interface {{ intf.name | replace("lag", "lag ") }}
    description {{ intf.description }}
 {%     endif %}
 {%     if intf.ip_addresses | length > 0 %}
+{# LAG must be explicitly routed - some platforms default LAGs to L2 mode #}
+   routing
 {%       if intf.mtu == none %}
    no ip mtu
 {%       else %}

@@ -524,17 +524,70 @@ class TestBuildL3ConfigLines:
         assert "l3-counters" in lines
 
     def test_command_order_custom_vrf(self):
-        """VRF first, then MTU, then IPs, then l3-counters"""
+        """Routing first, then VRF, then MTU, then IPs, then l3-counters"""
         item = _make_item(
             {"vrf": {"name": "TEST"}, "mtu": 9000},
             [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "physical", "custom", True)
 
-        assert lines[0] == "vrf attach TEST"
+        assert lines[0] == "routing"
+        assert lines[1] == "vrf attach TEST"
         assert lines.index("ip mtu 9000") < lines.index(
             "ip address 10.0.0.1/24")
         assert lines[-1] == "l3-counters"
+
+    def test_physical_emits_routing(self):
+        """Physical L3 interfaces explicitly enable routed mode"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "physical", "default", True)
+
+        assert lines[0] == "routing"
+
+    def test_lag_emits_routing(self):
+        """LAG L3 interfaces explicitly enable routed mode"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "lag", "default", True)
+
+        assert lines[0] == "routing"
+
+    def test_vlan_does_not_emit_routing(self):
+        """VLAN SVIs are always L3 by nature - no explicit routing needed"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", True)
+
+        assert "routing" not in lines
+
+    def test_loopback_does_not_emit_routing(self):
+        """Loopback interfaces are always L3 by nature - no explicit routing needed"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/32", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "loopback", "default", True)
+
+        assert "routing" not in lines
+
+    def test_subinterface_does_not_emit_routing(self):
+        """Sub-interfaces don't emit their own 'routing' line - the parent
+        interface's routed-mode enablement is handled separately in
+        tasks/configure_physical_interfaces.yml"""
+        item = _make_item(
+            {"tagged_vlans": [{"vid": 100}], "mtu": None},
+            [{"address": "10.0.0.1/30", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "subinterface", "default", True)
+
+        assert "routing" not in lines
 
     def test_subinterface_with_encapsulation(self):
         """Sub-interface generates dot1q encapsulation before other lines"""

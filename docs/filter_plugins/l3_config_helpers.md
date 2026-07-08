@@ -212,12 +212,23 @@ build_l3_config_lines(
    encapsulation dot1q <vlan_id>
    ```
 
-2. **VRF Attachment** (custom VRF only)
+2. **Routing mode** (`interface_type` is `'physical'` or `'lag'` only)
+   ```
+   routing
+   ```
+   Some AOS-CX hardware/firmware defaults physical and LAG ports to L2
+   (switching) mode, so routed mode is explicitly enabled whenever the
+   interface carries L3 config. VLAN SVIs and loopbacks are always L3 by
+   nature and never emit this line; sub-interface parents are handled
+   separately in `tasks/configure_physical_interfaces.yml` (not by this
+   function).
+
+3. **VRF Attachment** (custom VRF only)
    ```
    vrf attach <vrf_name>
    ```
 
-3. **All IPv4 addresses** (anycast first, then regular)
+4. **All IPv4 addresses** (anycast first, then regular)
    ```
    active-gateway ip mac <mac>          # anycast
    active-gateway ip <address>          # anycast
@@ -225,7 +236,7 @@ build_l3_config_lines(
    ip address <address> secondary       # additional regular IPs
    ```
 
-4. **All IPv6 addresses** (anycast first, then regular)
+5. **All IPv6 addresses** (anycast first, then regular)
    ```
    ipv6 address link-local <addr>/<prefix>  # if anycast addr is link-local (fe80::)
    active-gateway ipv6 mac <mac>            # anycast
@@ -238,17 +249,17 @@ build_l3_config_lines(
    > `build_l3_config_lines` emits this automatically when the anycast address
    > starts with `fe80:`. Global-unicast anycast addresses are unaffected.
 
-5. **MTU** (if set on interface)
+6. **MTU** (if set on interface)
    ```
    ip mtu <mtu>
    ```
 
-6. **L3 Counters** (if enabled)
+7. **L3 Counters** (if enabled)
    ```
    l3-counters
    ```
 
-7. **OSPF** (if `custom_fields.if_ip_ospf_1_area` is set on interface)
+8. **OSPF** (if `custom_fields.if_ip_ospf_1_area` is set on interface)
    ```
    ip ospf <process_id> area <area>
    ip ospf network <type>               # if if_ip_ospf_network is set
