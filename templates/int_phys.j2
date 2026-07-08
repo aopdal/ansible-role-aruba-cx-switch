@@ -1,4 +1,13 @@
 
+{% set subinterface_parent_names = interfaces
+  | selectattr('type', 'defined')
+  | selectattr('type.value', 'equalto', 'virtual')
+  | selectattr('parent', 'defined')
+  | selectattr('parent')
+  | map(attribute='parent')
+  | map(attribute='name', default='')
+  | select
+  | unique | list %}
 {% for intf in interfaces %}
 {%   if 'mgmt' not in intf.name and 'lag' not in intf.name and 'loopback' not in intf.name and 'vlan' not in intf.name %}
 interface {{ intf.name }}
@@ -33,6 +42,11 @@ interface {{ intf.name }}
    ip mtu {{ intf.mtu }}
 {%       endif %}
    l3-counters
+{%     endif %}
+{%     if intf.parent is none and intf.name in subinterface_parent_names %}
+{# Parent of a sub-interface - must be in routed mode so dot1q sub-interfaces #}
+{# can attach. Some hardware/firmware defaults physical ports to L2 mode. #}
+   routing
 {%     endif %}
 {%     if intf.parent is not none %}
 {# Subinterface - L3 routed configuration #}
@@ -135,7 +149,7 @@ interface {{ intf.name }}
 {%       endif %}
 
 {%     endif %}
-{%     if intf.parent is none and intf.ip_addresses | length == 0 %}
+{%     if intf.parent is none and intf.ip_addresses | length == 0 and intf.name not in subinterface_parent_names %}
 {# Physical interface without IP - L2 settings #}
 {%       if intf.mode %}
    no routing

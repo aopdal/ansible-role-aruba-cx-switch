@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.12] - 2026-07-08
+
+### Fixed
+
+- Physical interfaces that are the parent of a dot1q sub-interface (`templates/int_phys.j2` and `tasks/configure_physical_interfaces.yml`) now explicitly enable routed mode (`routing`). Some AOS-CX hardware/firmware defaults physical ports to L2 (switching) mode, which previously left the parent unrouted and blocked sub-interface encapsulation. The runtime task compares against gathered device facts so `routing` is only pushed when the parent is not already routed.
+- Physical and LAG interfaces configured with an L3 address (`netbox_filters_lib/l3_config_helpers.py` and `templates/int_lag.j2`) now explicitly enable routed mode (`routing`), to support platforms that default physical/LAG ports to L2 (switching) mode instead of L3. VLAN SVIs and loopbacks are unaffected, since they are always L3 by default on every platform. `templates/int_phys.j2` already emitted `routing` for L3 physical interfaces.
+
 ## [0.13.11] - 2026-07-08
 
 ### Fixed

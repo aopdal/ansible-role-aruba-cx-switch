@@ -282,6 +282,16 @@ def build_l3_config_lines(
                 lines.append(f"encapsulation dot1q {vlan_id}")
                 _debug(f"  Adding encapsulation: dot1q {vlan_id}")
 
+    # Explicit "routing" for physical and LAG interfaces (must come first, after
+    # encapsulation). Some AOS-CX hardware/firmware defaults physical and LAG
+    # ports to L2 (switching) mode, so routed mode must be enabled explicitly.
+    # VLAN SVIs and loopbacks are always L3 by nature on every platform and
+    # never need this; sub-interface parents are handled separately in
+    # tasks/configure_physical_interfaces.yml.
+    if interface_type in ("physical", "lag"):
+        lines.append("routing")
+        _debug("  Adding routing (L3 mode)")
+
     # VRF attachment — once per interface, not once per IP
     # Two cases require "vrf attach":
     #   1. Normal custom-VRF configuration (vrf_type == "custom"): attach the named VRF.
