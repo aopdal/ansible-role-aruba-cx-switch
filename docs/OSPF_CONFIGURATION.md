@@ -251,7 +251,7 @@ a plain string (cleartext) or a dict:
 ospf_auth_keys:
   default:
     secret: "ChangeMe-Default"
-    encrypted: false        # cleartext, pushed as: md5 <secret>
+    encrypted: false        # pushed as: md5 plaintext <secret>
   tenant_a:
     secret: "$1$mdp$abcdef0123456789abcdef01"
     encrypted: true         # pushed as: md5 ciphertext <secret>
