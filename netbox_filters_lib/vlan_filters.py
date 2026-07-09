@@ -815,3 +815,100 @@ def get_vlans_needing_voice_update(
     )
 
     return vlans_needing_update
+
+
+def get_vlans_needing_name_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None):
+    """
+    Determine which VLANs need name or description configuration updates
+
+    Filters VLANs to only those that:
+    1. Are in use on interfaces
+    2. Have a name and/or description different from current device state
+       (when facts available)
+
+    Args:
+        device_vlans: List of VLAN objects available for this device from NetBox
+        vlans_in_use_dict: Dict from get_vlans_in_use() with 'vids' and 'vlans'
+        enhanced_vlan_facts: Optional dict from REST API with current name/description
+                           Format: {"101": {"name": "...", "description": "...", ...}, ...}
+
+    Returns:
+        List of VLAN objects needing name/description configuration updates
+    """
+    vlans_needing_update = []
+
+    # Ensure inputs are valid
+    if not device_vlans:
+        _debug("No device VLANs provided")
+        return vlans_needing_update
+
+    if not vlans_in_use_dict or "vids" not in vlans_in_use_dict:
+        _debug("No VLANs in use provided")
+        return vlans_needing_update
+
+    vids_in_use = set(vlans_in_use_dict["vids"])
+    _debug(f"VLANs in use on interfaces: {sorted(list(vids_in_use))}")
+
+    # Process each VLAN
+    for vlan in device_vlans:
+        if not vlan or not isinstance(vlan, dict):
+            continue
+
+        vid = vlan.get("vid")
+        if vid is None or vid < 2 or vid > 4094:
+            continue
+
+        # Skip if VLAN is not in use
+        if vid not in vids_in_use:
+            _debug(f"VLAN {vid} not in use - skipping name check")
+            continue
+
+        desired_name = vlan.get("name")
+        desired_description = vlan.get("description") or ""
+
+        # If we have enhanced facts, compare current vs desired state
+        if enhanced_vlan_facts and isinstance(enhanced_vlan_facts, dict):
+            vid_str = str(vid)
+
+            if vid_str in enhanced_vlan_facts:
+                vlan_facts = enhanced_vlan_facts[vid_str]
+
+                if isinstance(vlan_facts, dict):
+                    current_name = vlan_facts.get("name") or ""
+                    current_description = vlan_facts.get("description") or ""
+
+                    if (
+                        desired_name != current_name
+                        or desired_description != current_description
+                    ):
+                        vlans_needing_update.append(vlan)
+                        _debug(
+                            f"VLAN {vid} name/description needs update: "
+                            f"'{current_name}'/'{current_description}' -> "
+                            f"'{desired_name}'/'{desired_description}'"
+                        )
+                    else:
+                        _debug(f"VLAN {vid} name/description already correct")
+                    continue
+
+            # If we get here, VLAN not found in enhanced facts
+            # Add it to be safe (assume it needs update)
+            _debug(
+                f"VLAN {vid} not in enhanced facts - assuming needs update "
+                f"to name '{desired_name}'"
+            )
+            vlans_needing_update.append(vlan)
+        else:
+            # No enhanced facts - assume all VLANs need update
+            _debug(
+                f"No enhanced facts - VLAN {vid} will be updated to name "
+                f"'{desired_name}'"
+            )
+            vlans_needing_update.append(vlan)
+
+    _debug(
+        f"VLANs needing name/description update: {len(vlans_needing_update)} - "
+        f"{[v.get('vid') for v in vlans_needing_update]}"
+    )
+
+    return vlans_needing_update

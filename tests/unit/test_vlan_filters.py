@@ -11,6 +11,7 @@ from netbox_filters_lib.vlan_filters import (
     get_vlans_needing_changes,
     get_vlans_needing_igmp_update,
     get_vlans_needing_voice_update,
+    get_vlans_needing_name_update,
     get_vlan_interfaces,
     parse_evpn_evi_output,
 )
@@ -719,3 +720,143 @@ class TestGetVlansNeedingVoiceUpdate:
 
         # VLANs 10 and 30 need update (truthy != False), VLAN 20 is correct
         assert sorted(result_vids) == [10, 30]
+
+
+class TestGetVlansNeedingNameUpdate:
+    """Tests for get_vlans_needing_name_update function"""
+
+    def test_skip_vlans_not_in_use(self):
+        """Test that VLANs not in use are skipped even if name differs"""
+        vlans = [
+            {"vid": 10, "name": "NEW10"},
+            {"vid": 20, "name": "NEW20"},
+            {"vid": 30, "name": "NEW30"},
+        ]
+        vlans_in_use = {"vids": [10, 20], "vlans": vlans[:2]}
+        enhanced_facts = {
+            "10": {"name": "OLD10"},
+            "20": {"name": "OLD20"},
+            "30": {"name": "OLD30"},
+        }
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        assert sorted(result_vids) == [10, 20]
+
+    def test_skip_invalid_vlan_ids(self):
+        """Test that invalid VLAN IDs (< 2 or > 4094) are skipped"""
+        vlans = [
+            {"vid": 1, "name": "NEW1"},
+            {"vid": 10, "name": "NEW10"},
+            {"vid": 4095, "name": "NEW4095"},
+        ]
+        vlans_in_use = {"vids": [1, 10, 4095], "vlans": vlans}
+        enhanced_facts = {
+            "1": {"name": "OLD1"},
+            "10": {"name": "OLD10"},
+            "4095": {"name": "OLD4095"},
+        }
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        assert result_vids == [10]
+
+    def test_with_enhanced_facts_no_change_needed(self):
+        """Test with enhanced facts when name/description match (no update needed)"""
+        vlans = [
+            {"vid": 101, "name": "VLAN101", "description": "desc101"},
+            {"vid": 102, "name": "VLAN102", "description": "desc102"},
+        ]
+        vlans_in_use = {"vids": [101, 102], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"name": "VLAN101", "description": "desc101"},
+            "102": {"name": "VLAN102", "description": "desc102"},
+        }
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, enhanced_facts)
+
+        assert result == []
+
+    def test_with_enhanced_facts_name_change_needed(self):
+        """Test with enhanced facts when name differs (update needed)"""
+        vlans = [
+            {"vid": 101, "name": "RENAMED", "description": "desc101"},
+            {"vid": 102, "name": "VLAN102", "description": "desc102"},
+        ]
+        vlans_in_use = {"vids": [101, 102], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"name": "VLAN101", "description": "desc101"},
+            "102": {"name": "VLAN102", "description": "desc102"},
+        }
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        assert result_vids == [101]
+
+    def test_with_enhanced_facts_description_change_needed(self):
+        """Test with enhanced facts when only description differs (update needed)"""
+        vlans = [
+            {"vid": 101, "name": "VLAN101", "description": "new desc"},
+        ]
+        vlans_in_use = {"vids": [101], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"name": "VLAN101", "description": "old desc"},
+        }
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        assert result_vids == [101]
+
+    def test_with_enhanced_facts_vlan_not_in_facts(self):
+        """Test when VLAN is in use but not in enhanced facts (assume needs update)"""
+        vlans = [
+            {"vid": 101, "name": "VLAN101"},
+            {"vid": 102, "name": "VLAN102"},
+        ]
+        vlans_in_use = {"vids": [101, 102], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"name": "VLAN101"},
+            # VLAN 102 missing from facts
+        }
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, enhanced_facts)
+        result_vids = [v["vid"] for v in result]
+
+        assert result_vids == [102]
+
+    def test_without_enhanced_facts_all_updated(self):
+        """Test without enhanced facts (all in-use VLANs are updated)"""
+        vlans = [
+            {"vid": 10, "name": "VLAN10"},
+            {"vid": 20, "name": "VLAN20"},
+        ]
+        vlans_in_use = {"vids": [10, 20], "vlans": vlans}
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, None)
+        result_vids = [v["vid"] for v in result]
+
+        assert sorted(result_vids) == [10, 20]
+
+    def test_empty_inputs(self):
+        """Test with empty inputs"""
+        assert get_vlans_needing_name_update([], {"vids": [], "vlans": []}) == []
+        assert get_vlans_needing_name_update(None, {"vids": [], "vlans": []}) == []
+        assert get_vlans_needing_name_update([], None) == []
+
+    def test_missing_description_treated_as_empty_string(self):
+        """Test that a missing description on both sides doesn't trigger an update"""
+        vlans = [
+            {"vid": 101, "name": "VLAN101"},
+        ]
+        vlans_in_use = {"vids": [101], "vlans": vlans}
+        enhanced_facts = {
+            "101": {"name": "VLAN101", "description": ""},
+        }
+
+        result = get_vlans_needing_name_update(vlans, vlans_in_use, enhanced_facts)
+
+        assert result == []

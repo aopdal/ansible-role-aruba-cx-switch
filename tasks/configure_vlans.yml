@@ -84,6 +84,24 @@
     - vlans | length > 0
     - vlans_in_use.vids | length > 0
 
+# Update name/description settings on VLANs in use from NetBox
+# This ensures changes to the VLAN name and description in NetBox are applied
+# Only applies to VLANs that are actually in use on this device
+# Uses enhanced VLAN facts (when available) to only update VLANs where name/description differ
+- name: Update VLAN name and description
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: "{{ item.vid }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    state: update
+  loop: "{{ vlans | get_vlans_needing_name_update(vlans_in_use,
+    aoscx_enhanced_vlan_facts | default(none)) }}"
+  loop_control:
+    label: "VLAN {{ item.vid }} - name: {{ item.name }}"
+  when:
+    - vlans | length > 0
+    - vlans_in_use.vids | length > 0
+
 # NOTE: VLAN deletion is handled in cleanup_vlans.yml task
 # This runs AFTER interface cleanup to ensure VLANs are not in use
 # when they are deleted. See tasks/main.yml for task ordering.
