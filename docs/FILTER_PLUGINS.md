@@ -458,6 +458,13 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
     - Only returns VLANs where voice setting differs from device
     - Returns: List of VLAN objects needing voice VLAN updates
 
+- **`get_vlans_needing_name_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None)`**
+    - Determine which VLANs need name or description configuration updates
+    - Filters to VLANs in use on this device
+    - Compares desired NetBox `name`/`description` vs current device state (when enhanced facts available)
+    - Only returns VLANs where name or description differs from device
+    - Returns: List of VLAN objects needing name/description updates
+
 - **`get_vlan_interfaces(interfaces)`**
     - Extract VLAN/SVI interfaces (e.g., vlan100, vlan200)
     - Returns: List of VLAN interface objects
