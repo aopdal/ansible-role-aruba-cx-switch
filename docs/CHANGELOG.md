@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.13] - 2026-07-09
+
+### Fixed
+
+- Changing a VLAN's `name` or `description` in NetBox was not propagated to the device. `configure_vlans.yml` only ever created VLANs (`state: create`, a no-op if the VLAN already exists) and updated IGMP/voice settings, never the name/description of an existing in-use VLAN. New `get_vlans_needing_name_update` filter compares desired NetBox `name`/`description` against `aoscx_enhanced_vlan_facts` (REST API facts, already queried with these attributes) and a new task in `configure_vlans.yml` pushes `aoscx_vlan` with `state: update` only when they differ.
+
 ## [0.13.12] - 2026-07-08
 
 ### Fixed
