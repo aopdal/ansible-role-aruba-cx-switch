@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.14] - 2026-07-16
+
+### Added
+
+- New `aoscx_ospf_router_facts` REST API fact (`tasks/gather_facts_rest_api.yml`), giving the OSPF router-id, configured areas, and passive interfaces per VRF/process-id (`{vrf: {process_id: {router_id, areas, passive_interfaces}}}`), alongside the existing `aoscx_ospf_interface_facts`. Both let a report-only playbook (`aoscx_configure_ospf: false`, `aoscx_gather_facts_rest_api: true`) compare what NetBox declares against what the device actually has configured.
+- New `normalize_ospf_vrfs` filter (`netbox_filters_lib/ospf_filters.py`) that collapses the multi-VRF (`ospf_vrfs`) and legacy single-VRF (`ospf_1_vrf` + `ospf_areas`) NetBox OSPF config context formats into one shape. Used by both `configure_ospf.yml` and the new OSPF router facts query so the two stay in sync. See [docs/filter_plugins/ospf_filters.md](docs/filter_plugins/ospf_filters.md).
+
+### Changed
+
+- OSPF fact gathering (`aoscx_ospf_interface_facts`, `aoscx_ospf_router_facts`) no longer requires `aoscx_configure_ospf: true`. It now only requires `aoscx_gather_facts_rest_api: true` and the device's `device_ospf` custom field to be `true`, matching the pattern used for static route facts. This unblocks report-only/verification playbooks that gather OSPF facts via the role without pushing OSPF configuration.
+
+### Fixed
+
+- Legacy single-VRF OSPF config context (`ospf_1_vrf` + `ospf_areas`) silently failed to configure any areas: `configure_ospf.yml` copied `ospf_areas` entries (keyed `ospf_1_area`) straight into the normalized `areas` list without renaming the key to `area`, but the area-configuration loop reads `item.1.area`. Fixed by the new `normalize_ospf_vrfs` filter, which correctly maps `ospf_1_area` to `area`.
+- `configure_ospf.yml` raised `object of type 'dict' has no attribute 'if_ip_ospf_network'` under ansible-core 2.19 for any OSPF-enabled interface missing the `if_ip_ospf_network` custom field (e.g. loopbacks, which typically only set `if_ip_ospf_1_area`). Ansible 2.19's templating engine raises `AttributeError` instead of returning `Undefined` when an unguarded missing-attribute lookup is stored into a dict/list literal inside a `{% set %}` block. Fixed by defaulting the lookup to an empty string (`| default('', true)`).
+- `Build OSPF router facts from REST API responses` (`tasks/gather_facts_rest_api.yml`) raised `object of type 'str' has no attribute 'keys'`. The `areas` field on the `ospf_routers` REST endpoint is a child-table URI reference, not a reference-list attribute like `passive_interfaces`, so it never expands into a dict via `attributes=`/`depth=` on that endpoint - it always comes back as the raw sub-collection URL string. Fixed by querying the `.../ospf_routers/{process_id}/areas?depth=1` sub-collection directly for the area IDs, merged into `aoscx_ospf_router_facts` alongside the router-id/passive-interfaces query.
+- `group_interface_ips` (`netbox_filters_lib/l3_config_helpers.py`) broke idempotency for OSPF interfaces with `if_ip_ospf_network` set to `nbma` or `point-to-multipoint`: its `_OSPF_TYPE_MAP` only mapped `point-to-point`, so those two types always compared as a mismatch against gathered facts even when already correctly configured, causing the role to flag them as needing a change on every run. Also fixed the same broadcast-default gap identified in `report_ospf.yml`: `broadcast` is the AOS-CX default network type, so a `null`/missing `ospf_if_type` in facts is now correctly treated as equivalent to `broadcast` rather than a mismatch. Replaced the partial hardcoded map with the same general `type.replace('-', '').replace('tt', 't')` transform used by the AOS-CX Ansible collection.
+
 ## [0.13.13] - 2026-07-09
 
 ### Fixed
