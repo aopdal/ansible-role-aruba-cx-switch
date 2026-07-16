@@ -6,6 +6,7 @@ from netbox_filters_lib.ospf_filters import (
     select_ospf_interfaces,
     extract_ospf_areas,
     get_ospf_interfaces_by_area,
+    normalize_ospf_vrfs,
     validate_ospf_config,
 )
 from .fixtures import get_sample_ospf_config
@@ -155,6 +156,61 @@ class TestGetOspfInterfacesByArea:
         """Test with no interfaces"""
         result = get_ospf_interfaces_by_area([], "0.0.0.0")
         assert result == []
+
+
+class TestNormalizeOspfVrfs:
+    """Tests for normalize_ospf_vrfs function"""
+
+    def test_multi_vrf_passthrough(self):
+        """Test that the multi-VRF format is returned unchanged"""
+        ospf_vrfs = [
+            {"vrf": "default", "areas": [{"area": "0.0.0.0"}]},
+            {"vrf": "CUSTOMER", "areas": [{"area": "0.0.0.1"}]},
+        ]
+        result = normalize_ospf_vrfs(ospf_vrfs)
+        assert result == ospf_vrfs
+
+    def test_multi_vrf_takes_precedence_over_legacy(self):
+        """Test that ospf_vrfs wins even if legacy args are also given"""
+        ospf_vrfs = [{"vrf": "default", "areas": [{"area": "0.0.0.0"}]}]
+        result = normalize_ospf_vrfs(
+            ospf_vrfs, ospf_1_vrf="default", ospf_areas=[{"ospf_1_area": "0.0.0.9"}]
+        )
+        assert result == ospf_vrfs
+
+    def test_legacy_format_normalizes_ospf_1_area_key(self):
+        """Test that legacy ospf_1_area key is renamed to area"""
+        result = normalize_ospf_vrfs(
+            None,
+            ospf_1_vrf="default",
+            ospf_areas=[{"ospf_1_area": "0.0.0.0"}, {"ospf_1_area": "0.0.0.1"}],
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "areas": [{"area": "0.0.0.0"}, {"area": "0.0.0.1"}],
+            }
+        ]
+
+    def test_legacy_format_accepts_pre_normalized_area_key(self):
+        """Test that legacy area entries already using 'area' key still work"""
+        result = normalize_ospf_vrfs(
+            None, ospf_1_vrf="default", ospf_areas=[{"area": "0.0.0.0"}]
+        )
+        assert result == [{"vrf": "default", "areas": [{"area": "0.0.0.0"}]}]
+
+    def test_legacy_format_defaults_vrf_to_default(self):
+        """Test that ospf_1_vrf defaults to 'default' when not provided"""
+        result = normalize_ospf_vrfs(
+            None, ospf_1_vrf=None, ospf_areas=[{"ospf_1_area": "0.0.0.0"}]
+        )
+        assert result == [{"vrf": "default", "areas": [{"area": "0.0.0.0"}]}]
+
+    def test_no_inputs_returns_empty_list(self):
+        """Test that no config context input returns an empty list"""
+        assert normalize_ospf_vrfs(None) == []
+        assert normalize_ospf_vrfs([]) == []
+        assert normalize_ospf_vrfs(None, None, None) == []
 
 
 class TestValidateOspfConfig:

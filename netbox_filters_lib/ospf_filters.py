@@ -88,6 +88,44 @@ def get_ospf_interfaces_by_area(interfaces, area_id):
     return area_interfaces
 
 
+def normalize_ospf_vrfs(ospf_vrfs, ospf_1_vrf=None, ospf_areas=None):
+    """
+    Normalize NetBox OSPF router/area config context into a single shape.
+
+    Supports both the recommended multi-VRF format (``ospf_vrfs``) and the
+    legacy single-VRF format (``ospf_1_vrf`` + ``ospf_areas``, where each
+    area entry uses the ``ospf_1_area`` key instead of ``area``). Used by
+    both `tasks/configure_ospf.yml` (to build the VRF/area push list) and
+    `tasks/gather_facts_rest_api.yml` (to build the REST query list for
+    `aoscx_ospf_router_facts`), so the two stay in sync.
+
+    Args:
+        ospf_vrfs (list): Multi-VRF config context
+            (``[{'vrf': str, 'areas': [{'area': str}, ...]}, ...]``), or
+            None/empty if not used.
+        ospf_1_vrf (str): Legacy single-VRF name, or None if not used.
+        ospf_areas (list): Legacy single-VRF area list
+            (``[{'ospf_1_area': str}, ...]`` or ``[{'area': str}, ...]``),
+            or None if not used.
+
+    Returns:
+        list: Normalized ``[{'vrf': str, 'areas': [{'area': str}, ...]}, ...]``.
+        Empty list when neither format is provided.
+    """
+    if ospf_vrfs:
+        return ospf_vrfs
+
+    if ospf_1_vrf is not None or ospf_areas:
+        areas = []
+        for area_entry in ospf_areas or []:
+            area_id = area_entry.get("area") or area_entry.get("ospf_1_area")
+            if area_id:
+                areas.append({"area": area_id})
+        return [{"vrf": ospf_1_vrf or "default", "areas": areas}]
+
+    return []
+
+
 def validate_ospf_config(device_config, interfaces):
     """
     Validate OSPF configuration consistency

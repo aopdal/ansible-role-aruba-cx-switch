@@ -21,11 +21,11 @@ The `ospf_filters.py` module provides OSPF (Open Shortest Path First) interface 
 
 **File Location**: `netbox_filters_lib/ospf_filters.py`
 
-**Lines of Code**: 112 lines
+**Lines of Code**: 187 lines
 
 **Dependencies**: None (standalone module)
 
-**Filter Count**: 4 filters
+**Filter Count**: 5 filters
 
 ## NetBox Custom Fields
 
@@ -340,7 +340,72 @@ Filters interfaces to those in a specific OSPF area, useful for area-specific co
 
 ---
 
-### 4. `validate_ospf_config(device_config, interfaces)`
+### 4. `normalize_ospf_vrfs(ospf_vrfs, ospf_1_vrf=None, ospf_areas=None)`
+
+Normalizes NetBox OSPF router/area config context into a single shape.
+
+#### Purpose
+
+The NetBox OSPF config context supports two formats: the recommended
+multi-VRF format (`ospf_vrfs`) and a legacy single-VRF format
+(`ospf_1_vrf` + `ospf_areas`, where each area entry uses the
+`ospf_1_area` key instead of `area`). This filter collapses both into
+one normalized shape so downstream tasks (building the router/area push
+list in `tasks/configure_ospf.yml`, and the OSPF router facts query in
+`tasks/gather_facts_rest_api.yml`) only need to handle a single format.
+
+#### Parameters
+
+- **ospf_vrfs** (list): Multi-VRF config context
+  (`[{'vrf': str, 'areas': [{'area': str}, ...]}, ...]`), or `None`/empty
+  if not used.
+- **ospf_1_vrf** (str, optional): Legacy single-VRF name. Defaults to
+  `'default'` if a legacy area list is provided without a VRF name.
+- **ospf_areas** (list, optional): Legacy single-VRF area list
+  (`[{'ospf_1_area': str}, ...]` or already-normalized
+  `[{'area': str}, ...]`).
+
+#### Returns
+
+- **list**: Normalized `[{'vrf': str, 'areas': [{'area': str}, ...]}, ...]`.
+  Empty list when neither format is provided. `ospf_vrfs` always takes
+  precedence when non-empty.
+
+#### Usage Examples
+
+**Multi-VRF format (passthrough):**
+```yaml
+- name: Normalize OSPF VRF config
+  set_fact:
+    normalized_vrfs: "{{ (ospf_vrfs | default(none)) | normalize_ospf_vrfs }}"
+```
+
+**Legacy single-VRF format:**
+```yaml
+# ospf_1_vrf: "default"
+# ospf_areas: [{ospf_1_area: "0.0.0.0"}]
+- name: Normalize legacy OSPF config
+  set_fact:
+    normalized_vrfs: "{{ (ospf_vrfs | default(none)) |
+      normalize_ospf_vrfs(ospf_1_vrf | default(none), ospf_areas | default(none)) }}"
+  # Returns: [{'vrf': 'default', 'areas': [{'area': '0.0.0.0'}]}]
+```
+
+**Building the OSPF router query list for facts gathering:**
+```yaml
+- name: Build OSPF router query list from NetBox config context
+  set_fact:
+    ospf_router_queries: >-
+      {%- set queries = [] -%}
+      {%- for vrf_entry in (ospf_vrfs | default(none)) |
+        normalize_ospf_vrfs(ospf_1_vrf | default(none), ospf_areas | default(none)) -%}
+        {%- set _ = queries.append({'vrf': vrf_entry.vrf, 'process_id': '1'}) -%}
+      {%- endfor -%} {{ queries }}
+```
+
+---
+
+### 5. `validate_ospf_config(device_config, interfaces)`
 
 Validates OSPF configuration consistency between device and interfaces.
 

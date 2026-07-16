@@ -312,8 +312,12 @@
   tags:
     - always
 
-# Query OSPF interface facts (optional, when OSPF is configured on the device)
-# Skipped unless both aoscx_configure_ospf and custom_fields.device_ospf are true.
+# Query OSPF interface facts (optional, when OSPF is enabled on the device)
+# Skipped unless custom_fields.device_ospf is true. Gathered independently of
+# aoscx_configure_ospf so report-only/verification playbooks (which set
+# aoscx_configure_ospf: false) can still compare NetBox intent against what
+# the device actually has configured - matching the pattern used for static
+# route facts below.
 # Determines which interfaces are already registered in each OSPF area so that
 # group_interface_ips can skip interfaces where OSPF config has not changed.
 #
@@ -335,7 +339,6 @@
         {%- endif -%}
       {%- endfor -%} {{ queries }}
   when:
-    - aoscx_configure_ospf | default(false) | bool
     - custom_fields.device_ospf | default(false) | bool
   tags:
     - always
@@ -358,7 +361,6 @@
   register: _rest_ospf_results
   delegate_to: localhost
   when:
-    - aoscx_configure_ospf | default(false) | bool
     - custom_fields.device_ospf | default(false) | bool
     - _ospf_queries | default([]) | length > 0
   tags:
@@ -387,9 +389,115 @@
         {%- endif -%}
       {%- endfor -%} {{ result }}
   when:
-    - aoscx_configure_ospf | default(false) | bool
     - custom_fields.device_ospf | default(false) | bool
     - _rest_ospf_results is defined
+  tags:
+    - always
+
+# Query OSPF router facts (optional, when OSPF is enabled on the device)
+# Skipped unless custom_fields.device_ospf is true. Gathered independently of
+# aoscx_configure_ospf, same rationale as the interface facts above.
+#
+# Queries two endpoints per VRF found in the NetBox OSPF config context
+# (ospf_vrfs, or the legacy ospf_1_vrf/ospf_areas format via normalize_ospf_vrfs):
+#   /system/vrfs/{vrf}/ospf_routers/{process_id}?attributes=admin_router_id,passive_interfaces
+#   /system/vrfs/{vrf}/ospf_routers/{process_id}/areas?depth=1
+# "areas" on the router endpoint is a child-table reference, not a
+# reference-list attribute like passive_interfaces, so it does not expand
+# when requested via attributes=/depth= on the router endpoint itself - it
+# is always returned as the raw sub-collection URL string. The area IDs
+# must be queried from that sub-collection endpoint directly.
+#
+# Output: aoscx_ospf_router_facts = { vrf: { process_id: { router_id: str,
+#         areas: [area, ...], passive_interfaces: [intf_name, ...] } } }
+# passive_interfaces is device-wide per VRF/process (AOS-CX has no
+# per-interface REST attribute for passive state - it lives on the router).
+- name: Build OSPF router query list from NetBox config context
+  ansible.builtin.set_fact:
+    _ospf_router_queries: >-
+      {%- set queries = [] -%}
+      {%- set pid = (ospf_process_id | default(1)) | string -%}
+      {%- for vrf_entry in (ospf_vrfs | default(none)) |
+        normalize_ospf_vrfs(ospf_1_vrf | default(none), ospf_areas | default(none)) -%}
+        {%- set _ = queries.append({'vrf': vrf_entry.vrf, 'process_id': pid}) -%}
+      {%- endfor -%} {{ queries }}
+  when:
+    - custom_fields.device_ospf | default(false) | bool
+  tags:
+    - always
+
+- name: Query OSPF router facts from REST API
+  ansible.builtin.uri:
+    url: >-
+      {{ _rest_api_base }}/system/vrfs/{{ item.vrf }}/ospf_routers/{{
+      item.process_id }}?attributes=admin_router_id,passive_interfaces&depth=1
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  loop: "{{ _ospf_router_queries | default([]) }}"
+  loop_control:
+    label: "VRF {{ item.vrf }} process {{ item.process_id }}"
+  register: _rest_ospf_router_results
+  delegate_to: localhost
+  when:
+    - custom_fields.device_ospf | default(false) | bool
+    - _ospf_router_queries | default([]) | length > 0
+  tags:
+    - always
+
+- name: Query OSPF router areas from REST API
+  ansible.builtin.uri:
+    url: >-
+      {{ _rest_api_base }}/system/vrfs/{{ item.vrf }}/ospf_routers/{{
+      item.process_id }}/areas?depth=1
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  loop: "{{ _ospf_router_queries | default([]) }}"
+  loop_control:
+    label: "VRF {{ item.vrf }} process {{ item.process_id }}"
+  register: _rest_ospf_router_areas_results
+  delegate_to: localhost
+  when:
+    - custom_fields.device_ospf | default(false) | bool
+    - _ospf_router_queries | default([]) | length > 0
+  tags:
+    - always
+
+- name: Build OSPF router facts from REST API responses
+  ansible.builtin.set_fact:
+    aoscx_ospf_router_facts: >-
+      {%- set result = {} -%}
+      {%- for resp in _rest_ospf_router_results.results | default([]) -%}
+        {%- if resp.status == 200 and resp.json is mapping -%}
+          {%- set vrf = resp.item.vrf -%}
+          {%- set pid = resp.item.process_id -%}
+          {%- if vrf not in result -%}{%- set _ = result.update({vrf: {}}) -%}{%- endif -%}
+          {%- set _ = result[vrf].update({pid: {
+              'router_id': resp.json.admin_router_id | default(''),
+              'areas': [],
+              'passive_interfaces': (resp.json.passive_interfaces | default({})).keys() | list,
+          }}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- for resp in _rest_ospf_router_areas_results.results | default([]) -%}
+        {%- if resp.status == 200 and resp.json is mapping -%}
+          {%- set vrf = resp.item.vrf -%}
+          {%- set pid = resp.item.process_id -%}
+          {%- if vrf in result and pid in result[vrf] -%}
+            {%- set _ = result[vrf][pid].update({'areas': resp.json.keys() | list}) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%} {{ result }}
+  when:
+    - custom_fields.device_ospf | default(false) | bool
+    - _rest_ospf_router_results is defined
   tags:
     - always
 

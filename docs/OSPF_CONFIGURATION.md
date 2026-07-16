@@ -11,7 +11,9 @@ role. It covers:
    (area, network type)
 4. [Interface MD5 authentication](#interface-md5-authentication)
    (per-VRF secrets, vault layout, cleartext-to-ciphertext migration)
-5. [Operational notes](#operational-notes)
+5. [OSPF facts gathering](#ospf-facts-gathering)
+   (`aoscx_ospf_router_facts`, `aoscx_ospf_interface_facts`)
+6. [Operational notes](#operational-notes)
 
 ## How OSPF is modelled in NetBox
 
@@ -30,10 +32,13 @@ playbook variables are needed for the routing topology itself.
 | Interface     | Custom field `if_ip_ospf_passive` (bool)| Passive interface — no OSPF hellos sent/received   |
 | Interface     | Custom field `if_ip_ospf_auth` (bool)   | Enable authentication on this interface (default `true`) |
 
-OSPF tasks only run when **both** are true:
+OSPF *configuration* tasks only run when **both** are true:
 
 - `aoscx_configure_ospf` is `true` (default) **and**
 - The device's `device_ospf` custom field is `true`
+
+OSPF *facts gathering* is independent of `aoscx_configure_ospf` — see
+[OSPF facts gathering](#ospf-facts-gathering) below.
 
 See [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md) for the
 tag-based gating model.
@@ -450,6 +455,67 @@ credentials.
 
 **Impact:** Requires both connection types to be functional.
 
+## OSPF facts gathering
+
+When `aoscx_gather_facts_rest_api: true`, the role queries OSPF facts
+from the device's REST API whenever the device's `device_ospf` custom
+field is `true` — **independent of `aoscx_configure_ospf`**. This lets
+report-only/verification playbooks (which typically set
+`aoscx_configure_ospf: false` to avoid pushing config) still compare
+what NetBox declares against what the device actually has configured.
+It also means the facts-gathering logic itself is exercised on every
+run where OSPF is enabled on the device, not only on runs that also
+configure it.
+
+Two facts variables are produced:
+
+### `aoscx_ospf_router_facts`
+
+Router-id, configured areas, and passive interfaces, per VRF and
+process id. Queried from `/system/vrfs/{vrf}/ospf_routers/{process_id}`
+for every VRF found in the NetBox OSPF config context (normalized via
+the [`normalize_ospf_vrfs`](filter_plugins/ospf_filters.md) filter, so
+both the multi-VRF and legacy single-VRF formats are covered).
+`passive_interfaces` lives here (not on the interface facts below)
+because AOS-CX models passive state as a per-router list, not a
+per-interface REST attribute.
+
+```yaml
+aoscx_ospf_router_facts:
+  default:
+    "1":
+      router_id: "10.0.0.1"
+      areas: ["0.0.0.0", "0.0.0.1"]
+      passive_interfaces: ["1/1/3", "loopback1"]
+  tenant_a:
+    "1":
+      router_id: "10.0.0.1"
+      areas: ["0.0.0.0"]
+      passive_interfaces: []
+```
+
+### `aoscx_ospf_interface_facts`
+
+Per-interface OSPF interface-type and authentication-type, keyed by
+VRF, process id, and area. Queried from
+`/system/vrfs/{vrf}/ospf_routers/{process_id}/areas/{area}/ospf_interfaces`
+for every unique (VRF, area) combination found on NetBox OSPF
+interfaces.
+
+```yaml
+aoscx_ospf_interface_facts:
+  default:
+    "1":
+      "0.0.0.0":
+        1/1/1:
+          ospf_if_type: "ospf_iftype_ptop"
+          ospf_auth_type: "md5"
+```
+
+This is also used internally by `configure_ospf.yml` / interface
+change detection to skip interfaces where OSPF configuration has not
+changed.
+
 ## Operational notes
 
 - **Module-based configuration**: OSPF interface configuration uses
@@ -495,5 +561,5 @@ credentials.
 
 - **Filter reference**: See
   [filter_plugins/ospf_filters.md](filter_plugins/ospf_filters.md)
-  for `select_ospf_interfaces`, `extract_ospf_areas`, and
-  `validate_ospf_config`.
+  for `select_ospf_interfaces`, `extract_ospf_areas`,
+  `normalize_ospf_vrfs`, and `validate_ospf_config`.

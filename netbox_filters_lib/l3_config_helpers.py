@@ -196,12 +196,30 @@ def group_interface_ips(
                     # Interface is in the area — also check network type
                     current_type = area_data[intf_name].get("ospf_if_type")
                     desired_network = custom_fields.get("if_ip_ospf_network")
-                    # Map NetBox network type to AOS-CX ospf_if_type value
-                    _OSPF_TYPE_MAP = {"point-to-point": "ospf_iftype_pointopoint"}
-                    desired_type = (
-                        _OSPF_TYPE_MAP.get(desired_network) if desired_network else None
-                    )
-                    has_ospf_change = current_type != desired_type
+                    if desired_network:
+                        # AOS-CX REST OSPF interface-type enum does not
+                        # mirror NetBox's hyphenated values 1:1 (e.g.
+                        # point-to-point -> ospf_iftype_pointopoint, not
+                        # ospf_iftype_point_to_point) - matches how the
+                        # AOS-CX Ansible collection builds it:
+                        # type.replace('-', '').replace('tt', 't').
+                        desired_type = "ospf_iftype_" + desired_network.replace(
+                            "-", ""
+                        ).replace("tt", "t")
+                        if desired_type == "ospf_iftype_broadcast":
+                            # broadcast is the AOS-CX default network type -
+                            # the device only stores an explicit
+                            # ospf_if_type when it differs from broadcast,
+                            # so a missing/None value in facts is
+                            # equivalent to broadcast.
+                            has_ospf_change = current_type not in (
+                                None,
+                                "ospf_iftype_broadcast",
+                            )
+                        else:
+                            has_ospf_change = current_type != desired_type
+                    else:
+                        has_ospf_change = current_type is not None
                 _debug(
                     f"  OSPF check {intf_name}: area={ospf_area} vrf={vrf_name} "
                     f"change_needed={has_ospf_change}"
