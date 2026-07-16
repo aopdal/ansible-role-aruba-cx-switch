@@ -59,6 +59,7 @@ from netbox_filters_lib.ospf_filters import (
     select_ospf_interfaces,
     extract_ospf_areas,
     get_ospf_interfaces_by_area,
+    normalize_ospf_vrfs,
     validate_ospf_config,
 )
 from netbox_filters_lib.l3_config_helpers import (
@@ -121,6 +122,7 @@ class FilterModule:
             "select_ospf_interfaces": select_ospf_interfaces,
             "extract_ospf_areas": extract_ospf_areas,
             "get_ospf_interfaces_by_area": get_ospf_interfaces_by_area,
+            "normalize_ospf_vrfs": normalize_ospf_vrfs,
             "validate_ospf_config": validate_ospf_config,
             # L3 configuration helpers
             "format_interface_name": format_interface_name,

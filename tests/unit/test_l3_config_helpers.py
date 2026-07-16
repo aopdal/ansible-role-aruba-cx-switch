@@ -329,6 +329,56 @@ class TestGroupInterfaceIps:
         result = group_interface_ips(items, ospf_facts=ospf_facts)
         assert len(result) == 1  # type mismatch → include for reconfiguration
 
+    def test_skips_ospf_interface_when_network_type_matches_nbma(self):
+        """Skip interface when both device and NetBox have nbma (regression: was
+        previously always seen as changed since nbma was missing from the map)"""
+        items = [{"interface_name": "1/1/18",
+                  "interface": {"custom_fields": {
+                      "if_ip_ospf_1_area": "0.0.0.0",
+                      "if_ip_ospf_network": "nbma",
+                  }},
+                  "address": "10.0.0.1/31", "ip_role": None, "anycast_mac": None,
+                  "_needs_add": False}]
+        ospf_facts = {"default": {"1": {"0.0.0.0": {
+            "1/1/18": {"ospf_if_type": "ospf_iftype_nbma"},
+        }}}}
+        result = group_interface_ips(items, ospf_facts=ospf_facts)
+        assert result == []  # nbma matches → skip
+
+    def test_skips_ospf_interface_when_network_type_matches_p2mp(self):
+        """Skip interface when both device and NetBox have point-to-multipoint
+        (regression: was previously always seen as changed since
+        point-to-multipoint was missing from the map)"""
+        items = [{"interface_name": "1/1/18",
+                  "interface": {"custom_fields": {
+                      "if_ip_ospf_1_area": "0.0.0.0",
+                      "if_ip_ospf_network": "point-to-multipoint",
+                  }},
+                  "address": "10.0.0.1/31", "ip_role": None, "anycast_mac": None,
+                  "_needs_add": False}]
+        ospf_facts = {"default": {"1": {"0.0.0.0": {
+            "1/1/18": {"ospf_if_type": "ospf_iftype_pointomultipoint"},
+        }}}}
+        result = group_interface_ips(items, ospf_facts=ospf_facts)
+        assert result == []  # point-to-multipoint matches → skip
+
+    def test_skips_ospf_interface_when_network_type_matches_broadcast_explicit(self):
+        """Skip interface when NetBox explicitly says broadcast and device has
+        no explicit ospf_if_type (broadcast is the AOS-CX default, so a null
+        facts value is equivalent to broadcast, not a mismatch)"""
+        items = [{"interface_name": "1/1/18",
+                  "interface": {"custom_fields": {
+                      "if_ip_ospf_1_area": "0.0.0.0",
+                      "if_ip_ospf_network": "broadcast",
+                  }},
+                  "address": "10.0.0.1/31", "ip_role": None, "anycast_mac": None,
+                  "_needs_add": False}]
+        ospf_facts = {"default": {"1": {"0.0.0.0": {
+            "1/1/18": {"ospf_if_type": None},
+        }}}}
+        result = group_interface_ips(items, ospf_facts=ospf_facts)
+        assert result == []  # broadcast (implicit) matches → skip
+
 
 class TestBuildL3ConfigLines:
     """Tests for build_l3_config_lines function (interface-level, grouped addresses)"""
