@@ -10,6 +10,7 @@ from netbox_filters_lib.vrf_filters import (
     get_all_rt_names,
     build_vrf_rt_config,
     get_vrf_rt_removals,
+    get_vrf_changes,
 )
 from .fixtures import get_sample_interfaces, get_sample_ip_addresses, get_sample_vrfs
 
@@ -407,3 +408,179 @@ class TestGetVrfRtRemovals:
 
     def test_empty_facts_dict_means_no_removals(self):
         assert get_vrf_rt_removals({"lab-blue": {}}, {}) == []
+
+
+class TestGetVrfChanges:
+    """Tests for get_vrf_changes function"""
+
+    def test_no_facts_pushes_everything(self):
+        vrfs_in_use = {
+            "vrf_names": ["lab-blue"],
+            "vrfs": {"lab-blue": {"rd": "65000:1"}},
+        }
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": ["65000:1"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        result = get_vrf_changes(vrfs_in_use, vrf_rt_config, None, None)
+        assert result["to_create"] == ["lab-blue"]
+        assert result["rd_changes"] == [{"vrf": "lab-blue", "rd": "65000:1"}]
+        assert result["rt_additions"] == [
+            {
+                "vrf": "lab-blue",
+                "address_family": "ipv4",
+                "direction": "export",
+                "rt": "65000:1",
+            }
+        ]
+        assert result["rt_removals"] == []
+        assert result["no_changes"] == []
+
+    def test_vrf_not_on_device_is_created(self):
+        vrfs_in_use = {"vrf_names": ["lab-blue"], "vrfs": {"lab-blue": {}}}
+        result = get_vrf_changes(vrfs_in_use, {}, {}, {})
+        assert result["to_create"] == ["lab-blue"]
+
+    def test_matching_state_yields_no_changes(self):
+        vrfs_in_use = {
+            "vrf_names": ["lab-blue"],
+            "vrfs": {"lab-blue": {"rd": "65000:1"}},
+        }
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": ["65000:1"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        vrf_facts = {"lab-blue": {"rd": "65000:1"}}
+        vrf_rt_facts = {
+            "lab-blue": {
+                "ipv4": {"export": ["65000:1"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        result = get_vrf_changes(vrfs_in_use, vrf_rt_config, vrf_facts, vrf_rt_facts)
+        assert result["to_create"] == []
+        assert result["rd_changes"] == []
+        assert result["rt_additions"] == []
+        assert result["rt_removals"] == []
+        assert result["no_changes"] == ["lab-blue"]
+
+    def test_rd_mismatch_detected(self):
+        vrfs_in_use = {
+            "vrf_names": ["lab-blue"],
+            "vrfs": {"lab-blue": {"rd": "65000:2"}},
+        }
+        vrf_facts = {"lab-blue": {"rd": "65000:1"}}
+        result = get_vrf_changes(vrfs_in_use, {}, vrf_facts, {})
+        assert result["rd_changes"] == [{"vrf": "lab-blue", "rd": "65000:2"}]
+        assert result["to_create"] == []
+        assert result["no_changes"] == []
+
+    def test_rt_addition_detected_when_missing_on_device(self):
+        vrfs_in_use = {"vrf_names": ["lab-blue"], "vrfs": {"lab-blue": {}}}
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": ["65000:1"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        vrf_facts = {"lab-blue": {"rd": None}}
+        vrf_rt_facts = {
+            "lab-blue": {
+                "ipv4": {"export": [], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        result = get_vrf_changes(vrfs_in_use, vrf_rt_config, vrf_facts, vrf_rt_facts)
+        assert result["rt_additions"] == [
+            {
+                "vrf": "lab-blue",
+                "address_family": "ipv4",
+                "direction": "export",
+                "rt": "65000:1",
+            }
+        ]
+        assert result["no_changes"] == []
+
+    def test_rt_removal_delegates_to_get_vrf_rt_removals(self):
+        vrfs_in_use = {"vrf_names": ["lab-blue"], "vrfs": {"lab-blue": {}}}
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": [], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        vrf_facts = {"lab-blue": {"rd": None}}
+        vrf_rt_facts = {
+            "lab-blue": {
+                "ipv4": {"export": ["65000:99"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        result = get_vrf_changes(vrfs_in_use, vrf_rt_config, vrf_facts, vrf_rt_facts)
+        assert result["rt_removals"] == [
+            {
+                "vrf": "lab-blue",
+                "address_family": "ipv4",
+                "direction": "export",
+                "rt": "65000:99",
+            }
+        ]
+        # A removal-only diff still means the VRF has a pending change, so
+        # it must not appear in no_changes.
+        assert result["no_changes"] == []
+
+    def test_empty_vrfs_in_use(self):
+        result = get_vrf_changes({"vrf_names": [], "vrfs": {}}, {}, {}, {})
+        assert result == {
+            "to_create": [],
+            "rd_changes": [],
+            "rt_additions": [],
+            "rt_removals": [],
+            "no_changes": [],
+        }
+
+    def test_no_desired_rd_skips_rd_check(self):
+        vrfs_in_use = {"vrf_names": ["lab-blue"], "vrfs": {"lab-blue": {}}}
+        vrf_facts = {"lab-blue": {"rd": "65000:1"}}
+        result = get_vrf_changes(vrfs_in_use, {}, vrf_facts, {})
+        assert result["rd_changes"] == []
+        assert result["no_changes"] == ["lab-blue"]
+
+    def test_scalar_vrf_fact_value_does_not_crash(self):
+        """Regression: some AOS-CX firmware collapses a single-attribute
+        collection query to a bare scalar (e.g. {"lab-blue": "65000:1"})
+        instead of a nested {"rd": ...} dict. get_vrf_changes must not
+        raise AttributeError on that shape - it should just treat it as an
+        RD mismatch and let the push happen."""
+        vrfs_in_use = {
+            "vrf_names": ["lab-blue"],
+            "vrfs": {"lab-blue": {"rd": "65000:1"}},
+        }
+        vrf_facts = {"lab-blue": "65000:1"}
+        result = get_vrf_changes(vrfs_in_use, {}, vrf_facts, {})
+        assert result["to_create"] == []
+        assert result["rd_changes"] == [{"vrf": "lab-blue", "rd": "65000:1"}]
+
+    def test_scalar_vrf_rt_fact_value_does_not_crash(self):
+        vrfs_in_use = {"vrf_names": ["lab-blue"], "vrfs": {"lab-blue": {}}}
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": ["65000:1"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        vrf_facts = {"lab-blue": {"rd": None}}
+        vrf_rt_facts = {"lab-blue": "not-a-dict"}
+        result = get_vrf_changes(vrfs_in_use, vrf_rt_config, vrf_facts, vrf_rt_facts)
+        assert result["rt_additions"] == [
+            {
+                "vrf": "lab-blue",
+                "address_family": "ipv4",
+                "direction": "export",
+                "rt": "65000:1",
+            }
+        ]

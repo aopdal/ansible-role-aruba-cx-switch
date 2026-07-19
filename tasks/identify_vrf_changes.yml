@@ -1,0 +1,101 @@
+---
+# Identify which VRFs need configuration changes
+#
+# This task file is the SINGLE SOURCE OF TRUTH for VRF change calculations,
+# mirroring identify_interface_changes.yml / identify_vlan_changes.yml so
+# configure_vrfs.yml only pushes VRF creation, Route Distinguisher, and
+# Route Target changes that actually differ from device state - instead of
+# relying solely on aoscx_vrf's own idempotency and aoscx_config's
+# match: line to no-op unnecessary pushes.
+#
+# When REST API fact gathering is disabled (aoscx_gather_facts_rest_api:
+# false), aoscx_vrf_facts/aoscx_vrf_rt_facts are undefined and every VRF/RD/RT
+# is returned for push - matching the role's previous behaviour.
+#
+# Facts created:
+# - vrfs_in_use: VRFs referenced by interfaces/IPs (existing get_vrfs_in_use output)
+# - vrf_details: Full VRF objects from NetBox (for RT address-family lookup)
+# - vrf_rt_config: Desired route targets grouped by VRF/address-family
+# - vrf_changes: Dict with categorized VRFs
+#   - to_create: VRF names not present on the device
+#   - rd_changes: VRFs whose Route Distinguisher differs from NetBox
+#   - rt_additions: Route targets present in NetBox but not on the device
+#   - rt_removals: Route targets present on the device but not in NetBox
+#   - no_changes: VRFs that don't need any changes
+
+- name: Get VRFs in use on device
+  ansible.builtin.set_fact:
+    vrfs_in_use: "{{ interfaces | get_vrfs_in_use(ip_addresses | default([])) }}"
+
+- name: Debug - Show VRF filtering
+  ansible.builtin.debug:
+    msg:
+      - "VRFs in use (configurable): {{ vrfs_in_use.vrf_names }}"
+      - "Total configurable VRFs: {{ vrfs_in_use.vrf_names | length }}"
+      - "Built-in VRFs filtered: default, Default, Global, global, mgmt, MGMT"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Get VRF details from NetBox using pynetbox
+  ansible.builtin.set_fact:
+    netbox_vrfs: "{{ lookup('netbox.netbox.nb_lookup', 'vrfs',
+      api_filter='name=' + item,
+      api_endpoint=netbox_url,
+      token=netbox_token,
+      validate_certs=false) }}"
+  loop: "{{ vrfs_in_use.vrf_names }}"
+  register: vrf_details_raw
+  when: vrfs_in_use.vrf_names | length > 0
+
+- name: Build VRF details dictionary
+  ansible.builtin.set_fact:
+    vrf_details: >-
+      {{
+        vrf_details | default({}) | combine({
+          item.item: item.ansible_facts.netbox_vrfs.value
+        })
+      }}
+  loop: "{{ vrf_details_raw.results }}"
+  loop_control:
+    label: "VRF: {{ item.item }}"
+  when:
+    - vrf_details_raw is defined
+    - vrf_details_raw.results is defined
+    - item.ansible_facts is defined
+    - item.ansible_facts.netbox_vrfs is defined
+    - item.ansible_facts.netbox_vrfs is not none
+    - item.ansible_facts.netbox_vrfs | length > 0
+
+- name: Debug - Show VRF details
+  ansible.builtin.debug:
+    var: vrf_details
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 1
+    - vrf_details is defined
+
+- name: Build VRF route target config grouped by address family
+  ansible.builtin.set_fact:
+    vrf_rt_config: "{{ vrf_details | default({}) | build_vrf_rt_config }}"
+
+- name: Debug - Show VRF route target config by address family
+  ansible.builtin.debug:
+    var: vrf_rt_config
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Identify VRFs needing configuration changes
+  ansible.builtin.set_fact:
+    vrf_changes: "{{ vrfs_in_use | get_vrf_changes(vrf_rt_config, aoscx_vrf_facts | default(None), aoscx_vrf_rt_facts | default(None)) }}"
+
+- name: Debug - VRF change analysis summary
+  ansible.builtin.debug:
+    msg:
+      - "=== VRF Change Analysis ==="
+      - "Device: {{ inventory_hostname }}"
+      - "VRF facts available: {{ aoscx_vrf_facts is defined }}"
+      - "VRF route-target facts available: {{ aoscx_vrf_rt_facts is defined }}"
+      - "VRFs to create: {{ vrf_changes.to_create | length }} - {{ vrf_changes.to_create }}"
+      - "RD changes: {{ vrf_changes.rd_changes | length }}"
+      - "Route targets to add: {{ vrf_changes.rt_additions | length }}"
+      - "Route targets to remove: {{ vrf_changes.rt_removals | length }}"
+      - "VRFs with no changes: {{ vrf_changes.no_changes | length }} - {{ vrf_changes.no_changes }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1

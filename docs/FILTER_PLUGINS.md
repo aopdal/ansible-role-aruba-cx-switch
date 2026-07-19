@@ -304,13 +304,13 @@ filter_plugins/
     ├── utils.py                         # Helper functions (176 lines)
     ├── l3_config_helpers.py             # L3 configuration optimization (181 lines)
     ├── vlan_filters.py                  # VLAN operations (454 lines)
-    ├── vrf_filters.py                   # VRF operations (191 lines)
+    ├── vrf_filters.py                   # VRF operations (450 lines)
     ├── bgp_filters.py                   # BGP session enrichment (~350 lines)
     ├── interface_categorization.py      # L2/L3 interface categorization (294 lines)
     ├── interface_ip_processing.py       # IP address matching (106 lines)
     ├── interface_change_detection.py    # Change detection & idempotency (814 lines)
     ├── comparison.py                    # State comparison (295 lines)
-    ├── ospf_filters.py                  # OSPF operations (138 lines)
+    ├── ospf_filters.py                  # OSPF operations (439 lines)
     └── stp.py                           # STP interface change detection (1 filter)
 ```
 
@@ -473,7 +473,7 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
 
 ### `vrf_filters.py` - VRF Operations
 
-VRF extraction and filtering (7 filters):
+VRF extraction and filtering (8 filters):
 
 - **`extract_interface_vrfs(interfaces)`**
     - Extract unique VRF names from interfaces
@@ -512,6 +512,19 @@ VRF extraction and filtering (7 filters):
       closes the "stale RT" gap for `aoscx_idempotent_mode` cleanup
     - Returns `[]` when `vrf_rt_facts` is `None` (no reliable device state to diff against)
     - Returns: List of `{vrf, address_family, direction, rt}` dicts
+
+- **`get_vrf_changes(vrfs_in_use, vrf_rt_config, vrf_facts=None, vrf_rt_facts=None)`**
+    - Single source of truth for VRF change detection, used by
+      `tasks/identify_vrf_changes.yml` so `configure_vrfs.yml` only pushes
+      VRF creation / RD / route-target diffs that actually differ from device
+      state (mirrors the interface/VLAN change-identification pattern)
+    - Compares NetBox desired state (`vrfs_in_use`, `vrf_rt_config`) against
+      device REST facts (`aoscx_vrf_facts`, `aoscx_vrf_rt_facts`)
+    - When facts are `None` (REST API fact gathering disabled), returns every
+      VRF/RD/RT for push - same "push everything" fallback convention as
+      `get_static_route_changes` and `get_vrf_rt_removals`
+    - Returns: Dict with `to_create`, `rd_changes`, `rt_additions`,
+      `rt_removals`, and `no_changes` keys
 
 ### `interface_categorization.py` - Interface Categorization
 
@@ -697,6 +710,24 @@ OSPF interface selection and validation:
     - Validate OSPF configuration consistency
     - Checks router ID and area definitions
     - Returns: Dict with `valid` boolean, `warnings`, and `errors` lists
+
+- **`get_ospf_router_changes(ospf_config, ospf_router_facts=None)`**
+    - Compares desired OSPF router-id/areas per VRF against device REST
+      facts (`aoscx_ospf_router_facts`)
+    - When `ospf_router_facts` is `None` (REST facts unavailable), every
+      desired router-id/area is returned for push
+    - Returns: `{"router_changes": [...], "area_additions": [...],
+      "no_changes": [...]}`
+
+- **`get_ospf_interface_changes(ospf_interface_items, ospf_interface_facts=None, ospf_router_facts=None, process_id=1)`**
+    - Compares desired per-interface OSPF settings (area, network type,
+      MD5 authentication, passive) against device REST facts
+      (`aoscx_ospf_interface_facts`, `aoscx_ospf_router_facts`)
+    - Reuses the same network-type enum mapping and MD5-auth-presence
+      semantics as `l3_config_helpers.group_interface_ips`
+    - When facts are unavailable, every item is returned for push
+    - Returns: `{"config_changes": [...], "passive_set": [...],
+      "passive_clear": [...], "no_changes": [...]}`
 
 ### `static_route_filters.py` - Static Route Change Detection
 
@@ -1155,10 +1186,10 @@ netbox_filters.py (main entry point)
 | `vlan_filters.py` | 8 | 454 | VLAN lifecycle management |
 | `comparison.py` | 2 | 295 | State comparison logic |
 | `interface_categorization.py` | 2 | 294 | Interface categorization |
-| `vrf_filters.py` | 6 | 191 | VRF operations |
+| `vrf_filters.py` | 8 | 450 | VRF operations |
 | `l3_config_helpers.py` | 6 | 181 | L3 configuration optimization (incl. ip helper-address) |
 | `utils.py` | 5 | 176 | Helper functions |
-| `ospf_filters.py` | 4 | 138 | OSPF configuration |
+| `ospf_filters.py` | 8 | 439 | OSPF configuration |
 | `bgp_filters.py` | 2 | 350 | BGP session enrichment |
 | `interface_ip_processing.py` | 1 | 106 | IP address matching |
 | `stp.py` | 1 | ~65 | STP interface change detection |

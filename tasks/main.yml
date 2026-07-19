@@ -137,6 +137,20 @@
 
 # VRFs should be configured before L3 interfaces, NTP, and DNS
 # (NTP and DNS may reference a VRF that must already exist)
+- name: Identify VRF changes (before configuration)
+  ansible.builtin.include_tasks:
+    file: identify_vrf_changes.yml
+    apply:
+      tags:
+        - vrfs
+        - layer3
+        - routing
+  when: aoscx_configure_vrfs | bool
+  tags:
+    - vrfs
+    - layer3
+    - routing
+
 - name: Include VRF configuration tasks
   ansible.builtin.include_tasks:
     file: configure_vrfs.yml
@@ -396,6 +410,24 @@
     - port_access
     - cleanup
     - idempotent
+
+- name: Identify OSPF changes (before configuration)
+  ansible.builtin.include_tasks:
+    file: identify_ospf_changes.yml
+    apply:
+      tags:
+        - ospf
+        - routing
+        - layer3
+  when:
+    - aoscx_configure_ospf | bool
+    - custom_fields.device_ospf | default(false) | bool
+    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
+      ansible_run_tags"
+  tags:
+    - ospf
+    - routing
+    - layer3
 
 - name: Include OSPF configuration tasks
   ansible.builtin.include_tasks:

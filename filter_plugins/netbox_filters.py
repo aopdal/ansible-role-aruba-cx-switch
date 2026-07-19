@@ -41,6 +41,7 @@ from netbox_filters_lib.vrf_filters import (
     get_all_rt_names,
     build_vrf_rt_config,
     get_vrf_rt_removals,
+    get_vrf_changes,
 )
 from netbox_filters_lib.interface_categorization import (
     categorize_l2_interfaces,
@@ -63,6 +64,8 @@ from netbox_filters_lib.ospf_filters import (
     normalize_ospf_vrfs,
     filter_ospf_vrfs_in_use,
     validate_ospf_config,
+    get_ospf_router_changes,
+    get_ospf_interface_changes,
 )
 from netbox_filters_lib.l3_config_helpers import (
     format_interface_name,
@@ -116,6 +119,7 @@ class FilterModule:
             "get_all_rt_names": get_all_rt_names,
             "build_vrf_rt_config": build_vrf_rt_config,
             "get_vrf_rt_removals": get_vrf_rt_removals,
+            "get_vrf_changes": get_vrf_changes,
             "categorize_l2_interfaces": categorize_l2_interfaces,
             "categorize_l3_interfaces": categorize_l3_interfaces,
             "get_interface_ip_addresses": get_interface_ip_addresses,
@@ -128,6 +132,8 @@ class FilterModule:
             "normalize_ospf_vrfs": normalize_ospf_vrfs,
             "filter_ospf_vrfs_in_use": filter_ospf_vrfs_in_use,
             "validate_ospf_config": validate_ospf_config,
+            "get_ospf_router_changes": get_ospf_router_changes,
+            "get_ospf_interface_changes": get_ospf_interface_changes,
             # L3 configuration helpers
             "format_interface_name": format_interface_name,
             "is_ipv4_address": is_ipv4_address,

@@ -1,181 +1,55 @@
 ---
 # Configure VRFs on AOS-CX switches
 #
-# Route-target additions are idempotent via aoscx_config's match: line (it
-# already skips lines already present on the device). Route-target
-# *removals* require a reliable view of device state to diff against, so
-# they are only computed when aoscx_vrf_rt_facts is available (REST API
-# fact gathering, aoscx_gather_facts_rest_api: true) and only applied in
-# aoscx_idempotent_mode - same pattern used for static route cleanup.
-
-- name: Get VRFs in use on device
-  ansible.builtin.set_fact:
-    vrfs_in_use: "{{ interfaces | get_vrfs_in_use(ip_addresses | default([])) }}"
-
-- name: Debug - Show VRF filtering
-  ansible.builtin.debug:
-    msg:
-      - "VRFs in use (configurable): {{ vrfs_in_use.vrf_names }}"
-      - "Total configurable VRFs: {{ vrfs_in_use.vrf_names | length }}"
-      - "Built-in VRFs filtered: default, Default, Global, global, mgmt, MGMT"
-  when: aoscx_debug | bool or ansible_verbosity >= 1
-
-- name: Get VRF details from NetBox using pynetbox
-  ansible.builtin.set_fact:
-    netbox_vrfs: "{{ lookup('netbox.netbox.nb_lookup', 'vrfs',
-      api_filter='name=' + item,
-      api_endpoint=netbox_url,
-      token=netbox_token,
-      validate_certs=false) }}"
-  loop: "{{ vrfs_in_use.vrf_names }}"
-  register: vrf_details_raw
-  when: vrfs_in_use.vrf_names | length > 0
-
-- name: Debug - Show VRF lookup raw results
-  ansible.builtin.debug:
-    msg:
-      - "Item: {{ item.item }}"
-      - "Has ansible_facts: {{ item.ansible_facts is defined }}"
-      - "Has netbox_vrfs: {{ (item.ansible_facts.netbox_vrfs is defined) if (item.ansible_facts is defined) else false }}"
-      - >-
-        netbox_vrfs type:
-        {{ item.ansible_facts.netbox_vrfs | type_debug if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}
-      - >-
-        netbox_vrfs content:
-        {{ item.ansible_facts.netbox_vrfs if (item.ansible_facts is defined and item.ansible_facts.netbox_vrfs is defined) else 'undefined' }}
-  loop: "{{ vrf_details_raw.results }}"
-  loop_control:
-    label: "VRF: {{ item.item }}"
-  when:
-    - aoscx_debug | bool or ansible_verbosity >= 1
-    - vrf_details_raw is defined
-    - vrf_details_raw.results is defined
-
-- name: Build VRF details dictionary
-  ansible.builtin.set_fact:
-    vrf_details: >-
-      {{
-        vrf_details | default({}) | combine({
-          item.item: item.ansible_facts.netbox_vrfs.value
-        })
-      }}
-  loop: "{{ vrf_details_raw.results }}"
-  loop_control:
-    label: "VRF: {{ item.item }}"
-  when:
-    - vrf_details_raw is defined
-    - vrf_details_raw.results is defined
-    - item.ansible_facts is defined
-    - item.ansible_facts.netbox_vrfs is defined
-    - item.ansible_facts.netbox_vrfs is not none
-    - item.ansible_facts.netbox_vrfs | length > 0
-
-- name: Debug - Show VRF details
-  ansible.builtin.debug:
-    var: vrf_details
-  when:
-    - aoscx_debug | bool or ansible_verbosity >= 1
-    - vrf_details is defined
+# Depends on: identify_vrf_changes.yml (included just before this file in
+# tasks/main.yml), which sets vrfs_in_use, vrf_rt_config, and vrf_changes -
+# the categorized create/RD/route-target diff against device state.
+#
+# When aoscx_vrf_facts/aoscx_vrf_rt_facts are unavailable (REST API fact
+# gathering disabled), vrf_changes.to_create/rd_changes/rt_additions contain
+# every desired VRF/RD/RT (push everything, let aoscx_vrf's own idempotency
+# and aoscx_config's match: line handle it) - same convention as static
+# route / VRF route-target removal handling.
+#
+# Route-target removals additionally require aoscx_idempotent_mode: true,
+# same pattern used for static route cleanup.
 
 - name: Create VRFs
   arubanetworks.aoscx.aoscx_vrf:
     name: "{{ item }}"
     state: create
-  loop: "{{ vrfs_in_use.vrf_names }}"
+  loop: "{{ vrf_changes.to_create }}"
   loop_control:
     label: "VRF: {{ item }}"
-  when: vrfs_in_use.vrf_names | length > 0
+  when: vrf_changes.to_create | length > 0
 
 - name: Configure VRF Route Distinguisher (RD)
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - rd {{ vrfs_in_use.vrfs[item].rd }}
-    parents: vrf {{ item }}
+      - "rd {{ item.rd }}"
+    parents: "vrf {{ item.vrf }}"
     match: line
-  loop: "{{ vrfs_in_use.vrf_names }}"
+  loop: "{{ vrf_changes.rd_changes }}"
   loop_control:
-    label: "VRF: {{ item }} RD: {{ vrfs_in_use.vrfs[item].rd | default('none') }}"
-  when:
-    - vrfs_in_use.vrf_names | length > 0
-    - vrfs_in_use.vrfs[item] is defined
-    - vrfs_in_use.vrfs[item].rd is defined
-    - vrfs_in_use.vrfs[item].rd != none
-    - vrfs_in_use.vrfs[item].rd != ''
+    label: "VRF: {{ item.vrf }} RD: {{ item.rd }}"
+  when: vrf_changes.rd_changes | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
 
-- name: Build VRF route target config grouped by address family
-  ansible.builtin.set_fact:
-    vrf_rt_config: "{{ vrf_details | build_vrf_rt_config }}"
-  when: vrf_details is defined
-
-- name: Debug - Show VRF route target config by address family
-  ansible.builtin.debug:
-    var: vrf_rt_config
-  when:
-    - aoscx_debug | bool or ansible_verbosity >= 1
-    - vrf_rt_config is defined
-
-- name: Configure VRF Route Targets IPv4 Unicast
+- name: Add VRF route targets
   arubanetworks.aoscx.aoscx_config:
-    lines: >-
-      {{
-        (vrf_rt_config[item].ipv4.export | map('regex_replace', '^(.*)$', 'route-target export \1') | list)
-        + (vrf_rt_config[item].ipv4.import | map('regex_replace', '^(.*)$', 'route-target import \1') | list)
-      }}
+    lines:
+      - "route-target {{ item.direction }} {{ item.rt }}"
     parents:
-      - "vrf {{ item }}"
-      - "address-family ipv4 unicast"
+      - "vrf {{ item.vrf }}"
+      - "address-family {{ item.address_family }} unicast"
     match: line
-  loop: "{{ vrfs_in_use.vrf_names }}"
+  loop: "{{ vrf_changes.rt_additions }}"
   loop_control:
-    label: >-
-      VRF: {{ item }} IPv4 export={{ vrf_rt_config[item].ipv4.export | length }}
-      import={{ vrf_rt_config[item].ipv4.import | length }}
-  when:
-    - vrfs_in_use.vrf_names | length > 0
-    - vrf_rt_config is defined
-    - vrf_rt_config[item] is defined
-    - (vrf_rt_config[item].ipv4.export | length > 0) or (vrf_rt_config[item].ipv4.import | length > 0)
+    label: "VRF: {{ item.vrf }} {{ item.address_family }} add {{ item.direction }} {{ item.rt }}"
+  when: vrf_changes.rt_additions | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
-
-- name: Configure VRF Route Targets IPv6 Unicast
-  arubanetworks.aoscx.aoscx_config:
-    lines: >-
-      {{
-        (vrf_rt_config[item].ipv6.export | map('regex_replace', '^(.*)$', 'route-target export \1') | list)
-        + (vrf_rt_config[item].ipv6.import | map('regex_replace', '^(.*)$', 'route-target import \1') | list)
-      }}
-    parents:
-      - "vrf {{ item }}"
-      - "address-family ipv6 unicast"
-    match: line
-  loop: "{{ vrfs_in_use.vrf_names }}"
-  loop_control:
-    label: >-
-      VRF: {{ item }} IPv6 export={{ vrf_rt_config[item].ipv6.export | length }}
-      import={{ vrf_rt_config[item].ipv6.import | length }}
-  when:
-    - vrfs_in_use.vrf_names | length > 0
-    - vrf_rt_config is defined
-    - vrf_rt_config[item] is defined
-    - (vrf_rt_config[item].ipv6.export | length > 0) or (vrf_rt_config[item].ipv6.import | length > 0)
-  vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
-
-# --- VRF route target cleanup (idempotent mode only) ---
-- name: Compute stale VRF route target removals
-  ansible.builtin.set_fact:
-    vrf_rt_removals: "{{ vrf_rt_config | get_vrf_rt_removals(aoscx_vrf_rt_facts | default(None)) }}"
-  when: vrf_rt_config is defined
-
-- name: Debug - Show VRF route target removals
-  ansible.builtin.debug:
-    var: vrf_rt_removals
-  when:
-    - aoscx_debug | bool or ansible_verbosity >= 1
-    - vrf_rt_removals is defined
 
 - name: Remove stale VRF route targets
   arubanetworks.aoscx.aoscx_config:
@@ -185,11 +59,11 @@
       - "vrf {{ item.vrf }}"
       - "address-family {{ item.address_family }} unicast"
     match: line
-  loop: "{{ vrf_rt_removals | default([]) }}"
+  loop: "{{ vrf_changes.rt_removals }}"
   loop_control:
     label: "VRF: {{ item.vrf }} {{ item.address_family }} remove {{ item.direction }} {{ item.rt }}"
   when:
     - aoscx_idempotent_mode | bool
-    - vrf_rt_removals | default([]) | length > 0
+    - vrf_changes.rt_removals | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
