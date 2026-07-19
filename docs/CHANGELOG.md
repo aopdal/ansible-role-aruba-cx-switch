@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `aoscx_vrf_rt_facts` REST API fact (`tasks/gather_facts_rest_api.yml`), giving the device's actual VRF route-targets per address family (`{vrf: {ipv4: {export: [...], import: [...]}, ipv6: {...}}}`), gathered from `/system/vrfs/{vrf}/vrf_address_families` for every VRF in use. Requires `aoscx_gather_facts_rest_api: true`.
+- New `get_vrf_rt_removals` filter (`netbox_filters_lib/vrf_filters.py`) that compares desired route targets (`build_vrf_rt_config` output) against `aoscx_vrf_rt_facts` to find route targets present on the device but no longer declared in NetBox. `configure_vrfs.yml` now removes these stale route targets (`no route-target export|import <rt>`) when `aoscx_idempotent_mode: true` and REST API facts are available - closing the one idempotency gap in VRF route-target push (additions were already idempotent via `aoscx_config`'s `match: line`; only removals were previously undetectable). See [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md).
+
 ## [0.13.15] - 2026-07-19
 
 ### Fixed

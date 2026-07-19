@@ -473,7 +473,7 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
 
 ### `vrf_filters.py` - VRF Operations
 
-VRF extraction and filtering (6 filters, 191 lines):
+VRF extraction and filtering (7 filters):
 
 - **`extract_interface_vrfs(interfaces)`**
     - Extract unique VRF names from interfaces
@@ -503,6 +503,15 @@ VRF extraction and filtering (6 filters, 191 lines):
     - Build address-family-aware route target config grouped per VRF
     - Reads `address_family` custom field from RT objects; defaults to `ipv4`
     - Returns: Dict keyed by VRF name → `{ipv4: {export: [], import: []}, ipv6: {...}}`
+
+- **`get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts=None)`**
+    - Compare desired route targets (`build_vrf_rt_config` output) against device state
+      (`aoscx_vrf_rt_facts`, gathered via REST API) to find route targets present on the
+      device but no longer in NetBox
+    - RT *additions* stay idempotent via `aoscx_config`'s `match: line`; this filter only
+      closes the "stale RT" gap for `aoscx_idempotent_mode` cleanup
+    - Returns `[]` when `vrf_rt_facts` is `None` (no reliable device state to diff against)
+    - Returns: List of `{vrf, address_family, direction, rt}` dicts
 
 ### `interface_categorization.py` - Interface Categorization
 

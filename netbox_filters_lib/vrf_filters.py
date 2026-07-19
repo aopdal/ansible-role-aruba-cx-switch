@@ -258,6 +258,67 @@ def build_vrf_rt_config(vrf_details):
     return result
 
 
+def get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts=None):
+    """
+    Compute route-targets present on the device but no longer desired in
+    NetBox, so they can be removed with ``no route-target <direction> <rt>``.
+
+    Route-target *additions* stay idempotent via ``aoscx_config``'s
+    ``match: line`` (it already skips lines already present on the device),
+    so this filter only closes the "stale RT" gap - it does not need to
+    compute anything to add.
+
+    Args:
+        vrf_rt_config: Desired config as returned by ``build_vrf_rt_config``,
+            keyed by VRF name::
+
+                {'ipv4': {'export': [...], 'import': [...]},
+                 'ipv6': {'export': [...], 'import': [...]}}
+
+        vrf_rt_facts: Current device state (``aoscx_vrf_rt_facts``, gathered
+            via REST API), same per-VRF shape as ``vrf_rt_config``, or
+            ``None`` when REST API fact gathering is disabled - in that case
+            there is no reliable view of device state to diff against, so no
+            removals are computed.
+
+    Returns:
+        List of dicts, each ``{'vrf': ..., 'address_family': 'ipv4'|'ipv6',
+        'direction': 'export'|'import', 'rt': <rt_name>}``.
+    """
+    if not isinstance(vrf_rt_facts, dict):
+        _debug("No vrf_rt_facts provided - no route-target removals computed")
+        return []
+
+    empty_af = {"export": [], "import": []}
+    removals = []
+
+    for vrf_name, actual_afs in vrf_rt_facts.items():
+        if not isinstance(actual_afs, dict):
+            continue
+        desired_afs = vrf_rt_config.get(vrf_name) or {}
+        for af in ("ipv4", "ipv6"):
+            desired_af = desired_afs.get(af) or empty_af
+            actual_af = actual_afs.get(af) or empty_af
+            for direction in ("export", "import"):
+                desired_rts = set(desired_af.get(direction) or [])
+                actual_rts = set(actual_af.get(direction) or [])
+                for rt in sorted(actual_rts - desired_rts):
+                    _debug(
+                        f"VRF {vrf_name} {af} {direction} route-target {rt} "
+                        "not in NetBox - will remove"
+                    )
+                    removals.append(
+                        {
+                            "vrf": vrf_name,
+                            "address_family": af,
+                            "direction": direction,
+                            "rt": rt,
+                        }
+                    )
+
+    return removals
+
+
 def filter_configurable_vrfs(vrfs):
     """
     Filter out VRFs that should not be configured (built-in VRFs)

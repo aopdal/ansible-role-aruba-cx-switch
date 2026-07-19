@@ -9,6 +9,7 @@ from netbox_filters_lib.vrf_filters import (
     filter_configurable_vrfs,
     get_all_rt_names,
     build_vrf_rt_config,
+    get_vrf_rt_removals,
 )
 from .fixtures import get_sample_interfaces, get_sample_ip_addresses, get_sample_vrfs
 
@@ -315,3 +316,94 @@ class TestBuildVrfRtConfig:
         }
         result = build_vrf_rt_config(vrf_details)
         assert result["lab-blue"]["ipv4"]["export"] == ["65015:10"]
+
+
+class TestGetVrfRtRemovals:
+    """Tests for get_vrf_rt_removals function"""
+
+    def test_no_facts_means_no_removals(self):
+        """Without device facts there's no reliable state to diff against."""
+        vrf_rt_config = {"lab-blue": {"ipv4": {"export": ["65015:10"], "import": []}}}
+        assert get_vrf_rt_removals(vrf_rt_config, None) == []
+
+    def test_stale_export_target_is_removed(self):
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": ["65015:10"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        vrf_rt_facts = {
+            "lab-blue": {
+                "ipv4": {"export": ["65015:10", "65015:99"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        result = get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts)
+        assert result == [
+            {
+                "vrf": "lab-blue",
+                "address_family": "ipv4",
+                "direction": "export",
+                "rt": "65015:99",
+            }
+        ]
+
+    def test_no_removals_when_device_matches_netbox(self):
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": ["65015:10"], "import": ["65015:10"]},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        vrf_rt_facts = {
+            "lab-blue": {
+                "ipv4": {"export": ["65015:10"], "import": ["65015:10"]},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        assert get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts) == []
+
+    def test_vrf_absent_from_desired_config_removes_all_actual_rts(self):
+        """VRF present on device but no longer in vrf_rt_config: all RTs are stale."""
+        vrf_rt_facts = {
+            "old-vrf": {
+                "ipv4": {"export": ["65015:10"], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        result = get_vrf_rt_removals({}, vrf_rt_facts)
+        assert result == [
+            {
+                "vrf": "old-vrf",
+                "address_family": "ipv4",
+                "direction": "export",
+                "rt": "65015:10",
+            }
+        ]
+
+    def test_import_and_export_removals_across_both_address_families(self):
+        vrf_rt_config = {
+            "lab-blue": {
+                "ipv4": {"export": [], "import": []},
+                "ipv6": {"export": [], "import": []},
+            }
+        }
+        vrf_rt_facts = {
+            "lab-blue": {
+                "ipv4": {"export": ["65015:10"], "import": ["65015:11"]},
+                "ipv6": {"export": ["65015:20"], "import": ["65015:21"]},
+            }
+        }
+        result = get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts)
+        assert len(result) == 4
+        directions = {(r["address_family"], r["direction"], r["rt"]) for r in result}
+        assert directions == {
+            ("ipv4", "export", "65015:10"),
+            ("ipv4", "import", "65015:11"),
+            ("ipv6", "export", "65015:20"),
+            ("ipv6", "import", "65015:21"),
+        }
+
+    def test_empty_facts_dict_means_no_removals(self):
+        assert get_vrf_rt_removals({"lab-blue": {}}, {}) == []

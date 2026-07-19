@@ -1,5 +1,12 @@
 ---
 # Configure VRFs on AOS-CX switches
+#
+# Route-target additions are idempotent via aoscx_config's match: line (it
+# already skips lines already present on the device). Route-target
+# *removals* require a reliable view of device state to diff against, so
+# they are only computed when aoscx_vrf_rt_facts is available (REST API
+# fact gathering, aoscx_gather_facts_rest_api: true) and only applied in
+# aoscx_idempotent_mode - same pattern used for static route cleanup.
 
 - name: Get VRFs in use on device
   ansible.builtin.set_fact:
@@ -154,5 +161,35 @@
     - vrf_rt_config is defined
     - vrf_rt_config[item] is defined
     - (vrf_rt_config[item].ipv6.export | length > 0) or (vrf_rt_config[item].ipv6.import | length > 0)
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+
+# --- VRF route target cleanup (idempotent mode only) ---
+- name: Compute stale VRF route target removals
+  ansible.builtin.set_fact:
+    vrf_rt_removals: "{{ vrf_rt_config | get_vrf_rt_removals(aoscx_vrf_rt_facts | default(None)) }}"
+  when: vrf_rt_config is defined
+
+- name: Debug - Show VRF route target removals
+  ansible.builtin.debug:
+    var: vrf_rt_removals
+  when:
+    - aoscx_debug | bool or ansible_verbosity >= 1
+    - vrf_rt_removals is defined
+
+- name: Remove stale VRF route targets
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no route-target {{ item.direction }} {{ item.rt }}"
+    parents:
+      - "vrf {{ item.vrf }}"
+      - "address-family {{ item.address_family }} unicast"
+    match: line
+  loop: "{{ vrf_rt_removals | default([]) }}"
+  loop_control:
+    label: "VRF: {{ item.vrf }} {{ item.address_family }} remove {{ item.direction }} {{ item.rt }}"
+  when:
+    - aoscx_idempotent_mode | bool
+    - vrf_rt_removals | default([]) | length > 0
   vars:
     ansible_connection: "{{ aoscx_connection_type }}"
