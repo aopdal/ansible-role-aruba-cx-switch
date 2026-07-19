@@ -1,0 +1,130 @@
+---
+# Identify which OSPF router/area/interface settings need configuration changes
+#
+# This task file is the SINGLE SOURCE OF TRUTH for OSPF change calculations,
+# mirroring identify_vrf_changes.yml so configure_ospf.yml only pushes
+# router-id, area, and per-interface (area/network-type/authentication/
+# passive) changes that actually differ from device state - instead of
+# relying solely on aoscx_ospf_router/aoscx_ospf_area's own idempotency and
+# aoscx_config's line-matching to no-op unnecessary pushes.
+#
+# When REST API fact gathering is disabled, or the device does not have
+# custom_fields.device_ospf set (aoscx_ospf_router_facts/
+# aoscx_ospf_interface_facts undefined), every desired router/area/interface
+# setting is returned for push - matching the role's previous behaviour.
+#
+# Facts created:
+# - ospf_interfaces: Interfaces from NetBox with OSPF configuration
+# - ospf_config: Normalized OSPF router/area config (process_id, router_id, vrfs)
+# - _ospf_interface_items: Per-interface OSPF parameters, including the
+#   precomputed md5_auth_desired flag (reused by both get_ospf_interface_changes
+#   and configure_ospf.yml so the auth-key-presence logic lives in one place)
+# - ospf_router_changes: Dict with categorized router/area changes
+#   - router_changes: VRF entries whose router-id needs (re)configuring
+#   - area_additions: {vrf, area} pairs not yet present on the device
+#   - no_changes: VRF names with nothing to push
+# - ospf_interface_changes: Dict with categorized per-interface changes
+#   - config_changes: items needing area/network-type/authentication reconciled
+#   - passive_set: items needing 'ip ospf passive' pushed
+#   - passive_clear: items needing 'no ip ospf passive' pushed
+#   - no_changes: interface names with nothing to push
+
+- name: Get interfaces with OSPF configuration from NetBox
+  ansible.builtin.set_fact:
+    ospf_interfaces: "{{ interfaces | select_ospf_interfaces }}"
+
+- name: Debug - Show OSPF interface filtering
+  ansible.builtin.debug:
+    msg:
+      - "Interfaces with OSPF config: {{ ospf_interfaces | length }}"
+      - "OSPF Areas in use: {{ ospf_interfaces |
+        map(attribute='custom_fields.if_ip_ospf_1_area') | select | unique |
+        list }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Get OSPF configuration from config_context
+  ansible.builtin.set_fact:
+    ospf_config:
+      process_id: "{{ ospf_process_id | default(1) }}"
+      router_id: "{{ custom_fields.device_ospf_1_routerid | default('') }}"
+      # Support both old single-VRF format and new multi-VRF format
+      vrfs: "{{ (ospf_vrfs | default(none)) |
+        normalize_ospf_vrfs(ospf_1_vrf | default(none), ospf_areas | default(none)) }}"
+
+# config_context can list OSPF areas for VRFs that have no interfaces
+# assigned on this device. Drop those before computing OSPF router/area
+# changes so we never try to configure OSPF on a VRF that doesn't exist
+# on the switch. 'default' is exempt since it always exists.
+- name: Filter OSPF VRFs to those actually in use on device
+  ansible.builtin.set_fact:
+    ospf_config: "{{ ospf_config | combine({
+      'vrfs': ospf_config.vrfs | filter_ospf_vrfs_in_use(
+        (interfaces | get_vrfs_in_use(ip_addresses | default([]))).vrf_names) }) }}"
+
+- name: Debug - Show OSPF configuration
+  ansible.builtin.debug:
+    msg:
+      - "OSPF Process ID: {{ ospf_config.process_id }}"
+      - "OSPF Router ID: {{ ospf_config.router_id | default('Not configured') }}"
+      - "OSPF VRFs: {{ ospf_config.vrfs | length }}"
+      - "OSPF VRF details: {{ ospf_config.vrfs }}"
+      - "Interfaces to configure: {{ ospf_interfaces | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+# Build per-interface OSPF parameters, including md5_auth_desired - precomputed
+# here (rather than in configure_ospf.yml) so both get_ospf_interface_changes
+# and the actual CLI push reference the exact same auth-key-presence logic.
+- name: Build per-interface OSPF parameter list
+  ansible.builtin.set_fact:
+    _ospf_interface_items: >-
+      {%- set out = [] -%} {%- for intf in ospf_interfaces -%}
+        {%- set vrf_name = ((intf.vrf.name | default('default'))
+          if intf.vrf is mapping else 'default') | replace('Global', 'default') -%}
+        {%- set area = intf.custom_fields.if_ip_ospf_1_area -%}
+        {%- set network = intf.custom_fields.if_ip_ospf_network | default('', true) -%}
+        {%- set passive = intf.custom_fields.if_ip_ospf_passive | default(false) -%}
+        {%- set auth_enabled = intf.custom_fields.if_ip_ospf_auth | default(true) -%}
+        {%- set key_obj = (ospf_auth_keys.get(vrf_name)
+            if ospf_auth_keys is defined else none) -%}
+        {%- set key_secret = ((key_obj.secret if key_obj is mapping else key_obj)
+            | default('', true)) -%}
+        {%- set has_auth_key = key_secret | length > 0 -%}
+        {%- set auth_allowed = ('loopback' not in intf.name and
+            not passive and auth_enabled) -%}
+        {%- set _ = out.append({
+          'interface_name': intf.name,
+          'vrf': vrf_name,
+          'area_id': area,
+          'network_type': network,
+          'passive': passive,
+          'auth_enabled': auth_enabled,
+          'md5_auth_desired': (auth_allowed and has_auth_key),
+        }) -%}
+      {%- endfor -%} {{ out }}
+  when: ospf_interfaces | length > 0
+
+- name: Identify OSPF router/area changes needed
+  ansible.builtin.set_fact:
+    ospf_router_changes: "{{ ospf_config | get_ospf_router_changes(aoscx_ospf_router_facts | default(None)) }}"
+
+- name: Identify OSPF interface changes needed
+  ansible.builtin.set_fact:
+    ospf_interface_changes: "{{ (_ospf_interface_items | default([]))
+      | get_ospf_interface_changes(aoscx_ospf_interface_facts | default(None),
+        aoscx_ospf_router_facts | default(None), ospf_config.process_id) }}"
+
+- name: Debug - OSPF change analysis summary
+  ansible.builtin.debug:
+    msg:
+      - "=== OSPF Change Analysis ==="
+      - "Device: {{ inventory_hostname }}"
+      - "OSPF router facts available: {{ aoscx_ospf_router_facts is defined }}"
+      - "OSPF interface facts available: {{ aoscx_ospf_interface_facts is defined }}"
+      - "Router-id changes: {{ ospf_router_changes.router_changes | length }}"
+      - "Area additions: {{ ospf_router_changes.area_additions | length }}"
+      - "VRFs with no router/area changes: {{ ospf_router_changes.no_changes | length }}"
+      - "Interface config changes: {{ ospf_interface_changes.config_changes | length }}"
+      - "Interfaces to set passive: {{ ospf_interface_changes.passive_set | length }}"
+      - "Interfaces to clear passive: {{ ospf_interface_changes.passive_clear | length }}"
+      - "Interfaces with no changes: {{ ospf_interface_changes.no_changes | length }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1

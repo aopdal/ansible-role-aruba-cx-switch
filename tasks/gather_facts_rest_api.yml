@@ -590,6 +590,128 @@
   tags:
     - always
 
+# Query VRF existence/RD facts (optional, when VRFs are in use)
+# Used by configure_vrfs.yml to skip creating VRFs that already exist and to
+# skip pushing a Route Distinguisher that's already set to the desired
+# value, instead of relying solely on aoscx_vrf's own idempotency and
+# aoscx_config's match: line - matching the pre-compare-against-facts
+# pattern used for L3 interfaces and static routes.
+#
+# Single collection query (no per-VRF loop needed, unlike vrf_address_families
+# which is a per-VRF sub-resource):
+#   /system/vrfs?attributes=name,rd&depth=2
+#
+# Uses depth=2, not depth=1: like the VLAN facts query above, depth=1 on a
+# top-level collection GET only expands each entry into a URI string, not a
+# full attribute object - depth=2 is needed to get real {"rd": ...} dicts
+# per VRF. (An earlier attempt kept depth=1 and dropped the attributes
+# filter, assuming the crash below was caused by a single-attribute
+# collapse; it wasn't - actual_vrf was silently coerced from a URI string
+# to {} by _to_dict(), masking the real depth bug and making every RD/RT
+# always look mismatched even though the device already matched NetBox.)
+#
+# Output: aoscx_vrf_facts = { vrf_name: { 'rd': <str or None>, ... }, ... }
+- name: Query VRF facts from REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/vrfs?attributes=name,rd&depth=2"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  register: _rest_vrfs
+  delegate_to: localhost
+  when:
+    - aoscx_configure_vrfs | default(true) | bool
+  tags:
+    - always
+
+- name: Build VRF facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_vrf_facts: "{{ _rest_vrfs.json | default({}) }}"
+  when:
+    - aoscx_configure_vrfs | default(true) | bool
+    - _rest_vrfs is defined
+    - _rest_vrfs.status | default(0) == 200
+  tags:
+    - always
+
+# Query VRF route-target facts (optional, when VRFs are in use)
+# Used by configure_vrfs.yml to detect route-targets present on the device
+# but no longer desired in NetBox, so they can be removed. Route-target
+# pushes themselves stay idempotent via aoscx_config's match: line (it
+# already skips lines that are already present) - these facts only close
+# the "stale RT" gap, matching the cleanup pattern used for static routes.
+#
+# Queries one endpoint per VRF in use:
+#   /system/vrfs/{vrf}/vrf_address_families?attributes=export_route_targets,import_route_targets&depth=2
+#
+# Uses depth=2, not depth=1: this is a collection GET (ipv4_unicast and
+# ipv6_unicast entries) and needs the actual export/import_route_targets
+# *values* nested inside each entry - depth=1 only expands each entry into
+# a URI string (see the VLAN facts query and the VRF facts query above for
+# the same distinction). Code elsewhere in this file that only needs a
+# collection's *keys* (e.g. OSPF router areas/passive_interfaces below)
+# stays correct at depth=1.
+#
+# Output: aoscx_vrf_rt_facts = { vrf: { 'ipv4': {'export': [...], 'import': [...]},
+#                                       'ipv6': {'export': [...], 'import': [...]} } }
+# AOS-CX address-family keys ipv4_unicast/ipv6_unicast are normalised to
+# ipv4/ipv6 here to match the shape produced by build_vrf_rt_config.
+- name: Build VRF list for route-target fact gathering
+  ansible.builtin.set_fact:
+    _vrf_rt_vrf_names: "{{ (interfaces | default([]) | get_vrfs_in_use(ip_addresses | default([]))).vrf_names }}"
+  when:
+    - aoscx_configure_vrfs | default(true) | bool
+  tags:
+    - always
+
+- name: Query VRF route-target facts from REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/vrfs/{{ item }}/vrf_address_families?attributes=export_route_targets,import_route_targets&depth=2"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  loop: "{{ _vrf_rt_vrf_names | default([]) }}"
+  loop_control:
+    label: "VRF {{ item }}"
+  register: _rest_vrf_rts
+  delegate_to: localhost
+  when:
+    - aoscx_configure_vrfs | default(true) | bool
+    - _vrf_rt_vrf_names | default([]) | length > 0
+  tags:
+    - always
+
+- name: Build VRF route-target facts from REST API responses
+  ansible.builtin.set_fact:
+    aoscx_vrf_rt_facts: >-
+      {%- set af_map = {'ipv4_unicast': 'ipv4', 'ipv6_unicast': 'ipv6'} -%}
+      {%- set result = {} -%}
+      {%- for resp in _rest_vrf_rts.results | default([]) -%}
+        {%- if resp.status == 200 and resp.json is mapping -%}
+          {%- set vrf_afs = {'ipv4': {'export': [], 'import': []}, 'ipv6': {'export': [], 'import': []}} -%}
+          {%- for af_name, af_data in resp.json.items() -%}
+            {%- if af_name in af_map -%}
+              {%- set _ = vrf_afs.update({af_map[af_name]: {
+                  'export': af_data.export_route_targets | default([]),
+                  'import': af_data.import_route_targets | default([]),
+              }}) -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- set _ = result.update({resp.item: vrf_afs}) -%}
+        {%- endif -%}
+      {%- endfor -%} {{ result }}
+  when:
+    - aoscx_configure_vrfs | default(true) | bool
+    - _rest_vrf_rts is defined
+  tags:
+    - always
+
 # Logout to clean up session
 - name: Logout from AOS-CX REST API
   ansible.builtin.uri:
@@ -708,7 +830,9 @@
         'VNI facts available: ' ~ (aoscx_vni_facts is defined),
         'VSX facts available: ' ~ (aoscx_vsx_facts is defined),
         'Port-access facts available: ' ~ (aoscx_port_access_facts is defined),
-        'Static route facts available: ' ~ (aoscx_static_route_facts is defined)
+        'Static route facts available: ' ~ (aoscx_static_route_facts is defined),
+        'VRF facts available: ' ~ (aoscx_vrf_facts is defined),
+        'VRF route-target facts available: ' ~ (aoscx_vrf_rt_facts is defined)
       ] }}
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1

@@ -6,7 +6,7 @@ Provides functions to select, filter, and validate OSPF interface configurations
 from NetBox data for use with Aruba AOS-CX switches.
 """
 
-from .utils import _debug
+from .utils import _debug, _to_dict
 
 
 def select_ospf_interfaces(interfaces):
@@ -223,3 +223,217 @@ def validate_ospf_config(device_config, interfaces):
         _debug("OSPF validation completed successfully - no issues found")
 
     return validation
+
+
+def get_ospf_router_changes(ospf_config, ospf_router_facts=None):
+    """
+    Categorize which OSPF router instances/areas actually need configuration
+    changes, comparing NetBox desired state against device REST facts -
+    mirroring `get_vrf_changes` so `configure_ospf.yml` only pushes the diff
+    instead of relying solely on `aoscx_ospf_router`/`aoscx_ospf_area`'s own
+    idempotency.
+
+    When facts are unavailable (``ospf_router_facts`` is ``None`` - REST API
+    fact gathering disabled, or OSPF facts not gathered for this device),
+    every desired VRF/area is returned for push, matching the role's previous
+    behaviour - same convention as `get_vrf_changes`.
+
+    Args:
+        ospf_config: Normalized OSPF config as built in
+            `tasks/identify_ospf_changes.yml` - ``{'process_id': int,
+            'router_id': str, 'vrfs': [{'vrf': str, 'areas': [{'area': str},
+            ...]}, ...]}``.
+        ospf_router_facts: Device REST facts (``aoscx_ospf_router_facts``) -
+            ``{vrf: {process_id_str: {'router_id': str, 'areas': [...],
+            'passive_interfaces': [...]}}}``, or ``None``/not a dict when
+            unavailable.
+
+    Returns:
+        dict with:
+        - router_changes: list of VRF entries (from ``ospf_config['vrfs']``)
+          whose router-id needs (re)configuring.
+        - area_additions: list of ``{'vrf': str, 'area': str}`` for areas
+          not yet present on the device.
+        - no_changes: list of VRF names with nothing to push.
+    """
+    facts_available = isinstance(ospf_router_facts, dict)
+    process_id = str(ospf_config.get("process_id", 1))
+    router_id = ospf_config.get("router_id") or ""
+    vrfs = ospf_config.get("vrfs") or []
+
+    router_changes = []
+    area_additions = []
+    no_changes = []
+
+    for vrf_entry in vrfs:
+        vrf_name = vrf_entry.get("vrf")
+        areas = vrf_entry.get("areas") or []
+        changed = False
+
+        actual = _to_dict(ospf_router_facts.get(vrf_name)) if facts_available else {}
+        actual = _to_dict(actual.get(process_id))
+
+        if router_id:
+            actual_router_id = actual.get("router_id") or ""
+            if not facts_available or actual_router_id != router_id:
+                _debug(f"OSPF router-id for VRF {vrf_name} differs from device state - will set")
+                router_changes.append(vrf_entry)
+                changed = True
+
+        actual_areas = set(actual.get("areas") or []) if facts_available else set()
+        for area_entry in areas:
+            area_id = area_entry.get("area")
+            if not area_id:
+                continue
+            if not facts_available or area_id not in actual_areas:
+                _debug(f"OSPF area {area_id} for VRF {vrf_name} not on device - will add")
+                area_additions.append({"vrf": vrf_name, "area": area_id})
+                changed = True
+
+        if not changed:
+            no_changes.append(vrf_name)
+
+    return {
+        "router_changes": router_changes,
+        "area_additions": area_additions,
+        "no_changes": no_changes,
+    }
+
+
+def get_ospf_interface_changes(
+    ospf_interface_items, ospf_interface_facts=None, ospf_router_facts=None, process_id=1
+):
+    """
+    Categorize which per-interface OSPF settings actually need configuration
+    changes, comparing NetBox desired state against device REST facts -
+    mirroring `get_vrf_changes`/`get_ospf_router_changes` so
+    `configure_ospf.yml` only pushes the diff instead of unconditionally
+    looping over every OSPF interface on every run.
+
+    Reuses the same network-type enum mapping and MD5-auth-presence
+    semantics as `l3_config_helpers.group_interface_ips` /
+    `configure_ospf.yml`'s inline auth computation, so the three stay
+    consistent.
+
+    When facts are unavailable (``ospf_interface_facts`` /
+    ``ospf_router_facts`` is ``None`` - REST API fact gathering disabled),
+    every item is returned for push, matching the role's previous
+    behaviour.
+
+    Args:
+        ospf_interface_items: List of per-interface dicts as built in
+            `tasks/identify_ospf_changes.yml` - each with keys
+            ``interface_name``, ``vrf``, ``area_id``, ``network_type``,
+            ``passive`` (bool), and ``md5_auth_desired`` (bool, precomputed
+            from ``ospf_auth_keys``/``ospf_auth_key_id``).
+        ospf_interface_facts: Device REST facts
+            (``aoscx_ospf_interface_facts``) - ``{vrf: {process_id_str:
+            {area: {intf_name: {'ospf_if_type': ..., 'ospf_auth_type':
+            ...}}}}}``, or ``None``/not a dict when unavailable.
+        ospf_router_facts: Device REST facts (``aoscx_ospf_router_facts``) -
+            used here only for ``passive_interfaces``, or ``None``/not a
+            dict when unavailable.
+        process_id: OSPF process ID to look up in the facts (default: 1).
+
+    Returns:
+        dict with:
+        - config_changes: items needing area/network-type/authentication
+          reconciled via `aoscx_config`.
+        - passive_set: items needing `ip ospf passive` pushed.
+        - passive_clear: items needing `no ip ospf passive` pushed.
+        - no_changes: interface names with nothing to push.
+    """
+    facts_available = isinstance(ospf_interface_facts, dict)
+    router_facts_available = isinstance(ospf_router_facts, dict)
+    pid_str = str(process_id)
+
+    config_changes = []
+    passive_set = []
+    passive_clear = []
+    no_changes = []
+
+    for item in ospf_interface_items or []:
+        intf_name = item.get("interface_name")
+        vrf_name = item.get("vrf") or "default"
+        area_id = item.get("area_id")
+        network_type = item.get("network_type") or ""
+        passive = bool(item.get("passive"))
+        md5_auth_desired = bool(item.get("md5_auth_desired"))
+        is_loopback = "loopback" in (intf_name or "")
+
+        changed = False
+
+        area_data = {}
+        if facts_available:
+            vrf_facts = _to_dict(ospf_interface_facts.get(vrf_name))
+            pid_facts = _to_dict(vrf_facts.get(pid_str))
+            area_data = _to_dict(pid_facts.get(area_id))
+
+        if not facts_available or intf_name not in area_data:
+            _debug(f"OSPF interface {intf_name} not registered in area {area_id} - will configure")
+            config_changes.append(item)
+            changed = True
+        else:
+            intf_facts = _to_dict(area_data.get(intf_name))
+            current_type = intf_facts.get("ospf_if_type")
+
+            if network_type and network_type != "loopback":
+                # AOS-CX REST OSPF interface-type enum does not mirror
+                # NetBox's hyphenated values 1:1 (e.g. point-to-point ->
+                # ospf_iftype_pointopoint) - matches how the AOS-CX Ansible
+                # collection builds it: type.replace('-', '').replace('tt', 't').
+                desired_type = "ospf_iftype_" + network_type.replace("-", "").replace(
+                    "tt", "t"
+                )
+            else:
+                desired_type = "ospf_iftype_broadcast"
+
+            if desired_type == "ospf_iftype_broadcast":
+                # broadcast is the AOS-CX default network type - the device
+                # only stores an explicit ospf_if_type when it differs from
+                # broadcast, so a missing/None value in facts is equivalent
+                # to broadcast.
+                type_changed = current_type not in (None, "ospf_iftype_broadcast")
+            else:
+                type_changed = current_type != desired_type
+
+            # AOS-CX returns the string "null" (not JSON null) when MD5 auth
+            # is disabled.
+            current_auth_type = intf_facts.get("ospf_auth_type")
+            auth_active = current_auth_type not in (None, "", "null")
+            auth_changed = auth_active != md5_auth_desired
+
+            if type_changed or auth_changed:
+                _debug(f"OSPF interface {intf_name} config differs from device state - will configure")
+                config_changes.append(item)
+                changed = True
+
+        if not is_loopback:
+            actual_passive_interfaces = set()
+            currently_passive = False
+            if router_facts_available:
+                vrf_router_facts = _to_dict(ospf_router_facts.get(vrf_name))
+                pid_router_facts = _to_dict(vrf_router_facts.get(pid_str))
+                actual_passive_interfaces = set(
+                    pid_router_facts.get("passive_interfaces") or []
+                )
+                currently_passive = intf_name in actual_passive_interfaces
+
+            if passive:
+                if not router_facts_available or not currently_passive:
+                    passive_set.append(item)
+                    changed = True
+            else:
+                if not router_facts_available or currently_passive:
+                    passive_clear.append(item)
+                    changed = True
+
+        if not changed:
+            no_changes.append(intf_name)
+
+    return {
+        "config_changes": config_changes,
+        "passive_set": passive_set,
+        "passive_clear": passive_clear,
+        "no_changes": no_changes,
+    }

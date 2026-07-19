@@ -9,6 +9,8 @@ from netbox_filters_lib.ospf_filters import (
     normalize_ospf_vrfs,
     filter_ospf_vrfs_in_use,
     validate_ospf_config,
+    get_ospf_router_changes,
+    get_ospf_interface_changes,
 )
 from .fixtures import get_sample_ospf_config
 
@@ -365,5 +367,213 @@ class TestValidateOspfConfig:
                 },
             },
         ]
-        result = validate_ospf_config(device_config, interfaces)
-        assert len(result["warnings"]) > 0
+        result_final = validate_ospf_config(device_config, interfaces)
+        assert len(result_final["warnings"]) > 0
+
+
+class TestGetOspfRouterChanges:
+    """Tests for get_ospf_router_changes function"""
+
+    def _config(self, router_id="10.255.255.1", vrfs=None):
+        return {
+            "process_id": 1,
+            "router_id": router_id,
+            "vrfs": vrfs
+            if vrfs is not None
+            else [{"vrf": "default", "areas": [{"area": "0.0.0.0"}]}],
+        }
+
+    def test_no_facts_pushes_everything(self):
+        """No REST facts available - every VRF/area is returned for push"""
+        result = get_ospf_router_changes(self._config(), None)
+        assert len(result["router_changes"]) == 1
+        assert result["area_additions"] == [{"vrf": "default", "area": "0.0.0.0"}]
+        assert result["no_changes"] == []
+
+    def test_matching_state_yields_no_changes(self):
+        """Router-id and area already on device - nothing to push"""
+        facts = {
+            "default": {
+                "1": {
+                    "router_id": "10.255.255.1",
+                    "areas": ["0.0.0.0"],
+                    "passive_interfaces": [],
+                }
+            }
+        }
+        result = get_ospf_router_changes(self._config(), facts)
+        assert result["router_changes"] == []
+        assert result["area_additions"] == []
+        assert result["no_changes"] == ["default"]
+
+    def test_router_id_mismatch_detected(self):
+        """Router-id differs from device state - flagged for push"""
+        facts = {
+            "default": {
+                "1": {
+                    "router_id": "10.255.255.9",
+                    "areas": ["0.0.0.0"],
+                    "passive_interfaces": [],
+                }
+            }
+        }
+        result = get_ospf_router_changes(self._config(), facts)
+        assert len(result["router_changes"]) == 1
+        assert result["router_changes"][0]["vrf"] == "default"
+        assert result["area_additions"] == []
+
+    def test_missing_area_detected(self):
+        """Area not yet present on device - flagged for push"""
+        facts = {
+            "default": {
+                "1": {
+                    "router_id": "10.255.255.1",
+                    "areas": [],
+                    "passive_interfaces": [],
+                }
+            }
+        }
+        result = get_ospf_router_changes(self._config(), facts)
+        assert result["router_changes"] == []
+        assert result["area_additions"] == [{"vrf": "default", "area": "0.0.0.0"}]
+
+    def test_no_router_id_skips_router_check(self):
+        """No router-id desired - only areas are checked"""
+        facts = {
+            "default": {
+                "1": {
+                    "router_id": "",
+                    "areas": ["0.0.0.0"],
+                    "passive_interfaces": [],
+                }
+            }
+        }
+        result = get_ospf_router_changes(self._config(router_id=""), facts)
+        assert result["router_changes"] == []
+        assert result["no_changes"] == ["default"]
+
+    def test_scalar_facts_value_does_not_crash(self):
+        """Unexpected non-dict facts value coerces safely instead of crashing"""
+        facts = {"default": "https://example/system/vrfs/default/ospf_routers"}
+        result = get_ospf_router_changes(self._config(), facts)
+        assert len(result["router_changes"]) == 1
+        assert result["area_additions"] == [{"vrf": "default", "area": "0.0.0.0"}]
+
+
+class TestGetOspfInterfaceChanges:
+    """Tests for get_ospf_interface_changes function"""
+
+    def _item(self, **overrides):
+        item = {
+            "interface_name": "vlan10",
+            "vrf": "default",
+            "area_id": "0.0.0.0",
+            "network_type": "",
+            "passive": False,
+            "auth_enabled": True,
+            "md5_auth_desired": False,
+        }
+        item.update(overrides)
+        return item
+
+    def test_no_facts_pushes_everything(self):
+        """No REST facts available - every item is returned for push"""
+        items = [self._item()]
+        result = get_ospf_interface_changes(items, None, None)
+        assert result["config_changes"] == items
+        assert result["passive_clear"] == items
+        assert result["no_changes"] == []
+
+    def test_matching_state_yields_no_changes(self):
+        """Interface already in area, broadcast type, no auth, not passive"""
+        items = [self._item()]
+        interface_facts = {
+            "default": {
+                "1": {
+                    "0.0.0.0": {
+                        "vlan10": {
+                            "ospf_if_type": None,
+                            "ospf_auth_type": "null",
+                        }
+                    }
+                }
+            }
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": []}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["config_changes"] == []
+        assert result["passive_set"] == []
+        assert result["passive_clear"] == []
+        assert result["no_changes"] == ["vlan10"]
+
+    def test_network_type_mismatch_detected(self):
+        """Desired point-to-point differs from device broadcast (None)"""
+        items = [self._item(network_type="point-to-point")]
+        interface_facts = {
+            "default": {"1": {"0.0.0.0": {"vlan10": {"ospf_if_type": None}}}}
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": []}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert len(result["config_changes"]) == 1
+
+    def test_auth_state_mismatch_detected(self):
+        """MD5 auth desired but device shows no auth configured"""
+        items = [self._item(md5_auth_desired=True)]
+        interface_facts = {
+            "default": {
+                "1": {"0.0.0.0": {"vlan10": {"ospf_if_type": None, "ospf_auth_type": "null"}}}
+            }
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": []}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert len(result["config_changes"]) == 1
+
+    def test_interface_not_in_area_detected(self):
+        """Interface not yet registered in the desired area"""
+        items = [self._item()]
+        interface_facts = {"default": {"1": {"0.0.0.0": {}}}}
+        router_facts = {"default": {"1": {"passive_interfaces": []}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["config_changes"] == items
+
+    def test_passive_set_detected(self):
+        """Passive desired but interface not in device passive_interfaces"""
+        items = [self._item(passive=True)]
+        interface_facts = {
+            "default": {"1": {"0.0.0.0": {"vlan10": {"ospf_if_type": None}}}}
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": []}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["passive_set"] == items
+        assert result["passive_clear"] == []
+
+    def test_passive_clear_detected(self):
+        """Passive not desired but interface is in device passive_interfaces"""
+        items = [self._item(passive=False)]
+        interface_facts = {
+            "default": {"1": {"0.0.0.0": {"vlan10": {"ospf_if_type": None}}}}
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": ["vlan10"]}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["passive_clear"] == items
+        assert result["passive_set"] == []
+
+    def test_loopback_skips_passive_check(self):
+        """Loopback interfaces are excluded from passive set/clear entirely"""
+        items = [self._item(interface_name="loopback1", passive=False)]
+        interface_facts = {
+            "default": {"1": {"0.0.0.0": {"loopback1": {"ospf_if_type": None}}}}
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": ["loopback1"]}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["passive_set"] == []
+        assert result["passive_clear"] == []
+        assert result["no_changes"] == ["loopback1"]
+
+    def test_scalar_facts_value_does_not_crash(self):
+        """Unexpected non-dict facts values coerce safely instead of crashing"""
+        items = [self._item()]
+        interface_facts = {"default": "https://example/ospf_interfaces"}
+        router_facts = {"default": "https://example/ospf_routers"}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["config_changes"] == items

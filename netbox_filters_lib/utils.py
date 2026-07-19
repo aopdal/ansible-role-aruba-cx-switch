@@ -3,6 +3,7 @@
 Utility functions for NetBox filters
 """
 
+import json
 import os
 
 
@@ -10,6 +11,25 @@ def _debug(message):
     """Print debug message if DEBUG_ANSIBLE environment variable is set"""
     if os.environ.get("DEBUG_ANSIBLE", "").lower() in ("true", "1", "yes"):
         print(f"DEBUG: {message}")
+
+
+def _to_dict(obj):
+    """
+    Coerce a value to a dict.
+
+    Ansible's fact system sometimes stores nested objects from nb_lookup or
+    REST facts as AnsibleUnsafeText (JSON-encoded strings) rather than parsed
+    dicts. This helper transparently handles both cases.
+    """
+    if isinstance(obj, dict):
+        return obj
+    try:
+        parsed = json.loads(str(obj))
+        if isinstance(parsed, dict):
+            return parsed
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return {}
 
 
 def collapse_vlan_list(vlan_list):

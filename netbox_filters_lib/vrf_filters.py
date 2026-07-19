@@ -3,28 +3,8 @@
 VRF-related filters for NetBox data transformation
 """
 
-import json
 import os
-from .utils import _debug
-
-
-def _to_dict(obj):
-    """
-    Coerce a value to a dict.
-
-    Ansible's fact system sometimes stores nested objects from nb_lookup as
-    AnsibleUnsafeText (JSON-encoded strings) rather than parsed dicts.  This
-    helper transparently handles both cases.
-    """
-    if isinstance(obj, dict):
-        return obj
-    try:
-        parsed = json.loads(str(obj))
-        if isinstance(parsed, dict):
-            return parsed
-    except (json.JSONDecodeError, ValueError):
-        pass
-    return {}
+from .utils import _debug, _to_dict
 
 
 def extract_interface_vrfs(interfaces):
@@ -256,6 +236,163 @@ def build_vrf_rt_config(vrf_details):
         result[vrf_name] = entry
 
     return result
+
+
+def get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts=None):
+    """
+    Compute route-targets present on the device but no longer desired in
+    NetBox, so they can be removed with ``no route-target <direction> <rt>``.
+
+    Route-target *additions* stay idempotent via ``aoscx_config``'s
+    ``match: line`` (it already skips lines already present on the device),
+    so this filter only closes the "stale RT" gap - it does not need to
+    compute anything to add.
+
+    Args:
+        vrf_rt_config: Desired config as returned by ``build_vrf_rt_config``,
+            keyed by VRF name::
+
+                {'ipv4': {'export': [...], 'import': [...]},
+                 'ipv6': {'export': [...], 'import': [...]}}
+
+        vrf_rt_facts: Current device state (``aoscx_vrf_rt_facts``, gathered
+            via REST API), same per-VRF shape as ``vrf_rt_config``, or
+            ``None`` when REST API fact gathering is disabled - in that case
+            there is no reliable view of device state to diff against, so no
+            removals are computed.
+
+    Returns:
+        List of dicts, each ``{'vrf': ..., 'address_family': 'ipv4'|'ipv6',
+        'direction': 'export'|'import', 'rt': <rt_name>}``.
+    """
+    if not isinstance(vrf_rt_facts, dict):
+        _debug("No vrf_rt_facts provided - no route-target removals computed")
+        return []
+
+    empty_af = {"export": [], "import": []}
+    removals = []
+
+    for vrf_name, actual_afs in vrf_rt_facts.items():
+        actual_afs = _to_dict(actual_afs)
+        desired_afs = vrf_rt_config.get(vrf_name) or {}
+        for af in ("ipv4", "ipv6"):
+            desired_af = desired_afs.get(af) or empty_af
+            actual_af = _to_dict(actual_afs.get(af)) or empty_af
+            for direction in ("export", "import"):
+                desired_rts = set(desired_af.get(direction) or [])
+                actual_rts = set(actual_af.get(direction) or [])
+                for rt in sorted(actual_rts - desired_rts):
+                    _debug(
+                        f"VRF {vrf_name} {af} {direction} route-target {rt} "
+                        "not in NetBox - will remove"
+                    )
+                    removals.append(
+                        {
+                            "vrf": vrf_name,
+                            "address_family": af,
+                            "direction": direction,
+                            "rt": rt,
+                        }
+                    )
+
+    return removals
+
+
+def get_vrf_changes(vrfs_in_use, vrf_rt_config, vrf_facts=None, vrf_rt_facts=None):
+    """
+    Categorize which VRFs actually need configuration changes, comparing
+    NetBox desired state against device REST facts - mirroring the
+    interface/VLAN change-identification pattern so ``configure_vrfs.yml``
+    only pushes the diff instead of relying solely on ``aoscx_vrf``'s own
+    idempotency and ``aoscx_config``'s ``match: line`` to no-op unnecessary
+    pushes.
+
+    When facts are unavailable (``vrf_facts``/``vrf_rt_facts`` is ``None`` -
+    REST API fact gathering disabled), every desired VRF/RD/RT is returned
+    for push, matching the role's previous behaviour (push everything, let
+    the module/CLI match handle idempotency) - same convention as
+    ``get_static_route_changes`` and ``get_vrf_rt_removals``.
+
+    Args:
+        vrfs_in_use: ``get_vrfs_in_use()`` output - ``{'vrf_names': [...],
+            'vrfs': {name: vrf_obj}}``, where each ``vrf_obj`` may carry an
+            ``rd`` key (NetBox's nested VRF serializer includes it).
+        vrf_rt_config: ``build_vrf_rt_config()`` output - ``{name: {'ipv4':
+            {'export': [...], 'import': [...]}, 'ipv6': {...}}}``.
+        vrf_facts: Device REST facts (``aoscx_vrf_facts``) - ``{name: {'rd':
+            <str or None>}, ...}``, or ``None`` when unavailable.
+        vrf_rt_facts: Device REST facts (``aoscx_vrf_rt_facts``), same shape
+            as ``vrf_rt_config``, or ``None`` when unavailable.
+
+    Returns:
+        dict: ``{
+            'to_create': [vrf_name, ...],
+            'rd_changes': [{'vrf': ..., 'rd': ...}, ...],
+            'rt_additions': [{'vrf': ..., 'address_family': ..., 'direction': ..., 'rt': ...}, ...],
+            'rt_removals': [... same shape as rt_additions ...],
+            'no_changes': [vrf_name, ...],
+        }``
+    """
+    vrf_names = (vrfs_in_use or {}).get("vrf_names") or []
+    vrf_objs = (vrfs_in_use or {}).get("vrfs") or {}
+    vrf_rt_config = vrf_rt_config or {}
+
+    facts_available = isinstance(vrf_facts, dict)
+    rt_facts_available = isinstance(vrf_rt_facts, dict)
+
+    empty_af = {"export": [], "import": []}
+    to_create = []
+    rd_changes = []
+    rt_additions = []
+    no_changes = []
+
+    for vrf_name in vrf_names:
+        changed = False
+
+        actual_vrf = vrf_facts.get(vrf_name) if facts_available else None
+        if not facts_available or actual_vrf is None:
+            _debug(f"VRF {vrf_name} not found on device (or facts unavailable) - will create")
+            to_create.append(vrf_name)
+            changed = True
+
+        desired_rd = (vrf_objs.get(vrf_name) or {}).get("rd") or None
+        if desired_rd:
+            actual_rd = _to_dict(actual_vrf).get("rd") or None
+            if not facts_available or actual_rd != desired_rd:
+                _debug(f"VRF {vrf_name} RD differs from device state - will set to {desired_rd}")
+                rd_changes.append({"vrf": vrf_name, "rd": desired_rd})
+                changed = True
+
+        desired_afs = vrf_rt_config.get(vrf_name) or {}
+        actual_afs = _to_dict(vrf_rt_facts.get(vrf_name)) if rt_facts_available else {}
+        for af in ("ipv4", "ipv6"):
+            desired_af = desired_afs.get(af) or empty_af
+            actual_af = _to_dict(actual_afs.get(af)) or empty_af
+            for direction in ("export", "import"):
+                desired_rts = set(desired_af.get(direction) or [])
+                actual_rts = set(actual_af.get(direction) or []) if rt_facts_available else set()
+                missing = desired_rts if not rt_facts_available else (desired_rts - actual_rts)
+                for rt in sorted(missing):
+                    _debug(f"VRF {vrf_name} {af} {direction} route-target {rt} not on device - will add")
+                    rt_additions.append(
+                        {"vrf": vrf_name, "address_family": af, "direction": direction, "rt": rt}
+                    )
+                    changed = True
+
+        if not changed:
+            no_changes.append(vrf_name)
+
+    rt_removals = get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts)
+    vrfs_with_removals = {removal["vrf"] for removal in rt_removals}
+    no_changes = [vrf_name for vrf_name in no_changes if vrf_name not in vrfs_with_removals]
+
+    return {
+        "to_create": to_create,
+        "rd_changes": rd_changes,
+        "rt_additions": rt_additions,
+        "rt_removals": rt_removals,
+        "no_changes": no_changes,
+    }
 
 
 def filter_configurable_vrfs(vrfs):
