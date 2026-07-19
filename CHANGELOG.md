@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.15] - 2026-07-19
+
+### Fixed
+
+- OSPF config context (`ospf_vrfs`, or legacy `ospf_1_vrf`/`ospf_areas`) could list areas for VRFs that exist in NetBox but have no interfaces assigned on the device, causing `configure_ospf.yml` to try to push OSPF router/area config for VRFs that don't exist on the switch. New `filter_ospf_vrfs_in_use` filter (`netbox_filters_lib/ospf_filters.py`) drops those entries before configuration, using the same `get_vrfs_in_use` logic already used by `configure_vrfs.yml` to decide which VRFs are actually in use; the built-in `default` VRF is always exempt since it always exists on the device. See [docs/filter_plugins/ospf_filters.md](docs/filter_plugins/ospf_filters.md).
+- Interface `description` changes in NetBox were not always reflected on the device. REST API fact gathering (`tasks/gather_facts_rest_api.yml`) already queried `attributes=description` and `filter_plugins/rest_api_transforms.py` already normalized it, but VLAN SVIs, loopbacks, and sub-interfaces (NetBox `type.value == "virtual"`) had no description comparison in change detection at all, so a description-only edit on one of these interface types was silently dropped. `netbox_filters_lib/interface_change_detection.py` now compares `description` for virtual interfaces and sets `_ip_changes.description_change`; `group_interface_ips()` (`netbox_filters_lib/l3_config_helpers.py`) now includes an interface flagged this way even when no IP addresses need adding; and `build_l3_config_lines()` emits a `description` line for `vlan`/`loopback`/`subinterface` types. Physical and LAG interfaces (L2 and L3) already pushed description correctly via `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml` and are unchanged; `build_l3_config_lines()` deliberately excludes `physical`/`lag` from the new description logic to avoid duplicating that push.
+
 ## [0.13.14] - 2026-07-16
 
 ### Added

@@ -102,6 +102,16 @@ The role normalizes this internally to the multi-VRF shape.
     - VRF names are **case-sensitive**: `Tenant_A` ≠ `tenant_a`.
     - Whitespace and `-` vs `_` must match (`tenant-a` ≠ `tenant_a`).
 
+!!! note "VRFs not in use on the device are skipped"
+    `configure_ospf.yml` only pushes OSPF router/area config for VRFs
+    that actually have interfaces assigned on this device (or the
+    built-in `default` VRF, which always exists). If `ospf_vrfs` lists a
+    VRF that exists in NetBox but has no interfaces on this switch, that
+    VRF's OSPF config is silently dropped instead of being pushed —
+    pushing it would fail since the VRF itself is never created on the
+    device. See
+    [`filter_ospf_vrfs_in_use`](filter_plugins/ospf_filters.md).
+
 ## Interface configuration
 
 OSPF on an interface is enabled by setting custom fields in NetBox:

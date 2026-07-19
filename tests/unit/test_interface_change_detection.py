@@ -139,6 +139,83 @@ class TestGetInterfacesNeedingConfigChanges:
             interfaces, device_facts)
         assert len(result["physical"]) == 1
 
+    def test_vlan_svi_description_mismatch(self):
+        """VLAN SVI (virtual) with a description mismatch needs L3 changes and
+        is flagged with _ip_changes.description_change for group_interface_ips()."""
+        interfaces = [
+            {
+                "name": "vlan100",
+                "type": {"value": "virtual"},
+                "description": "New Description",
+                "ip_addresses": [{"address": "10.1.100.1/24"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan100": {
+                        "description": "Old Description",
+                        "ip4_address": "10.1.100.1/24",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["name"] == "vlan100"
+        assert result["l3"][0]["_ip_changes"]["description_change"] is True
+
+    def test_vlan_svi_description_match_no_changes(self):
+        """VLAN SVI with matching description and IP needs no changes."""
+        interfaces = [
+            {
+                "name": "vlan100",
+                "type": {"value": "virtual"},
+                "description": "Same Description",
+                "ip_addresses": [{"address": "10.1.100.1/24"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan100": {
+                        "description": "Same Description",
+                        "ip4_address": "10.1.100.1/24",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["no_changes"]) == 1
+        assert "_ip_changes" not in result["no_changes"][0]
+
+    def test_loopback_description_mismatch(self):
+        """Loopback interface (virtual) with a description mismatch is flagged."""
+        interfaces = [
+            {
+                "name": "loopback0",
+                "type": {"value": "virtual"},
+                "description": "RID loopback",
+                "ip_addresses": [{"address": "10.255.0.1/32"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "loopback0": {
+                        "description": "",
+                        "ip4_address": "10.255.0.1/32",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["_ip_changes"]["description_change"] is True
+
     def test_mtu_mismatch(self):
         """Test detection of MTU mismatch"""
         interfaces = [

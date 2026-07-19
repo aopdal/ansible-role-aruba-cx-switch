@@ -25,7 +25,7 @@ The `ospf_filters.py` module provides OSPF (Open Shortest Path First) interface 
 
 **Dependencies**: None (standalone module)
 
-**Filter Count**: 5 filters
+**Filter Count**: 6 filters
 
 ## NetBox Custom Fields
 
@@ -405,7 +405,57 @@ list in `tasks/configure_ospf.yml`, and the OSPF router facts query in
 
 ---
 
-### 5. `validate_ospf_config(device_config, interfaces)`
+### 5. `filter_ospf_vrfs_in_use(ospf_vrfs, vrf_names_in_use)`
+
+Drops OSPF VRF/area entries for VRFs that are not actually in use on the device.
+
+#### Purpose
+
+Config context (`ospf_vrfs`, or the legacy `ospf_1_vrf`/`ospf_areas`
+format after `normalize_ospf_vrfs`) can list OSPF areas for VRFs that
+exist in NetBox but have no interfaces assigned on this particular
+device. Pushing OSPF router/area config for those VRFs would fail
+because the VRF is never created on the switch. This filter drops those
+entries before `tasks/configure_ospf.yml` configures anything. The
+built-in `default` VRF is always kept since it always exists on the
+device regardless of interface assignment.
+
+#### Parameters
+
+- **ospf_vrfs** (list): Normalized OSPF VRF config
+  (`[{'vrf': str, 'areas': [...]}, ...]`) as produced by
+  `normalize_ospf_vrfs`.
+- **vrf_names_in_use** (list): VRF names actually in use on the device,
+  e.g. `get_vrfs_in_use(interfaces, ip_addresses).vrf_names`. Built-in
+  VRFs such as `default` are not expected to appear in this list.
+
+#### Returns
+
+- **list**: `ospf_vrfs` entries whose VRF is `default` or present in
+  `vrf_names_in_use`.
+
+#### Usage Examples
+
+**Filter after normalizing OSPF config context:**
+```yaml
+- name: Get OSPF configuration from config_context
+  set_fact:
+    ospf_config:
+      process_id: "{{ ospf_process_id | default(1) }}"
+      router_id: "{{ custom_fields.device_ospf_1_routerid | default('') }}"
+      vrfs: "{{ (ospf_vrfs | default(none)) |
+        normalize_ospf_vrfs(ospf_1_vrf | default(none), ospf_areas | default(none)) }}"
+
+- name: Filter OSPF VRFs to those actually in use on device
+  set_fact:
+    ospf_config: "{{ ospf_config | combine({
+      'vrfs': ospf_config.vrfs | filter_ospf_vrfs_in_use(
+        (interfaces | get_vrfs_in_use(ip_addresses | default([]))).vrf_names) }) }}"
+```
+
+---
+
+### 6. `validate_ospf_config(device_config, interfaces)`
 
 Validates OSPF configuration consistency between device and interfaces.
 

@@ -23,6 +23,16 @@
       vrfs: "{{ (ospf_vrfs | default(none)) |
         normalize_ospf_vrfs(ospf_1_vrf | default(none), ospf_areas | default(none)) }}"
 
+# config_context can list OSPF areas for VRFs that have no interfaces
+# assigned on this device. Drop those before pushing OSPF router/area
+# config so we never try to configure OSPF on a VRF that doesn't exist
+# on the switch. 'default' is exempt since it always exists.
+- name: Filter OSPF VRFs to those actually in use on device
+  ansible.builtin.set_fact:
+    ospf_config: "{{ ospf_config | combine({
+      'vrfs': ospf_config.vrfs | filter_ospf_vrfs_in_use(
+        (interfaces | get_vrfs_in_use(ip_addresses | default([]))).vrf_names) }) }}"
+
 - name: Debug - Show OSPF configuration
   ansible.builtin.debug:
     msg:

@@ -126,6 +126,44 @@ def normalize_ospf_vrfs(ospf_vrfs, ospf_1_vrf=None, ospf_areas=None):
     return []
 
 
+def filter_ospf_vrfs_in_use(ospf_vrfs, vrf_names_in_use):
+    """
+    Drop OSPF VRF/area entries for VRFs that are not actually in use.
+
+    Config context can list OSPF areas for VRFs that exist in NetBox but
+    have no interfaces assigned on this particular device. Pushing OSPF
+    router/area config for those VRFs fails (or creates config drift)
+    because the VRF itself is never created on the switch. The built-in
+    'default' VRF is always exempt since it always exists on the device
+    regardless of interface assignment.
+
+    Args:
+        ospf_vrfs (list): Normalized OSPF VRF config
+            (``[{'vrf': str, 'areas': [...]}, ...]``) as produced by
+            `normalize_ospf_vrfs`.
+        vrf_names_in_use (list): VRF names actually in use on the device,
+            e.g. from ``get_vrfs_in_use(...)['vrf_names']``. Built-in VRFs
+            such as 'default' are not expected to appear in this list.
+
+    Returns:
+        list: `ospf_vrfs` entries whose VRF is 'default' or present in
+        `vrf_names_in_use`.
+    """
+    if not ospf_vrfs:
+        return []
+
+    vrf_names_in_use = set(vrf_names_in_use or [])
+    filtered = []
+    for entry in ospf_vrfs:
+        vrf_name = entry.get("vrf")
+        if vrf_name == "default" or vrf_name in vrf_names_in_use:
+            filtered.append(entry)
+        else:
+            _debug(f"Skipping OSPF config for VRF '{vrf_name}' - not in use on device")
+
+    return filtered
+
+
 def validate_ospf_config(device_config, interfaces):
     """
     Validate OSPF configuration consistency

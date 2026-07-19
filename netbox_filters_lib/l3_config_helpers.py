@@ -105,6 +105,9 @@ def group_interface_ips(
       - The interface's OSPF network type does not match the desired type.
     - The interface has _ip_changes.dhcp_relay_change=True (set by change detection
       when ip helper-address configuration differs from device state).
+    - The interface has _ip_changes.description_change=True (set by change detection
+      for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when the
+      NetBox description differs from the device description).
 
     Args:
         interface_ip_list: List of per-IP items, each with keys:
@@ -237,7 +240,22 @@ def group_interface_ips(
             else False
         )
 
-        if item["addresses"] or has_ospf_change or has_dhcp_relay_change:
+        # Check whether a description-only change was flagged during change
+        # detection (virtual interfaces only — see interface_change_detection.py).
+        # This covers VLAN SVIs/loopbacks/sub-interfaces where the description
+        # differs but no IP/OSPF/DHCP change is otherwise needed.
+        has_description_change = bool(
+            ip_changes.get("description_change")
+            if isinstance(ip_changes, dict)
+            else False
+        )
+
+        if (
+            item["addresses"]
+            or has_ospf_change
+            or has_dhcp_relay_change
+            or has_description_change
+        ):
             item["addresses"].sort(key=_addr_sort_key)
             result.append(item)
 
@@ -258,11 +276,18 @@ def build_l3_config_lines(
     interface. Each per-interface command (vrf attach, ip mtu, l3-counters)
     is emitted exactly once regardless of how many IP addresses are present.
 
+    For 'vlan', 'loopback', and 'subinterface' types, also emits a
+    'description' line when the NetBox interface has one set. 'physical' and
+    'lag' types do NOT get a description line here — those are handled by
+    configure_physical_interfaces.yml / configure_lag_interfaces.yml /
+    configure_mclag_interfaces.yml regardless of L2/L3 role, so adding it here
+    too would duplicate the command.
+
     Args:
         item: Per-interface dict produced by group_interface_ips(), with keys:
             - interface_name: Name of the interface
             - interface: Full NetBox interface object (provides mtu, vrf,
-                         tagged_vlans for sub-interfaces)
+                         description, tagged_vlans for sub-interfaces)
             - addresses: List of {address, ip_role, anycast_mac} dicts
         interface_type: Type of interface ('physical', 'lag', 'vlan',
                         'subinterface', 'loopback')
@@ -290,6 +315,18 @@ def build_l3_config_lines(
         f"interface_type={interface_type}, vrf_type={vrf_type}, "
         f"addresses={len(addresses)}"
     )
+
+    # Description — only for VLAN SVI, loopback, and sub-interface types.
+    # Physical, LAG, and MCLAG interfaces already get description applied via
+    # configure_physical_interfaces.yml / configure_lag_interfaces.yml /
+    # configure_mclag_interfaces.yml regardless of L2/L3 role (those tasks push
+    # description whenever the interface has ANY pending change), so emitting
+    # it again here would just duplicate that command.
+    if interface_type in ("vlan", "loopback", "subinterface"):
+        description = interface_obj.get("description")
+        if description:
+            lines.append(f"description {description}")
+            _debug(f"  Adding description: {description}")
 
     # Encapsulation for sub-interfaces (must come first)
     if interface_type == "subinterface":
