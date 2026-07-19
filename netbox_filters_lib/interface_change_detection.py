@@ -148,7 +148,8 @@ def get_interfaces_needing_config_changes(
         - lag: LAG interfaces needing changes
         - mclag: MCLAG interfaces needing changes
         - l2: L2 interfaces needing VLAN changes
-        - l3: L3 interfaces needing IP address changes
+        - l3: L3 interfaces needing IP address changes (also includes VLAN SVI /
+          loopback / sub-interface entries that only need a description update)
         - lag_members: Physical interfaces needing LAG assignment changes
         - no_changes: Interfaces that don't need any changes
     """
@@ -392,6 +393,23 @@ def get_interfaces_needing_config_changes(
                     change_reasons.append(
                         f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
                     )
+        else:
+            # Virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces) skip the
+            # admin/MTU checks above (those properties don't apply), but description
+            # is still pushed for them via build_l3_config_lines() in the L3 config
+            # path, so compare it here and flag it the same way as other L3 changes
+            # (vrf_change, dhcp_relay_change) that group_interface_ips() looks for.
+            nb_description = nb_intf.get("description", "")
+            device_description = device_intf.get("description", "")
+            if nb_description and nb_description != device_description:
+                needs_change = True
+                change_reasons.append(
+                    f"description mismatch (NB: {nb_description}, "
+                    f"device: {device_description})"
+                )
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                nb_intf["_ip_changes"]["description_change"] = True
 
         # Check LAG membership
         # AOS-CX stores LAG membership in the LAG interface's "interfaces" dict,

@@ -781,6 +781,79 @@ class TestBuildL3ConfigLines:
         assert not any("vrf attach" in line for line in lines)
 
 
+class TestBuildL3ConfigLinesDescription:
+    """Tests for description-line emission in build_l3_config_lines.
+
+    Description is only emitted here for vlan/loopback/subinterface types.
+    physical/lag/mclag are excluded because configure_physical_interfaces.yml /
+    configure_lag_interfaces.yml / configure_mclag_interfaces.yml already push
+    description unconditionally whenever those interfaces have any pending
+    change — emitting it again here would duplicate the command.
+    """
+
+    def test_vlan_description_emitted(self):
+        """VLAN SVI with a description emits a description line"""
+        item = _make_item(
+            {"description": "Server VLAN"},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", True)
+
+        assert "description Server VLAN" in lines
+
+    def test_loopback_description_emitted(self):
+        """Loopback with a description emits a description line"""
+        item = _make_item(
+            {"description": "RID loopback"},
+            [{"address": "10.255.0.1/32", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "loopback", "default", True)
+
+        assert "description RID loopback" in lines
+
+    def test_subinterface_description_emitted(self):
+        """Sub-interface with a description emits a description line"""
+        item = _make_item(
+            {"description": "Customer sub-int"},
+            [{"address": "10.0.1.1/30", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "subinterface", "default", True)
+
+        assert "description Customer sub-int" in lines
+
+    def test_vlan_no_description_no_line(self):
+        """VLAN SVI without a description does not emit a description line"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", True)
+
+        assert not any(line.startswith("description") for line in lines)
+
+    def test_physical_description_not_emitted(self):
+        """Physical interface with a description does NOT emit a description
+        line here — configure_physical_interfaces.yml already handles it."""
+        item = _make_item(
+            {"description": "Uplink to core"},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "physical", "default", True)
+
+        assert not any(line.startswith("description") for line in lines)
+
+    def test_lag_description_not_emitted(self):
+        """LAG interface with a description does NOT emit a description line
+        here — configure_lag_interfaces.yml already handles it."""
+        item = _make_item(
+            {"description": "Uplink LAG"},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "lag", "default", True)
+
+        assert not any(line.startswith("description") for line in lines)
+
+
 class TestBuildL3ConfigLinesIpHelper:
     """Tests for ip helper-address support in build_l3_config_lines"""
 
@@ -994,3 +1067,59 @@ class TestGroupInterfaceIpsDhcpRelayChange:
         """Interface without _ip_changes at all is not included when _needs_add=False."""
         item = self._make_item({"name": "vlan101", "custom_fields": {}})
         assert group_interface_ips([item]) == []
+
+
+class TestGroupInterfaceIpsDescriptionChange:
+    """Tests for group_interface_ips including interfaces with only a description change."""
+
+    def _make_item(self, interface_obj, needs_add=False):
+        """Build a minimal per-IP item with given interface dict."""
+        return {
+            "interface_name": interface_obj.get("name", "vlan101"),
+            "interface": interface_obj,
+            "address": "10.0.0.1/24",
+            "ip_role": None,
+            "anycast_mac": None,
+            "_needs_add": needs_add,
+        }
+
+    def test_includes_interface_with_description_change_flag(self):
+        """Interface flagged description_change=True is included even when no IPs need adding."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"description_change": True, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert result[0]["interface_name"] == "vlan101"
+        assert result[0]["addresses"] == []
+
+    def test_omits_interface_without_description_change_flag(self):
+        """Interface with no flag and _needs_add=False is still omitted."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_description_change_false_does_not_include(self):
+        """Explicit description_change=False does not cause inclusion."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"description_change": False, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_description_change_combined_with_ip_add(self):
+        """Interface with both a description change and an IP to add is included with the address."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"description_change": True},
+            "custom_fields": {},
+        }, needs_add=True)
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert len(result[0]["addresses"]) == 1

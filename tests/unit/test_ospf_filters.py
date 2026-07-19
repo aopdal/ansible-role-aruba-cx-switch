@@ -7,6 +7,7 @@ from netbox_filters_lib.ospf_filters import (
     extract_ospf_areas,
     get_ospf_interfaces_by_area,
     normalize_ospf_vrfs,
+    filter_ospf_vrfs_in_use,
     validate_ospf_config,
 )
 from .fixtures import get_sample_ospf_config
@@ -211,6 +212,48 @@ class TestNormalizeOspfVrfs:
         assert normalize_ospf_vrfs(None) == []
         assert normalize_ospf_vrfs([]) == []
         assert normalize_ospf_vrfs(None, None, None) == []
+
+
+class TestFilterOspfVrfsInUse:
+    """Tests for filter_ospf_vrfs_in_use function"""
+
+    def test_keeps_default_vrf_always(self):
+        """Test that the 'default' VRF is kept even if not in vrf_names_in_use"""
+        ospf_vrfs = [{"vrf": "default", "areas": [{"area": "0.0.0.0"}]}]
+        result = filter_ospf_vrfs_in_use(ospf_vrfs, [])
+        assert result == ospf_vrfs
+
+    def test_drops_vrf_not_in_use(self):
+        """Test that a non-default VRF absent from vrf_names_in_use is dropped"""
+        ospf_vrfs = [
+            {"vrf": "default", "areas": [{"area": "0.0.0.0"}]},
+            {"vrf": "CUSTOMER", "areas": [{"area": "0.0.0.1"}]},
+        ]
+        result = filter_ospf_vrfs_in_use(ospf_vrfs, ["OTHER"])
+        assert result == [{"vrf": "default", "areas": [{"area": "0.0.0.0"}]}]
+
+    def test_keeps_vrf_in_use(self):
+        """Test that a non-default VRF present in vrf_names_in_use is kept"""
+        ospf_vrfs = [
+            {"vrf": "default", "areas": [{"area": "0.0.0.0"}]},
+            {"vrf": "CUSTOMER", "areas": [{"area": "0.0.0.1"}]},
+        ]
+        result = filter_ospf_vrfs_in_use(ospf_vrfs, ["CUSTOMER"])
+        assert result == ospf_vrfs
+
+    def test_empty_ospf_vrfs_returns_empty(self):
+        """Test that an empty/None input returns an empty list"""
+        assert filter_ospf_vrfs_in_use([], ["CUSTOMER"]) == []
+        assert filter_ospf_vrfs_in_use(None, ["CUSTOMER"]) == []
+
+    def test_none_vrf_names_in_use_only_keeps_default(self):
+        """Test that None for vrf_names_in_use is treated as no VRFs in use"""
+        ospf_vrfs = [
+            {"vrf": "default", "areas": [{"area": "0.0.0.0"}]},
+            {"vrf": "CUSTOMER", "areas": [{"area": "0.0.0.1"}]},
+        ]
+        result = filter_ospf_vrfs_in_use(ospf_vrfs, None)
+        assert result == [{"vrf": "default", "areas": [{"area": "0.0.0.0"}]}]
 
 
 class TestValidateOspfConfig:

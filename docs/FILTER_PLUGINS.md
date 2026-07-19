@@ -379,12 +379,14 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
     - Includes an interface with no `_needs_add` IPs when any of the following is true:
         - The interface has `if_ip_ospf_1_area` set AND it is not yet in the correct OSPF area (or `ospf_facts` is `None`)
         - `_ip_changes.dhcp_relay_change` is `True` (set by change detection when DHCP relay servers differ)
+        - `_ip_changes.description_change` is `True` (set by change detection for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when the NetBox description differs from the device description)
     - Returns: List of `{interface_name, interface, addresses}` dicts
 
 - **`build_l3_config_lines(item, interface_type, vrf_type, l3_counters_enable=True, ip_helper_addresses=None)`**
     - Build complete L3 configuration command list for a single interface
     - `item` is a per-interface grouped dict from `group_interface_ips()` with an `addresses` list
     - Handles all IPs (IPv4 + IPv6, anycast gateways) in a single call — each per-interface command (vrf attach, ip mtu, l3-counters) emitted exactly once
+    - For `interface_type` `vlan`, `loopback`, or `subinterface`, emits a `description <text>` line when `item.interface.description` is set. `physical` and `lag` are deliberately excluded — those are already pushed unconditionally by `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml` regardless of L2/L3 role, so emitting it here too would duplicate the command.
     - OSPF interface config is handled separately in `tasks/configure_ospf.yml`
     - When `ip_helper_addresses` is provided and the interface has `custom_fields.if_ip_helper=True`, emits `ip helper-address <ip>` lines (one per server, ordered by string index key) after all IP/anycast lines and before `l3-counters`
     - Servers are looked up by the interface VRF name in `ip_helper_addresses` (a dict keyed by VRF, values are `{"0": "ip", "1": "ip", ...}`)
@@ -550,7 +552,8 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
 - **`get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts=None, dhcp_relay_facts=None, ip_helper_addresses=None)`**
     - Compare NetBox interface configuration with device state
     - Implements granular change detection for:
-      - Physical properties (enabled/disabled, description, MTU)
+      - Physical properties (enabled/disabled, description, MTU) — physical, LAG, and MCLAG interfaces
+      - Description — virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces; NetBox `type.value == "virtual"`), which skip the admin-state/MTU checks above but are still compared on `description`
       - LAG membership
       - L2 VLAN configuration
       - L3 IP addresses (IPv4 with specific address tracking; IPv6 with full comparison when `enhanced_facts` is provided, otherwise reference only)
@@ -566,7 +569,7 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
       - `lag`: LAG interfaces needing changes
       - `mclag`: MCLAG interfaces needing changes
       - `l2`: L2 interfaces needing VLAN changes
-      - `l3`: L3 interfaces needing IP address or DHCP relay changes
+      - `l3`: L3 interfaces needing IP address or DHCP relay changes (also includes VLAN SVI / loopback / sub-interface entries that only need a description update)
       - `lag_members`: Physical interfaces needing LAG assignment changes
       - `no_changes`: Interfaces that don't need any changes
     - Adds `_ip_changes` dict to L3 interfaces containing:
@@ -574,6 +577,7 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
       - `ipv6_addresses`: List of IPv6 addresses needing configuration (all when enhanced facts are absent; only additions when enhanced facts are available)
       - `dhcp_relay_change`: `True` when DHCP relay configuration needs to be pushed (set in all relay-change branches so `group_interface_ips` includes the interface even when no IPs need adding)
       - `dhcp_relay_to_remove`: Sorted list of relay server IPs present on the device but absent from NetBox (requires `dhcp_relay_facts`). Used by the "Remove stale ip helper-address entries" task.
+      - `description_change`: `True` when a virtual interface's (VLAN SVI/loopback/sub-interface) description differs from the device, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` emits a `description` line. Physical/LAG/MCLAG description changes are handled separately by `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml`, which push description unconditionally whenever the interface has any pending change.
     - See "L3 Interface IP Address Idempotency" section for performance details
 
 ### `bgp_filters.py` - BGP Session Enrichment
@@ -655,7 +659,7 @@ NetBox vs device state comparison (2 filters, 295 lines):
     - `configure`: Interfaces needing VLAN additions
 
 ### `ospf_filters.py` - OSPF Configuration
-OSPF interface selection and validation (4 filters, 138 lines):
+OSPF interface selection and validation:
 
 - **`select_ospf_interfaces(interfaces)`**
     - Filter interfaces that have OSPF configuration defined
@@ -669,6 +673,16 @@ OSPF interface selection and validation (4 filters, 138 lines):
 - **`get_ospf_interfaces_by_area(interfaces, area_id)`**
     - Get all interfaces belonging to a specific OSPF area
     - Returns: List of interfaces in the specified area
+
+- **`normalize_ospf_vrfs(ospf_vrfs, ospf_1_vrf=None, ospf_areas=None)`**
+    - Collapses the multi-VRF (`ospf_vrfs`) and legacy single-VRF
+      (`ospf_1_vrf` + `ospf_areas`) config context formats into one shape
+    - Returns: `[{'vrf': str, 'areas': [{'area': str}, ...]}, ...]`
+
+- **`filter_ospf_vrfs_in_use(ospf_vrfs, vrf_names_in_use)`**
+    - Drops OSPF VRF/area entries for VRFs with no interfaces assigned on
+      this device (the built-in `default` VRF is always kept)
+    - Returns: Filtered `ospf_vrfs` list
 
 - **`validate_ospf_config(device_config, interfaces)`**
     - Validate OSPF configuration consistency
