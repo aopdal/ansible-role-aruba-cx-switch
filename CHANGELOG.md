@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.17] - 2026-07-20
+
+### Changed
+
+- `aoscx_vrf_facts`/`aoscx_vrf_rt_facts` REST API fact gathering (`tasks/gather_facts_rest_api.yml`) no longer requires `aoscx_configure_vrfs: true`. It now only requires `aoscx_gather_facts_rest_api: true` and at least one VRF in use (via `get_vrfs_in_use`), matching the pattern already used for OSPF and static route facts. This unblocks report-only/verification playbooks (`aoscx_configure_vrfs: false`, `aoscx_gather_facts_rest_api: true`) that want to compare NetBox-desired VRF/RD/route-target state against the device without the role also pushing VRF configuration.
+
 ## [0.13.16] - 2026-07-19
 
 ### Added
