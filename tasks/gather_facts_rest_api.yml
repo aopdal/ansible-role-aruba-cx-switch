@@ -590,12 +590,25 @@
   tags:
     - always
 
+# Build the list of VRFs in use up front - both the VRF and VRF
+# route-target fact queries below need it, and it's gathered independently
+# of aoscx_configure_vrfs (same rationale as static route / OSPF facts
+# below) so report-only/verification playbooks (which set
+# aoscx_configure_vrfs: false) can still compare NetBox intent against what
+# the device actually has configured.
+- name: Build VRF list for fact gathering
+  ansible.builtin.set_fact:
+    _vrf_rt_vrf_names: "{{ (interfaces | default([]) | get_vrfs_in_use(ip_addresses | default([]))).vrf_names }}"
+  tags:
+    - always
+
 # Query VRF existence/RD facts (optional, when VRFs are in use)
 # Used by configure_vrfs.yml to skip creating VRFs that already exist and to
 # skip pushing a Route Distinguisher that's already set to the desired
 # value, instead of relying solely on aoscx_vrf's own idempotency and
 # aoscx_config's match: line - matching the pre-compare-against-facts
-# pattern used for L3 interfaces and static routes.
+# pattern used for L3 interfaces and static routes. Gathered independently
+# of aoscx_configure_vrfs, same rationale as above.
 #
 # Single collection query (no per-VRF loop needed, unlike vrf_address_families
 # which is a per-VRF sub-resource):
@@ -623,7 +636,7 @@
   register: _rest_vrfs
   delegate_to: localhost
   when:
-    - aoscx_configure_vrfs | default(true) | bool
+    - _vrf_rt_vrf_names | default([]) | length > 0
   tags:
     - always
 
@@ -631,7 +644,6 @@
   ansible.builtin.set_fact:
     aoscx_vrf_facts: "{{ _rest_vrfs.json | default({}) }}"
   when:
-    - aoscx_configure_vrfs | default(true) | bool
     - _rest_vrfs is defined
     - _rest_vrfs.status | default(0) == 200
   tags:
@@ -643,6 +655,7 @@
 # pushes themselves stay idempotent via aoscx_config's match: line (it
 # already skips lines that are already present) - these facts only close
 # the "stale RT" gap, matching the cleanup pattern used for static routes.
+# Gathered independently of aoscx_configure_vrfs, same rationale as above.
 #
 # Queries one endpoint per VRF in use:
 #   /system/vrfs/{vrf}/vrf_address_families?attributes=export_route_targets,import_route_targets&depth=2
@@ -659,14 +672,6 @@
 #                                       'ipv6': {'export': [...], 'import': [...]} } }
 # AOS-CX address-family keys ipv4_unicast/ipv6_unicast are normalised to
 # ipv4/ipv6 here to match the shape produced by build_vrf_rt_config.
-- name: Build VRF list for route-target fact gathering
-  ansible.builtin.set_fact:
-    _vrf_rt_vrf_names: "{{ (interfaces | default([]) | get_vrfs_in_use(ip_addresses | default([]))).vrf_names }}"
-  when:
-    - aoscx_configure_vrfs | default(true) | bool
-  tags:
-    - always
-
 - name: Query VRF route-target facts from REST API
   ansible.builtin.uri:
     url: "{{ _rest_api_base }}/system/vrfs/{{ item }}/vrf_address_families?attributes=export_route_targets,import_route_targets&depth=2"
@@ -682,7 +687,6 @@
   register: _rest_vrf_rts
   delegate_to: localhost
   when:
-    - aoscx_configure_vrfs | default(true) | bool
     - _vrf_rt_vrf_names | default([]) | length > 0
   tags:
     - always
@@ -707,7 +711,6 @@
         {%- endif -%}
       {%- endfor -%} {{ result }}
   when:
-    - aoscx_configure_vrfs | default(true) | bool
     - _rest_vrf_rts is defined
   tags:
     - always
