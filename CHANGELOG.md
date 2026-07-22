@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.18] - 2026-07-22
+
+### Added
+
+- New `aoscx_test_mode` variable (default `false`, `defaults/main.yml`). REST API fact gathering (`tasks/gather_facts_rest_api.yml`) now skips a feature's queries (OSPF, VSX, static routes, VRFs/VRF route-targets, STP, EVPN, VXLAN, port-access, DHCP relay) in regular runs when that feature's `aoscx_configure_*` flag is `false`, since nothing downstream would consume the facts. Set `aoscx_test_mode: true` in test/report-only playbooks (e.g. `aruba-role-testing`) to force these queries regardless of the `aoscx_configure_*` flags, so device state can still be verified against NetBox intent without the role pushing configuration. See [docs/PERFORMANCE_OPTIMIZATION.md](docs/PERFORMANCE_OPTIMIZATION.md#selective-fact-gathering-with-aoscx_test_mode).
+
+### Changed
+
+- `aoscx_ospf_interface_facts`/`aoscx_ospf_router_facts`, `aoscx_vsx_facts`, `aoscx_stp_global_facts`, `aoscx_static_route_facts`, `aoscx_vrf_facts`/`aoscx_vrf_rt_facts`, and `aoscx_dhcp_relay_facts` REST API queries (`tasks/gather_facts_rest_api.yml`) are now also gated on their matching `aoscx_configure_*` flag (`aoscx_configure_ospf`, `aoscx_configure_vsx`, `aoscx_configure_stp`, `aoscx_configure_static_routes`, `aoscx_configure_vrfs`, `aoscx_configure_l3_interfaces`) unless `aoscx_test_mode: true` is set. This reverts the unconditional-gathering behaviour added in 0.13.17 for VRF facts (and extends the same pattern to the other feature facts) now that `aoscx_test_mode` gives test/report-only playbooks an explicit way to opt back in, instead of every regular run paying for REST calls whose results nothing consumes.
+
 ## [0.13.17] - 2026-07-20
 
 ### Changed
