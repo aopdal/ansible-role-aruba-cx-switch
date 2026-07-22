@@ -556,6 +556,27 @@ aoscx_rest_api_version: "10.15"
 
 With `aoscx_gather_facts_rest_api: true`, IPv6 addresses, VSX virtual IPs, OSPF interface facts, and EVPN/VXLAN data are all gathered in the same session.
 
+### Selective Fact Gathering with `aoscx_test_mode`
+
+Feature-specific REST queries (OSPF, VSX, static routes, VRFs, STP, EVPN/VXLAN,
+port-access, DHCP relay) only run when their data has a consumer: the matching
+`aoscx_configure_*` flag must also be true. In a regular run, if a feature is
+disabled (e.g. `aoscx_configure_vsx: false`), the role skips that feature's
+REST calls entirely, since nothing downstream would use the facts.
+
+Test/report-only playbooks (e.g. the `aruba-role-testing` workspace) often set
+`aoscx_configure_*: false` to verify device state without pushing config, but
+still need the REST facts gathered so they can compare NetBox intent against
+what the device actually has. Set `aoscx_test_mode: true` for these playbooks
+to force the REST queries regardless of the `aoscx_configure_*` flags:
+
+```yaml
+aoscx_gather_facts_rest_api: true
+aoscx_test_mode: true      # gather all feature facts for verification
+aoscx_configure_ospf: false
+aoscx_configure_vsx: false
+```
+
 ---
 
 ## Notes for Users
