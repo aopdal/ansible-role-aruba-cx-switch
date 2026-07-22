@@ -11,6 +11,14 @@
 # vsx_virtual_gw_mac_v4, vsx_virtual_gw_mac_v6) are only queried when device_vsx is enabled.
 # Some switch models (e.g., CX 6000) don't support these attributes.
 #
+# Feature-specific queries below (OSPF, VSX, static routes, VRFs, STP,
+# EVPN/VXLAN, port-access, DHCP relay) only run when their data has a
+# consumer: the matching aoscx_configure_* flag must also be true, OR
+# aoscx_test_mode: true is set. aoscx_test_mode exists for test/report-only
+# playbooks that need REST facts gathered even when aoscx_configure_*: false
+# (e.g. verifying device state without pushing config) - use it there
+# instead of flipping individual aoscx_configure_* flags to true.
+#
 # Requirements:
 # - REST API version 10.15 or later (auto-detected from firmware if not specified)
 #
@@ -110,9 +118,12 @@
   ansible.builtin.set_fact:
     _rest_interface_attrs: >-
       {{ _rest_interface_base_attrs }}{% if custom_fields.device_ospf |
-      default(false) | bool %},{{ _rest_interface_ospf_attrs }}{% endif %}{% if
-      custom_fields.device_vsx | default(false) | bool %},{{
-      _rest_interface_vsx_attrs }}{% endif %},{{ _rest_interface_stp_attrs }}
+      default(false) | bool and (aoscx_configure_ospf | bool or
+      aoscx_test_mode | bool) %},{{ _rest_interface_ospf_attrs }}{% endif
+      %}{% if custom_fields.device_vsx | default(false) | bool and
+      (aoscx_configure_vsx | bool or aoscx_test_mode | bool) %},{{
+      _rest_interface_vsx_attrs }}{% endif %}{% if aoscx_configure_stp | bool
+      or aoscx_test_mode | bool %},{{ _rest_interface_stp_attrs }}{% endif %}
   tags:
     - always
 
@@ -211,8 +222,8 @@
   register: _rest_evpn
   delegate_to: localhost
   when:
-    - aoscx_configure_evpn | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
+    - aoscx_configure_evpn | default(false) | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -229,8 +240,8 @@
   register: _rest_evpn_vlans
   delegate_to: localhost
   when:
-    - aoscx_configure_evpn | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
+    - aoscx_configure_evpn | default(false) | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -247,8 +258,8 @@
   register: _rest_vnis
   delegate_to: localhost
   when:
-    - aoscx_configure_vxlan | default(false) | bool
     - custom_fields.device_vxlan | default(false) | bool
+    - aoscx_configure_vxlan | default(false) | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -265,6 +276,7 @@
     return_content: true
   register: _rest_stp_global
   delegate_to: localhost
+  when: aoscx_configure_stp | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -283,6 +295,7 @@
   delegate_to: localhost
   when:
     - custom_fields.device_vsx | default(false) | bool
+    - aoscx_configure_vsx | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -307,17 +320,17 @@
   register: _rest_port_access_profiles
   delegate_to: localhost
   when:
-    - aoscx_configure_port_access | default(true) | bool
     - (port_access | default({})) | length > 0
+    - aoscx_configure_port_access | default(true) | bool or aoscx_test_mode | bool
   tags:
     - always
 
 # Query OSPF interface facts (optional, when OSPF is enabled on the device)
-# Skipped unless custom_fields.device_ospf is true. Gathered independently of
-# aoscx_configure_ospf so report-only/verification playbooks (which set
-# aoscx_configure_ospf: false) can still compare NetBox intent against what
-# the device actually has configured - matching the pattern used for static
-# route facts below.
+# Skipped unless custom_fields.device_ospf is true and either
+# aoscx_configure_ospf or aoscx_test_mode is true. The latter lets
+# report-only/verification playbooks (which set aoscx_configure_ospf: false)
+# still compare NetBox intent against what the device actually has
+# configured - matching the pattern used for static route facts below.
 # Determines which interfaces are already registered in each OSPF area so that
 # group_interface_ips can skip interfaces where OSPF config has not changed.
 #
@@ -340,6 +353,7 @@
       {%- endfor -%} {{ queries }}
   when:
     - custom_fields.device_ospf | default(false) | bool
+    - aoscx_configure_ospf | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -395,8 +409,9 @@
     - always
 
 # Query OSPF router facts (optional, when OSPF is enabled on the device)
-# Skipped unless custom_fields.device_ospf is true. Gathered independently of
-# aoscx_configure_ospf, same rationale as the interface facts above.
+# Skipped unless custom_fields.device_ospf is true and either
+# aoscx_configure_ospf or aoscx_test_mode is true, same rationale as the
+# interface facts above.
 #
 # Queries two endpoints per VRF found in the NetBox OSPF config context
 # (ospf_vrfs, or the legacy ospf_1_vrf/ospf_areas format via normalize_ospf_vrfs):
@@ -423,6 +438,7 @@
       {%- endfor -%} {{ queries }}
   when:
     - custom_fields.device_ospf | default(false) | bool
+    - aoscx_configure_ospf | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -503,7 +519,10 @@
 
 # Query DHCP relay facts (optional, when ip_helper_addresses is defined for the device)
 # Used by interface change detection to determine if ip helper-address configuration
-# has already been applied, avoiding unnecessary pushes.
+# has already been applied, avoiding unnecessary pushes. ip_helper_addresses is only
+# ever pushed by configure_l3_interface_common.yml (gated on
+# aoscx_configure_l3_interfaces), so skip the query when that flag is off unless
+# aoscx_test_mode is set for report-only verification.
 #
 # Output: aoscx_dhcp_relay_facts = { interface_name: [server1, server2, ...] }
 # Example: { "vlan101": ["172.16.3.10", "172.16.3.11"] }
@@ -518,7 +537,9 @@
     return_content: true
   register: _rest_dhcp_relays
   delegate_to: localhost
-  when: ip_helper_addresses | default({}) | length > 0
+  when:
+    - ip_helper_addresses | default({}) | length > 0
+    - aoscx_configure_l3_interfaces | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -535,7 +556,9 @@
 # Query static route facts (optional, when static_routes config_context is defined)
 # Used by configure_static_routes.yml to compute the create/update/delete diff,
 # since the aoscx_static_route module is not idempotent (pyaoscx always deletes
-# and recreates the nexthop).
+# and recreates the nexthop). configure_static_routes.yml is only included when
+# aoscx_configure_static_routes is true, so skip the query otherwise unless
+# aoscx_test_mode is set for report-only verification.
 #
 # Queries one endpoint per VRF referenced in the static_routes config_context:
 #   /system/vrfs/{vrf}/static_routes?attributes=&depth=4
@@ -559,6 +582,7 @@
   delegate_to: localhost
   when:
     - (static_routes | default({})) | length > 0
+    - aoscx_configure_static_routes | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -591,11 +615,9 @@
     - always
 
 # Build the list of VRFs in use up front - both the VRF and VRF
-# route-target fact queries below need it, and it's gathered independently
-# of aoscx_configure_vrfs (same rationale as static route / OSPF facts
-# below) so report-only/verification playbooks (which set
-# aoscx_configure_vrfs: false) can still compare NetBox intent against what
-# the device actually has configured.
+# route-target fact queries below need it. This step itself makes no API
+# call, so it stays unconditional; the queries below are gated on
+# aoscx_configure_vrfs / aoscx_test_mode.
 - name: Build VRF list for fact gathering
   ansible.builtin.set_fact:
     _vrf_rt_vrf_names: "{{ (interfaces | default([]) | get_vrfs_in_use(ip_addresses | default([]))).vrf_names }}"
@@ -607,8 +629,9 @@
 # skip pushing a Route Distinguisher that's already set to the desired
 # value, instead of relying solely on aoscx_vrf's own idempotency and
 # aoscx_config's match: line - matching the pre-compare-against-facts
-# pattern used for L3 interfaces and static routes. Gathered independently
-# of aoscx_configure_vrfs, same rationale as above.
+# pattern used for L3 interfaces and static routes. configure_vrfs.yml is
+# only included when aoscx_configure_vrfs is true, so skip the query
+# otherwise unless aoscx_test_mode is set for report-only verification.
 #
 # Single collection query (no per-VRF loop needed, unlike vrf_address_families
 # which is a per-VRF sub-resource):
@@ -637,6 +660,7 @@
   delegate_to: localhost
   when:
     - _vrf_rt_vrf_names | default([]) | length > 0
+    - aoscx_configure_vrfs | bool or aoscx_test_mode | bool
   tags:
     - always
 
@@ -655,7 +679,7 @@
 # pushes themselves stay idempotent via aoscx_config's match: line (it
 # already skips lines that are already present) - these facts only close
 # the "stale RT" gap, matching the cleanup pattern used for static routes.
-# Gathered independently of aoscx_configure_vrfs, same rationale as above.
+# Gated on aoscx_configure_vrfs / aoscx_test_mode, same rationale as above.
 #
 # Queries one endpoint per VRF in use:
 #   /system/vrfs/{vrf}/vrf_address_families?attributes=export_route_targets,import_route_targets&depth=2
@@ -688,6 +712,7 @@
   delegate_to: localhost
   when:
     - _vrf_rt_vrf_names | default([]) | length > 0
+    - aoscx_configure_vrfs | bool or aoscx_test_mode | bool
   tags:
     - always
 
