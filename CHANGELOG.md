@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.19] - 2026-07-22
+
+### Fixed
+
+- The `aoscx_configure_*`-gated `when` added to the "Query VRF route-target facts" and "Query static route facts" REST API tasks (`tasks/gather_facts_rest_api.yml`) is evaluated per loop item, since neither condition depends on the loop's `item`. When the flag was `false` and `aoscx_test_mode` unset, Ansible still looped over a non-empty item list (VRF names / static route VRFs) and marked each iteration skipped, producing a populated `results` list of skip stubs (no `status`/`json` keys) instead of an empty list. The downstream "Build VRF route-target facts"/"Build static route facts" tasks only checked `_rest_vrf_rts is defined`/`_rest_static_routes is defined` - true even for a skipped register - and then iterated those stubs, crashing with `object of type 'dict' has no attribute 'status'`. Fixed by adding the same `aoscx_configure_vrfs`/`aoscx_configure_static_routes` (or `aoscx_test_mode`) gate to the two "Build" tasks so they only run when the query actually executed for real. The equivalent OSPF interface/router "Build" tasks were not affected (their loop source is built by a separate `set_fact` that is itself skipped when the flag is off, yielding a genuinely empty loop rather than per-item stubs) but were given the same explicit gate as defense-in-depth. Also added the missing `aoscx_test_mode` OR-condition to the EVPN/VNI/port-access "Set facts" tasks, which required their `aoscx_configure_*` flag even when `aoscx_test_mode: true` had forced the corresponding query to run.
+
 ## [0.13.18] - 2026-07-22
 
 ### Added
