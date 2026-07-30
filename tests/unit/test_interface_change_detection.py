@@ -729,6 +729,57 @@ class TestEnhancedFacts:
             assert ip_changes.get("anycast_ipv6_to_remove", []) == []
             assert ip_changes.get("anycast_ipv4_to_remove", []) == []
 
+    def test_no_change_when_device_vsx_virtual_ip4_has_cidr_prefix(self):
+        """Regression test: AOS-CX REST API may return vsx_virtual_ip4 with a
+        CIDR prefix (e.g. "172.18.19.129/27"), mirroring how ip4_address is
+        stored, even though active-gateway ip itself takes no prefix. NetBox
+        anycast addresses are always compared without a prefix, so a device
+        that already has the anycast IP configured must not be flagged for
+        change just because vsx_virtual_ip4 came back with "/27" attached."""
+        interfaces = [
+            {
+                "name": "vlan31",
+                "type": {"value": "virtual"},
+                "vrf": {"name": "l2-yellow"},
+                "custom_fields": {"if_anycast_gateway_mac": "00:00:00:01:00:01"},
+                "ip_addresses": [
+                    {"address": "172.18.19.130/27", "role": None,
+                        "vrf": {"name": "l2-yellow"}},
+                    {"address": "172.18.19.129/27", "role": {"value": "anycast"},
+                        "vrf": {"name": "l2-yellow"}},
+                ],
+            }
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan31": {
+                        "ip4_address": "172.18.19.130/27",
+                        "ip6_addresses": {},
+                    }
+                }
+            }
+        }
+        enhanced_facts = {
+            "vlan31": {
+                "ip4_address": "172.18.19.130/27",
+                "ip4_address_secondary": [],
+                "ip6_addresses": {},
+                # Device already matches NetBox, but the REST API returned
+                # vsx_virtual_ip4 with a CIDR prefix instead of a bare address.
+                "vsx_virtual_ip4": ["172.18.19.129/27"],
+                "vsx_virtual_ip6": [],
+                "vsx_virtual_gw_mac_v4": "00:00:00:01:00:01",
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts, enhanced_facts
+        )
+        # Anycast IP already present on device (modulo the CIDR-suffix
+        # formatting difference) — interface must NOT be flagged for change.
+        assert len(result["l3"]) == 0
+
     def test_link_local_anycast_missing_link_local_address_detected(self):
         """When active-gateway ipv6 fe80::1 is configured but 'ipv6 address link-local'
         is missing, link_local_ipv6_to_add must contain the full address with prefix"""

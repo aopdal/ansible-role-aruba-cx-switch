@@ -233,6 +233,14 @@ Look for the filter debug output showing IP role and anycast MAC values.
 
 **Solution**: Update the `if_anycast_gateway_mac` custom field on the interface in NetBox and re-run the playbook.
 
+### SVI Always Reports `changed` Even Though Nothing Changed
+
+**Issue**: An SVI with an already-correctly-configured anycast gateway (`active-gateway ip mac ...` / `active-gateway ip ...` present in `show running-config`) is re-pushed — including `description`, `vrf attach`, and `l3-counters` — on every single run.
+
+**Cause**: The device-side `vsx_virtual_ip4` REST API attribute (used to detect whether the anycast IP is already configured) can be returned in CIDR form (e.g. `172.18.19.129/27`) on some firmware/API versions, mirroring how `ip4_address` is stored — even though the `active-gateway ip` CLI command itself takes no prefix and NetBox's anycast address is always compared without one. Before the fix, that formatting mismatch made the comparison think the anycast IP was missing on every run. The role now strips any `/prefix` from `vsx_virtual_ip4` before comparing, so this should no longer occur from this cause on current versions.
+
+**If you still see this**: enable `-e aoscx_debug=true` and check the `Anycast comparison for <intf>` debug line — if `device VSX virtual IPv4` doesn't contain the expected address at all (not just a prefix mismatch), verify `custom_fields.device_vsx` is `true` on the device in NetBox and `aoscx_gather_facts_rest_api: true` is set; `vsx_virtual_ip4` is only queried when both are true (or `aoscx_test_mode: true`).
+
 ### Multiple VLANs with Same Anycast IP
 
 This is valid for anycast gateway - multiple VLANs can use the same IP address in different VRFs:
