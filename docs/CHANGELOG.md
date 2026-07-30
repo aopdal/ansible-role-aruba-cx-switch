@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.21] - 2026-07-30
+
+### Fixed
+
+- The REST API "Build interface attributes query string" task (`tasks/gather_facts_rest_api.yml`) only requested the `vsx_virtual_ip4`/`vsx_virtual_ip6`/`vsx_virtual_gw_mac_v4`/`vsx_virtual_gw_mac_v6`/`ip4_address_secondary` attributes when `custom_fields.device_vsx` was `true` **and** `aoscx_configure_vsx` (or `aoscx_test_mode`) was `true`. `aoscx_configure_vsx` defaults to `false` and is commonly left off when only L3/anycast-gateway configuration is being pushed (VSX pairing config is a separate feature). Since AOS-CX's REST API omits attributes that were never requested — it does not return them as `null` — the anycast comparison in `netbox_filters_lib/interface_change_detection.py` saw no `vsx_virtual_ip4`/`vsx_virtual_ip6` at all and always concluded the anycast address was missing, even when it was already correctly configured on the device. This produced the same non-idempotent `changed: true` (re-pushing `active-gateway`, `vrf attach`, `description`, `l3-counters` every run) as the CIDR-prefix bug fixed in 0.13.20, but from a different root cause (missing REST attribute vs. mismatched format) that the 0.13.20 fix did not address. The VSX-attributes query is now also triggered when `custom_fields.device_anycast_gateway` is `true` and `aoscx_configure_l3_interfaces` (or `aoscx_test_mode`) is `true`, independent of `aoscx_configure_vsx`/`device_vsx`. The debug output (`-e aoscx_debug=true`) now also prints `Device anycast gateway enabled: <bool>` alongside the existing OSPF/VSX lines.
+
 ## [0.13.20] - 2026-07-30
 
 ### Fixed
