@@ -723,12 +723,24 @@ def get_interfaces_needing_config_changes(
                         _debug(f"Enhanced IPv6 for {intf_name}: {device_ipv6}")
 
                     # Extract VSX virtual IPs (anycast/active-gateway)
+                    # The REST API may return vsx_virtual_ip4 in CIDR form
+                    # (e.g. "172.18.19.129/27"), mirroring how ip4_address is
+                    # stored, even though the active-gateway CLI itself takes
+                    # no prefix. NetBox anycast addresses are compared without
+                    # a prefix (see addr_without_prefix below), so strip any
+                    # "/prefix" here too - otherwise a device that already has
+                    # the anycast IP configured is reported as needing it
+                    # added on every run (false positive, non-idempotent).
                     vsx_ip4 = enhanced_intf.get("vsx_virtual_ip4")
                     if vsx_ip4:
-                        if isinstance(vsx_ip4, list):
-                            device_vsx_virtual_ip4.update(vsx_ip4)
-                        else:
-                            device_vsx_virtual_ip4.add(vsx_ip4)
+                        vsx_ip4_list = (
+                            vsx_ip4 if isinstance(vsx_ip4, list) else [vsx_ip4]
+                        )
+                        for addr in vsx_ip4_list:
+                            if addr:
+                                device_vsx_virtual_ip4.add(
+                                    addr.split("/")[0] if "/" in addr else addr
+                                )
 
                     vsx_ip6 = enhanced_intf.get("vsx_virtual_ip6")
                     if vsx_ip6:
