@@ -114,14 +114,27 @@
   tags:
     - always
 
+# The vsx_virtual_* attributes are also how the role detects an already-
+# configured anycast/active-gateway address (see
+# netbox_filters_lib/interface_change_detection.py), not just VSX ISL/
+# keepalive pairing. If we only query them when aoscx_configure_vsx is
+# true, a device that has device_anycast_gateway enabled but VSX
+# config-pushing disabled (aoscx_configure_vsx: false, the role default)
+# never gets vsx_virtual_ip4/ip6 back from the REST API at all - the key
+# is silently omitted, not null - so the anycast comparison always thinks
+# the address is missing and re-pushes the interface's L3 config every
+# run. Query the VSX attrs whenever either VSX or anycast-gateway config
+# is in play for this device.
 - name: Build interface attributes query string
   ansible.builtin.set_fact:
     _rest_interface_attrs: >-
       {{ _rest_interface_base_attrs }}{% if custom_fields.device_ospf |
       default(false) | bool and (aoscx_configure_ospf | bool or
       aoscx_test_mode | bool) %},{{ _rest_interface_ospf_attrs }}{% endif
-      %}{% if custom_fields.device_vsx | default(false) | bool and
-      (aoscx_configure_vsx | bool or aoscx_test_mode | bool) %},{{
+      %}{% if (custom_fields.device_vsx | default(false) | bool and
+      (aoscx_configure_vsx | bool or aoscx_test_mode | bool)) or
+      (custom_fields.device_anycast_gateway | default(false) | bool and
+      (aoscx_configure_l3_interfaces | bool or aoscx_test_mode | bool)) %},{{
       _rest_interface_vsx_attrs }}{% endif %}{% if aoscx_configure_stp | bool
       or aoscx_test_mode | bool %},{{ _rest_interface_stp_attrs }}{% endif %}
   tags:
@@ -135,6 +148,8 @@
       - "REST API base URL: {{ _rest_api_base }}"
       - "Device OSPF enabled: {{ custom_fields.device_ospf | default(false) }}"
       - "Device VSX enabled: {{ custom_fields.device_vsx | default(false) }}"
+      - "Device anycast gateway enabled: {{
+        custom_fields.device_anycast_gateway | default(false) }}"
       - "STP configuration enabled: {{ aoscx_configure_stp | default(true) }}"
       - "Interface attributes to query: {{ _rest_interface_attrs }}"
   when:
