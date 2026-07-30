@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.20] - 2026-07-30
+
+### Fixed
+
+- Anycast gateway IPv4 comparison (`netbox_filters_lib/interface_change_detection.py`) treated a device's `vsx_virtual_ip4` REST API value as an exact string match against the NetBox anycast address (always compared without a `/prefix`, since `active-gateway ip` takes no prefix). When the AOS-CX REST API returns `vsx_virtual_ip4` in CIDR form (e.g. `172.18.19.129/27`, mirroring how `ip4_address` is stored) instead of a bare address, the comparison never matched, so an SVI with an already-correctly-configured anycast gateway was reported as needing the `active-gateway ip mac` / `active-gateway ip` / `vrf attach` / `description` / `l3-counters` lines re-pushed on every run (non-idempotent `changed: true` with no actual drift). The device-side `vsx_virtual_ip4` value(s) are now stripped of any `/prefix` before comparison, matching the normalization the IPv6 side already had via `_normalize_ipv6`. (The IPv6 anycast comparison was not affected — it already normalizes prefixes on both sides.)
+
 ## [0.13.19] - 2026-07-22
 
 ### Fixed
