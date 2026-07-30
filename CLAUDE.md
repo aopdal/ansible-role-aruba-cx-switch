@@ -159,6 +159,10 @@ rejected by lint / review.
   only act on the diff — see `tasks/configure_l3_interface_common.yml` and
   the helpers in
   [netbox_filters_lib/l3_config_helpers.py](netbox_filters_lib/l3_config_helpers.py).
+  **Exception**: write-only/hashed secret fields (OSPF MD5 auth today;
+  AAA/SNMP/local-user passwords when implemented) cannot be idempotency-
+  compared against device state at all — see
+  [§4.7](#47-write-only--hashed-secret-fields-idempotency).
 - L3 interfaces use `aoscx_config` (not `aoscx_l3_interface`) so that
   `ip mtu` and `l3-counters` can be set. Do not "simplify" back to
   `aoscx_l3_interface` — capability would regress.
@@ -226,6 +230,59 @@ use emojis in headings.
 User-visible changes go in [CHANGELOG.md](CHANGELOG.md) under an
 `Unreleased` section using Keep-a-Changelog headings (`Added`, `Changed`,
 `Deprecated`, `Removed`, `Fixed`, `Security`).
+
+### 4.7 Write-only / hashed secret fields (idempotency)
+
+AOS-CX (like most network OSes) never returns a secret in a form
+comparable to the cleartext value an operator supplies — it stores and
+reports back a hash or ciphertext instead, or omits the field from facts
+entirely. **Never compare a desired cleartext secret against device
+state to decide whether to push it** — that comparison is not just
+unreliable, it's fundamentally impossible, and will produce false
+`changed: true` on every run.
+
+OSPF MD5 authentication (`ospf_auth_keys`) is the existing example of
+this and is deliberately built around it instead of fighting it — see
+[docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md#interface-md5-authentication)
+("Cleartext Key Idempotency"):
+
+- **Decision layer** (whether to push auth config at all) compares
+  *presence/enablement state*, not secret equality — see
+  `get_ospf_interface_changes` in
+  [netbox_filters_lib/ospf_filters.py](netbox_filters_lib/ospf_filters.py)
+  (`auth_active` vs. `md5_auth_desired`, both booleans).
+- **Push layer**: once a push is triggered, `ospf_auth_keys[...].encrypted:
+  false` (cleartext) will still show `changed: true` on every run, because
+  the module diffs the cleartext value against the device's stored
+  ciphertext at the CLI/text level. This is accepted for dev/test and
+  documented as such; production guidance is to switch to
+  `encrypted: true` using the device's own ciphertext, which *is*
+  idempotent.
+
+This is a category, not an OSPF-specific quirk. Every **planned** feature
+that carries a secret — AAA/RADIUS/TACACS+ shared secrets, SNMPv3
+auth/priv passphrases, local user passwords — will hit the same wall when
+implemented, for the same reason: the device is the only place that can
+say whether a secret is "correct," and it will not hand that answer back
+over facts/REST in a form comparable to cleartext input. When building
+any such feature:
+
+1. Design the change-detection (`identify_*_changes.yml` /
+   `netbox_filters_lib/*.py`) around presence/enablement/structural state,
+   following the OSPF MD5 pattern — not "does the device's value equal my
+   cleartext value."
+2. If the target device/module supports an accepted ciphertext/hash input
+   form, support it (`encrypted: true`-style flag) and document it as the
+   idempotent path, same as `ospf_auth_keys`.
+3. Document in the feature's `docs/` page, up front, that cleartext input
+   is expected to show `changed: true` on every run and that this is a
+   platform limitation, not a bug — do not let this get "discovered" via a
+   bug report.
+4. If the [autotest-aoscx](../autotest-aoscx) idempotency-rerun check
+   (or any future CI idempotency check) covers this feature, it needs an
+   explicit exemption or an accepted-ciphertext test fixture for it —
+   a blanket `changed == 0` assertion will otherwise have a permanent,
+   growing false-positive rate as these features land.
 
 ## 5. Common Commands
 
