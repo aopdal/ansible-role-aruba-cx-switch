@@ -98,6 +98,7 @@ nav:
                             - Developer Guide: VLAN_DEVELOPER_GUIDE.md
                             - L2 Interface Modes: L2_INTERFACE_MODES.md
                             - Anycast Gateway: ANYCAST_GATEWAY.md
+                            - Virtual Interface Cleanup: VIRTUAL_INTERFACE_CLEANUP.md
                   - EVPN & VXLAN:
                             - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
                   - BGP: BGP_CONFIGURATION.md

@@ -1,0 +1,47 @@
+---
+# Remove virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces) that exist
+# on the device but are no longer present in NetBox.
+#
+# This runs BEFORE L3 interface configuration, unlike the VLAN/EVPN/VXLAN
+# cleanup tasks which run after everything else. If NetBox renames or
+# re-parents an interface (e.g. moves an IP from vlan10 to vlan20, or from
+# one sub-interface to another), the stale device-side object is never
+# touched by configure_l3_interfaces.yml and can hold the same IP address
+# as its replacement - causing that task to fail with a duplicate IP
+# address. Deleting orphans first avoids the conflict.
+#
+# Uses the facts gathered at the start of the play (gather_facts.yml).
+# Nothing earlier in tasks/main.yml creates or deletes VLAN SVI, loopback,
+# or sub-interface objects, so those facts are still accurate here and no
+# re-gather is needed.
+
+- name: Identify orphaned virtual interfaces
+  ansible.builtin.set_fact:
+    virtual_interface_orphans: "{{ interfaces | default([]) | get_virtual_interfaces_to_delete(ansible_facts.network_resources.interfaces) }}"
+  when:
+    - ansible_facts is defined
+    - ansible_facts.network_resources is defined
+    - ansible_facts.network_resources.interfaces is defined
+
+- name: Debug - Show orphaned virtual interfaces
+  ansible.builtin.debug:
+    msg:
+      "Virtual interfaces on device but not in NetBox (will be deleted): {{
+      virtual_interface_orphans | default([]) }}"
+  when:
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+    - virtual_interface_orphans | default([]) | length > 0
+
+- name: Remove orphaned virtual interfaces
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no interface {{ item | format_interface_name(item_type) }}"
+  loop: "{{ virtual_interface_orphans | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item }}"
+  vars:
+    ansible_connection: "{{ aoscx_connection_type }}"
+    item_type: >-
+      {{ 'vlan' if item.startswith('vlan')
+      else ('loopback' if item.startswith('loopback') else 'subinterface') }}
+  when: virtual_interface_orphans | default([]) | length > 0

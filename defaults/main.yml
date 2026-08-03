@@ -63,6 +63,17 @@ aoscx_configure_port_access: true
 # Idempotency mode - when true, removes configs not in NetBox
 aoscx_idempotent_mode: false
 
+# When true (and aoscx_idempotent_mode is also true), removes virtual
+# interfaces (VLAN SVIs, loopbacks, sub-interfaces) that exist on the device
+# but are no longer present in NetBox. Runs BEFORE L3 interface
+# configuration - if NetBox renames/re-parents an interface, the stale
+# device-side object can hold the same IP address as its replacement and
+# make L3 configuration fail with a duplicate IP address. Physical, LAG,
+# and MCLAG interfaces are never affected (they cannot be deleted from the
+# device). Set to false to keep aoscx_idempotent_mode's VLAN/EVPN/VXLAN
+# cleanup while leaving virtual interfaces untouched.
+aoscx_cleanup_virtual_interfaces: true
+
 # Configure ALL VLANs available for the device from NetBox, regardless of
 # whether they are currently used by an interface or port-access role.
 # When true:

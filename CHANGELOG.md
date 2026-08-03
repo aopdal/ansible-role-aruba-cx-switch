@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.22] - 2026-08-03
+
+### Added
+
+- Idempotent-mode cleanup of orphaned virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces) that exist on the device but are no longer present in NetBox, gated by the new `aoscx_cleanup_virtual_interfaces` variable (default `true`) alongside `aoscx_idempotent_mode`. Unlike the VLAN/EVPN/VXLAN cleanup tasks, this runs **before** `configure_l3_interfaces.yml` rather than after: if NetBox renames or re-parents an interface (e.g. an IP moved from `vlan10` to `vlan20`), the stale device-side object is never touched by L3 configuration and can hold the same IP address as its replacement, causing configuration to fail with a duplicate IP address. See `docs/VIRTUAL_INTERFACE_CLEANUP.md`.
+
 ## [0.13.21] - 2026-07-30
 
 ### Fixed

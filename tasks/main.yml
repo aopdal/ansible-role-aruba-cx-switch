@@ -447,6 +447,27 @@
     - routing
     - layer3
 
+- name: Include virtual interface cleanup tasks (before L3 config)
+  ansible.builtin.include_tasks:
+    file: cleanup_virtual_interfaces.yml
+    apply:
+      tags:
+        - interfaces
+        - l3_interfaces
+        - layer3
+        - cleanup
+        - idempotent
+  when:
+    - aoscx_configure_l3_interfaces | bool
+    - aoscx_idempotent_mode | bool
+    - aoscx_cleanup_virtual_interfaces | bool
+  tags:
+    - interfaces
+    - l3_interfaces
+    - layer3
+    - cleanup
+    - idempotent
+
 - name: Include L3 interface configuration tasks
   ansible.builtin.include_tasks:
     file: configure_l3_interfaces.yml
