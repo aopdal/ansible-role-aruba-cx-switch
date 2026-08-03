@@ -434,17 +434,24 @@ def get_interfaces_needing_config_changes(
                 )
 
         # Check L2 configuration (VLANs)
-        # Skip L2 VLAN checks for VLAN interfaces (SVIs) - these are L3 interfaces
-        # that provide routing for a VLAN, and don't have vlan_mode/vlan_tag properties.
-        # NetBox uses the mode/VLAN fields just to identify which VLAN the SVI represents.
-        is_vlan_interface = intf_name.startswith("vlan") and (
+        # Skip L2 VLAN checks for ALL virtual interfaces (VLAN SVIs, loopbacks,
+        # sub-interfaces) - none of these have vlan_mode/vlan_tag/vlan_trunks on
+        # the device. NetBox may still populate mode/tagged_vlans on a virtual
+        # interface object (e.g. a sub-interface's dot1Q tag is modelled via
+        # mode: tagged + tagged_vlans, same fields used for L2 trunk ports),
+        # but on AOS-CX that's expressed via subintf_vlan/encapsulation dot1q
+        # instead (checked separately above), not via L2 vlan_mode. Without
+        # this exclusion, every sub-interface with a tagged VLAN in NetBox is
+        # incorrectly flagged as "VLANs configured in NetBox but not on
+        # device", since device_mode is always null for them.
+        is_virtual_interface = (
             nb_intf.get("type", {}).get("value") == "virtual"
             if isinstance(nb_intf.get("type"), dict)
             else False
         )
 
         mode_obj = nb_intf.get("mode")
-        if mode_obj and isinstance(mode_obj, dict) and not is_vlan_interface:
+        if mode_obj and isinstance(mode_obj, dict) and not is_virtual_interface:
             # Has L2 mode - check VLAN configuration
             nb_mode = mode_obj.get("value")
             device_mode = device_intf.get("vlan_mode") or device_intf.get(
@@ -780,6 +787,38 @@ def get_interfaces_needing_config_changes(
                     f"VRF change detected for {intf_name}: "
                     f"NB={nb_vrf_name}, device={device_vrf_name}"
                 )
+
+            # Encapsulation VLAN check (sub-interfaces only)
+            # AOS-CX reports the subinterface's configured 802.1Q encapsulation
+            # VLAN as `subintf_vlan` via the REST API - this is not present in
+            # standard aoscx_facts, so the comparison only runs when enhanced
+            # facts are available. This is the drift case that motivated the
+            # virtual-interface cleanup task: if NetBox re-tags the interface
+            # to a different VLAN without renaming it, the device keeps
+            # forwarding on the stale VLAN unless this is corrected.
+            if enhanced_intf and nb_intf.get("parent") is not None:
+                nb_tagged_vlans = nb_intf.get("tagged_vlans")
+                nb_encap_vlan = None
+                if (
+                    nb_tagged_vlans
+                    and isinstance(nb_tagged_vlans, list)
+                    and isinstance(nb_tagged_vlans[0], dict)
+                ):
+                    nb_encap_vlan = nb_tagged_vlans[0].get("vid")
+                device_encap_vlan = enhanced_intf.get("subintf_vlan")
+                if nb_encap_vlan is not None and nb_encap_vlan != device_encap_vlan:
+                    needs_change = True
+                    change_reasons.append(
+                        f"encapsulation VLAN mismatch (NB: {nb_encap_vlan}, "
+                        f"device: {device_encap_vlan})"
+                    )
+                    if "_ip_changes" not in nb_intf:
+                        nb_intf["_ip_changes"] = {}
+                    nb_intf["_ip_changes"]["encapsulation_change"] = True
+                    _debug(
+                        f"Encapsulation VLAN change detected for {intf_name}: "
+                        f"NB={nb_encap_vlan}, device={device_encap_vlan}"
+                    )
 
             # Compare the IP addresses
             ipv4_to_add = nb_ipv4 - device_ipv4

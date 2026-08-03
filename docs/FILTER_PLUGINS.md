@@ -75,6 +75,17 @@ Interfaces with `mode: tagged` but no tagged VLANs are silently skipped and will
 - Use NetBox `mode: tagged-all` for trunk ports that allow all VLANs (with or without native VLAN)
 - Document your organization's NetBox modeling standards
 
+**Virtual interfaces are excluded entirely**: NetBox also uses `mode`/
+`tagged_vlans` to describe a sub-interface's 802.1Q encapsulation tag (see
+[VIRTUAL_INTERFACE_CLEANUP.md](VIRTUAL_INTERFACE_CLEANUP.md#sub-interfaces-are-not-l2-trunk-ports)),
+even though AOS-CX configures that via `encapsulation dot1q`, not L2
+`vlan_mode`. `interface_change_detection.py` skips this entire L2 VLAN
+mode/membership comparison for any interface with `type.value == "virtual"`
+(VLAN SVIs, loopbacks, sub-interfaces) — none of them ever populate
+`vlan_mode`/`vlan_tag`/`vlan_trunks` on the device, so without this
+exclusion every virtual interface with a `mode`/`tagged_vlans` set in
+NetBox would be incorrectly flagged as needing L2 changes.
+
 #### Admin State Detection
 
 **Filter**: `interface_change_detection.py`
@@ -576,6 +587,7 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
     - Implements granular change detection for:
       - Physical properties (enabled/disabled, description, MTU) — physical, LAG, and MCLAG interfaces
       - Description — virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces; NetBox `type.value == "virtual"`), which skip the admin-state/MTU checks above but are still compared on `description`
+      - Encapsulation VLAN — sub-interfaces only (NetBox `type.value == "virtual"` with `parent` set). Compares the device's `subintf_vlan` (REST API, requires `enhanced_facts`) against the first `tagged_vlans[].vid` on the NetBox interface, so a re-tagged sub-interface is detected as drift instead of silently passing when its IP/description are otherwise unchanged
       - LAG membership
       - L2 VLAN configuration
       - L3 IP addresses (IPv4 with specific address tracking; IPv6 with full comparison when `enhanced_facts` is provided, otherwise reference only)
@@ -600,6 +612,7 @@ NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
       - `dhcp_relay_change`: `True` when DHCP relay configuration needs to be pushed (set in all relay-change branches so `group_interface_ips` includes the interface even when no IPs need adding)
       - `dhcp_relay_to_remove`: Sorted list of relay server IPs present on the device but absent from NetBox (requires `dhcp_relay_facts`). Used by the "Remove stale ip helper-address entries" task.
       - `description_change`: `True` when a virtual interface's (VLAN SVI/loopback/sub-interface) description differs from the device, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` emits a `description` line. Physical/LAG/MCLAG description changes are handled separately by `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml`, which push description unconditionally whenever the interface has any pending change.
+      - `encapsulation_change`: `True` when a sub-interface's device-side `subintf_vlan` (REST API, requires `enhanced_facts`) differs from NetBox's `tagged_vlans[0].vid`, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` re-emits the `encapsulation dot1q <vid>` line. Without `enhanced_facts` this comparison is skipped (no false positives, but also no drift detection) since standard `aoscx_facts` does not expose `subintf_vlan`.
     - See "L3 Interface IP Address Idempotency" section for performance details
 
 ### `bgp_filters.py` - BGP Session Enrichment

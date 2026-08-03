@@ -1123,3 +1123,49 @@ class TestGroupInterfaceIpsDescriptionChange:
         result = group_interface_ips([item])
         assert len(result) == 1
         assert len(result[0]["addresses"]) == 1
+
+
+class TestGroupInterfaceIpsEncapsulationChange:
+    """Tests for group_interface_ips including sub-interfaces with only an
+    encapsulation VLAN change (see interface_change_detection.py)."""
+
+    def _make_item(self, interface_obj, needs_add=False):
+        """Build a minimal per-IP item with given interface dict."""
+        return {
+            "interface_name": interface_obj.get("name", "1/1/1.701"),
+            "interface": interface_obj,
+            "address": "172.18.17.6/31",
+            "ip_role": None,
+            "anycast_mac": None,
+            "_needs_add": needs_add,
+        }
+
+    def test_includes_interface_with_encapsulation_change_flag(self):
+        """Interface flagged encapsulation_change=True is included even when no IPs need adding."""
+        item = self._make_item({
+            "name": "1/1/1.701",
+            "_ip_changes": {"encapsulation_change": True, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert result[0]["interface_name"] == "1/1/1.701"
+        assert result[0]["addresses"] == []
+
+    def test_omits_interface_without_encapsulation_change_flag(self):
+        """Interface with no flag and _needs_add=False is still omitted."""
+        item = self._make_item({
+            "name": "1/1/1.701",
+            "_ip_changes": {"ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_encapsulation_change_false_does_not_include(self):
+        """Explicit encapsulation_change=False does not cause inclusion."""
+        item = self._make_item({
+            "name": "1/1/1.701",
+            "_ip_changes": {"encapsulation_change": False, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []

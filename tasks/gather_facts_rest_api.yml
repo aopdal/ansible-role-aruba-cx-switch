@@ -104,7 +104,7 @@
       'name,admin,description,mtu,type,interfaces,ip4_address,ip6_addresses,' ~
       'ip6_address_link_local,' ~
       'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,' ~
-      'other_config,routing,vrf' }}"
+      'other_config,routing,vrf,subintf_vlan,subintf_parent' }}"
     _rest_interface_ospf_attrs: "ospf_if_type,ospf_auth_type"
     _rest_interface_vsx_attrs:
       "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_i\

@@ -250,11 +250,23 @@ def group_interface_ips(
             else False
         )
 
+        # Check whether a sub-interface encapsulation VLAN change was flagged
+        # during change detection (requires enhanced/REST facts - see
+        # interface_change_detection.py). Covers sub-interfaces where the IP
+        # is already correct but NetBox re-tagged the interface to a
+        # different VLAN.
+        has_encapsulation_change = bool(
+            ip_changes.get("encapsulation_change")
+            if isinstance(ip_changes, dict)
+            else False
+        )
+
         if (
             item["addresses"]
             or has_ospf_change
             or has_dhcp_relay_change
             or has_description_change
+            or has_encapsulation_change
         ):
             item["addresses"].sort(key=_addr_sort_key)
             result.append(item)
