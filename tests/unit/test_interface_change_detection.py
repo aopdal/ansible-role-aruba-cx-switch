@@ -1428,3 +1428,135 @@ class TestVrfChangeDetection:
         assert ip_changes.get("vrf_change") is True
         # All IPs must be in ipv4_to_add (device will wipe L3 on VRF change)
         assert "10.0.0.1/24" in ip_changes.get("ipv4_to_add", [])
+
+
+class TestSubinterfaceEncapsulationChangeDetection:
+    """Tests for sub-interface `subintf_vlan` (802.1Q encapsulation) comparison.
+
+    AOS-CX only exposes subintf_vlan via the REST API (enhanced_facts), not
+    standard aoscx_facts, so this comparison only runs when enhanced facts are
+    supplied and the NetBox interface is a sub-interface (virtual + parent
+    set).
+    """
+
+    def _make_subinterface(self, name="1/1/1.701", vid=701, parent="1/1/1"):
+        return {
+            "name": name,
+            "type": {"value": "virtual"},
+            "parent": {"name": parent},
+            # NetBox models a sub-interface's 802.1Q tag using the same
+            # mode/tagged_vlans fields used for L2 trunk ports (confirmed
+            # against real device data), even though AOS-CX configures it
+            # via encapsulation dot1q, not L2 vlan_mode.
+            "mode": {"value": "tagged"},
+            "tagged_vlans": [{"vid": vid}],
+            "ip_addresses": [{"address": "172.18.17.6/31"}],
+        }
+
+    def _device_facts(self, name="1/1/1.701"):
+        return {
+            "network_resources": {
+                "interfaces": {
+                    name: {
+                        "ip4_address": "172.18.17.6/31",
+                    }
+                }
+            }
+        }
+
+    def test_encapsulation_mismatch_detected(self):
+        """subintf_vlan on device differs from NetBox tagged VLAN → flagged."""
+        iface = self._make_subinterface(vid=701)
+        device_facts = self._device_facts()
+        enhanced_facts = {
+            "1/1/1.701": {
+                "ip4_address": "172.18.17.6/31",
+                "subintf_vlan": 999,
+                "subintf_parent": {"1/1/1": "/rest/v10.17/system/interfaces/1%2F1%2F1"},
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["_ip_changes"]["encapsulation_change"] is True
+
+    def test_encapsulation_match_no_change(self):
+        """subintf_vlan matching NetBox tagged VLAN → no change."""
+        iface = self._make_subinterface(vid=701)
+        device_facts = self._device_facts()
+        enhanced_facts = {
+            "1/1/1.701": {
+                "ip4_address": "172.18.17.6/31",
+                "subintf_vlan": 701,
+                "subintf_parent": {"1/1/1": "/rest/v10.17/system/interfaces/1%2F1%2F1"},
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["l3"]) == 0
+        assert len(result["no_changes"]) == 1
+
+    def test_no_enhanced_facts_skips_encapsulation_check(self):
+        """Without enhanced facts, subintf_vlan is unavailable - no false positive."""
+        iface = self._make_subinterface(vid=701)
+        device_facts = self._device_facts()
+        result = get_interfaces_needing_config_changes([iface], device_facts)
+        assert len(result["no_changes"]) == 1
+
+    def test_vlan_svi_not_treated_as_subinterface(self):
+        """A VLAN SVI (virtual, no parent) is unaffected by the encapsulation
+        check even when enhanced facts happen to include a stray subintf_vlan."""
+        iface = {
+            "name": "vlan100",
+            "type": {"value": "virtual"},
+            "ip_addresses": [{"address": "10.1.100.1/24"}],
+        }
+        device_facts = {
+            "network_resources": {
+                "interfaces": {"vlan100": {"ip4_address": "10.1.100.1/24"}}
+            }
+        }
+        enhanced_facts = {
+            "vlan100": {"ip4_address": "10.1.100.1/24", "subintf_vlan": 999}
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["l3"]) == 0
+        assert len(result["no_changes"]) == 1
+
+    def test_matching_subinterface_not_flagged_by_l2_vlan_mode_check(self):
+        """Regression: a sub-interface with mode=tagged/tagged_vlans set in
+        NetBox (the standard way NetBox represents its 802.1Q tag) must not
+        be treated as an L2 trunk port. Device facts never populate
+        vlan_mode/vlan_tag/vlan_trunks for sub-interfaces (they use
+        subintf_vlan instead), so the L2 VLAN-mode/membership check
+        previously always concluded "VLANs configured in NetBox but not on
+        device" for every matching sub-interface."""
+        iface = self._make_subinterface(vid=701)
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1.701": {
+                        "ip4_address": "172.18.17.6/31",
+                        "vlan_mode": None,
+                        "vlan_tag": None,
+                        "vlan_trunks": {},
+                    }
+                }
+            }
+        }
+        enhanced_facts = {
+            "1/1/1.701": {
+                "ip4_address": "172.18.17.6/31",
+                "subintf_vlan": 701,
+                "subintf_parent": {"1/1/1": "/rest/v10.17/system/interfaces/1%2F1%2F1"},
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts, enhanced_facts
+        )
+        assert len(result["l3"]) == 0
+        assert len(result["no_changes"]) == 1

@@ -53,6 +53,42 @@ No re-gather of facts is needed before this step, since nothing earlier in
 `tasks/main.yml` creates or deletes VLAN SVI, loopback, or sub-interface
 objects.
 
+## Related: sub-interface encapsulation VLAN drift
+
+Renaming/re-parenting handles the case where NetBox moves an IP to a
+*differently-named* interface. A narrower variant of the same misconfiguration
+is possible when a sub-interface keeps its name but NetBox changes which VLAN
+it is tagged for (e.g. `1/1/1.701` moves from `tagged_vlans: [701]` to
+`tagged_vlans: [702]` in NetBox without renaming the sub-interface). Cleanup-
+by-name does not catch this, since the interface name is unchanged - only the
+`encapsulation dot1q <vid>` command on it is now wrong.
+
+This is detected separately, as ordinary configuration drift rather than an
+orphan: `get_interfaces_needing_config_changes()` (see
+[`interface_change_detection.py`](../netbox_filters_lib/interface_change_detection.py)
+in [FILTER_PLUGINS.md](FILTER_PLUGINS.md)) compares the device's actual
+`subintf_vlan` against NetBox's `tagged_vlans[0].vid` and flags a mismatch via
+`_ip_changes.encapsulation_change`, causing `configure_l3_interfaces.yml` to
+re-push the correct `encapsulation dot1q <vid>` line on the next run.
+
+This comparison requires `aoscx_gather_facts_rest_api: true` -
+`subintf_vlan` is only available via the REST API
+(`aoscx_enhanced_interface_facts`), not standard `aoscx_facts`. Without it,
+the comparison is skipped (no false positives, but also no drift detection
+for encapsulation).
+
+### Sub-interfaces are not L2 trunk ports
+
+NetBox represents a sub-interface's 802.1Q tag using the same `mode`/
+`tagged_vlans` fields used for L2 trunk ports (e.g. `1/1/1.701` has
+`mode: {"value": "tagged"}` and `tagged_vlans: [{"vid": 701}]`), even though
+AOS-CX configures it via `encapsulation dot1q <vid>`, not L2 `vlan_mode`.
+`get_interfaces_needing_config_changes()` skips the L2 VLAN mode/membership
+check for all virtual-type interfaces (VLAN SVIs, loopbacks,
+sub-interfaces), since none of them ever populate `vlan_mode`/`vlan_tag`/
+`vlan_trunks` on the device - only the encapsulation-VLAN comparison above
+applies to sub-interfaces.
+
 ## Variables
 
 | Variable                            | Default | Description                                                                 |

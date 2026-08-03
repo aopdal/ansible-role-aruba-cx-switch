@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.23] - 2026-08-03
+
+### Fixed
+
+- Sub-interface 802.1Q encapsulation VLAN drift was never detected: `get_interfaces_needing_config_changes()` (`netbox_filters_lib/interface_change_detection.py`) only ever emitted the `encapsulation dot1q <vid>` command as a side effect of an IP/description mismatch already being flagged, so a sub-interface with a correct IP/description but a *wrong* tagged VLAN (e.g. NetBox re-tags `1/1/1.701` from VLAN 701 to 702 without renaming the interface) silently passed as "no changes needed". The REST API attribute query (`tasks/gather_facts_rest_api.yml`) now also requests `subintf_vlan`/`subintf_parent`, and change detection compares the device's `subintf_vlan` (via `aoscx_enhanced_interface_facts`, requires `aoscx_gather_facts_rest_api: true`) against NetBox's `tagged_vlans[0].vid`, flagging a mismatch via the new `_ip_changes.encapsulation_change` flag so `configure_l3_interfaces.yml` re-pushes the correct encapsulation on the next run. See `docs/VIRTUAL_INTERFACE_CLEANUP.md#related-sub-interface-encapsulation-vlan-drift`.
+- Every sub-interface was incorrectly flagged as needing changes even when fully in sync with NetBox: NetBox represents a sub-interface's 802.1Q tag using the same `mode`/`tagged_vlans` fields used for L2 trunk ports, but `get_interfaces_needing_config_changes()`'s L2 VLAN mode/membership check only excluded VLAN SVIs by name (`vlan*`), not sub-interfaces. Since AOS-CX never populates `vlan_mode`/`vlan_tag`/`vlan_trunks` for a sub-interface (it uses `subintf_vlan`/`encapsulation dot1q` instead, see above), this check always concluded "VLANs configured in NetBox but not on device" and marked the sub-interface `changed`, independent of whether the encapsulation VLAN actually matched. The L2 VLAN mode/membership check is now skipped for all virtual-type interfaces (VLAN SVIs, loopbacks, sub-interfaces), matching the exclusion already used for the admin/MTU check.
+
 ## [0.13.22] - 2026-08-03
 
 ### Added
