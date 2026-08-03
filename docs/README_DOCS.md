@@ -73,6 +73,10 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - Common patterns and best practices
     - Available facts and debugging
 
+- **[VIRTUAL_INTERFACE_CLEANUP.md](VIRTUAL_INTERFACE_CLEANUP.md)** - Orphaned VLAN SVI/loopback/sub-interface removal
+    - Runs before L3 interface configuration to avoid duplicate-IP failures
+    - `aoscx_idempotent_mode` + `aoscx_cleanup_virtual_interfaces` variables
+
 ### EVPN & VXLAN
 
 - **[EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md)** - EVPN/VXLAN configuration, operating modes, and cleanup

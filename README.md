@@ -344,6 +344,9 @@ aoscx_configure_static_routes: true
 # Idempotent mode - removes configs not in NetBox
 aoscx_idempotent_mode: false
 
+# Remove orphaned VLAN SVI/loopback/sub-interfaces (only when idempotent_mode is also true)
+aoscx_cleanup_virtual_interfaces: true
+
 # Configure ALL NetBox-scoped VLANs on the device, regardless of whether
 # they are currently used by an interface or port-access role.
 # Useful for access/edge switches.
@@ -787,6 +790,7 @@ The role supports two configuration modes controlled by the `aoscx_idempotent_mo
     - EVPN configuration for VLANs being removed
     - VXLAN VNI and VLAN-to-VNI mappings for VLANs being removed
     - BGP neighbours ot in NetBox
+    - Orphaned VLAN SVI/loopback/sub-interfaces not in NetBox (see [`aoscx_cleanup_virtual_interfaces`](docs/VIRTUAL_INTERFACE_CLEANUP.md), default `true`) - removed **before** L3 interface configuration to avoid duplicate-IP failures when an interface is renamed in NetBox
 - ✅ **Intelligent cleanup** - Only removes configs not referenced in NetBox
 - ✅ **Proper cleanup order** - EVPN → VXLAN → VLAN (prevents orphaned configurations)
 - ✅ **Use case**: Ongoing management, drift detection, compliance enforcement
