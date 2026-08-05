@@ -352,6 +352,11 @@ aoscx_cleanup_virtual_interfaces: true
 # Useful for access/edge switches.
 aoscx_configure_vlans_all: false
 
+# NetBox VLAN group slugs to exclude from the aoscx_configure_vlans_all
+# catalog (e.g. a region-scoped linknet VLAN group that shouldn't be
+# configured on access switches). See docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
+aoscx_configure_vlans_all_exclude_vlan_groups: []
+
 # Save configuration after changes
 aoscx_save_config: true
 

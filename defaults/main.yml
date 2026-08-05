@@ -89,6 +89,19 @@ aoscx_cleanup_virtual_interfaces: true
 # device should always exist regardless of current interface usage.
 aoscx_configure_vlans_all: false
 
+# NetBox VLAN group slugs to exclude when aoscx_configure_vlans_all is true.
+# Only affects the "treat all NetBox-available VLANs as in use" step - VLANs
+# in these groups are still created/protected normally if an interface
+# actually references them.
+# Use case: a VLAN group scoped to a Region (e.g. dedicated linknet VLANs)
+# is returned by NetBox's available_on_device for every device in that
+# region, including access switches that should never carry those VLANs.
+# Listing the group's slug here excludes it from the configure-all catalog.
+# Safe to set globally: a device only sees a group if NetBox's scoping
+# (region/site/location) actually makes it available, so excluding a slug
+# that a given device never sees is a no-op.
+aoscx_configure_vlans_all_exclude_vlan_groups: []
+
 # Configure STP (Spanning Tree Protocol) settings.
 # When true:
 #   - Global MSTP settings are applied from config_context (mstp_config_name,

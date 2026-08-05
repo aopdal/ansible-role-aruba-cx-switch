@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.24] - 2026-08-05
+
+### Added
+
+- New `aoscx_configure_vlans_all_exclude_vlan_groups` variable (default `[]`): excludes VLANs belonging to the given NetBox VLAN group slugs from the `aoscx_configure_vlans_all` "treat every available VLAN as in use" catalog. Fixes region-scoped VLAN groups (e.g. a dedicated linknet group) leaking onto every device in that region - including access switches - since NetBox's `available_on_device` returns VLANs scoped above the device's own site. New `filter_out_vlan_groups()` filter in `netbox_filters_lib/vlan_filters.py`. See `docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md#excluding-vlan-groups-from-configure-all-aoscx_configure_vlans_all_exclude_vlan_groups`.
+
+### Fixed
+
+- `aoscx_configure_vlans_all_exclude_vlan_groups` was only applied in `tasks/identify_vlan_changes.yml`, not in `tasks/gather_template_data.yml`'s independent, duplicated "treat all NetBox-available VLANs as in use" logic used when `aoscx_generate_template_config: true`. Template-based config generation (`templates/vlan.j2`, driven by `template_vlans_in_use`) therefore still rendered excluded VLAN groups (e.g. region-scoped linknet VLANs) on every device. `gather_template_data.yml` now applies the same `filter_out_vlan_groups()` filter as `identify_vlan_changes.yml`.
+
 ## [0.13.23] - 2026-08-03
 
 ### Fixed

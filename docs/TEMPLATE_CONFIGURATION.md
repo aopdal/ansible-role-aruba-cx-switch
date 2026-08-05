@@ -53,6 +53,13 @@ The `aoscx.j2` master template includes:
    - **Works WITH device facts**: Identifies VRFs/VLANs actually in use on device
    - **Works WITHOUT device facts**: Fetches all available VRFs/VLANs from NetBox
    - Sets template-accessible facts (template_vrfs, template_vlans, etc.)
+   - This is a **separate implementation** from `identify_vlan_changes.yml`
+     (template generation must work pre-deployment, without device facts, so
+     it can't reuse the same task). `aoscx_configure_vlans_all` and
+     `aoscx_configure_vlans_all_exclude_vlan_groups` are both honoured here
+     too - see [VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md#excluding-vlan-groups-from-configure-all-aoscx_configure_vlans_all_exclude_vlan_groups) -
+     but any future change to the configure-all/exclude-groups logic must be
+     applied to **both** task files.
 
 2. **generate_template_config.yml** - Renders Jinja2 templates
    - Uses data gathered by previous task

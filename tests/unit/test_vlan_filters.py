@@ -5,6 +5,7 @@ import pytest
 from netbox_filters_lib.vlan_filters import (
     extract_vlan_ids,
     filter_vlans_in_use,
+    filter_out_vlan_groups,
     extract_evpn_vlans,
     extract_vxlan_mappings,
     get_vlans_in_use,
@@ -116,6 +117,39 @@ class TestFilterVlansInUse:
         result = filter_vlans_in_use(vlans, interfaces)
         assert len(result) == 1
         assert result[0]["vid"] == 10
+
+
+class TestFilterOutVlanGroups:
+    """Tests for filter_out_vlan_groups function"""
+
+    def test_no_group_slugs_returns_all(self):
+        """Empty exclude list is a no-op"""
+        vlans = [
+            {"vid": 10, "group": {"slug": "site-a"}},
+            {"vid": 900, "group": {"slug": "region-linknets"}},
+        ]
+        result = filter_out_vlan_groups(vlans, [])
+        assert [v["vid"] for v in result] == [10, 900]
+
+    def test_excludes_matching_group(self):
+        """VLANs whose group slug is excluded are removed"""
+        vlans = [
+            {"vid": 10, "group": {"slug": "site-a"}},
+            {"vid": 900, "group": {"slug": "region-linknets"}},
+            {"vid": 901, "group": {"slug": "region-linknets"}},
+        ]
+        result = filter_out_vlan_groups(vlans, ["region-linknets"])
+        assert [v["vid"] for v in result] == [10]
+
+    def test_vlans_without_group_are_kept(self):
+        """VLANs with no group at all are never excluded"""
+        vlans = [{"vid": 10, "group": None}, {"vid": 20}]
+        result = filter_out_vlan_groups(vlans, ["region-linknets"])
+        assert [v["vid"] for v in result] == [10, 20]
+
+    def test_empty_vlans_list(self):
+        """Empty input returns empty output"""
+        assert filter_out_vlan_groups([], ["region-linknets"]) == []
 
 
 class TestExtractEvpnVlans:
