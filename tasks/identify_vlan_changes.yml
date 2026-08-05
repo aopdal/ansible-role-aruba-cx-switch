@@ -57,11 +57,15 @@
   ansible.builtin.set_fact:
     vlans_in_use:
       vids: >-
-        {{ vlans | default([])
+        {{ filtered_all_vlans
              | map(attribute='vid')
              | select('integer')
              | unique | sort | list }}
-      vlans: "{{ vlans | default([]) }}"
+      vlans: "{{ filtered_all_vlans }}"
+  vars:
+    filtered_all_vlans: >-
+      {{ vlans | default([])
+           | filter_out_vlan_groups(aoscx_configure_vlans_all_exclude_vlan_groups | default([])) }}
   when:
     - aoscx_configure_vlans_all | default(false) | bool
 

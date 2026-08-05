@@ -35,6 +35,32 @@ NetBox returns for the device as "in use". This:
 Typical use: access/edge switches where the VLAN catalog should always
 match NetBox regardless of current port assignments.
 
+#### Excluding VLAN groups from configure-all (`aoscx_configure_vlans_all_exclude_vlan_groups`)
+
+`available_on_device` returns every VLAN NetBox scopes to a device -
+including VLANs from groups scoped to a Region/Site-group above the
+device's own site. If a region has a VLAN group dedicated to, say,
+inter-switch linknet VLANs, every device in that region (including access
+switches that should never carry those VLANs) sees them as "available".
+
+Set `aoscx_configure_vlans_all_exclude_vlan_groups` to a list of NetBox
+VLAN group slugs to drop from the configure-all catalog:
+
+```yaml
+aoscx_configure_vlans_all_exclude_vlan_groups:
+  - region-linknets
+```
+
+This only affects the "treat every available VLAN as in use" step - if an
+interface genuinely references a VLAN from an excluded group (e.g. a core
+switch's routed linknet interface), it is still detected as in-use via the
+normal interface-scanning path and configured/protected as usual.
+
+Because a device only ever sees a group if NetBox's own scoping
+(region/site/location) makes it available, it is safe to set this list
+globally (e.g. `group_vars/all.yml`) - excluding a slug that a given
+device's NetBox scope never returns is a no-op for that device.
+
 ### Task Execution Order
 
 #### Configuration Phase (Create/Update)

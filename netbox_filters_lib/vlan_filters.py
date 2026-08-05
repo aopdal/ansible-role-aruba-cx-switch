@@ -251,6 +251,45 @@ def extract_port_access_vlan_ids(port_access):
     return sorted(vids)
 
 
+def filter_out_vlan_groups(vlans, group_slugs):
+    """
+    Remove VLANs that belong to one of the given NetBox VLAN group slugs.
+
+    Used to exclude VLAN groups (e.g. a region-scoped linknet group) from
+    the aoscx_configure_vlans_all "treat every available VLAN as in use"
+    catalog, without affecting VLANs that are genuinely referenced by an
+    interface.
+
+    Args:
+        vlans: List of VLAN objects from NetBox (each may have a 'group'
+            dict with a 'slug' key; VLANs without a group are always kept).
+        group_slugs: List of VLAN group slugs to exclude. Falsy/empty
+            input means no filtering.
+
+    Returns:
+        List of VLAN objects whose group slug is not in group_slugs.
+    """
+    if not vlans:
+        return []
+
+    if not group_slugs:
+        return list(vlans)
+
+    excluded = set(group_slugs)
+    filtered = []
+    for vlan in vlans:
+        if not vlan or not isinstance(vlan, dict):
+            continue
+        group = vlan.get("group")
+        slug = group.get("slug") if isinstance(group, dict) else None
+        if slug in excluded:
+            _debug(f"Excluding VLAN {vlan.get('vid')} - group '{slug}' is excluded")
+            continue
+        filtered.append(vlan)
+
+    return filtered
+
+
 def get_vlans_in_use(interfaces, vlan_interfaces=None, port_access=None):
     """
     Extract all VLANs that are in use on interfaces
