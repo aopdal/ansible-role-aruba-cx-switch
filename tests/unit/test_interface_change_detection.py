@@ -1209,6 +1209,29 @@ class TestDhcpRelayChangeDetection:
             "_ip_changes", {}).get("dhcp_relay_change")
         assert not flag
 
+    def test_dhcp_relay_expected_and_actual_always_stored(self):
+        """dhcp_relay_expected/actual are stored even when the relay already matches.
+
+        This lets report/verification tasks display current ip helper state
+        for interfaces that land in no_changes, not just drifted ones.
+        """
+        iface = _vlan_intf_with_helper("vlan101", "lab-blue")
+        device_facts = _device_facts_for("vlan101")
+        dhcp_relay_facts = {"vlan101": ["172.16.3.10", "172.16.3.11"]}
+
+        result = get_interfaces_needing_config_changes(
+            [iface], device_facts,
+            dhcp_relay_facts=dhcp_relay_facts,
+            ip_helper_addresses=_IP_HELPER_ADDRESSES,
+        )
+
+        assert len(result["no_changes"]) == 1
+        ip_changes = result["no_changes"][0].get("_ip_changes", {})
+        assert ip_changes.get("dhcp_relay_expected") == [
+            "172.16.3.10", "172.16.3.11"]
+        assert ip_changes.get("dhcp_relay_actual") == [
+            "172.16.3.10", "172.16.3.11"]
+
     def test_dhcp_relay_to_remove_contains_stale_ips(self):
         """dhcp_relay_to_remove holds only the IPs present on device but not in NetBox."""
         iface = _vlan_intf_with_helper("vlan101", "lab-blue")
