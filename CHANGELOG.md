@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.25] - 2026-08-06
+
+### Added
+
+- `get_interfaces_needing_config_changes()` (`netbox_filters_lib/interface_change_detection.py`) now always stores `_ip_changes.dhcp_relay_expected`/`_ip_changes.dhcp_relay_actual` (the desired vs. currently-configured `ip helper-address` servers) for any interface with `if_ip_helper=True`, not just interfaces flagged for a push. Previously this data was only populated on mismatch, so verification/report tooling (e.g. `autotest-aoscx`'s `report_interfaces.yml`) had no way to display ip helper state for interfaces that already matched NetBox.
+
 ## [0.13.24] - 2026-08-05
 
 ### Added
