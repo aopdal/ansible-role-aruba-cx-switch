@@ -1221,10 +1221,18 @@ def get_interfaces_needing_config_changes(
                 if isinstance(vrf_helpers, dict):
                     expected_servers = set(v for v in vrf_helpers.values() if v)
                 device_servers = set(dhcp_relay_facts.get(intf_name, []))
+
+                # ALWAYS store the expected/actual helper servers when facts are
+                # available, even when they match — mirrors the "always store
+                # IPv6 change info" pattern above, so report/verification tasks
+                # can display current ip helper state regardless of drift.
+                if "_ip_changes" not in nb_intf:
+                    nb_intf["_ip_changes"] = {}
+                nb_intf["_ip_changes"]["dhcp_relay_expected"] = sorted(expected_servers)
+                nb_intf["_ip_changes"]["dhcp_relay_actual"] = sorted(device_servers)
+
                 if expected_servers != device_servers:
                     needs_change = True
-                    if "_ip_changes" not in nb_intf:
-                        nb_intf["_ip_changes"] = {}
                     nb_intf["_ip_changes"]["dhcp_relay_change"] = True
                     stale = sorted(device_servers - expected_servers)
                     if stale:
