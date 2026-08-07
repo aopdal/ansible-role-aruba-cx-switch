@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.26] - 2026-08-07
+
+### Fixed
+
+- REST API fact gathering (`tasks/gather_facts_rest_api.yml`) requested the unused `subintf_parent` interface attribute alongside `subintf_vlan`, causing `Query interfaces via REST API` to fail with `HTTP 400: invalid attribute: 'subintf_parent' for the resource 'Interface'` on switches whose REST API version does not expose that attribute (e.g. observed on `/rest/v10.16`). `subintf_parent` was never consumed by change detection - only `subintf_vlan` is used (see `netbox_filters_lib/interface_change_detection.py`) - so it is now dropped from the query.
+- `subintf_vlan` itself was also unconditionally queried and is rejected the same way on platforms that don't support sub-interfaces at all - confirmed on a real CX 6200 VSF stack (`invalid attribute: 'subintf_vlan' for the resource 'Interface'`), which would have broken fact gathering for every device on that platform, not just ones with sub-interfaces. It's now only added to the query when NetBox defines at least one sub-interface (`parent` set) for the device, via a new `_rest_has_subinterfaces` check.
+
 ## [0.13.25] - 2026-08-06
 
 ### Added

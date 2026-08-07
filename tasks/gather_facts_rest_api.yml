@@ -98,19 +98,38 @@
 # Build attributes list dynamically based on device capabilities.
 # Base attributes are always queried; VSX-specific attributes only when device_vsx is enabled.
 # CX 6000 and some other models don't support ip4_address_secondary or vsx_virtual_* fields.
+# subintf_vlan is queried only when NetBox actually defines a sub-interface
+# for this device (see below) - confirmed via a real CX 6200 VSF stack that
+# the attribute is rejected outright ("invalid attribute") on that platform,
+# so querying it unconditionally breaks fact gathering for every device on
+# such a platform, not just ones with sub-interfaces.
 - name: Set interface attributes to query
   ansible.builtin.set_fact:
     _rest_interface_base_attrs: "{{
       'name,admin,description,mtu,type,interfaces,ip4_address,ip6_addresses,' ~
       'ip6_address_link_local,' ~
       'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,' ~
-      'other_config,routing,vrf,subintf_vlan,subintf_parent' }}"
+      'other_config,routing,vrf' }}"
     _rest_interface_ospf_attrs: "ospf_if_type,ospf_auth_type"
     _rest_interface_vsx_attrs:
       "ip4_address_secondary,vsx_virtual_ip4,vsx_virtual_i\
       p6,vsx_virtual_gw_mac_v4,vsx_virtual_gw_mac_v6"
     # stp_config is a nested dict; depth=2 expands it into full key/value pairs
     _rest_interface_stp_attrs: "stp_config"
+    _rest_interface_subintf_attrs: "subintf_vlan"
+  tags:
+    - always
+
+# Only query subintf_vlan when NetBox defines at least one sub-interface
+# (an interface with a parent) for this device. Platforms/firmware that
+# don't support sub-interfaces at all (observed on a CX 6200 VSF stack)
+# reject the attribute outright, and a device with no sub-interfaces in
+# NetBox has no need for it anyway.
+- name: Determine whether this device has NetBox sub-interfaces defined
+  ansible.builtin.set_fact:
+    _rest_has_subinterfaces: "{{
+      (interfaces | default([]) | selectattr('parent', 'defined') |
+      selectattr('parent') | list | length) > 0 }}"
   tags:
     - always
 
@@ -128,7 +147,9 @@
 - name: Build interface attributes query string
   ansible.builtin.set_fact:
     _rest_interface_attrs: >-
-      {{ _rest_interface_base_attrs }}{% if custom_fields.device_ospf |
+      {{ _rest_interface_base_attrs }}{% if _rest_has_subinterfaces | bool
+      %},{{ _rest_interface_subintf_attrs }}{% endif %}{% if
+      custom_fields.device_ospf |
       default(false) | bool and (aoscx_configure_ospf | bool or
       aoscx_test_mode | bool) %},{{ _rest_interface_ospf_attrs }}{% endif
       %}{% if (custom_fields.device_vsx | default(false) | bool and
