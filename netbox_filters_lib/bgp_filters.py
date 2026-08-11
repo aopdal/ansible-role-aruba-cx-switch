@@ -6,10 +6,44 @@ Provides functions to enrich BGP session data with VRF and address-family
 information derived from the device's interface assignments in NetBox.
 """
 
+import re
+
 from .utils import _debug
 
 # VRF names that are built-in / non-configurable; treated as 'default'
 _BUILTIN_VRFS = {"mgmt", "MGMT", "Global", "global", "default", "Default"}
+
+# BGP redistribution is not part of the netbox-bgp plugin's session data
+# model, so it is driven by the 'bgp_redistribute' NetBox config_context key
+# instead - see docs/BGP_CONFIGURATION.md#bgp-redistribution.
+_VALID_BGP_ADDRESS_FAMILIES = {"ipv4", "ipv6"}
+_VALID_REDISTRIBUTE_PROTOCOLS = {"connected", "static", "ospf", "ospfv3", "rip"}
+
+# Generic per-neighbor address-family CLI options (e.g. 'soft-reconfiguration
+# inbound') are likewise not part of the netbox-bgp plugin's session data
+# model, so they are driven by the 'bgp_neighbor_options' NetBox
+# config_context key - see docs/BGP_CONFIGURATION.md#bgp-neighbor-options.
+# These keywords are already managed elsewhere in tasks/configure_bgp.yml
+# (remote-as, update-source, route-maps, etc.) - cleanup must never touch
+# lines starting with one of them, even if absent from bgp_neighbor_options,
+# or it would fight those other tasks.
+_RESERVED_NEIGHBOR_KEYWORDS = {
+    "remote-as",
+    "update-source",
+    "activate",
+    "send-community",
+    "route-map",
+    "next-hop-self",
+    "route-reflector-client",
+}
+_NEIGHBOR_LINE_RE = re.compile(r"^neighbor (\S+) (.+)$")
+
+# Some neighbor options (e.g. 'fall-over bfd') are configured directly under
+# 'router bgp <asn>' / 'vrf <name>', not inside an address-family block - see
+# AOS-CX CLI reference. The 'general' scope in 'bgp_neighbor_options' targets
+# that level, as opposed to 'ipv4'/'ipv6' which target the matching
+# address-family block.
+_NEIGHBOR_OPTION_GENERAL_SCOPE = "general"
 
 
 def get_bgp_session_vrf_info(sessions, interfaces):
@@ -348,3 +382,510 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
         "prefix_lists": prefix_lists,
         "route_map_rules": route_map_rules,
     }
+
+
+def get_bgp_redistribute_config(bgp_redistribute):
+    """
+    Flatten the 'bgp_redistribute' NetBox config_context into a list of
+    per-VRF, per-address-family redistribution entries.
+
+    Expected config_context shape::
+
+        bgp_redistribute:
+          default:                 # global 'router bgp' context (no VRF)
+            ipv4: [connected, static]
+            ipv6: [static]
+          lab-blue:                 # must match an existing VRF name
+            ipv4: [static]
+            ipv6: [static]
+
+    Unknown/invalid address families or protocols are skipped rather than
+    raised, consistent with this role's tolerant handling of malformed
+    config_context data elsewhere (e.g. static_route_filters).
+
+    Args:
+        bgp_redistribute: The 'bgp_redistribute' config_context dict, keyed
+            by VRF name ('default' for the global BGP instance), each
+            mapping an address family ('ipv4'/'ipv6') to a list of
+            protocols to redistribute.
+
+    Returns:
+        List of dicts, one per (vrf, af, protocol) combination, sorted for
+        deterministic ordering::
+
+            [{"vrf": "default", "af": "ipv4", "protocol": "connected"},
+             {"vrf": "lab-blue", "af": "ipv4", "protocol": "static"}]
+    """
+    result = []
+
+    if not isinstance(bgp_redistribute, dict):
+        return result
+
+    for vrf_name, af_map in bgp_redistribute.items():
+        if not isinstance(af_map, dict):
+            continue
+
+        for af, protocols in af_map.items():
+            if af not in _VALID_BGP_ADDRESS_FAMILIES:
+                _debug(
+                    f"get_bgp_redistribute_config: skipping unknown address "
+                    f"family '{af}' for VRF '{vrf_name}'"
+                )
+                continue
+            if not isinstance(protocols, list):
+                continue
+
+            for protocol in protocols:
+                if protocol not in _VALID_REDISTRIBUTE_PROTOCOLS:
+                    _debug(
+                        f"get_bgp_redistribute_config: skipping unsupported "
+                        f"protocol '{protocol}' for VRF '{vrf_name}' ({af})"
+                    )
+                    continue
+
+                result.append({"vrf": vrf_name, "af": af, "protocol": protocol})
+
+    result.sort(key=lambda entry: (entry["vrf"], entry["af"], entry["protocol"]))
+    return result
+
+
+def _iter_bgp_lines(running_config, local_asn):
+    """
+    Walk 'show running-config' text and yield every line found under the
+    'router bgp <local_asn>' instance, whether it sits directly under
+    'router bgp' / 'vrf <name>' or inside an 'address-family (ipv4|ipv6)
+    unicast' block.
+
+    Tracks context ('vrf <name>' / 'exit-vrf', 'address-family ... unicast'
+    / 'exit-address-family') structurally rather than by counting
+    whitespace, so it tolerates minor indentation differences in the
+    device's running-config output.
+
+    Args:
+        running_config: Full 'show running-config' text from the device.
+        local_asn: The device's BGP ASN, used to scope parsing to the
+            correct 'router bgp' block (a device can only run one).
+
+    Yields:
+        (vrf, af, line) tuples for each non-empty, non-structural line -
+        'af' is None for lines directly under 'router bgp' / 'vrf <name>'
+        (outside any address-family block), or 'ipv4'/'ipv6' for lines
+        inside the matching 'address-family ... unicast' block. 'vrf' is
+        'default' for the global BGP instance.
+    """
+    if not running_config:
+        return
+
+    router_bgp_re = re.compile(rf"^router bgp {re.escape(str(local_asn))}$")
+    af_re = re.compile(r"^address-family (ipv4|ipv6) unicast$")
+
+    in_bgp = False
+    current_vrf = "default"
+    current_af = None
+
+    for raw_line in running_config.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        # A new top-level (non-indented) statement ends the router bgp block.
+        if not raw_line[0].isspace():
+            in_bgp = bool(router_bgp_re.match(line))
+            current_vrf = "default"
+            current_af = None
+            continue
+
+        if not in_bgp:
+            continue
+
+        af_match = af_re.match(line)
+        if line.startswith("vrf "):
+            current_vrf = line[len("vrf ") :].strip()
+            current_af = None
+            continue
+        if line == "exit-vrf":
+            current_vrf = "default"
+            current_af = None
+            continue
+        if af_match:
+            current_af = af_match.group(1)
+            continue
+        if line == "exit-address-family":
+            current_af = None
+            continue
+
+        yield current_vrf, current_af, line
+
+
+def _parse_bgp_redistribute_from_config(running_config, local_asn):
+    """
+    Parse 'redistribute <protocol>' statements out of 'show running-config'
+    text, scoped to the 'router bgp <local_asn>' block. 'redistribute' is
+    only valid inside an address-family block, so lines outside one are
+    ignored.
+
+    Args:
+        running_config: Full 'show running-config' text from the device.
+        local_asn: The device's BGP ASN, used to scope parsing to the
+            correct 'router bgp' block (a device can only run one).
+
+    Returns:
+        List of {"vrf": str, "af": "ipv4"|"ipv6", "protocol": str} dicts -
+        every redistribute statement currently configured under that BGP
+        instance, regardless of whether this role manages it.
+    """
+    result = []
+    for vrf, af, line in _iter_bgp_lines(running_config, local_asn):
+        if af is not None and line.startswith("redistribute "):
+            protocol = line[len("redistribute ") :].strip()
+            result.append({"vrf": vrf, "af": af, "protocol": protocol})
+    return result
+
+
+def get_stale_bgp_redistribute(bgp_redistribute, running_config, local_asn):
+    """
+    Compute BGP redistribute entries present on the device but no longer
+    present in the 'bgp_redistribute' NetBox config_context.
+
+    'aoscx_config' (used to push desired redistribute entries, see
+    get_bgp_redistribute_config) only ever adds missing lines - it never
+    removes ones that were deleted from config_context. This diffs the
+    actual running-config against the desired state to find explicit
+    'no redistribute' candidates, for use in idempotent cleanup.
+
+    Args:
+        bgp_redistribute: The 'bgp_redistribute' config_context dict (see
+            get_bgp_redistribute_config for the expected shape).
+        running_config: Full 'show running-config' text from the device.
+        local_asn: The device's BGP ASN (device_bgp_sessions[0].local_as.asn).
+
+    Returns:
+        List of {"vrf": str, "af": str, "protocol": str} dicts to remove.
+    """
+    desired = get_bgp_redistribute_config(bgp_redistribute)
+    desired_keys = {(d["vrf"], d["af"], d["protocol"]) for d in desired}
+
+    current = _parse_bgp_redistribute_from_config(running_config, local_asn)
+
+    stale = [
+        entry
+        for entry in current
+        if (entry["vrf"], entry["af"], entry["protocol"]) not in desired_keys
+    ]
+
+    if stale:
+        _debug(f"get_stale_bgp_redistribute: {len(stale)} stale entrie(s) found")
+
+    return stale
+
+
+def get_bgp_neighbor_options_config(bgp_neighbor_options, sessions):
+    """
+    Flatten the 'bgp_neighbor_options' NetBox config_context into a list of
+    per-VRF, per-scope, per-neighbor CLI option entries.
+
+    The netbox-bgp plugin's session model does not cover generic per-neighbor
+    options, so this supports adding arbitrary ones via config_context
+    without extending the plugin. Each neighbor IP is matched against live
+    session data (enriched with '_vrf' / '_af' by get_bgp_session_vrf_info)
+    to determine which VRF(s) it is actually configured under - unmatched
+    neighbor IPs are skipped rather than blindly pushed.
+
+    Two scopes are supported per neighbor:
+      - 'ipv4' / 'ipv6': options configured inside the matching
+        'address-family ... unicast' block (e.g. 'soft-reconfiguration
+        inbound'). Resolved against sessions matching that address family.
+      - 'general': options configured directly under 'router bgp' / 'vrf
+        <name>', outside any address-family block (e.g. 'fall-over bfd').
+        Resolved against all VRFs the neighbor IP is peered under,
+        regardless of address family.
+
+    Lines starting with a keyword already managed by other tasks in
+    tasks/configure_bgp.yml (e.g. 'remote-as', 'route-map', 'activate') are
+    also skipped, so this feature cannot fight those tasks.
+
+    Expected config_context shape::
+
+        bgp_neighbor_options:
+          172.27.250.32:                 # neighbor IP, no CIDR
+            general:
+              - "fall-over bfd"
+            ipv4:
+              - "soft-reconfiguration inbound"
+          2001:db8::1:
+            ipv6:
+              - "soft-reconfiguration inbound"
+
+    Args:
+        bgp_neighbor_options: The 'bgp_neighbor_options' config_context
+            dict, keyed by neighbor IP, each mapping a scope
+            ('ipv4'/'ipv6'/'general') to a list of CLI option strings
+            (everything after 'neighbor <ip> ').
+        sessions: List of BGP session objects, already enriched with
+            '_vrf' / '_af' by get_bgp_session_vrf_info.
+
+    Returns:
+        List of dicts, one per (vrf, af, neighbor_ip, command) combination,
+        sorted for deterministic ordering. 'af' is None for 'general'-scope
+        entries::
+
+            [{"vrf": "default", "af": None, "neighbor_ip": "172.27.250.32",
+              "command": "fall-over bfd"},
+             {"vrf": "default", "af": "ipv4", "neighbor_ip": "172.27.250.32",
+              "command": "soft-reconfiguration inbound"}]
+    """
+    result = []
+
+    if not isinstance(bgp_neighbor_options, dict):
+        return result
+
+    # Build a lookup: neighbor IP -> set of (vrf, af) contexts it is
+    # actually configured under, from live session data.
+    ip_to_contexts = {}
+    for session in sessions or []:
+        if not isinstance(session, dict):
+            continue
+        remote_addr_obj = session.get("remote_address") or {}
+        remote_addr = (
+            remote_addr_obj.get("address", "")
+            if isinstance(remote_addr_obj, dict)
+            else ""
+        )
+        neighbor_ip = remote_addr.split("/")[0] if remote_addr else ""
+        if not neighbor_ip:
+            continue
+        vrf = session.get("_vrf", "default")
+        af = session.get("_af")
+        ip_to_contexts.setdefault(neighbor_ip, set()).add((vrf, af))
+
+    for neighbor_ip, scope_map in bgp_neighbor_options.items():
+        if not isinstance(scope_map, dict):
+            continue
+
+        contexts = ip_to_contexts.get(neighbor_ip)
+        if not contexts:
+            _debug(
+                f"get_bgp_neighbor_options_config: skipping neighbor "
+                f"'{neighbor_ip}' - no matching BGP session found"
+            )
+            continue
+
+        for scope, commands in scope_map.items():
+            if scope == _NEIGHBOR_OPTION_GENERAL_SCOPE:
+                af = None
+                vrfs = {vrf for vrf, _af in contexts}
+            elif scope in _VALID_BGP_ADDRESS_FAMILIES:
+                af = scope
+                vrfs = {vrf for vrf, session_af in contexts if session_af == af}
+            else:
+                _debug(
+                    f"get_bgp_neighbor_options_config: skipping unknown "
+                    f"scope '{scope}' for neighbor '{neighbor_ip}'"
+                )
+                continue
+
+            if not isinstance(commands, list):
+                continue
+
+            if not vrfs:
+                _debug(
+                    f"get_bgp_neighbor_options_config: skipping neighbor "
+                    f"'{neighbor_ip}' - no session found for scope '{scope}'"
+                )
+                continue
+
+            for command in commands:
+                if not command:
+                    continue
+                keyword = command.split(" ", 1)[0]
+                if keyword in _RESERVED_NEIGHBOR_KEYWORDS:
+                    _debug(
+                        f"get_bgp_neighbor_options_config: skipping reserved "
+                        f"keyword '{keyword}' for neighbor '{neighbor_ip}' - "
+                        "already managed by tasks/configure_bgp.yml"
+                    )
+                    continue
+                for vrf in vrfs:
+                    result.append(
+                        {
+                            "vrf": vrf,
+                            "af": af,
+                            "neighbor_ip": neighbor_ip,
+                            "command": command,
+                        }
+                    )
+
+    result.sort(
+        key=lambda entry: (
+            entry["vrf"],
+            entry["af"] or "",
+            entry["neighbor_ip"],
+            entry["command"],
+        )
+    )
+    return result
+
+
+def _parse_bgp_neighbor_options_from_config(running_config, local_asn):
+    """
+    Parse 'neighbor <ip> <options>' statements out of 'show running-config'
+    text, scoped to the 'router bgp <local_asn>' block.
+
+    Lines whose first keyword is in _RESERVED_NEIGHBOR_KEYWORDS are skipped,
+    since those are already managed by other tasks in
+    tasks/configure_bgp.yml and must never be treated as candidates for
+    removal by this feature's cleanup.
+
+    Args:
+        running_config: Full 'show running-config' text from the device.
+        local_asn: The device's BGP ASN, used to scope parsing to the
+            correct 'router bgp' block (a device can only run one).
+
+    Returns:
+        List of {"vrf": str, "af": "ipv4"|"ipv6"|None, "neighbor_ip": str,
+        "command": str} dicts - every non-reserved per-neighbor option
+        currently configured under that BGP instance. 'af' is None for
+        options configured outside any address-family block.
+    """
+    result = []
+    for vrf, af, line in _iter_bgp_lines(running_config, local_asn):
+        match = _NEIGHBOR_LINE_RE.match(line)
+        if not match:
+            continue
+
+        neighbor_ip, rest = match.group(1), match.group(2)
+        keyword = rest.split(" ", 1)[0]
+        if keyword in _RESERVED_NEIGHBOR_KEYWORDS:
+            continue
+
+        result.append(
+            {"vrf": vrf, "af": af, "neighbor_ip": neighbor_ip, "command": rest}
+        )
+
+    return result
+
+
+def get_stale_bgp_neighbor_options(
+    bgp_neighbor_options, sessions, running_config, local_asn
+):
+    """
+    Compute BGP neighbor options (address-family-scoped or 'general') present
+    on the device but no longer present in the 'bgp_neighbor_options' NetBox
+    config_context.
+
+    Mirrors get_stale_bgp_redistribute: 'aoscx_config' only ever adds
+    missing lines, so this diffs the actual running-config against the
+    desired state to find explicit 'no neighbor <ip> <options>' candidates
+    for idempotent cleanup. Lines matching a reserved keyword (see
+    _RESERVED_NEIGHBOR_KEYWORDS) are excluded by
+    _parse_bgp_neighbor_options_from_config before the diff even runs, so
+    this can never suggest removing a line owned by another task.
+
+    Args:
+        bgp_neighbor_options: The 'bgp_neighbor_options' config_context
+            dict (see get_bgp_neighbor_options_config for the expected
+            shape).
+        sessions: List of BGP session objects, enriched with '_vrf' /
+            '_af' by get_bgp_session_vrf_info.
+        running_config: Full 'show running-config' text from the device.
+        local_asn: The device's BGP ASN (device_bgp_sessions[0].local_as.asn).
+
+    Returns:
+        List of {"vrf": str, "af": str|None, "neighbor_ip": str,
+        "command": str} dicts to remove. 'af' is None for 'general'-scope
+        (non-address-family) entries.
+    """
+    desired = get_bgp_neighbor_options_config(bgp_neighbor_options, sessions)
+    desired_keys = {
+        (d["vrf"], d["af"], d["neighbor_ip"], d["command"]) for d in desired
+    }
+
+    current = _parse_bgp_neighbor_options_from_config(running_config, local_asn)
+
+    stale = [
+        entry
+        for entry in current
+        if (entry["vrf"], entry["af"], entry["neighbor_ip"], entry["command"])
+        not in desired_keys
+    ]
+
+    if stale:
+        _debug(f"get_stale_bgp_neighbor_options: {len(stale)} stale entrie(s) found")
+
+    return stale
+
+
+def get_bgp_bfd_enabled(bgp_neighbor_options, sessions):
+    """
+    AOS-CX's 'bfd' command is global - configured as a single top-level
+    line (alongside things like 'clock timezone' and 'no ip icmp
+    redirect'), not nested under 'router bgp'/'vrf' and not per-VRF. It
+    must be enabled before 'neighbor <ip> fall-over bfd' has any effect;
+    the per-neighbor option alone does not turn BFD on. Rather than
+    requiring a second, easy-to-forget config_context entry that could
+    drift out of sync with the neighbor options, this derives whether
+    'bfd' is needed directly from any neighbor declaring 'fall-over bfd'
+    in the 'general' scope of 'bgp_neighbor_options'.
+
+    NOTE: 'bfd' is a switch-wide toggle also usable by OSPF/static routes.
+    If those features start managing it too, this and
+    get_stale_bgp_bfd() must be combined with their equivalent checks
+    before deciding to push 'no bfd', so cleanup here doesn't disable BFD
+    for a feature it doesn't know about.
+
+    Args:
+        bgp_neighbor_options: The 'bgp_neighbor_options' config_context
+            dict (see get_bgp_neighbor_options_config for the expected
+            shape).
+        sessions: List of BGP session objects, enriched with '_vrf' /
+            '_af' by get_bgp_session_vrf_info.
+
+    Returns:
+        True if any neighbor declares 'fall-over bfd', meaning the global
+        'bfd' line must be present.
+    """
+    entries = get_bgp_neighbor_options_config(bgp_neighbor_options, sessions)
+    return any(
+        entry["af"] is None and entry["command"] == "fall-over bfd"
+        for entry in entries
+    )
+
+
+def _is_global_bfd_enabled(running_config):
+    """
+    Check whether the global 'bfd' line is present in 'show running-config'
+    text, outside any nested context (VLAN, VRF, router bgp, etc.) - AOS-CX
+    configures it as a top-level, unindented command.
+    """
+    if not running_config:
+        return False
+    for raw_line in running_config.splitlines():
+        if raw_line.strip() == "bfd" and not raw_line[:1].isspace():
+            return True
+    return False
+
+
+def get_stale_bgp_bfd(bgp_neighbor_options, sessions, running_config):
+    """
+    Determine whether the global 'bfd' line is currently configured on the
+    device but no BGP neighbor declares 'fall-over bfd' anymore, so 'bfd'
+    should be disabled (see the NOTE on get_bgp_bfd_enabled about other
+    features sharing this same global toggle).
+
+    Args:
+        bgp_neighbor_options: The 'bgp_neighbor_options' config_context dict.
+        sessions: List of BGP session objects, enriched with '_vrf' / '_af'
+            by get_bgp_session_vrf_info.
+        running_config: Full 'show running-config' text from the device.
+
+    Returns:
+        True if 'no bfd' should be pushed.
+    """
+    if not _is_global_bfd_enabled(running_config):
+        return False
+
+    stale = not get_bgp_bfd_enabled(bgp_neighbor_options, sessions)
+    if stale:
+        _debug("get_stale_bgp_bfd: global 'bfd' is stale, no longer needed by BGP")
+
+    return stale

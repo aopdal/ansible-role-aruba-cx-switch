@@ -639,6 +639,218 @@ Returns:
 
 ---
 
+## BGP Redistribution
+
+Route redistribution (`redistribute connected`/`static`/`ospf`/`ospfv3`/`rip`)
+is **not** part of the netbox-bgp plugin's session data model — a session
+describes a neighbor relationship, not what gets originated into BGP.
+Without it, BGP neighbors can come up Established while nothing is actually
+advertised, since AOS-CX only advertises routes that are already in the BGP
+table (via redistribution, a `network` statement, or learned from another
+peer). This is the most common reason a working eBGP session to an edge
+router exports no routes.
+
+### NetBox Setup
+
+Add a `bgp_redistribute` config_context key, keyed by VRF name (`default`
+for the global, non-VRF `router bgp` context):
+
+```json
+{
+  "bgp_redistribute": {
+    "default": {
+      "ipv4": ["connected", "static"],
+      "ipv6": ["static"]
+    },
+    "lab-blue": {
+      "ipv4": ["static"],
+      "ipv6": ["static"]
+    },
+    "lab-green": {
+      "ipv4": ["static", "connected"]
+    }
+  }
+}
+```
+
+`lab-blue` and `lab-green` must match an existing VRF name exactly.
+
+Supported address families: `ipv4`, `ipv6`. Supported protocols:
+`connected`, `static`, `ospf`, `ospfv3`, `rip`. Unknown values are skipped
+(not raised) — same tolerant handling as other config_context-driven
+features in this role.
+
+### Generated Configuration
+
+```
+router bgp 65015
+    address-family ipv4 unicast
+        redistribute connected
+        redistribute static
+    exit-address-family
+    address-family ipv6 unicast
+        redistribute static
+    exit-address-family
+    vrf lab-blue
+        address-family ipv4 unicast
+            redistribute static
+        exit-address-family
+        address-family ipv6 unicast
+            redistribute static
+        exit-address-family
+    exit-vrf
+```
+
+### How It Works
+
+- `get_bgp_redistribute_config()` (`netbox_filters_lib/bgp_filters.py`)
+  flattens `bgp_redistribute` into a list of `{vrf, af, protocol}` entries.
+- `tasks/configure_bgp.yml` pushes each entry with `aoscx_config` using
+  nested `parents` (`router bgp <asn>` → `vrf <name>` if not `default` →
+  `address-family <af> unicast`) and `match: line`, the same pattern used
+  for the BGP router process task — this diffs against the real
+  running-config, so adding entries is naturally idempotent.
+- The BGP ASN and router-id always come from the netbox-bgp plugin session
+  data (`device_bgp_sessions[0].local_as.asn`), not from a separate
+  config_context value, so there is a single source of truth for the ASN.
+
+### Cleanup (Idempotent Mode)
+
+`aoscx_config` only ever adds missing lines — it never removes a
+`redistribute` statement that was deleted from `bgp_redistribute`. When
+`aoscx_idempotent_mode: true`, a separate cleanup step in
+`tasks/configure_bgp.yml`:
+
+1. Runs `show running-config` on the device (CLI, not REST — there is no
+   documented REST field for per-address-family redistribute state).
+2. Parses the `router bgp <asn>` block with `get_stale_bgp_redistribute()`
+   to find `redistribute` statements no longer present in
+   `bgp_redistribute` for their VRF/address-family.
+3. Pushes `no redistribute <protocol>` for each stale entry.
+
+This mirrors the existing stale-BGP-neighbor cleanup in the same file, just
+driven by CLI text instead of a REST facts diff.
+
+---
+
+## BGP Neighbor Options
+
+AOS-CX supports many per-neighbor CLI options beyond what the netbox-bgp
+plugin's session model exposes. Some live inside an address-family block —
+for example `neighbor <ip> soft-reconfiguration inbound` or
+`neighbor <ip> weight <n>`. Others live directly under `router bgp`/`vrf`,
+outside any address-family block — for example `neighbor <ip> fall-over
+bfd`. Rather than extending the plugin (or this role) for every possible
+keyword, arbitrary options can be added via a `bgp_neighbor_options`
+config_context key, keyed by neighbor IP address.
+
+### NetBox Setup
+
+```json
+{
+  "bgp_neighbor_options": {
+    "172.27.250.32": {
+      "general": ["fall-over bfd"],
+      "ipv4": ["soft-reconfiguration inbound"]
+    },
+    "2001:db8::1": {
+      "ipv6": ["soft-reconfiguration inbound"]
+    }
+  }
+}
+```
+
+Keys are neighbor IP addresses (no CIDR). Each neighbor IP maps to a dict of
+scopes:
+
+- `"general"` — pushed directly under `router bgp`/`vrf`, outside any
+  address-family block (e.g. `fall-over bfd`). Resolved against every VRF
+  the neighbor IP is peered under, regardless of address family.
+- `"ipv4"` / `"ipv6"` — pushed inside the matching `address-family ...
+  unicast` block. Resolved against sessions matching that address family.
+
+Each neighbor IP is matched against the device's live BGP session data
+(enriched with VRF and address family by `get_bgp_session_vrf_info()`) —
+a neighbor IP/scope combination that doesn't match an existing session is
+skipped rather than blindly pushed, and logged via `aoscx_debug`.
+
+Options that duplicate a keyword already managed elsewhere in
+`tasks/configure_bgp.yml` are also skipped, so this feature cannot conflict
+with those tasks. Reserved keywords: `remote-as`, `update-source`,
+`activate`, `send-community`, `route-map`, `next-hop-self`,
+`route-reflector-client`.
+
+### Generated Configuration
+
+```
+bfd
+router bgp 65015
+    neighbor 172.27.250.32 fall-over bfd
+    address-family ipv4 unicast
+        neighbor 172.27.250.32 soft-reconfiguration inbound
+    exit-address-family
+```
+
+Note that `bfd` is a top-level, global command — like `clock timezone` or
+`no ip icmp redirect` — and is not nested under `router bgp`/`vrf`. See
+below.
+
+### How It Works
+
+- `get_bgp_neighbor_options_config()` (`netbox_filters_lib/bgp_filters.py`)
+  flattens `bgp_neighbor_options` into a list of
+  `{vrf, af, neighbor_ip, command}` entries, resolving VRF/address-family
+  from live session data. `af` is `None` for `"general"`-scope entries.
+- `tasks/configure_bgp.yml` pushes each entry with `aoscx_config` using the
+  same nested `parents` pattern as BGP redistribution, and `match: line` for
+  idempotent additions. The `address-family <af> unicast` parent is omitted
+  when `af` is `None`, so `"general"`-scope entries land directly under
+  `router bgp`/`vrf`.
+
+### BFD Enablement for `fall-over bfd`
+
+On AOS-CX, `neighbor <ip> fall-over bfd` has no effect unless `bfd` is also
+enabled — but unlike neighbor options, `bfd` is a single **global** command,
+not nested under `router bgp`/`vrf` and not per-VRF. Rather than requiring
+a second, easy-to-forget config_context entry that could drift out of sync
+with the neighbor options, `get_bgp_bfd_enabled()`
+(`netbox_filters_lib/bgp_filters.py`) derives whether `bfd` is needed
+directly from any neighbor declaring `fall-over bfd` in the `"general"`
+scope of `bgp_neighbor_options`, on any VRF — no separate configuration is
+needed. `tasks/configure_bgp.yml` pushes the global `bfd` line before the
+neighbor options themselves.
+
+`bfd` is a switch-wide toggle that OSPF and static routes may also rely on
+in future. If those features start managing it too, the enable/cleanup
+logic here will need to account for their state as well so this feature's
+cleanup doesn't disable BFD for something it doesn't know about.
+
+### Cleanup (Idempotent Mode)
+
+Like redistribution, `aoscx_config` never removes a neighbor option line
+(or the global `bfd` line) that's no longer needed. When
+`aoscx_idempotent_mode: true`, the same cleanup step that handles stale
+redistribute entries also:
+
+1. Parses the `router bgp <asn>` block with
+   `get_stale_bgp_neighbor_options()` to find `neighbor <ip> <options>`
+   lines — both inside address-family blocks and directly under
+   `router bgp`/`vrf` — no longer present in `bgp_neighbor_options` for
+   their VRF/scope.
+2. Skips any line starting with a reserved keyword (see above) before the
+   diff even runs, so cleanup can never remove a line owned by another
+   task — even if it isn't declared in `bgp_neighbor_options`.
+3. Pushes `no neighbor <ip> <options>` for each remaining stale entry,
+   again omitting the `address-family` parent for `"general"`-scope
+   entries.
+4. Checks with `get_stale_bgp_bfd()` whether the global `bfd` line is
+   configured but no neighbor declares `fall-over bfd` anymore, and pushes
+   `no bfd` if so.
+
+All three cleanups reuse a single `show running-config` fetch.
+
+---
+
 ## Verification Commands
 
 ### On Spines (Route Reflectors)
@@ -714,6 +926,16 @@ Set `device_bgp_routerid` in NetBox custom fields:
 ```
 Device → Custom Fields → device_bgp_routerid = "10.255.255.11"
 ```
+
+### Neighbors Established but No Routes Exported
+
+BGP only advertises what's already in its table. If `show bgp summary` shows
+`Established` but `show bgp l2vpn evpn` / `show bgp ipv4 unicast` shows no
+routes advertised to the peer, there is nothing telling BGP to originate
+routes — a `network` statement, redistribution, or routes learned from
+another peer. See [BGP Redistribution](#bgp-redistribution) above to
+configure `redistribute connected`/`static`/etc. via the `bgp_redistribute`
+config_context key.
 
 ### EVPN Neighbors Not Establishing
 
