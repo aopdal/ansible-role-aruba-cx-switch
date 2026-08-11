@@ -5,6 +5,12 @@ import pytest
 from netbox_filters_lib.bgp_filters import (
     get_bgp_session_vrf_info,
     collect_ebgp_vrf_policy_config,
+    get_bgp_redistribute_config,
+    get_stale_bgp_redistribute,
+    get_bgp_neighbor_options_config,
+    get_stale_bgp_neighbor_options,
+    get_bgp_bfd_enabled,
+    get_stale_bgp_bfd,
 )
 
 
@@ -742,3 +748,664 @@ class TestCollectEbgpVrfPolicyConfig:
         af_map = {pl["name"]: pl["af"] for pl in result["prefix_lists"]}
         assert af_map["PFX-V4"] == "ipv4"
         assert af_map["PFX-V6"] == "ipv6"
+
+
+# ---------------------------------------------------------------------------
+# Tests for get_bgp_redistribute_config
+# ---------------------------------------------------------------------------
+
+
+class TestGetBgpRedistributeConfig:
+    """Tests for get_bgp_redistribute_config function"""
+
+    def test_none_returns_empty(self):
+        assert get_bgp_redistribute_config(None) == []
+
+    def test_empty_dict_returns_empty(self):
+        assert get_bgp_redistribute_config({}) == []
+
+    def test_non_dict_input_returns_empty(self):
+        assert get_bgp_redistribute_config("not-a-dict") == []
+
+    def test_global_default_vrf(self):
+        result = get_bgp_redistribute_config(
+            {"default": {"ipv4": ["connected", "static"]}}
+        )
+        assert result == [
+            {"vrf": "default", "af": "ipv4", "protocol": "connected"},
+            {"vrf": "default", "af": "ipv4", "protocol": "static"},
+        ]
+
+    def test_multiple_vrfs_and_address_families(self):
+        result = get_bgp_redistribute_config(
+            {
+                "lab-blue": {"ipv4": ["static"], "ipv6": ["static"]},
+                "lab-green": {"ipv4": ["static"]},
+            }
+        )
+        assert result == [
+            {"vrf": "lab-blue", "af": "ipv4", "protocol": "static"},
+            {"vrf": "lab-blue", "af": "ipv6", "protocol": "static"},
+            {"vrf": "lab-green", "af": "ipv4", "protocol": "static"},
+        ]
+
+    def test_unknown_address_family_skipped(self):
+        result = get_bgp_redistribute_config({"default": {"l2vpn": ["static"]}})
+        assert result == []
+
+    def test_unsupported_protocol_skipped(self):
+        result = get_bgp_redistribute_config({"default": {"ipv4": ["bgp", "static"]}})
+        assert result == [{"vrf": "default", "af": "ipv4", "protocol": "static"}]
+
+    def test_non_dict_af_map_skipped(self):
+        result = get_bgp_redistribute_config({"default": "not-a-dict"})
+        assert result == []
+
+    def test_non_list_protocols_skipped(self):
+        result = get_bgp_redistribute_config({"default": {"ipv4": "static"}})
+        assert result == []
+
+    def test_result_is_sorted(self):
+        result = get_bgp_redistribute_config(
+            {
+                "lab-green": {"ipv4": ["static"]},
+                "default": {"ipv6": ["static"], "ipv4": ["static", "connected"]},
+            }
+        )
+        assert result == [
+            {"vrf": "default", "af": "ipv4", "protocol": "connected"},
+            {"vrf": "default", "af": "ipv4", "protocol": "static"},
+            {"vrf": "default", "af": "ipv6", "protocol": "static"},
+            {"vrf": "lab-green", "af": "ipv4", "protocol": "static"},
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Tests for get_stale_bgp_redistribute
+# ---------------------------------------------------------------------------
+
+
+class TestGetStaleBgpRedistribute:
+    """Tests for get_stale_bgp_redistribute function"""
+
+    _RUNNING_CONFIG = """
+!
+router bgp 65015
+    bgp router-id 10.255.255.11
+    neighbor 10.255.255.1 remote-as 65015
+    address-family ipv4 unicast
+        redistribute connected
+    exit-address-family
+    vrf lab-blue
+        address-family ipv4 unicast
+            redistribute static
+        exit-address-family
+        address-family ipv6 unicast
+            redistribute static
+        exit-address-family
+    exit-vrf
+    vrf lab-green
+        address-family ipv4 unicast
+            redistribute static
+            redistribute connected
+        exit-address-family
+    exit-vrf
+!
+vlan 10
+    name TEST
+!
+"""
+
+    def test_no_stale_entries_when_config_matches(self):
+        desired = {
+            "default": {"ipv4": ["connected"]},
+            "lab-blue": {"ipv4": ["static"], "ipv6": ["static"]},
+            "lab-green": {"ipv4": ["static", "connected"]},
+        }
+        result = get_stale_bgp_redistribute(desired, self._RUNNING_CONFIG, 65015)
+        assert result == []
+
+    def test_removed_from_config_context_is_stale(self):
+        # lab-green's 'redistribute connected' removed from desired state
+        desired = {
+            "default": {"ipv4": ["connected"]},
+            "lab-blue": {"ipv4": ["static"], "ipv6": ["static"]},
+            "lab-green": {"ipv4": ["static"]},
+        }
+        result = get_stale_bgp_redistribute(desired, self._RUNNING_CONFIG, 65015)
+        assert result == [{"vrf": "lab-green", "af": "ipv4", "protocol": "connected"}]
+
+    def test_entire_vrf_removed_from_config_context(self):
+        desired = {"default": {"ipv4": ["connected"]}}
+        result = get_stale_bgp_redistribute(desired, self._RUNNING_CONFIG, 65015)
+        keys = {(e["vrf"], e["af"], e["protocol"]) for e in result}
+        assert ("lab-blue", "ipv4", "static") in keys
+        assert ("lab-blue", "ipv6", "static") in keys
+        assert ("lab-green", "ipv4", "static") in keys
+        assert ("lab-green", "ipv4", "connected") in keys
+        assert len(result) == 4
+
+    def test_empty_config_context_removes_everything(self):
+        result = get_stale_bgp_redistribute({}, self._RUNNING_CONFIG, 65015)
+        assert len(result) == 5
+
+    def test_wrong_asn_scopes_out_everything(self):
+        """ASN not matching the running-config's 'router bgp' line finds nothing."""
+        result = get_stale_bgp_redistribute({}, self._RUNNING_CONFIG, 65099)
+        assert result == []
+
+    def test_empty_running_config_returns_empty(self):
+        result = get_stale_bgp_redistribute(
+            {"default": {"ipv4": ["static"]}}, "", 65015
+        )
+        assert result == []
+
+    def test_none_running_config_returns_empty(self):
+        result = get_stale_bgp_redistribute(
+            {"default": {"ipv4": ["static"]}}, None, 65015
+        )
+        assert result == []
+
+    def test_redistribute_outside_address_family_is_ignored(self):
+        """A 'redistribute' line outside any address-family block is not parsed."""
+        running_config = """
+router bgp 65015
+    redistribute connected
+"""
+        result = get_stale_bgp_redistribute({}, running_config, 65015)
+        assert result == []
+
+    def test_l2vpn_evpn_address_family_is_ignored(self):
+        """redistribute isn't valid under l2vpn evpn; must not be parsed as ipv4/ipv6."""
+        running_config = """
+router bgp 65015
+    address-family l2vpn evpn
+        redistribute connected
+    exit-address-family
+"""
+        result = get_stale_bgp_redistribute({}, running_config, 65015)
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Tests for get_bgp_neighbor_options_config
+# ---------------------------------------------------------------------------
+
+
+def _enriched_session(remote_ip, vrf="default", af="ipv4"):
+    return {
+        "name": f"session-{remote_ip}",
+        "remote_address": {"address": f"{remote_ip}/31"},
+        "_vrf": vrf,
+        "_af": af,
+    }
+
+
+class TestGetBgpNeighborOptionsConfig:
+    """Tests for get_bgp_neighbor_options_config function"""
+
+    def test_none_returns_empty(self):
+        assert get_bgp_neighbor_options_config(None, []) == []
+
+    def test_empty_dict_returns_empty(self):
+        assert get_bgp_neighbor_options_config({}, []) == []
+
+    def test_non_dict_input_returns_empty(self):
+        assert get_bgp_neighbor_options_config("not-a-dict", []) == []
+
+    def test_basic_single_neighbor(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"ipv4": ["soft-reconfiguration inbound"]}}, sessions
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "soft-reconfiguration inbound",
+            }
+        ]
+
+    def test_multiple_commands_same_neighbor(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {
+                "172.27.250.32": {
+                    "ipv4": ["soft-reconfiguration inbound", "weight 100"]
+                }
+            },
+            sessions,
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "soft-reconfiguration inbound",
+            },
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "weight 100",
+            },
+        ]
+
+    def test_unmatched_neighbor_ip_skipped(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {"10.0.0.99": {"ipv4": ["soft-reconfiguration inbound"]}}, sessions
+        )
+        assert result == []
+
+    def test_unknown_address_family_skipped(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"l2vpn": ["soft-reconfiguration inbound"]}}, sessions
+        )
+        assert result == []
+
+    def test_af_not_matching_session_skipped(self):
+        # Session is ipv4 only; requesting an ipv6 option for the same IP finds no context.
+        sessions = [_enriched_session("172.27.250.32", af="ipv4")]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"ipv6": ["soft-reconfiguration inbound"]}}, sessions
+        )
+        assert result == []
+
+    def test_reserved_keyword_skipped(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {
+                "172.27.250.32": {
+                    "ipv4": [
+                        "remote-as 65001",
+                        "route-map FOO out",
+                        "activate",
+                        "next-hop-self",
+                        "route-reflector-client",
+                        "send-community extended",
+                        "update-source 10.0.0.1",
+                        "soft-reconfiguration inbound",
+                    ]
+                }
+            },
+            sessions,
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "soft-reconfiguration inbound",
+            }
+        ]
+
+    def test_non_list_commands_skipped(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"ipv4": "soft-reconfiguration inbound"}}, sessions
+        )
+        assert result == []
+
+    def test_non_dict_af_map_skipped(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": "not-a-dict"}, sessions
+        )
+        assert result == []
+
+    def test_multiple_vrfs_same_ip_and_af(self):
+        # Unlikely in practice, but the same neighbor IP could be peered
+        # under more than one VRF; the option must be pushed to each.
+        sessions = [
+            _enriched_session("172.27.250.32", vrf="lab-blue"),
+            _enriched_session("172.27.250.32", vrf="lab-green"),
+        ]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"ipv4": ["soft-reconfiguration inbound"]}}, sessions
+        )
+        assert result == [
+            {
+                "vrf": "lab-blue",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "soft-reconfiguration inbound",
+            },
+            {
+                "vrf": "lab-green",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "soft-reconfiguration inbound",
+            },
+        ]
+
+    def test_result_is_sorted(self):
+        sessions = [
+            _enriched_session("172.27.250.99"),
+            _enriched_session("172.27.250.32"),
+        ]
+        result = get_bgp_neighbor_options_config(
+            {
+                "172.27.250.99": {"ipv4": ["weight 100"]},
+                "172.27.250.32": {"ipv4": ["soft-reconfiguration inbound"]},
+            },
+            sessions,
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "soft-reconfiguration inbound",
+            },
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.99",
+                "command": "weight 100",
+            },
+        ]
+
+    def test_general_scope_basic(self):
+        """'general' scope commands (e.g. fall-over bfd) are pushed with af=None."""
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"general": ["fall-over bfd"]}}, sessions
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": None,
+                "neighbor_ip": "172.27.250.32",
+                "command": "fall-over bfd",
+            }
+        ]
+
+    def test_general_scope_matches_regardless_of_af(self):
+        """'general' options aren't tied to a specific address family, so
+        they resolve against every VRF the neighbor is peered under."""
+        sessions = [
+            _enriched_session("172.27.250.32", vrf="lab-blue", af="ipv4"),
+            _enriched_session("172.27.250.32", vrf="lab-blue", af="ipv6"),
+        ]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"general": ["fall-over bfd"]}}, sessions
+        )
+        assert result == [
+            {
+                "vrf": "lab-blue",
+                "af": None,
+                "neighbor_ip": "172.27.250.32",
+                "command": "fall-over bfd",
+            }
+        ]
+
+    def test_general_and_af_scopes_combined(self):
+        sessions = [_enriched_session("172.27.250.32", af="ipv4")]
+        result = get_bgp_neighbor_options_config(
+            {
+                "172.27.250.32": {
+                    "general": ["fall-over bfd"],
+                    "ipv4": ["soft-reconfiguration inbound"],
+                }
+            },
+            sessions,
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": None,
+                "neighbor_ip": "172.27.250.32",
+                "command": "fall-over bfd",
+            },
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "soft-reconfiguration inbound",
+            },
+        ]
+
+    def test_general_scope_reserved_keyword_skipped(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_neighbor_options_config(
+            {"172.27.250.32": {"general": ["remote-as 65001", "fall-over bfd"]}},
+            sessions,
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": None,
+                "neighbor_ip": "172.27.250.32",
+                "command": "fall-over bfd",
+            }
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Tests for get_stale_bgp_neighbor_options
+# ---------------------------------------------------------------------------
+
+
+class TestGetStaleBgpNeighborOptions:
+    """Tests for get_stale_bgp_neighbor_options function"""
+
+    _RUNNING_CONFIG = """
+!
+router bgp 65015
+    bgp router-id 10.255.255.11
+    neighbor 172.27.250.32 remote-as 65001
+    neighbor 172.27.250.32 update-source 10.255.255.11
+    neighbor 172.27.250.32 fall-over bfd
+    address-family ipv4 unicast
+        neighbor 172.27.250.32 activate
+        neighbor 172.27.250.32 soft-reconfiguration inbound
+        neighbor 172.27.250.32 weight 100
+    exit-address-family
+    vrf lab-blue
+        neighbor 172.27.100.1 remote-as 65010
+        address-family ipv4 unicast
+            neighbor 172.27.100.1 activate
+            neighbor 172.27.100.1 route-map LAB-BLUE-OUT out
+            neighbor 172.27.100.1 soft-reconfiguration inbound
+        exit-address-family
+    exit-vrf
+!
+vlan 10
+    name TEST
+!
+"""
+
+    _SESSIONS = [
+        _enriched_session("172.27.250.32", vrf="default", af="ipv4"),
+        _enriched_session("172.27.100.1", vrf="lab-blue", af="ipv4"),
+    ]
+
+    def test_no_stale_entries_when_config_matches(self):
+        desired = {
+            "172.27.250.32": {
+                "general": ["fall-over bfd"],
+                "ipv4": ["soft-reconfiguration inbound", "weight 100"],
+            },
+            "172.27.100.1": {"ipv4": ["soft-reconfiguration inbound"]},
+        }
+        result = get_stale_bgp_neighbor_options(
+            desired, self._SESSIONS, self._RUNNING_CONFIG, 65015
+        )
+        assert result == []
+
+    def test_removed_option_is_stale(self):
+        desired = {
+            "172.27.250.32": {
+                "general": ["fall-over bfd"],
+                "ipv4": ["soft-reconfiguration inbound"],
+            },
+            "172.27.100.1": {"ipv4": ["soft-reconfiguration inbound"]},
+        }
+        result = get_stale_bgp_neighbor_options(
+            desired, self._SESSIONS, self._RUNNING_CONFIG, 65015
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": "ipv4",
+                "neighbor_ip": "172.27.250.32",
+                "command": "weight 100",
+            }
+        ]
+
+    def test_removed_general_option_is_stale(self):
+        desired = {
+            "172.27.250.32": {
+                "ipv4": ["soft-reconfiguration inbound", "weight 100"],
+            },
+            "172.27.100.1": {"ipv4": ["soft-reconfiguration inbound"]},
+        }
+        result = get_stale_bgp_neighbor_options(
+            desired, self._SESSIONS, self._RUNNING_CONFIG, 65015
+        )
+        assert result == [
+            {
+                "vrf": "default",
+                "af": None,
+                "neighbor_ip": "172.27.250.32",
+                "command": "fall-over bfd",
+            }
+        ]
+
+    def test_reserved_keywords_never_considered_stale(self):
+        """Even with an empty config_context, lines owned by other tasks
+        (remote-as, update-source, activate, route-map) must never appear
+        as removal candidates."""
+        result = get_stale_bgp_neighbor_options(
+            {}, self._SESSIONS, self._RUNNING_CONFIG, 65015
+        )
+        commands = {entry["command"] for entry in result}
+        assert "soft-reconfiguration inbound" in commands
+        assert "weight 100" in commands
+        assert "fall-over bfd" in commands
+        assert not any(
+            cmd.startswith(
+                ("remote-as", "update-source", "activate", "route-map")
+            )
+            for cmd in commands
+        )
+        assert len(result) == 4
+
+    def test_wrong_asn_scopes_out_everything(self):
+        result = get_stale_bgp_neighbor_options(
+            {}, self._SESSIONS, self._RUNNING_CONFIG, 65099
+        )
+        assert result == []
+
+    def test_empty_running_config_returns_empty(self):
+        result = get_stale_bgp_neighbor_options(
+            {"172.27.250.32": {"ipv4": ["weight 100"]}}, self._SESSIONS, "", 65015
+        )
+        assert result == []
+
+    def test_none_running_config_returns_empty(self):
+        result = get_stale_bgp_neighbor_options(
+            {"172.27.250.32": {"ipv4": ["weight 100"]}}, self._SESSIONS, None, 65015
+        )
+        assert result == []
+
+
+class TestGetBgpBfdEnabled:
+    """Tests for get_bgp_bfd_enabled function"""
+
+    def test_fall_over_bfd_requires_bfd_enabled(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_bfd_enabled(
+            {"172.27.250.32": {"general": ["fall-over bfd"]}}, sessions
+        )
+        assert result is True
+
+    def test_fall_over_bfd_on_non_default_vrf_also_enables(self):
+        """'bfd' is global, so a fall-over bfd neighbor on any VRF counts."""
+        sessions = [_enriched_session("172.27.100.1", vrf="lab-blue")]
+        result = get_bgp_bfd_enabled(
+            {"172.27.100.1": {"general": ["fall-over bfd"]}}, sessions
+        )
+        assert result is True
+
+    def test_no_fall_over_bfd_returns_false(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_bfd_enabled(
+            {"172.27.250.32": {"ipv4": ["soft-reconfiguration inbound"]}}, sessions
+        )
+        assert result is False
+
+    def test_other_general_options_do_not_trigger_bfd(self):
+        sessions = [_enriched_session("172.27.250.32")]
+        result = get_bgp_bfd_enabled(
+            {"172.27.250.32": {"general": ["timers 3 9"]}}, sessions
+        )
+        assert result is False
+
+    def test_empty_config_returns_false(self):
+        assert get_bgp_bfd_enabled({}, [_enriched_session("172.27.250.32")]) is False
+
+
+class TestGetStaleBgpBfd:
+    """Tests for get_stale_bgp_bfd function"""
+
+    _RUNNING_CONFIG = """
+!
+clock timezone europe/oslo
+bfd
+no ip icmp redirect
+router bgp 65015
+    bgp router-id 10.255.255.11
+    neighbor 172.27.250.32 remote-as 65001
+    neighbor 172.27.250.32 fall-over bfd
+    vrf lab-blue
+        neighbor 172.27.100.1 remote-as 65010
+        address-family ipv4 unicast
+            neighbor 172.27.100.1 activate
+        exit-address-family
+    exit-vrf
+!
+"""
+
+    _SESSIONS = [
+        _enriched_session("172.27.250.32", vrf="default", af="ipv4"),
+        _enriched_session("172.27.100.1", vrf="lab-blue", af="ipv4"),
+    ]
+
+    def test_no_stale_when_still_desired(self):
+        desired = {"172.27.250.32": {"general": ["fall-over bfd"]}}
+        result = get_stale_bgp_bfd(desired, self._SESSIONS, self._RUNNING_CONFIG)
+        assert result is False
+
+    def test_removed_fall_over_bfd_makes_bfd_stale(self):
+        result = get_stale_bgp_bfd({}, self._SESSIONS, self._RUNNING_CONFIG)
+        assert result is True
+
+    def test_bfd_not_configured_is_never_stale(self):
+        running_config = "!\nclock timezone europe/oslo\nno ip icmp redirect\n!\n"
+        result = get_stale_bgp_bfd({}, self._SESSIONS, running_config)
+        assert result is False
+
+    def test_bfd_inside_router_bgp_is_not_the_global_line(self):
+        """A 'bfd' line nested under router bgp/vrf must not be mistaken for
+        the global toggle - only an unindented top-level 'bfd' counts."""
+        running_config = (
+            "!\nrouter bgp 65015\n    vrf lab-blue\n        bfd\n    exit-vrf\n!\n"
+        )
+        result = get_stale_bgp_bfd({}, self._SESSIONS, running_config)
+        assert result is False
+
+    def test_empty_running_config_returns_false(self):
+        result = get_stale_bgp_bfd(
+            {"172.27.250.32": {"general": ["fall-over bfd"]}}, self._SESSIONS, ""
+        )
+        assert result is False
+
+    def test_none_running_config_returns_false(self):
+        result = get_stale_bgp_bfd(
+            {"172.27.250.32": {"general": ["fall-over bfd"]}}, self._SESSIONS, None
+        )
+        assert result is False

@@ -79,6 +79,12 @@ from netbox_filters_lib.l3_config_helpers import (
 from netbox_filters_lib.bgp_filters import (
     get_bgp_session_vrf_info,
     collect_ebgp_vrf_policy_config,
+    get_bgp_redistribute_config,
+    get_stale_bgp_redistribute,
+    get_bgp_neighbor_options_config,
+    get_stale_bgp_neighbor_options,
+    get_bgp_bfd_enabled,
+    get_stale_bgp_bfd,
 )
 from netbox_filters_lib.port_access import (
     port_access_diff,
@@ -148,6 +154,12 @@ class FilterModule:
             # BGP helpers
             "get_bgp_session_vrf_info": get_bgp_session_vrf_info,
             "collect_ebgp_vrf_policy_config": collect_ebgp_vrf_policy_config,
+            "get_bgp_redistribute_config": get_bgp_redistribute_config,
+            "get_stale_bgp_redistribute": get_stale_bgp_redistribute,
+            "get_bgp_neighbor_options_config": get_bgp_neighbor_options_config,
+            "get_stale_bgp_neighbor_options": get_stale_bgp_neighbor_options,
+            "get_bgp_bfd_enabled": get_bgp_bfd_enabled,
+            "get_stale_bgp_bfd": get_stale_bgp_bfd,
             # Port-access
             "port_access_diff": port_access_diff,
             "port_access_facts_from_device_profiles": port_access_facts_from_device_profiles,

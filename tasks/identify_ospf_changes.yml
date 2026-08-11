@@ -91,8 +91,11 @@
         {%- set has_auth_key = key_secret | length > 0 -%}
         {%- set auth_allowed = ('loopback' not in intf.name and
             not passive and auth_enabled) -%}
+        {%- set interface_type = 'loopback' if 'loopback' in intf.name
+            else ('lag' if intf.name.startswith('lag') else 'physical') -%}
         {%- set _ = out.append({
           'interface_name': intf.name,
+          'interface_type': interface_type,
           'vrf': vrf_name,
           'area_id': area,
           'network_type': network,

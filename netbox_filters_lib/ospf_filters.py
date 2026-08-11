@@ -323,9 +323,9 @@ def get_ospf_interface_changes(
     Args:
         ospf_interface_items: List of per-interface dicts as built in
             `tasks/identify_ospf_changes.yml` - each with keys
-            ``interface_name``, ``vrf``, ``area_id``, ``network_type``,
-            ``passive`` (bool), and ``md5_auth_desired`` (bool, precomputed
-            from ``ospf_auth_keys``/``ospf_auth_key_id``).
+            ``interface_name``, ``interface_type``, ``vrf``, ``area_id``,
+            ``network_type``, ``passive`` (bool), and ``md5_auth_desired``
+            (bool, precomputed from ``ospf_auth_keys``/``ospf_auth_key_id``).
         ospf_interface_facts: Device REST facts
             (``aoscx_ospf_interface_facts``) - ``{vrf: {process_id_str:
             {area: {intf_name: {'ospf_if_type': ..., 'ospf_auth_type':

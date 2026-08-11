@@ -174,6 +174,36 @@
     ansible_connection: network_cli
 
 # ============================================================================
+# BGP Redistribution (from 'bgp_redistribute' NetBox config_context)
+# ============================================================================
+# Not covered by the netbox-bgp plugin's session data model, so redistribution
+# is driven by the 'bgp_redistribute' config_context key instead - see
+# docs/BGP_CONFIGURATION.md#bgp-redistribution for the expected shape.
+# aoscx_config + match: line diffs against the real running-config, so
+# adding entries is naturally idempotent. Removing entries deleted from
+# config_context is handled separately below, under aoscx_idempotent_mode.
+
+- name: Configure BGP redistribution
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "redistribute {{ item.protocol }}"
+    parents: >-
+      {{ ['router bgp ' ~ device_bgp_sessions[0].local_as.asn]
+         + (['vrf ' ~ item.vrf] if item.vrf != 'default' else [])
+         + ['address-family ' ~ item.af ~ ' unicast'] }}
+    match: line
+  loop: "{{ bgp_redistribute | default({}) | get_bgp_redistribute_config }}"
+  loop_control:
+    label: "VRF {{ item.vrf }} ({{ item.af }}): redistribute {{ item.protocol }}"
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+    - bgp_redistribute | default({}) | length > 0
+  vars:
+    ansible_connection: network_cli
+
+# ============================================================================
 # BGP EVPN Neighbors Configuration
 # ============================================================================
 
@@ -526,6 +556,72 @@
     ansible_connection: network_cli
 
 # ============================================================================
+# BGP BFD Enablement (derived from 'bgp_neighbor_options' fall-over bfd)
+# ============================================================================
+# 'neighbor <ip> fall-over bfd' has no effect on AOS-CX unless 'bfd' is also
+# enabled. Unlike neighbor options, 'bfd' is a single global command (like
+# 'clock timezone' or 'no ip icmp redirect') - it is not nested under
+# 'router bgp'/'vrf' and is not per-VRF. Rather than requiring a second
+# config_context entry that could drift out of sync, get_bgp_bfd_enabled()
+# derives whether it's needed directly from any neighbor declaring
+# 'fall-over bfd' in the 'general' scope below - see
+# docs/BGP_CONFIGURATION.md#bgp-neighbor-options.
+# NOTE: 'bfd' is switch-wide and may also be used by OSPF/static routes in
+# future - see the NOTE on get_bgp_bfd_enabled() before changing cleanup.
+
+- name: Enable BFD (required for neighbor fall-over bfd)
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "bfd"
+    match: line
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+    - bgp_neighbor_options | default({}) |
+      get_bgp_bfd_enabled(device_bgp_sessions_enriched | default([]))
+  vars:
+    ansible_connection: network_cli
+
+# ============================================================================
+# BGP Neighbor Options (from 'bgp_neighbor_options' config_context)
+# ============================================================================
+# Not covered by the netbox-bgp plugin's session data model, so generic
+# per-neighbor options are driven by the 'bgp_neighbor_options' config_context
+# key instead - see docs/BGP_CONFIGURATION.md#bgp-neighbor-options for the
+# expected shape. Two scopes are supported: 'ipv4'/'ipv6' (pushed inside the
+# matching address-family block, e.g. 'soft-reconfiguration inbound') and
+# 'general' (pushed directly under 'router bgp'/'vrf', outside any
+# address-family block, e.g. 'fall-over bfd') - item.af is None for 'general'
+# entries, which get_bgp_neighbor_options_config() encodes by simply omitting
+# the address-family parent below.
+# aoscx_config + match: line diffs against the real running-config, so
+# adding entries is naturally idempotent. Removing entries deleted from
+# config_context is handled separately below, under aoscx_idempotent_mode.
+
+- name: Configure BGP neighbor options
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "neighbor {{ item.neighbor_ip }} {{ item.command }}"
+    parents: >-
+      {{ ['router bgp ' ~ device_bgp_sessions[0].local_as.asn]
+         + (['vrf ' ~ item.vrf] if item.vrf != 'default' else [])
+         + (['address-family ' ~ item.af ~ ' unicast'] if item.af else []) }}
+    match: line
+  loop: >-
+    {{ bgp_neighbor_options | default({}) |
+       get_bgp_neighbor_options_config(device_bgp_sessions_enriched | default([])) }}
+  loop_control:
+    label: "VRF {{ item.vrf }} ({{ item.af | default('general', true) }}): neighbor {{ item.neighbor_ip }} {{ item.command }}"
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+    - bgp_neighbor_options | default({}) | length > 0
+  vars:
+    ansible_connection: network_cli
+
+# ============================================================================
 # BGP Route Reflector Settings
 # ============================================================================
 # If device role is "spine", automatically configure all BGP neighbors as
@@ -699,6 +795,119 @@
       loop_control:
         label: "VRF {{ item.vrf }}: no neighbor {{ item.ip }}"
       when: _bgp_stale_neighbors | length > 0
+      vars:
+        ansible_connection: network_cli
+
+# ============================================================================
+# BGP Redistribution / Neighbor Options / BFD Cleanup (idempotent mode)
+# ============================================================================
+# Removes 'redistribute' statements, per-neighbor options, and 'bfd'
+# enablement present on the device but no longer needed per the matching
+# 'bgp_redistribute' / 'bgp_neighbor_options' config_context. aoscx_config
+# (used above to add entries) never removes lines that are absent from its
+# desired list, so removal has to be driven from the device's actual
+# running-config rather than a blind diff.
+#
+# Uses 'show running-config' (CLI) rather than the REST API: there is no
+# documented REST field for per-address-family redistribute/neighbor-option
+# state, whereas the CLI text format is exactly what get_bgp_redistribute_config
+# / get_bgp_neighbor_options_config / get_bgp_bfd_vrfs's syntax is built from
+# and is already known-good (see docs/BGP_CONFIGURATION.md). All three
+# cleanups share a single 'show running-config' fetch.
+
+- name: Remove stale BGP redistribute, neighbor option, and BFD entries (idempotent mode)
+  when:
+    - aoscx_idempotent_mode | default(false) | bool
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+  block:
+    - name: Get current running-config for BGP redistribute/neighbor-option cleanup
+      arubanetworks.aoscx.aoscx_command:
+        commands:
+          - show running-config
+      register: _bgp_running_config
+      vars:
+        ansible_connection: network_cli
+
+    - name: Identify stale BGP redistribute entries
+      ansible.builtin.set_fact:
+        _bgp_redistribute_stale: >-
+          {{ bgp_redistribute | default({}) |
+             get_stale_bgp_redistribute(
+               _bgp_running_config.stdout[0],
+               device_bgp_sessions[0].local_as.asn
+             ) }}
+
+    - name: Debug stale BGP redistribute entries
+      ansible.builtin.debug:
+        msg: "Stale BGP redistribute entries to remove: {{ _bgp_redistribute_stale }}"
+      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+
+    - name: Remove stale BGP redistribute entries from device
+      arubanetworks.aoscx.aoscx_config:
+        lines:
+          - "no redistribute {{ item.protocol }}"
+        parents: >-
+          {{ ['router bgp ' ~ device_bgp_sessions[0].local_as.asn]
+             + (['vrf ' ~ item.vrf] if item.vrf != 'default' else [])
+             + ['address-family ' ~ item.af ~ ' unicast'] }}
+      loop: "{{ _bgp_redistribute_stale }}"
+      loop_control:
+        label: "VRF {{ item.vrf }} ({{ item.af }}): no redistribute {{ item.protocol }}"
+      when: _bgp_redistribute_stale | length > 0
+      vars:
+        ansible_connection: network_cli
+
+    - name: Identify stale BGP neighbor options
+      ansible.builtin.set_fact:
+        _bgp_neighbor_options_stale: >-
+          {{ bgp_neighbor_options | default({}) |
+             get_stale_bgp_neighbor_options(
+               device_bgp_sessions_enriched | default([]),
+               _bgp_running_config.stdout[0],
+               device_bgp_sessions[0].local_as.asn
+             ) }}
+
+    - name: Debug stale BGP neighbor options
+      ansible.builtin.debug:
+        msg: "Stale BGP neighbor options to remove: {{ _bgp_neighbor_options_stale }}"
+      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+
+    - name: Remove stale BGP neighbor options from device
+      arubanetworks.aoscx.aoscx_config:
+        lines:
+          - "no neighbor {{ item.neighbor_ip }} {{ item.command }}"
+        parents: >-
+          {{ ['router bgp ' ~ device_bgp_sessions[0].local_as.asn]
+             + (['vrf ' ~ item.vrf] if item.vrf != 'default' else [])
+             + (['address-family ' ~ item.af ~ ' unicast'] if item.af else []) }}
+      loop: "{{ _bgp_neighbor_options_stale }}"
+      loop_control:
+        label: "VRF {{ item.vrf }} ({{ item.af | default('general', true) }}): no neighbor {{ item.neighbor_ip }} {{ item.command }}"
+      when: _bgp_neighbor_options_stale | length > 0
+      vars:
+        ansible_connection: network_cli
+
+    - name: Identify stale global BGP BFD enablement
+      ansible.builtin.set_fact:
+        _bgp_bfd_stale: >-
+          {{ bgp_neighbor_options | default({}) |
+             get_stale_bgp_bfd(
+               device_bgp_sessions_enriched | default([]),
+               _bgp_running_config.stdout[0]
+             ) }}
+
+    - name: Debug stale global BGP BFD enablement
+      ansible.builtin.debug:
+        msg: "Global BFD enablement stale (no longer needed by BGP): {{ _bgp_bfd_stale }}"
+      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+
+    - name: Remove stale global BFD enablement from device
+      arubanetworks.aoscx.aoscx_config:
+        lines:
+          - "no bfd"
+      when: _bgp_bfd_stale
       vars:
         ansible_connection: network_cli
 

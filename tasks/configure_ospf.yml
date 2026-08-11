@@ -77,7 +77,7 @@
       {%- endif -%}
       {{ lines }}
     parents:
-      - "interface {{ item.interface_name }}"
+      - "interface {{ item.interface_name | format_interface_name(item.interface_type | default('physical')) }}"
   vars:
     ansible_connection: ansible.netcommon.network_cli
   loop: "{{ ospf_interface_changes.config_changes }}"
@@ -98,7 +98,7 @@
     lines:
       - ip ospf passive
     parents:
-      - "interface {{ item.interface_name }}"
+      - "interface {{ item.interface_name | format_interface_name(item.interface_type | default('physical')) }}"
   vars:
     ansible_connection: ansible.netcommon.network_cli
   loop: "{{ ospf_interface_changes.passive_set }}"
@@ -113,7 +113,7 @@
     lines:
       - no ip ospf passive
     parents:
-      - "interface {{ item.interface_name }}"
+      - "interface {{ item.interface_name | format_interface_name(item.interface_type | default('physical')) }}"
   vars:
     ansible_connection: ansible.netcommon.network_cli
   loop: "{{ ospf_interface_changes.passive_clear }}"

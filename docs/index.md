@@ -92,7 +92,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **STP** - Global and interface config
 - ✅ **DHCP relay IPv4** - Configuration pr VRF
 - ✅ **Static routing** - Forward, blackhole, and reject routes per VRF
-- ❌ **BFD** - on roadmap
+- ✅ **BFD** - For BGP
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
 - ❌ **DHCP Snooping** - on Roadmap
