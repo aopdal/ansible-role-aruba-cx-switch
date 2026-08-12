@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.28] - 2026-08-12
+
+### Fixed
+
+- Add extra lin in end of template to make copy and paste easier.
+
 ## [0.13.27] - 2026-08-11
 
 ### Added
