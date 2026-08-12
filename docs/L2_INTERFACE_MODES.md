@@ -137,8 +137,8 @@ flowchart TD
     Categorize[categorize_l2_interfaces\nPhysical / LAG / MCLAG × access/tagged/tagged-all]
 
     Categorize --> Physical[configure_l2_physical.yml]
-    Physical --> LAG[configure_l2_lag.yml]
-    LAG --> MCLAG[configure_l2_mclag.yml]
+    Physical --> LAG[configure_l2_lag_common.yml<br/>l2_lag_kind=lag]
+    LAG --> MCLAG[configure_l2_lag_common.yml<br/>l2_lag_kind=mclag]
     MCLAG --> End([Complete])
 
     classDef facts fill:#e1f5e1,stroke:#4caf50,stroke-width:2px

@@ -288,7 +288,7 @@
     label: "Interface: {{ item.name }}"
   when: subinterface_parents_needing_routing | default([]) | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: Debug - Physical interface configuration summary
   ansible.builtin.debug:

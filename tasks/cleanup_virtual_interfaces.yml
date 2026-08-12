@@ -25,8 +25,7 @@
 
 - name: Debug - Show orphaned virtual interfaces
   ansible.builtin.debug:
-    msg:
-      "Virtual interfaces on device but not in NetBox (will be deleted): {{
+    msg: "Virtual interfaces on device but not in NetBox (will be deleted): {{
       virtual_interface_orphans | default([]) }}"
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
@@ -40,7 +39,7 @@
   loop_control:
     label: "Interface: {{ item }}"
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
     item_type: >-
       {{ 'vlan' if item.startswith('vlan')
       else ('loopback' if item.startswith('loopback') else 'subinterface') }}

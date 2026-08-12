@@ -134,11 +134,15 @@ Interface processing is split into three focused modules:
 - Interface/IP address matching with anycast gateway support
 - Key filter: `get_interface_ip_addresses()`
 
-**Change Detection** (`interface_change_detection.py`)
+**Change Detection** (`interface_change_detection.py` + `interface_ip_comparisons.py`)
 **Filters**: 1
 
 - Idempotent change detection for interfaces
 - Key filter: `get_interfaces_needing_config_changes()`
+- IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison lives in
+  `interface_ip_comparisons.py` as internal helpers (`compute_l3_ip_changes()`,
+  `compute_dhcp_relay_changes()`), called by `get_interfaces_needing_config_changes()`
+  per interface — not separately registered as Ansible filters
 
 See **[Interface Filters](interface_filters.md)** for detailed documentation.
 

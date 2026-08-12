@@ -8,7 +8,7 @@ information derived from the device's interface assignments in NetBox.
 
 import re
 
-from .utils import _debug
+from .utils import _debug, is_ipv6_address
 
 # VRF names that are built-in / non-configurable; treated as 'default'
 _BUILTIN_VRFS = {"mgmt", "MGMT", "Global", "global", "default", "Default"}
@@ -17,7 +17,8 @@ _BUILTIN_VRFS = {"mgmt", "MGMT", "Global", "global", "default", "Default"}
 # model, so it is driven by the 'bgp_redistribute' NetBox config_context key
 # instead - see docs/BGP_CONFIGURATION.md#bgp-redistribution.
 _VALID_BGP_ADDRESS_FAMILIES = {"ipv4", "ipv6"}
-_VALID_REDISTRIBUTE_PROTOCOLS = {"connected", "static", "ospf", "ospfv3", "rip"}
+_VALID_REDISTRIBUTE_PROTOCOLS = {
+    "connected", "static", "ospf", "ospfv3", "rip"}
 
 # Generic per-neighbor address-family CLI options (e.g. 'soft-reconfiguration
 # inbound') are likewise not part of the netbox-bgp plugin's session data
@@ -100,7 +101,8 @@ def get_bgp_session_vrf_info(sessions, interfaces):
             vrf_name = "default"
 
         for ip_obj in intf.get("ip_addresses") or []:
-            addr = ip_obj.get("address") if isinstance(ip_obj, dict) else str(ip_obj)
+            addr = ip_obj.get("address") if isinstance(
+                ip_obj, dict) else str(ip_obj)
             if addr:
                 ip_vrf_map[addr] = vrf_name
                 _debug(
@@ -127,7 +129,7 @@ def get_bgp_session_vrf_info(sessions, interfaces):
         )
 
         vrf_name = ip_vrf_map.get(local_addr, "default")
-        af = "ipv6" if ":" in local_addr else "ipv4"
+        af = "ipv6" if is_ipv6_address(local_addr) else "ipv4"
 
         enriched = dict(session)
         enriched["_vrf"] = vrf_name
@@ -308,7 +310,8 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
     # ------------------------------------------------------------------
     # Collect prefix list rules for all referenced prefix lists
     # ------------------------------------------------------------------
-    prefix_lists_map = {}  # {prefix_list_name: {"af": str, "rules": [rule_dicts]}}
+    # {prefix_list_name: {"af": str, "rules": [rule_dicts]}}
+    prefix_lists_map = {}
 
     for rule in all_prefix_list_rules or []:
         if not isinstance(rule, dict):
@@ -363,7 +366,8 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
             {"index": index, "action": action, "prefix": str(network)}
         )
 
-        _debug(f"prefix-list rule: {pl_name} ({pl_af}) seq {index} {action} {network}")
+        _debug(
+            f"prefix-list rule: {pl_name} ({pl_af}) seq {index} {action} {network}")
 
     # Sort rules within each prefix list by sequence number
     prefix_lists = [
@@ -443,9 +447,11 @@ def get_bgp_redistribute_config(bgp_redistribute):
                     )
                     continue
 
-                result.append({"vrf": vrf_name, "af": af, "protocol": protocol})
+                result.append(
+                    {"vrf": vrf_name, "af": af, "protocol": protocol})
 
-    result.sort(key=lambda entry: (entry["vrf"], entry["af"], entry["protocol"]))
+    result.sort(key=lambda entry: (
+        entry["vrf"], entry["af"], entry["protocol"]))
     return result
 
 
@@ -500,7 +506,7 @@ def _iter_bgp_lines(running_config, local_asn):
 
         af_match = af_re.match(line)
         if line.startswith("vrf "):
-            current_vrf = line[len("vrf ") :].strip()
+            current_vrf = line[len("vrf "):].strip()
             current_af = None
             continue
         if line == "exit-vrf":
@@ -537,7 +543,7 @@ def _parse_bgp_redistribute_from_config(running_config, local_asn):
     result = []
     for vrf, af, line in _iter_bgp_lines(running_config, local_asn):
         if af is not None and line.startswith("redistribute "):
-            protocol = line[len("redistribute ") :].strip()
+            protocol = line[len("redistribute "):].strip()
             result.append({"vrf": vrf, "af": af, "protocol": protocol})
     return result
 
@@ -574,7 +580,8 @@ def get_stale_bgp_redistribute(bgp_redistribute, running_config, local_asn):
     ]
 
     if stale:
-        _debug(f"get_stale_bgp_redistribute: {len(stale)} stale entrie(s) found")
+        _debug(
+            f"get_stale_bgp_redistribute: {len(stale)} stale entrie(s) found")
 
     return stale
 
@@ -800,7 +807,8 @@ def get_stale_bgp_neighbor_options(
         (d["vrf"], d["af"], d["neighbor_ip"], d["command"]) for d in desired
     }
 
-    current = _parse_bgp_neighbor_options_from_config(running_config, local_asn)
+    current = _parse_bgp_neighbor_options_from_config(
+        running_config, local_asn)
 
     stale = [
         entry
@@ -810,7 +818,8 @@ def get_stale_bgp_neighbor_options(
     ]
 
     if stale:
-        _debug(f"get_stale_bgp_neighbor_options: {len(stale)} stale entrie(s) found")
+        _debug(
+            f"get_stale_bgp_neighbor_options: {len(stale)} stale entrie(s) found")
 
     return stale
 

@@ -139,8 +139,11 @@ rejected by lint / review.
   `custom_fields.device_*` / `interfaces` / `vlans` etc.
 - Booleans are filtered with `| bool` at the use site.
 - Do not rename or remove existing variables without a deprecation entry
-  (see `aoscx_fast_mode` for the pattern: keep the variable, add a debug
-  warning in `tasks/main.yml`, document in `CHANGELOG.md`).
+  (see `aoscx_connection_type` and `aoscx_no_log` for the current pattern:
+  keep the variable in `defaults/main.yml` with a `# DEPRECATED: ...`
+  comment noting it has no runtime effect, add a `Deprecated` section to
+  `CHANGELOG.md`, and drop the variable outright only after a full release
+  cycle).
 
 ### 4.2 Tasks
 
@@ -166,11 +169,52 @@ rejected by lint / review.
 - L3 interfaces use `aoscx_config` (not `aoscx_l3_interface`) so that
   `ip mtu` and `l3-counters` can be set. Do not "simplify" back to
   `aoscx_l3_interface` — capability would regress.
+- **`aoscx_config` / `aoscx_command` require CLI, not pyaoscx REST.**
+  Inventories for this role commonly set
+  `ansible_connection: arubanetworks.aoscx.aoscx` (pyaoscx REST) at the
+  group_vars / platform level so that pyaoscx-backed modules
+  (`aoscx_facts`, `aoscx_vlan`, `aoscx_interface`, ...) use REST. But
+  `aoscx_config` and `aoscx_command` are CLI-only — they must run over
+  `network_cli` regardless of the inventory-level connection. Any new task
+  invoking either module MUST override the connection at the task level:
+
+  ```yaml
+  - name: Push some CLI config
+    arubanetworks.aoscx.aoscx_config:
+      lines: [...]
+      parents: [...]
+    vars:
+      ansible_connection: network_cli
+  ```
+
+  Use the short form `network_cli`, not the FQCN
+  `ansible.netcommon.network_cli`. Do NOT reintroduce the deprecated
+  `aoscx_connection_type` variable indirection — every existing
+  `aoscx_config` task in the role hardcodes `network_cli`, and
+  `aoscx_connection_type` is retained in `defaults/main.yml` only for
+  backward compatibility with existing inventories (it has no runtime
+  effect). Tasks invoking pyaoscx-backed modules should NOT override
+  `ansible_connection` at all — they inherit the inventory value, which is
+  what the operator wants.
 - **`when` conditions must resolve to a boolean.** Ansible 2.19 deprecates
   evaluating dicts/lists as booleans in `when`. Never write `- my_dict` or
   `and my_dict` to test non-emptiness; use `my_dict | length > 0` (or
   `== 0` for the inverse). Same rule for lists. Booleans and integers are
   fine with `| bool` / direct comparison.
+- **`no_log: true` is hardcoded on any task that touches a secret.** Do NOT
+  gate `no_log` on a variable (e.g. `no_log: "{{ aoscx_no_log | default(...) }}"`)
+  for tasks that see credentials, tokens, MD5/hash keys, or session
+  cookies. A user-toggleable `no_log` is a footgun — flipping it to `false`
+  for debugging leaks the secret on the next production run. Categories
+  that must hardcode `no_log: true` today: NetBox API calls carrying the
+  `NETBOX_TOKEN` header, AOS-CX REST login/logout (`uri` calls posting
+  username/password), `set_fact` blocks that resolve `ansible_password` /
+  `aoscx_rest_password`, and OSPF MD5 key pushes via `aoscx_config`. Any
+  future feature carrying a secret (AAA/RADIUS/TACACS+ shared secrets,
+  SNMPv3 auth/priv passphrases, local user passwords, BGP MD5 password,
+  etc.) MUST follow the same rule. Do NOT reintroduce the deprecated
+  `aoscx_no_log` variable — it is retained in `defaults/main.yml` for
+  backward compatibility only and has no runtime effect.
 - **Filter plugins are called with pipe syntax, not `lookup()`.** Use
   `{{ value | my_filter(arg) }}` in `set_fact`. `lookup()` is for lookup
   plugins only — using it on a filter plugin silently returns nothing.

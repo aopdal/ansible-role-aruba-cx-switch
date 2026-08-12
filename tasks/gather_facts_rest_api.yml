@@ -191,7 +191,7 @@
     return_content: true
   register: _rest_login
   delegate_to: localhost
-  no_log: "{{ aoscx_no_log | default(true) }}"
+  no_log: true
   tags:
     - always
 

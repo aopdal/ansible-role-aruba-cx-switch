@@ -75,6 +75,8 @@ from netbox_filters_lib.l3_config_helpers import (
     get_interface_vrf,
     group_interface_ips,
     build_l3_config_lines,
+    should_add_interface_ip,
+    build_l3_config_preview,
 )
 from netbox_filters_lib.bgp_filters import (
     get_bgp_session_vrf_info,
@@ -151,6 +153,8 @@ class FilterModule:
             "get_interface_vrf": get_interface_vrf,
             "group_interface_ips": group_interface_ips,
             "build_l3_config_lines": build_l3_config_lines,
+            "should_add_interface_ip": should_add_interface_ip,
+            "build_l3_config_preview": build_l3_config_preview,
             # BGP helpers
             "get_bgp_session_vrf_info": get_bgp_session_vrf_info,
             "collect_ebgp_vrf_policy_config": collect_ebgp_vrf_policy_config,

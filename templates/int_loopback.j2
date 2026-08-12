@@ -19,7 +19,7 @@ interface {{ intf.name | replace("loopback", "loopback ") }}
 {%       endif %}
 {%     endfor %}
 {%     if intf.custom_fields.if_ip_ospf_1_area != none %}
-   ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
+   ip ospf {{ ospf_process_id | default(1) }} area {{ intf.custom_fields.if_ip_ospf_1_area }}
 {%     endif %}
 {%   endif %}
 {% endfor %}

@@ -122,21 +122,29 @@ aoscx_configure_stp: true
 # Default: false (use change detection for efficiency)
 aoscx_force_l2_config: false
 
-# DEPRECATED: aoscx_fast_mode has no effect and will be removed in a future version.
-# It caused more API calls (not fewer) due to absent device state for change detection.
-# For faster fact gathering, use aoscx_gather_facts_rest_api: true instead.
-aoscx_fast_mode: false
-
 # NetBox BGP plugin settings
 aoscx_use_netbox_bgp_plugin: true # Query the netbox-bgp plugin for BGP sessions; set false to disable BGP configuration
 aoscx_netbox_validate_certs: true # Validate SSL certificates when querying NetBox API
-aoscx_no_log: true # Set to false to show sensitive data in logs (not recommended)
+# DEPRECATED: aoscx_no_log has no effect and will be removed in a future
+# version. Every task in the role that touches a secret (NetBox API tokens,
+# AOS-CX REST credentials, OSPF MD5 keys) now hardcodes `no_log: true`
+# because a user-toggleable no_log can leak credentials on the next run.
+# The variable is retained here only for backward compatibility with existing
+# inventories that set it.
+aoscx_no_log: true
 
 # Save configuration after changes
 aoscx_save_config: true
 
 # Connection settings
-aoscx_connection_type: network_cli # or httpapi
+# DEPRECATED: aoscx_connection_type has no effect and will be removed in a future
+# version. All aoscx_config / aoscx_command tasks now hardcode
+# `ansible_connection: network_cli` since those modules are CLI-only regardless
+# of the inventory-level connection. Set `ansible_connection` directly in your
+# inventory / group_vars (e.g. `arubanetworks.aoscx.aoscx` for pyaoscx REST) to
+# control the connection used by pyaoscx-backed modules (aoscx_facts,
+# aoscx_vlan, aoscx_interface, ...).
+aoscx_connection_type: network_cli
 
 # REST API-based fact gathering (v10.15+ recommended)
 # When true, uses direct REST API calls (gather_facts_rest_api.yml) instead of aoscx_facts module

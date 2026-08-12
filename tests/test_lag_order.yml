@@ -10,7 +10,6 @@
     aoscx_debug: true
     aoscx_configure_lag_interfaces: true
     aoscx_configure_mclag_interfaces: true
-    aoscx_connection_type: network_cli
 
     # Test interfaces with LAGs
     interfaces:

@@ -5,9 +5,107 @@ import pytest
 from netbox_filters_lib.utils import (
     collapse_vlan_list,
     extract_ip_addresses,
+    get_interface_type_value,
+    is_ipv4_address,
+    is_ipv6_address,
+    normalize_ipv6,
     populate_ip_changes,
     select_interfaces_to_configure,
 )
+
+
+class TestIsIpv4Address:
+    def test_ipv4_with_prefix(self):
+        assert is_ipv4_address("192.168.1.1/24") is True
+
+    def test_ipv4_without_prefix(self):
+        assert is_ipv4_address("10.0.0.1") is True
+
+    def test_ipv6_returns_false(self):
+        assert is_ipv4_address("2001:db8::1/64") is False
+        assert is_ipv4_address("::1") is False
+
+    def test_empty_string(self):
+        assert is_ipv4_address("") is True
+
+    def test_none_raises(self):
+        with pytest.raises(TypeError):
+            is_ipv4_address(None)
+
+
+class TestIsIpv6Address:
+    def test_ipv6_with_prefix(self):
+        assert is_ipv6_address("2001:db8::1/64") is True
+
+    def test_ipv6_without_prefix(self):
+        assert is_ipv6_address("::1") is True
+
+    def test_ipv4_returns_false(self):
+        assert is_ipv6_address("192.168.1.1/24") is False
+        assert is_ipv6_address("10.0.0.1") is False
+
+    def test_empty_string(self):
+        assert is_ipv6_address("") is False
+
+    def test_ipv4_and_ipv6_are_inverses(self):
+        for addr in ["192.168.1.1", "10.0.0.1/8", "2001:db8::1", "fe80::1/64"]:
+            assert is_ipv4_address(addr) != is_ipv6_address(addr)
+
+
+class TestGetInterfaceTypeValue:
+    def test_type_as_dict(self):
+        assert get_interface_type_value({"type": {"value": "lag"}}) == "lag"
+
+    def test_type_as_dict_with_extra_keys(self):
+        intf = {"type": {"value": "1000base-t", "label": "1G"}}
+        assert get_interface_type_value(intf) == "1000base-t"
+
+    def test_type_as_bare_string(self):
+        assert get_interface_type_value({"type": "virtual"}) == "virtual"
+
+    def test_type_dict_missing_value_key(self):
+        assert get_interface_type_value({"type": {"label": "1G"}}) is None
+
+    def test_missing_type_key(self):
+        assert get_interface_type_value({"name": "1/1/1"}) is None
+
+    def test_type_is_none(self):
+        assert get_interface_type_value({"type": None}) is None
+
+    def test_non_dict_interface(self):
+        assert get_interface_type_value(None) is None
+        assert get_interface_type_value("not a dict") is None
+        assert get_interface_type_value(42) is None
+
+
+class TestNormalizeIpv6:
+    def test_full_form_with_prefix(self):
+        norm, orig = normalize_ipv6(
+            "2001:0db8:0000:0000:0000:0000:0000:0001/64")
+        assert norm == "2001:db8::1"
+        assert orig == "2001:0db8:0000:0000:0000:0000:0000:0001/64"
+
+    def test_compressed_form_with_prefix(self):
+        norm, orig = normalize_ipv6("2001:db8::1/64")
+        assert norm == "2001:db8::1"
+        assert orig == "2001:db8::1/64"
+
+    def test_no_prefix(self):
+        norm, orig = normalize_ipv6("2001:db8::1")
+        assert norm == "2001:db8::1"
+        assert orig == "2001:db8::1"
+
+    def test_link_local(self):
+        norm, orig = normalize_ipv6("fe80::1/64")
+        assert norm == "fe80::1"
+        assert orig == "fe80::1/64"
+
+    def test_parse_failure_falls_back_to_stripped_prefix(self):
+        # An IPv4 address is not a valid IPv6 address; parser fails and we
+        # fall back to the address stripped of its prefix.
+        norm, orig = normalize_ipv6("garbage/64")
+        assert norm == "garbage"
+        assert orig == "garbage/64"
 
 
 class TestCollapseVlanList:
@@ -221,7 +319,8 @@ class TestSelectInterfacesToConfigure:
             {"name": "1/1/2", "type": {"value": "1000base-t"}},
             {"name": "lag1", "type": {"value": "lag"}},
         ]
-        result = select_interfaces_to_configure(interfaces, idempotent_mode=False)
+        result = select_interfaces_to_configure(
+            interfaces, idempotent_mode=False)
         assert len(result) == 3
         assert result == interfaces
 
@@ -263,7 +362,8 @@ class TestSelectInterfacesToConfigure:
             {"name": "1/1/2", "type": {"value": "1000base-t"}},
         ]
         # When idempotent mode is True but no changes dict provided, return all interfaces
-        result = select_interfaces_to_configure(interfaces, idempotent_mode=True)
+        result = select_interfaces_to_configure(
+            interfaces, idempotent_mode=True)
         assert len(result) == 2
 
     def test_idempotent_mode_with_invalid_changes_dict(self):

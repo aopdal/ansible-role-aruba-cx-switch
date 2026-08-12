@@ -242,13 +242,13 @@ The `get_interfaces_needing_config_changes()` filter returns:
 
 ```python
 {
-    '_ip_changes': {
-        'ipv4_to_add': ['10.1.1.1/24', '10.1.2.1/24'],  # Only IPs needing addition
-        'ipv6_addresses': ['2001:db8::1/64'],             # All IPv6 addresses (for reference)
-        'ipv6_to_add': ['fe80::1/64'],                   # IPv6 anycast/addresses to add
-        'anycast_ipv4_to_remove': ['10.1.3.1'],          # Stale active-gateway IPv4
-        'anycast_ipv6_to_remove': ['2001:db8::1'],        # Stale active-gateway IPv6
-        'link_local_ipv6_to_add': ['fe80::1/64'],        # Missing 'ipv6 address link-local'
+    "_ip_changes": {
+        "ipv4_to_add": ["10.1.1.1/24", "10.1.2.1/24"],  # Only IPs needing addition
+        "ipv6_addresses": ["2001:db8::1/64"],  # All IPv6 addresses (for reference)
+        "ipv6_to_add": ["fe80::1/64"],  # IPv6 anycast/addresses to add
+        "anycast_ipv4_to_remove": ["10.1.3.1"],  # Stale active-gateway IPv4
+        "anycast_ipv6_to_remove": ["2001:db8::1"],  # Stale active-gateway IPv6
+        "link_local_ipv6_to_add": ["fe80::1/64"],  # Missing 'ipv6 address link-local'
     }
 }
 ```
@@ -319,7 +319,8 @@ filter_plugins/
     ├── bgp_filters.py                   # BGP session enrichment (~350 lines)
     ├── interface_categorization.py      # L2/L3 interface categorization (294 lines)
     ├── interface_ip_processing.py       # IP address matching (106 lines)
-    ├── interface_change_detection.py    # Change detection & idempotency (814 lines)
+    ├── interface_change_detection.py    # Change detection orchestration (761 lines)
+    ├── interface_ip_comparisons.py      # IPv4/IPv6/VRF/anycast/DHCP relay comparison (682 lines)
     ├── comparison.py                    # State comparison (295 lines)
     ├── ospf_filters.py                  # OSPF operations (439 lines)
     └── stp.py                           # STP interface change detection (1 filter)
@@ -332,6 +333,20 @@ filter_plugins/
 
 **Recent Updates** (May 2026):
 - Added `stp.py` module: `stp_interface_changes` filter compares NetBox interface STP custom fields against REST API `stp_config` facts and returns only the interfaces and CLI commands that need to change
+
+**Recent Updates** (August 2026):
+- Split `interface_change_detection.py` (was 1,369 lines, a single ~1,180-line
+  function): the IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison
+  logic moved to a new `interface_ip_comparisons.py` module as two functions,
+  `compute_l3_ip_changes()` and `compute_dhcp_relay_changes()`, leaving
+  `get_interfaces_needing_config_changes()` focused on orchestration
+  (existence checks, physical/L2 property checks, categorization). Both new
+  functions are pure — they return `(needs_change, change_reasons,
+  ip_changes)` instead of writing `_ip_changes` onto the interface dict —
+  and `get_interfaces_needing_config_changes()` now shallow-copies each
+  interface at the top of its loop so it no longer mutates the `interfaces`
+  list passed in by the caller (see docs/CODE_AUDIT.md findings F4/F5). No
+  behavior change; the public filter's signature and output are unchanged.
 
 **Note**: The `interface_filters.py` module was split into three focused modules in November 2025:
 - `interface_categorization.py` - Interface type and VLAN mode categorization
@@ -402,6 +417,18 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
     - When `ip_helper_addresses` is provided and the interface has `custom_fields.if_ip_helper=True`, emits `ip helper-address <ip>` lines (one per server, ordered by string index key) after all IP/anycast lines and before `l3-counters`
     - Servers are looked up by the interface VRF name in `ip_helper_addresses` (a dict keyed by VRF, values are `{"0": "ip", "1": "ip", ...}`)
     - Returns: List of configuration commands
+
+- **`should_add_interface_ip(interface, address)`**
+    - Decide whether a single IP address on an interface must be pushed. Used by `tasks/configure_l3_interfaces.yml` to set the per-combo `_needs_add` flag consumed downstream by `group_interface_ips`.
+    - VRF-change short-circuit: when `interface._ip_changes.vrf_change` is `True`, always returns `True` (the switch wipes all L3 config on a VRF move, so every address — including anycast — must be re-applied).
+    - IPv4 (no colon in `address`): returns membership in `_ip_changes.ipv4_to_add` when present; if `_ip_changes` exists but has no `ipv4_to_add`, returns `False`; if no `_ip_changes` at all, returns `True` (new interface).
+    - IPv6 (colon in `address`): returns membership in `_ip_changes.ipv6_to_add` when present; if `_ip_changes` exists but has no `ipv6_to_add`, returns `True` (no enhanced facts — configure all IPv6 addresses); if no `_ip_changes` at all, returns `True`.
+    - Returns: Boolean
+
+- **`build_l3_config_preview(l3_interfaces, aoscx_builtin_vrfs, l3_counters_enable=True)`**
+    - Debug-only preview mapping formatted interface name → list of L3 config lines. Iterates every `(interface_type, VRF)` category in `l3_interfaces`, calls `group_interface_ips` + `build_l3_config_lines`, and keys the result by `format_interface_name`. Loopbacks (a single unsplit list in `categorize_l3_interfaces` output) are split by VRF here — loopbacks with `vrf in aoscx_builtin_vrfs + [None]` go to the default bucket, the rest to custom.
+    - `ip_helper_addresses` is intentionally not exposed: the preview is a lightweight summary; helper-address lines are only added in the live `configure_l3_interface_common.yml` push.
+    - Returns: Dict of `{formatted_interface_name: [config_line, ...]}`
 
 **Key Benefits**:
 - Eliminates duplicated task code across interface type files
@@ -580,7 +607,12 @@ IP address to interface matching and anycast gateway processing (1 filter, 106 l
 
 ### `interface_change_detection.py` - Change Detection
 
-NetBox vs device comparison and idempotency logic (1 filter, 814 lines):
+NetBox vs device comparison and idempotency logic (1 filter, 761 lines).
+The IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison itself lives
+in `interface_ip_comparisons.py` (682 lines, internal helpers
+`compute_l3_ip_changes()` and `compute_dhcp_relay_changes()` — not
+separately exposed as Ansible filters); this module handles the
+orchestration described below and calls into those helpers per interface.
 
 - **`get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts=None, dhcp_relay_facts=None, ip_helper_addresses=None)`**
     - Compare NetBox interface configuration with device state
@@ -1076,6 +1108,7 @@ All filters are available through the standard Ansible filter syntax:
    ```python
    from .utils import _debug
 
+
    def my_new_filter(data, optional_param=True):
        """
        Brief description of what the filter does
@@ -1100,6 +1133,7 @@ All filters are available through the standard Ansible filter syntax:
 4. **Register in `netbox_filters.py`**:
    ```python
    from netbox_filters_lib.my_module import my_new_filter
+
 
    class FilterModule:
        def filters(self):
@@ -1170,7 +1204,8 @@ netbox_filters.py (main entry point)
     ├── bgp_filters.py → utils
     ├── interface_categorization.py → utils
     ├── interface_ip_processing.py → utils
-    ├── interface_change_detection.py → utils
+    ├── interface_change_detection.py → utils, interface_ip_comparisons
+    ├── interface_ip_comparisons.py → utils
     ├── l3_config_helpers.py → utils
     ├── comparison.py → utils
     ├── ospf_filters.py → utils
@@ -1196,7 +1231,8 @@ netbox_filters.py (main entry point)
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| `interface_change_detection.py` | 1 | 814 | Change detection & idempotency (incl. DHCP relay) |
+| `interface_change_detection.py` | 1 | 761 | Change detection orchestration & idempotency |
+| `interface_ip_comparisons.py` | 0 (internal) | 682 | IPv4/IPv6/VRF/anycast/DHCP relay comparison |
 | `vlan_filters.py` | 8 | 454 | VLAN lifecycle management |
 | `comparison.py` | 2 | 295 | State comparison logic |
 | `interface_categorization.py` | 2 | 294 | Interface categorization |

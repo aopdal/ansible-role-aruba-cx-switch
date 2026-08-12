@@ -4,7 +4,7 @@ Interface and VLAN comparison logic for determining configuration changes
 """
 
 import traceback
-from .utils import _debug
+from .utils import _debug, get_interface_type_value
 
 
 def compare_interface_vlans(netbox_interface, device_facts_interface):
@@ -250,10 +250,7 @@ def get_interfaces_needing_changes(interfaces, device_facts):
 
                 # If VLANs need to be removed, also add to cleanup list
                 if comparison["vlans_to_remove"]:
-                    type_obj = nb_intf.get("type")
-                    is_lag = False
-                    if type_obj and isinstance(type_obj, dict):
-                        is_lag = type_obj.get("value") == "lag"
+                    is_lag = get_interface_type_value(nb_intf) == "lag"
 
                     custom_fields = nb_intf.get("custom_fields")
                     is_mclag = False

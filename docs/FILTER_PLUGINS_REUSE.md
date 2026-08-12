@@ -20,6 +20,7 @@ This document describes which filters are portable, which need adaptation, and w
 | `l3_config_helpers.py` | **Partially portable** | 3 of 6 filters generic; CLI builders are AOS-CX |
 | `comparison.py` | **AOS-CX specific** | Reads AOS-CX REST API facts structure |
 | `interface_change_detection.py` | **AOS-CX specific** | Deep coupling to AOS-CX facts + VSX |
+| `interface_ip_comparisons.py` | **AOS-CX specific** | IPv4/IPv6/VRF/anycast/DHCP-relay comparison, split out of `interface_change_detection.py` |
 
 ---
 
@@ -143,9 +144,13 @@ Both filters read AOS-CX-specific device facts:
 
 **To port**: Rewrite the device facts parsing sections for your vendor's facts format. The comparison *algorithm* (what to add, what to remove) is generic and reusable.
 
-### `interface_change_detection.py`
+### `interface_change_detection.py` and `interface_ip_comparisons.py`
 
-The main function `get_interfaces_needing_config_changes` is deeply coupled to AOS-CX:
+The IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison logic lives in
+`interface_ip_comparisons.py` (`compute_l3_ip_changes()`,
+`compute_dhcp_relay_changes()` — internal helpers called by
+`get_interfaces_needing_config_changes()`, not separately registered
+filters); both modules are deeply coupled to AOS-CX:
 - Admin state detection reads `user_config.admin`, `forwarding_state.enablement`, `admin_state` — AOS-CX REST API fields
 - LAG detection reads AOS-CX's `interfaces` sub-dict with `line_card` keys
 - VLAN comparison reads AOS-CX-specific mode/tag/trunk field names

@@ -79,7 +79,7 @@
     parents:
       - "interface {{ item.interface_name | format_interface_name(item.interface_type | default('physical')) }}"
   vars:
-    ansible_connection: ansible.netcommon.network_cli
+    ansible_connection: network_cli
   loop: "{{ ospf_interface_changes.config_changes }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }}, area: {{
@@ -100,7 +100,7 @@
     parents:
       - "interface {{ item.interface_name | format_interface_name(item.interface_type | default('physical')) }}"
   vars:
-    ansible_connection: ansible.netcommon.network_cli
+    ansible_connection: network_cli
   loop: "{{ ospf_interface_changes.passive_set }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }})"
@@ -115,7 +115,7 @@
     parents:
       - "interface {{ item.interface_name | format_interface_name(item.interface_type | default('physical')) }}"
   vars:
-    ansible_connection: ansible.netcommon.network_cli
+    ansible_connection: network_cli
   loop: "{{ ospf_interface_changes.passive_clear }}"
   loop_control:
     label: "Interface: {{ item.interface_name }} (VRF: {{ item.vrf }})"
