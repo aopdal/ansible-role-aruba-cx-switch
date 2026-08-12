@@ -12,7 +12,7 @@ repos:
       - id: trailing-whitespace
         exclude: ^tests/output/
       - id: end-of-file-fixer
-        exclude: ^tests/output/
+        exclude: ^tests/output/|^templates/aoscx\.j2$
       - id: check-yaml
         args: ['--unsafe']  # Allow custom YAML tags
       - id: check-added-large-files
