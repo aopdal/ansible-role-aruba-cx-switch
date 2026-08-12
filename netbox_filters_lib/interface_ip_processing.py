@@ -5,7 +5,7 @@ Interface IP address processing filters
 Provides functions to match and process IP addresses with their interfaces.
 """
 
-from .utils import _debug
+from .utils import _debug, get_interface_type_value
 
 
 def get_interface_ip_addresses(interfaces, ip_addresses):
@@ -85,9 +85,7 @@ def get_interface_ip_addresses(interfaces, ip_addresses):
             {
                 "interface": intf,
                 "interface_name": intf.get("name"),
-                "interface_type": intf.get("type", {}).get("value")
-                if isinstance(intf.get("type"), dict)
-                else None,
+                "interface_type": get_interface_type_value(intf),
                 "address": address,
                 "vrf": vrf_name,
                 "description": intf.get("description", ""),

@@ -669,6 +669,9 @@ ansible-playbook site.yml --tags layer2
 ### Layer 3 Configuration Only
 
 ```bash
+# L3 interface config (IP addresses, VRF attach, loopbacks); does NOT touch
+# routing protocols. Use `--tags routing` (or individual `ospf`/`bgp`/
+# `static_routes` tags) to run OSPF/BGP/static routes.
 ansible-playbook site.yml --tags layer3
 ```
 
@@ -712,10 +715,10 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `vxlan`, `overlay`, `cleanup`, `idempotent` - VXLAN cleanup (idempotent mode only)
 - `vlans`, `layer2`, `cleanup`, `idempotent` - VLAN cleanup (idempotent mode only)
 - `port_access`, `cleanup`, `idempotent` - Port-access orphan cleanup (idempotent mode only)
-- `ospf`, `routing`, `layer3` - OSPF configuration (tag-dependent)
-- `bgp`, `routing`, `layer3` - BGP configuration (tag-dependent)
-- `static_routes`, `routing`, `layer3` - Static route configuration (tag-dependent)
-- `vsx`, `ha` - VSX configuration (tag-dependent)
+- `ospf`, `routing` - OSPF configuration (not tagged `layer3`; use `--tags routing` or `--tags ospf` to run - see "Tag-Dependent Tasks" below)
+- `bgp`, `routing` - BGP configuration (not tagged `layer3`; use `--tags routing` or `--tags bgp` to run - see "Tag-Dependent Tasks" below)
+- `static_routes`, `routing` - Static route configuration (not tagged `layer3`; use `--tags routing` or `--tags static_routes` to run - see "Tag-Dependent Tasks" below)
+- `vsx`, `ha` - VSX configuration (not tagged `layer3`/`interfaces`; use `--tags vsx` or `--tags ha` to run - see "Tag-Dependent Tasks" below)
 - `always`, `save`, `config` - Save configuration (runs on every play due to `always`)
 
 ### Aggregate Tags
@@ -724,7 +727,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `services` - VRF-dependent services (NTP, DNS)
 - `layer1` - Physical interface configuration
 - `layer2` - All L2 configuration (VLANs, L2 interfaces, LAG, STP, port-access)
-- `layer3` - All L3 configuration (VRFs, L3 interfaces/loopbacks, OSPF, BGP)
+- `layer3` - L3 interface configuration (VRFs, L3 interfaces, loopbacks) - **does NOT include OSPF/BGP/static routes**; those live under `routing`. This narrowing is deliberate: `-t layer3` should not push routing-protocol changes. See [docs/TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md).
 - `interfaces` - All interface configuration (physical, LAG, MCLAG, L2, L3)
 - `routing` - All routing protocol configuration (VRFs, OSPF, BGP, static routes)
 - `overlay` - All overlay configuration (EVPN, VXLAN)
@@ -736,12 +739,16 @@ ansible-playbook site.yml -e aoscx_save_config=false
 
 ### Tag-Dependent Tasks
 
-Some tasks only run when explicitly requested with specific tags:
+Some tasks are deliberately excluded from broad layer sweeps (e.g. `--tags layer3`)
+to prevent routing-protocol changes during day-to-day operations. They still run
+when no `--tags` are supplied, and can be run explicitly:
 
-- **OSPF** - Requires `--tags ospf`, `--tags routing`, or no tags (full run)
-- **BGP** - Requires `--tags bgp`, `--tags routing`, or no tags (full run)
-- **Static routes** - Requires `--tags static_routes`, `--tags routing`, or no tags (full run)
-- **VSX** - Requires `--tags vsx`, `--tags ha`, or no tags (full run)
+- **OSPF** - Runs on `--tags ospf`, `--tags routing`, or no tags (full run). Skipped by `--tags layer3`.
+- **BGP** - Runs on `--tags bgp`, `--tags routing`, or no tags (full run). Skipped by `--tags layer3`.
+- **Static routes** - Runs on `--tags static_routes`, `--tags routing`, or no tags (full run). Skipped by `--tags layer3`.
+- **VSX** - Runs on `--tags vsx`, `--tags ha`, or no tags (full run). Skipped by `--tags interfaces`/`--tags layer3`.
+
+See [docs/TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md) for the full rationale and every meaningful `--tags` invocation walked through.
 
 ## VRF Handling
 

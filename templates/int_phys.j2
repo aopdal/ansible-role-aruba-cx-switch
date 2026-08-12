@@ -1,3 +1,4 @@
+{% import '_macros_interface.j2' as m with context %}
 
 {% set subinterface_parent_names = interfaces
   | selectattr('type', 'defined')
@@ -73,28 +74,7 @@ interface {{ intf.name }}
 {%         if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
    l3-counters
 {%         endif %}
-{%         if intf.custom_fields.if_ip_ospf_1_area != none %}
-   ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
-{%           if intf.custom_fields.if_ip_ospf_network != none %}
-   ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
-{%           endif %}
-{%           if intf.custom_fields.if_ip_ospf_passive %}
-   ip ospf passive
-{%           endif %}
-{%           set _vrf = (intf.vrf.name | default('default')) | replace('Global', 'default') %}
-{%           set _k = (ospf_auth_keys | default({})).get(_vrf) %}
-{%           set _auth_enabled = intf.custom_fields.if_ip_ospf_auth | default(true) %}
-{%           set _passive = intf.custom_fields.if_ip_ospf_passive | default(false) %}
-{%           if _auth_enabled and not _passive and _k %}
-{%             if _k is mapping and _k.get('secret') %}
-   ip ospf authentication message-digest
-   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 {{ 'ciphertext ' if _k.get('encrypted') else 'plaintext ' }}{{ _k.secret }}
-{%             elif _k is string and _k | length > 0 %}
-   ip ospf authentication message-digest
-   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 plaintext {{ _k }}
-{%             endif %}
-{%           endif %}
-{%         endif %}
+{{ m.ospf_interface(intf) }}
 {%       endif %}
 {%     elif intf.ip_addresses | length > 0 %}
 {# Non-subinterface with IP addresses - L3 routing #}
@@ -117,36 +97,11 @@ interface {{ intf.name }}
 {%       endfor %}
 {%       if intf.ip_addresses | selectattr('family.label', 'equalto', 'IPv4') | list | length > 0 %}
 {%         if intf.custom_fields.if_ip_helper %}
-{%           set _vrf = (intf.vrf.name | default('default')) | replace('Global', 'default') %}
-{%           set _helpers = (ip_helper_addresses | default({})).get(_vrf, {}) %}
-{%           for idx in _helpers.keys() | sort %}
-   ip helper-address {{ _helpers[idx] }}
-{%           endfor %}
+{{ m.ip_helpers(intf) }}
 {%         endif %}
    l3-counters
 {%       endif %}
-{%       if intf.custom_fields.if_ip_ospf_1_area != none %}
-   ip ospf 1 area {{ intf.custom_fields.if_ip_ospf_1_area }}
-{%         if intf.custom_fields.if_ip_ospf_network != none %}
-   ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
-{%         endif %}
-{%         if intf.custom_fields.if_ip_ospf_passive %}
-   ip ospf passive
-{%         endif %}
-{%         set _vrf = (intf.vrf.name | default('default')) | replace('Global', 'default') %}
-{%         set _k = (ospf_auth_keys | default({})).get(_vrf) %}
-{%         set _auth_enabled = intf.custom_fields.if_ip_ospf_auth | default(true) %}
-{%         set _passive = intf.custom_fields.if_ip_ospf_passive | default(false) %}
-{%         if _auth_enabled and not _passive and _k %}
-{%           if _k is mapping and _k.get('secret') %}
-   ip ospf authentication message-digest
-   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 {{ 'ciphertext ' if _k.get('encrypted') else 'plaintext ' }}{{ _k.secret }}
-{%           elif _k is string and _k | length > 0 %}
-   ip ospf authentication message-digest
-   ip ospf message-digest-key {{ ospf_auth_key_id | default(1) }} md5 plaintext {{ _k }}
-{%           endif %}
-{%         endif %}
-{%       endif %}
+{{ m.ospf_interface(intf) }}
 
 {%     endif %}
 {%     if intf.parent is none and intf.ip_addresses | length == 0 and intf.name not in subinterface_parent_names %}

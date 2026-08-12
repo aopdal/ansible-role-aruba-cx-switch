@@ -32,16 +32,15 @@
     domain_list: "{{ dns_domain_list | default(omit) }}"
     host_v4_address_mapping: "{{ dns_host_v4_address_mapping | default(omit) }}"
     vrf: "{{ dns_vrf | default(omit) }}"
-  when:
-    - >
-      dns_domain_name is defined or
-      dns_mgmt_nameservers is defined or
-      dns_domain_list is defined or
-      dns_host_v4_address_mapping is defined
+  when: >-
+    (dns_domain_name | default('') | length > 0) or
+    (dns_mgmt_nameservers | default({}) | length > 0) or
+    (dns_domain_list | default({}) | length > 0) or
+    (dns_host_v4_address_mapping | default({}) | length > 0)
 
 - name: configure_dns | Configure DNS name servers per VRF
   arubanetworks.aoscx.aoscx_dns:
     name_servers: "{{ item.value }}"
     vrf: "{{ item.key }}"
-  loop: "{{ dns_name_servers | dict2items }}"
-  when: dns_name_servers is defined
+  loop: "{{ dns_name_servers | default({}) | dict2items }}"
+  when: dns_name_servers | default({}) | length > 0

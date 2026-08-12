@@ -158,7 +158,11 @@
     (l2_interfaces.tagged_all_no_untagged | length > 0)
 
 - name: Phase 2 - Configure L2 LAG interfaces
-  ansible.builtin.include_tasks: configure_l2_lag.yml
+  ansible.builtin.include_tasks:
+    file: configure_l2_lag_common.yml
+  vars:
+    l2_lag_kind: lag
+    l2_lag_parent_suffix: ""
   when: >-
     (l2_interfaces.lag_access | length > 0) or
     (l2_interfaces.lag_tagged_with_untagged | length > 0) or
@@ -167,7 +171,11 @@
     (l2_interfaces.lag_tagged_all_no_untagged | length > 0)
 
 - name: Phase 2 - Configure L2 MCLAG interfaces
-  ansible.builtin.include_tasks: configure_l2_mclag.yml
+  ansible.builtin.include_tasks:
+    file: configure_l2_lag_common.yml
+  vars:
+    l2_lag_kind: mclag
+    l2_lag_parent_suffix: " multi-chassis"
   when: >-
     (l2_interfaces.mclag_access | length > 0) or
     (l2_interfaces.mclag_tagged_with_untagged | length > 0) or

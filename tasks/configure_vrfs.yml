@@ -34,7 +34,7 @@
     label: "VRF: {{ item.vrf }} RD: {{ item.rd }}"
   when: vrf_changes.rd_changes | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: Add VRF route targets
   arubanetworks.aoscx.aoscx_config:
@@ -49,7 +49,7 @@
     label: "VRF: {{ item.vrf }} {{ item.address_family }} add {{ item.direction }} {{ item.rt }}"
   when: vrf_changes.rt_additions | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: Remove stale VRF route targets
   arubanetworks.aoscx.aoscx_config:
@@ -66,4 +66,4 @@
     - aoscx_idempotent_mode | bool
     - vrf_changes.rt_removals | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli

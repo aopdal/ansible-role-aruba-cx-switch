@@ -2,225 +2,233 @@
 
 ## Overview
 
-Some configuration tasks should **only run when explicitly requested** via tags, not as part of normal day-to-day operations. This is achieved by checking `ansible_run_tags`.
+Some configuration tasks should **only run when explicitly requested** — not
+by a broad layer tag like `-t layer3`. This is achieved by *narrowing the
+tag list* on the include so that Ansible's own tag filter skips it under
+broad-tag runs. No custom `ansible_run_tags` string matching is used or
+needed.
 
 ## Use Cases
 
 Tasks that are:
 
-- **High-impact**: Changes that could disrupt service (VSX, BGP, OSPF)
-- **Infrequent**: Initial setup tasks rarely modified (VRFs, loopback)
-- **Risky**: Could cause network connectivity issues (routing, cleanup)
+- **High-impact**: changes that could disrupt service (VSX, BGP, OSPF).
+- **Risky**: could cause network connectivity issues (routing protocols,
+  static routes).
 
 ## Implementation
 
-### Basic Pattern
+### Basic pattern
+
+The include is tagged only with feature-specific tags (its own name and the
+category it belongs to). The broader layer tag (`layer3`) is intentionally
+omitted so that `-t layer3` does not sweep the include in:
 
 ```yaml
-- name: Include VSX configuration tasks
+- name: Include OSPF configuration tasks
   ansible.builtin.include_tasks:
-    file: configure_vsx.yml
+    file: configure_ospf.yml
     apply:
       tags:
-        - vsx
-        - ha
+        - ospf
+        - routing
   when:
-    - aoscx_configure_vsx | bool
-    - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in ansible_run_tags"
+    - aoscx_configure_ospf | bool
+    - custom_fields.device_ospf | default(false) | bool
   tags:
-    - vsx
-    - ha
+    - ospf
+    - routing
 ```
 
-### How It Works
+Compare with a regular L3 include, which does carry `layer3`:
 
-1. **Normal run (no tags)**:
+```yaml
+- name: Include L3 interface configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_l3_interfaces.yml
+    apply:
+      tags:
+        - interfaces
+        - l3_interfaces
+        - layer3
+  when: aoscx_configure_l3_interfaces | bool
+  tags:
+    - interfaces
+    - l3_interfaces
+    - layer3
+```
+
+### How it works
+
+Ansible's own tag filter drives include selection based on `--tags` and the
+tags declared on each include. The role does not evaluate
+`ansible_run_tags` itself.
+
+1. **Normal run (no tags)**
 
    ```bash
    ansible-playbook configure_aoscx.yml
    ```
 
-   - `ansible_run_tags` = `['all']`
-   - VSX tasks **DO run** (because of `'all' in ansible_run_tags`)
+   Every include that has tags (and isn't `never`) runs, subject to its
+   `when:` clause. OSPF/BGP/static-routes/VSX run.
 
-2. **Specific tags (without vsx)**:
+2. **Specific tags without a routing tag**
 
    ```bash
    ansible-playbook configure_aoscx.yml -t vlans
    ```
 
-   - `ansible_run_tags` = `['vlans']`
-   - VSX tasks **DO NOT run** (tag not in list)
+   OSPF/BGP/static-routes/VSX are not tagged `vlans`, so Ansible skips
+   their includes.
 
-3. **Explicit VSX request**:
+3. **Broad layer tag**
 
    ```bash
-   ansible-playbook configure_aoscx.yml -t vsx
+   ansible-playbook configure_aoscx.yml -t layer3
    ```
 
-   - `ansible_run_tags` = `['vsx']`
-   - VSX tasks **DO run** (tag explicitly requested)
+   OSPF/BGP/static-routes intentionally *do not* carry the `layer3` tag,
+   so Ansible skips them. L3-interface config still runs (it carries
+   `layer3`). This is the specific protection the design provides.
 
-## When to Use
+4. **Explicit feature request**
 
-### ✅ Good Candidates for Tag-Dependent Includes
+   ```bash
+   ansible-playbook configure_aoscx.yml -t ospf
+   ```
 
-- **VSX**: High-availability configuration, rarely changes
-- **BGP/OSPF**: Routing protocol configuration, could disrupt connectivity
-- **VRFs**: Virtual routing configuration, foundational setup
-- **Cleanup tasks**: Removing VLANs/interfaces, potentially dangerous
-- **EVPN/VXLAN**: Overlay networking, complex configuration
+   OSPF include runs.
 
-### ❌ Should NOT Be Tag-Dependent
+5. **`routing` sweep**
 
-- **VLANs**: Common day-to-day changes
-- **Interfaces**: Frequent configuration updates
-- **LAGs**: Regular operational changes
-- **Banner**: Low-risk base configuration
-- **NTP/DNS**: Tagged `services` (not `base_config`/`system`) because they may depend on VRFs
+   ```bash
+   ansible-playbook configure_aoscx.yml -t routing
+   ```
 
-## Current Tag-Dependent Tasks
+   OSPF, BGP, and static routes all run (they all carry `routing`).
 
-The following tasks **only run when explicitly requested** via tags:
+6. **`-t vsx` / `-t ha`**
+
+   VSX runs (its include carries both `vsx` and `ha`).
+
+## Current tag layout for protected features
+
+The following includes are protected from broad `layer3` (or, for VSX,
+broad interface-layer) sweeps by omitting the broad tag rather than by
+`when:` filtering.
 
 ### 1. VSX (Virtual Switching Extension)
 
-```yaml
-when:
-  - aoscx_configure_vsx | bool
-  - custom_fields.device_vsx | default(false) | bool
-  - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in ansible_run_tags"
-```
+Tags: `[vsx, ha]`. Not tagged `layer3` — a `-t layer3` run leaves VSX
+untouched. `-t vsx` or `-t ha` runs it.
 
-**Reason**: High-availability configuration that rarely changes and could disrupt service.
+### 2. OSPF
 
-### 2. OSPF (Open Shortest Path First)
+Tags: `[ospf, routing]`. Not tagged `layer3`. `-t ospf` or `-t routing`
+runs it.
 
-```yaml
-when:
-  - aoscx_configure_ospf | bool
-  - custom_fields.device_ospf | default(false) | bool
-  - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
-```
+### 3. BGP
 
-**Reason**: Routing protocol changes are high-impact and could affect network connectivity.
+Tags: `[bgp, routing]`. Not tagged `layer3`. `-t bgp` or `-t routing` runs
+it.
 
-### 3. BGP (Border Gateway Protocol)
+### 4. Static routes
 
-```yaml
-when:
-  - aoscx_configure_bgp | bool
-  - custom_fields.device_bgp | default(false) | bool
-  - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
-```
+Tags: `[static_routes, routing]`. Not tagged `layer3`. `-t static_routes`
+or `-t routing` runs it. Cleanup of stale routes is additionally gated by
+`aoscx_idempotent_mode` (see
+[STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)).
 
-**Reason**: Routing protocol changes are high-impact and could affect network connectivity.
+## Not protected
 
-### 4. Static Routes
+### Cleanup tasks
 
-```yaml
-when:
-  - aoscx_configure_static_routes | bool
-  - (static_routes | default({})) | length > 0
-  - "'static_routes' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
-```
+Protected by the `aoscx_idempotent_mode` role variable, not by tag
+narrowing.
 
-**Reason**: Static route changes (especially to a default route) are
-high-impact and could affect network connectivity, same as OSPF/BGP.
-Cleanup of stale routes is additionally gated by `aoscx_idempotent_mode`
-(see [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)).
+### EVPN / VXLAN
 
-## Tasks That Are NOT Tag-Dependent
+Must run alongside VLAN changes; the overlay depends on the underlay
+VLANs staying in sync. Not high-risk enough to require narrowing.
 
-### Cleanup Tasks
+### L2 / L3 interfaces, VLANs, LAGs, base config, NTP / DNS
 
-**Decision**: Protected by `aoscx_idempotent_mode` flag instead.
-
-- Cleanup only runs when explicitly enabled via variable
-- Idempotent mode prevents accidental deletions
-
-### EVPN/VXLAN
-
-**Decision**: Must run as part of VLAN changes.
-
-- Overlay networking needs to be updated when VLANs change
-- Will be run frequently as part of normal operations
-- Not high-risk enough to require explicit tagging
-
-### Regular Operations (Always Run When Tagged)
-
-- **VLANs**: Common day-to-day changes
-- **Interfaces**: Frequent configuration updates
-- **LAGs**: Regular operational changes
-- **Banner**: Low-risk base configuration
-- **NTP/DNS**: Tagged `services` (not `base_config`/`system`) because they may depend on VRFs
+Regular day-to-day operations. Carry their normal feature + layer tags.
 
 ## Testing
 
-### Test Tag-Dependent Behavior
+The [autotest-aoscx](../../autotest-aoscx) playbooks include tag-selection
+tests. To verify the design manually against a device:
 
 ```bash
-# 1. Run without tags - VSX should run
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 --check
+# 1. No tags - all protected features should run.
+ansible-playbook -i inv.yml configure_aoscx.yml -l zone13-cx3 --check
 
-# 2. Run with specific tags - VSX should NOT run
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t vlans --check
+# 2. -t vlans - protected features must not run.
+ansible-playbook -i inv.yml configure_aoscx.yml -l zone13-cx3 -t vlans --check
 
-# 3. Run with VSX tag - VSX should run
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t vsx --check
+# 3. -t layer3 - L3 interface config runs, OSPF/BGP/static routes must not.
+ansible-playbook -i inv.yml configure_aoscx.yml -l zone13-cx3 -t layer3 --check
 
-# 4. Verify with list-tasks
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l z13-cx3 -t vlans --list-tasks
-# Should NOT show "Include VSX configuration tasks"
+# 4. -t routing - OSPF, BGP, static routes all run.
+ansible-playbook -i inv.yml configure_aoscx.yml -l zone13-cx3 -t routing --check
+
+# 5. --list-tasks shows the expected filter.
+ansible-playbook -i inv.yml configure_aoscx.yml -l zone13-cx3 -t layer3 --list-tasks
+# Must NOT list "Include OSPF/BGP/static route configuration tasks".
 ```
 
-## Benefits
+## Example workflows
 
-1. **Safety**: Prevents accidental changes to critical infrastructure
-2. **Performance**: Skips unnecessary task evaluations
-3. **Clarity**: Explicit intent when running high-impact configurations
-4. **Flexibility**: Can still run everything with no tags or `--tags all`
-
-## Example Workflow
-
-### Day-to-Day Operations (Safe - No Routing Changes)
+### Day-to-day operations (safe — no routing changes)
 
 ```bash
-# Add new VLANs - no risk of changing VSX/BGP/OSPF
+# Add new VLANs.
 ansible-playbook configure_aoscx.yml -t vlans
 
-# Update interfaces - no risk of changing routing
+# Update interfaces.
 ansible-playbook configure_aoscx.yml -t interfaces
 
-# Modify base config (hostname, banner, timezone) - no VRF dependency
+# Modify base config (hostname, banner, timezone).
 ansible-playbook configure_aoscx.yml -t base_config
 
-# Configure NTP/DNS (may depend on VRFs)
+# Configure NTP / DNS (may depend on VRFs).
 ansible-playbook configure_aoscx.yml -t services
+
+# Push L3 interface config only, without touching routing protocols.
+ansible-playbook configure_aoscx.yml -t layer3
 ```
 
-### Intentional High-Impact Changes
+### Intentional high-impact changes
 
 ```bash
-# Explicitly configure VSX
+# Explicitly configure VSX.
 ansible-playbook configure_aoscx.yml -t vsx
 
-# Update BGP routing
+# Update BGP.
 ansible-playbook configure_aoscx.yml -t bgp
 
-# Update OSPF routing
+# Update OSPF.
 ansible-playbook configure_aoscx.yml -t ospf
 
-# Update all routing protocols
+# Update static routes.
+ansible-playbook configure_aoscx.yml -t static_routes
+
+# All routing protocols.
 ansible-playbook configure_aoscx.yml -t routing
 
-# Run everything (full configuration including routing)
+# Full run (everything, including routing).
 ansible-playbook configure_aoscx.yml
 ```
 
 ## Notes
 
-- `ansible_run_tags` is a built-in Ansible variable containing list of requested tags
-- Always include `'all' in ansible_run_tags` check to allow full runs
-- Can combine multiple tags in the condition with `or`
-- Tag-dependent includes still respect the boolean enable flag (e.g., `aoscx_configure_vsx | bool`)
+- The role deliberately does not read `ansible_run_tags` itself. Prior
+  versions used `"'ospf' in ansible_run_tags or 'routing' in
+  ansible_run_tags or 'all' in ansible_run_tags"` inside `when:` clauses;
+  this pattern duplicated Ansible's own tag filter and was removed in
+  favor of the tag-narrowing described above.
+- Protected includes still respect the boolean enable flag (e.g.
+  `aoscx_configure_ospf | bool`) and the NetBox custom-field gate (e.g.
+  `custom_fields.device_ospf`).

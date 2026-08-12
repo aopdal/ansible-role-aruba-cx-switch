@@ -5,7 +5,7 @@ VLAN-related filters for NetBox data transformation
 
 import re
 
-from .utils import _debug
+from .utils import _debug, get_interface_type_value
 
 
 def _is_subinterface(interface):
@@ -13,8 +13,7 @@ def _is_subinterface(interface):
     if not interface or not isinstance(interface, dict):
         return False
 
-    type_obj = interface.get("type")
-    type_value = type_obj.get("value") if isinstance(type_obj, dict) else None
+    type_value = get_interface_type_value(interface)
     has_parent = interface.get("parent") is not None
 
     return type_value == "virtual" and has_parent
@@ -283,7 +282,8 @@ def filter_out_vlan_groups(vlans, group_slugs):
         group = vlan.get("group")
         slug = group.get("slug") if isinstance(group, dict) else None
         if slug in excluded:
-            _debug(f"Excluding VLAN {vlan.get('vid')} - group '{slug}' is excluded")
+            _debug(
+                f"Excluding VLAN {vlan.get('vid')} - group '{slug}' is excluded")
             continue
         filtered.append(vlan)
 
@@ -364,11 +364,13 @@ def get_vlans_in_use(interfaces, vlan_interfaces=None, port_access=None):
     # the NetBox-provided VLAN list in get_vlans_needing_changes().
     pa_vids = extract_port_access_vlan_ids(port_access)
     if pa_vids:
-        _debug(f"Adding {len(pa_vids)} VLANs from port-access roles: {pa_vids}")
+        _debug(
+            f"Adding {len(pa_vids)} VLANs from port-access roles: {pa_vids}")
         for vid in pa_vids:
             vids_in_use.add(vid)
 
-    result = {"vids": sorted(list(vids_in_use)), "vlans": list(vlans_in_use.values())}
+    result = {"vids": sorted(list(vids_in_use)),
+              "vlans": list(vlans_in_use.values())}
 
     _debug(f"Found {len(result['vids'])} VLANs in use: {result['vids']}")
 
@@ -420,7 +422,8 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
         # Try both ansible_network_resources and network_resources paths
         network_resources = None
         if "ansible_network_resources" in device_facts:
-            network_resources = device_facts.get("ansible_network_resources", {})
+            network_resources = device_facts.get(
+                "ansible_network_resources", {})
             _debug("Using ansible_network_resources path")
         elif "network_resources" in device_facts:
             network_resources = device_facts.get("network_resources", {})
@@ -474,7 +477,8 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
                         f"(out of range 1-4094), skipping"
                     )
 
-    _debug(f"Available VLANs from NetBox: {sorted(list(available_vlans.keys()))}")
+    _debug(
+        f"Available VLANs from NetBox: {sorted(list(available_vlans.keys()))}")
     _debug(f"VLANs in use on interfaces: {sorted(list(vids_in_use))}")
     _debug(f"VLANs on device (from facts): {sorted(list(device_vids))}")
 
@@ -535,7 +539,8 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
     }
 
     vlan_create_ids = [v.get("vid") for v in result["vlans_to_create"]]
-    _debug(f"VLANs to create: {len(result['vlans_to_create'])} - {vlan_create_ids}")
+    _debug(
+        f"VLANs to create: {len(result['vlans_to_create'])} - {vlan_create_ids}")
     _debug(
         f"VLANs to delete: {len(result['vlans_to_delete'])} - "
         f"{result['vlans_to_delete']}"
@@ -564,18 +569,10 @@ def get_vlan_interfaces(interfaces):
             continue
 
         # Check if it's a virtual interface with 'vlan' in the name
-        type_obj = intf.get("type")
         name = intf.get("name", "").lower()
-
-        is_vlan_interface = False
-
-        # Check by type
-        if type_obj and isinstance(type_obj, dict):
-            type_value = type_obj.get("value", "")
-            if type_value == "virtual":
-                # Check if name contains 'vlan'
-                if "vlan" in name:
-                    is_vlan_interface = True
+        is_vlan_interface = (
+            get_interface_type_value(intf) == "virtual" and "vlan" in name
+        )
 
         if is_vlan_interface:
             vlan_interfaces.append(intf)
@@ -639,7 +636,8 @@ def parse_evpn_evi_output(output):
         "vxlan_vlans": vlans_int,  # Just the VLANs
     }
 
-    _debug(f"Parsed EVPN EVI output: {len(vlans_int)} VLANs, {len(vnis_int)} VNIs")
+    _debug(
+        f"Parsed EVPN EVI output: {len(vlans_int)} VLANs, {len(vnis_int)} VNIs")
     return result
 
 
@@ -696,7 +694,8 @@ def get_vlans_needing_igmp_update(
         desired_igmp = custom_fields.get("vlan_ip_igmp_snooping")
 
         if desired_igmp is None:
-            _debug(f"VLAN {vid} has no vlan_ip_igmp_snooping custom field - skipping")
+            _debug(
+                f"VLAN {vid} has no vlan_ip_igmp_snooping custom field - skipping")
             continue
 
         # Convert to boolean
@@ -804,7 +803,8 @@ def get_vlans_needing_voice_update(
         desired_voice = custom_fields.get("vlan_voice_vlan")
 
         if desired_voice is None:
-            _debug(f"VLAN {vid} has no vlan_voice_vlan custom field - skipping")
+            _debug(
+                f"VLAN {vid} has no vlan_voice_vlan custom field - skipping")
             continue
 
         # Convert to boolean

@@ -1,0 +1,87 @@
+---
+# Configure LAG or MCLAG L2 interfaces via CLI.
+#
+# Parameterized because LAG and MCLAG differ only in:
+#   - the source-list prefix in `l2_interfaces` (`lag_*` vs `mclag_*`)
+#   - the CLI parent header suffix (`interface lag X` vs `interface lag X multi-chassis`)
+#
+# `aoscx_config` / `aoscx_command` are CLI-only, so `ansible_connection: network_cli`
+# is hardcoded at each task per CLAUDE.md §4.2.
+#
+# Required parameters (set by caller via `vars:`):
+#   - l2_lag_kind: 'lag' or 'mclag' — key prefix in l2_interfaces and label
+#   - l2_lag_parent_suffix: '' or ' multi-chassis' — appended to `interface lag X`
+
+- name: "Configure access interfaces ({{ l2_lag_kind | upper }})"
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - no routing
+      - vlan access {{ item.untagged_vlan.vid }}
+    parents: interface {{ item.name | replace("lag", "lag ") }}{{ l2_lag_parent_suffix }}
+    match: line
+  loop: "{{ l2_interfaces[l2_lag_kind ~ '_access'] }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces[l2_lag_kind ~ '_access'] | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: "Configure tagged interfaces with untagged VLAN ({{ l2_lag_kind | upper }})"
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - no routing
+      - vlan trunk native {{ item.untagged_vlan.vid }}
+      - vlan trunk allowed {{ ([item.untagged_vlan.vid] + (item.tagged_vlans | map(attribute='vid') | list)) | collapse_vlan_list }}
+    parents: interface {{ item.name | replace("lag", "lag ") }}{{ l2_lag_parent_suffix }}
+    match: line
+  loop: "{{ l2_interfaces[l2_lag_kind ~ '_tagged_with_untagged'] }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces[l2_lag_kind ~ '_tagged_with_untagged'] | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: "Configure tagged interfaces without untagged VLAN ({{ l2_lag_kind | upper }})"
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - no routing
+      - vlan trunk native {{ item.tagged_vlans.0.vid }} tag
+      - vlan trunk allowed {{ item.tagged_vlans | map(attribute='vid') | list | collapse_vlan_list }}
+    parents: interface {{ item.name | replace("lag", "lag ") }}{{ l2_lag_parent_suffix }}
+    match: line
+  loop: "{{ l2_interfaces[l2_lag_kind ~ '_tagged_no_untagged'] }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces[l2_lag_kind ~ '_tagged_no_untagged'] | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: "Configure tagged-all interfaces with untagged VLAN ({{ l2_lag_kind | upper }})"
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - no routing
+      - vlan trunk native {{ item.untagged_vlan.vid }}
+      - vlan trunk allowed all
+    parents: interface {{ item.name | replace("lag", "lag ") }}{{ l2_lag_parent_suffix }}
+    match: line
+  loop: "{{ l2_interfaces[l2_lag_kind ~ '_tagged_all_with_untagged'] }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces[l2_lag_kind ~ '_tagged_all_with_untagged'] | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: "Configure tagged-all interfaces without untagged VLAN ({{ l2_lag_kind | upper }})"
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - no routing
+      - vlan trunk native 1 tag
+      - vlan trunk allowed all
+    parents: interface {{ item.name | replace("lag", "lag ") }}{{ l2_lag_parent_suffix }}
+    match: line
+  loop: "{{ l2_interfaces[l2_lag_kind ~ '_tagged_all_no_untagged'] }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when: l2_interfaces[l2_lag_kind ~ '_tagged_all_no_untagged'] | length > 0
+  vars:
+    ansible_connection: network_cli

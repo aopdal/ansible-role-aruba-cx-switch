@@ -3,6 +3,7 @@
 Utility functions for NetBox filters
 """
 
+import ipaddress
 import json
 import os
 
@@ -11,6 +12,55 @@ def _debug(message):
     """Print debug message if DEBUG_ANSIBLE environment variable is set"""
     if os.environ.get("DEBUG_ANSIBLE", "").lower() in ("true", "1", "yes"):
         print(f"DEBUG: {message}")
+
+
+def is_ipv4_address(address):
+    """Return True if `address` (with or without prefix) is IPv4.
+
+    Uses the ':' vs. no-':' distinction that AOS-CX and NetBox interop
+    reliably rely on; full IP validation is intentionally out of scope.
+    """
+    return ":" not in address
+
+
+def is_ipv6_address(address):
+    """Return True if `address` (with or without prefix) is IPv6."""
+    return ":" in address
+
+
+def get_interface_type_value(interface):
+    """Extract the normalised NetBox interface type value.
+
+    NetBox may serialise `interface.type` as a dict (`{"value": "lag", ...}`),
+    a bare string, or omit it. Returns the string value in all cases, or
+    None if it can't be resolved. Non-dict `interface` arguments return None.
+    """
+    if not isinstance(interface, dict):
+        return None
+    type_obj = interface.get("type")
+    if isinstance(type_obj, dict):
+        return type_obj.get("value")
+    if isinstance(type_obj, str):
+        return type_obj
+    return None
+
+
+def normalize_ipv6(addr):
+    """Normalize an IPv6 address (with or without prefix) to canonical form.
+
+    Returns (normalized_addr_without_prefix, original_addr). On parse error
+    falls back to (addr_without_prefix, original_addr) so callers can still
+    compare textually.
+    """
+    try:
+        if "/" in addr:
+            network = ipaddress.IPv6Interface(addr)
+            return (str(network.ip), addr)
+        ip = ipaddress.IPv6Address(addr)
+        return (str(ip), addr)
+    except (ValueError, ipaddress.AddressValueError):
+        base = addr.split("/")[0] if "/" in addr else addr
+        return (base, addr)
 
 
 def _to_dict(obj):
@@ -156,11 +206,12 @@ def extract_ip_addresses(nb_intf, exclude_anycast=False):
                             else role_obj
                         )
                         if role_value == "anycast":
-                            _debug(f"  Skipping anycast IP from comparison: {ip_addr}")
+                            _debug(
+                                f"  Skipping anycast IP from comparison: {ip_addr}")
                             continue
 
                 # Separate IPv4 and IPv6 by presence of colon
-                if ":" in ip_addr:
+                if is_ipv6_address(ip_addr):
                     nb_ipv6.append(ip_addr)
                 else:
                     nb_ipv4.append(ip_addr)

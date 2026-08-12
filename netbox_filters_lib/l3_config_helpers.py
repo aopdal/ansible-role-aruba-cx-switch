@@ -6,7 +6,18 @@ This module provides helper functions for building L3 interface configuration
 to reduce code duplication across physical, LAG, and VLAN interface types.
 """
 
-from .utils import _debug
+from .utils import _debug, is_ipv4_address, is_ipv6_address
+
+__all__ = [
+    "format_interface_name",
+    "is_ipv4_address",
+    "is_ipv6_address",
+    "get_interface_vrf",
+    "group_interface_ips",
+    "build_l3_config_lines",
+    "should_add_interface_ip",
+    "build_l3_config_preview",
+]
 
 
 def format_interface_name(interface_name, interface_type):
@@ -35,32 +46,6 @@ def format_interface_name(interface_name, interface_type):
         return interface_name.replace("loopback", "loopback ")
     # Physical, VLAN, and sub-interfaces use the name as-is
     return interface_name
-
-
-def is_ipv4_address(address):
-    """
-    Check if an IP address string is IPv4.
-
-    Args:
-        address: IP address string (e.g., "192.168.1.1/24" or "2001:db8::1/64")
-
-    Returns:
-        True if IPv4, False if IPv6
-    """
-    return ":" not in address
-
-
-def is_ipv6_address(address):
-    """
-    Check if an IP address string is IPv6.
-
-    Args:
-        address: IP address string (e.g., "192.168.1.1/24" or "2001:db8::1/64")
-
-    Returns:
-        True if IPv6, False if IPv4
-    """
-    return ":" in address
 
 
 def get_interface_vrf(interface_data):
@@ -158,8 +143,9 @@ def group_interface_ips(
 
     # Sort addresses: regular before anycast, IPv4 before IPv6
     def _addr_sort_key(addr):
-        is_ipv6 = ":" in addr.get("address", "")
-        is_anycast = addr.get("ip_role") == "anycast" and bool(addr.get("anycast_mac"))
+        is_ipv6 = is_ipv6_address(addr.get("address", ""))
+        is_anycast = addr.get("ip_role") == "anycast" and bool(
+            addr.get("anycast_mac"))
         return (int(is_ipv6), int(is_anycast))
 
     result = []
@@ -168,7 +154,8 @@ def group_interface_ips(
         # If ospf_facts are available, compare the intended area with device state.
         # If not available, fall back to always including OSPF-configured interfaces.
         interface_obj = (
-            item["interface"] if isinstance(item.get("interface"), dict) else {}
+            item["interface"] if isinstance(
+                item.get("interface"), dict) else {}
         )
         custom_fields = (
             interface_obj.get("custom_fields", {})
@@ -190,7 +177,8 @@ def group_interface_ips(
                 pid_str = str(ospf_process_id)
                 intf_name = item["interface_name"]
                 area_data = (
-                    ospf_facts.get(vrf_name, {}).get(pid_str, {}).get(ospf_area, {})
+                    ospf_facts.get(vrf_name, {}).get(
+                        pid_str, {}).get(ospf_area, {})
                 )
                 if intf_name not in area_data:
                     # Interface not registered in this OSPF area
@@ -318,7 +306,8 @@ def build_l3_config_lines(
 
     interface_name = item.get("interface_name", "unknown")
     interface_obj = (
-        item.get("interface") if isinstance(item.get("interface"), dict) else {}
+        item.get("interface") if isinstance(
+            item.get("interface"), dict) else {}
     )
     addresses = item.get("addresses", [])
 
@@ -387,8 +376,10 @@ def build_l3_config_lines(
 
     # IP addresses: regular-before-anycast, IPv4 before IPv6
     # AOS-CX requires 'ip address' before 'active-gateway ip' for each address family
-    ipv4_addrs = [a for a in addresses if ":" not in a.get("address", "")]
-    ipv6_addrs = [a for a in addresses if ":" in a.get("address", "")]
+    ipv4_addrs = [a for a in addresses if is_ipv4_address(
+        a.get("address", ""))]
+    ipv6_addrs = [a for a in addresses if is_ipv6_address(
+        a.get("address", ""))]
 
     # Regular IPv4 first, then anycast IPv4
     for addr_item in [
@@ -403,7 +394,8 @@ def build_l3_config_lines(
         a for a in ipv4_addrs if a.get("ip_role") == "anycast" and a.get("anycast_mac")
     ]:
         address = addr_item.get("address", "")
-        addr_without_prefix = address.split("/")[0] if "/" in address else address
+        addr_without_prefix = address.split(
+            "/")[0] if "/" in address else address
         lines.append(f"active-gateway ip mac {addr_item['anycast_mac']}")
         lines.append(f"active-gateway ip {addr_without_prefix}")
         _debug(
@@ -423,13 +415,15 @@ def build_l3_config_lines(
         a for a in ipv6_addrs if a.get("ip_role") == "anycast" and a.get("anycast_mac")
     ]:
         address = addr_item.get("address", "")
-        addr_without_prefix = address.split("/")[0] if "/" in address else address
+        addr_without_prefix = address.split(
+            "/")[0] if "/" in address else address
         # HPE Aruba recommendation: use a link-local address as the anycast gateway.
         # When the anycast IPv6 is link-local, the link-local address must be
         # explicitly configured before the active-gateway command.
         if addr_without_prefix.lower().startswith("fe80:"):
             lines.append(f"ipv6 address link-local {address}")
-            _debug(f"  Adding IPv6 link-local address for anycast gateway: {address}")
+            _debug(
+                f"  Adding IPv6 link-local address for anycast gateway: {address}")
         lines.append(f"active-gateway ipv6 mac {addr_item['anycast_mac']}")
         lines.append(f"active-gateway ipv6 {addr_without_prefix}")
         _debug(
@@ -461,15 +455,130 @@ def build_l3_config_lines(
     return lines
 
 
-class FilterModule:
-    """Ansible filter plugin for L3 configuration helpers"""
+def should_add_interface_ip(interface, address):
+    """
+    Decide whether a specific IP address on an interface must be pushed.
 
-    def filters(self):
-        return {
-            "format_interface_name": format_interface_name,
-            "is_ipv4_address": is_ipv4_address,
-            "is_ipv6_address": is_ipv6_address,
-            "get_interface_vrf": get_interface_vrf,
-            "group_interface_ips": group_interface_ips,
-            "build_l3_config_lines": build_l3_config_lines,
-        }
+    Replaces the 5-deep Jinja ternary previously inlined as ``_needs_add``
+    in ``tasks/configure_l3_interfaces.yml``. Semantics preserved exactly:
+
+    - If ``interface._ip_changes.vrf_change`` is True, always True — a VRF
+      move wipes all L3 config on the switch and every address must be
+      re-applied (including anycast addresses that are excluded from the
+      ``ipv4_to_add`` diff).
+    - IPv4 (no colon in the address string):
+        * If ``_ip_changes.ipv4_to_add`` exists, return whether the address
+          is a member.
+        * Else if ``_ip_changes`` exists at all, return False (change
+          detection ran and found no change for this address).
+        * Else return True (no ``_ip_changes`` — new interface).
+    - IPv6 (colon in the address string):
+        * If ``_ip_changes.ipv6_to_add`` exists (enhanced facts), return
+          whether the address is a member.
+        * Else if ``_ip_changes`` exists at all, return True (no enhanced
+          facts, configure all IPv6 addresses).
+        * Else return True (no ``_ip_changes`` — new interface).
+
+    Args:
+        interface: NetBox interface dict; may contain ``_ip_changes``.
+        address: IP address string with prefix, e.g. ``"172.16.0.1/24"``
+            or ``"2001:db8::1/64"``. Presence of ``:`` classifies as IPv6.
+
+    Returns:
+        Boolean.
+    """
+    if not isinstance(interface, dict):
+        return True
+
+    changes = interface.get("_ip_changes")
+
+    if isinstance(changes, dict) and changes.get("vrf_change"):
+        return True
+
+    is_ipv6 = is_ipv6_address(address or "")
+
+    if not isinstance(changes, dict):
+        return True
+
+    if is_ipv6:
+        if "ipv6_to_add" in changes:
+            return address in changes["ipv6_to_add"]
+        # No enhanced facts: configure all IPv6 addresses
+        return True
+
+    if "ipv4_to_add" in changes:
+        return address in changes["ipv4_to_add"]
+    return False
+
+
+def build_l3_config_preview(
+    l3_interfaces,
+    aoscx_builtin_vrfs,
+    l3_counters_enable=True,
+):
+    """
+    Build a dict mapping formatted interface name -> list of L3 config lines.
+
+    Debug-only preview replacing the ~15-line Jinja block previously inlined
+    as ``_l3_config_preview`` in ``tasks/configure_l3_interfaces.yml``.
+    Iterates every ``(interface_type, vrf_type)`` category in
+    ``l3_interfaces``, groups per-IP items with :func:`group_interface_ips`
+    (default OSPF-facts handling), and emits :func:`build_l3_config_lines`
+    output keyed by :func:`format_interface_name`.
+
+    ``ip_helper_addresses`` is intentionally not exposed here: the preview
+    is a lightweight summary; helper-address lines are only added in the
+    live ``configure_l3_interface_common.yml`` push.
+
+    Args:
+        l3_interfaces: Output of ``categorize_l3_interfaces``, containing
+            ``physical_default_vrf``, ``physical_custom_vrf``,
+            ``vlan_default_vrf``, ``vlan_custom_vrf``,
+            ``lag_default_vrf``, ``lag_custom_vrf``,
+            ``subinterface_default_vrf``, ``subinterface_custom_vrf``, and
+            ``loopback`` (which is split by VRF here).
+        aoscx_builtin_vrfs: List of VRF names treated as built-in
+            (``["default", "mgmt"]``) for the loopback split. Loopbacks
+            with ``vrf in aoscx_builtin_vrfs + [None]`` go to the default
+            bucket; the rest to custom.
+        l3_counters_enable: Passed through to
+            :func:`build_l3_config_lines`. Default True.
+
+    Returns:
+        Dict of ``{formatted_interface_name: [line, line, ...]}``.
+        Interfaces with no lines are still included with an empty list
+        (matches the prior Jinja behavior).
+    """
+    if not isinstance(l3_interfaces, dict):
+        return {}
+
+    builtin = list(aoscx_builtin_vrfs or []) + [None]
+    loopback = l3_interfaces.get("loopback") or []
+    loopback_default = [i for i in loopback if i.get("vrf") in builtin]
+    loopback_custom = [i for i in loopback if i.get("vrf") not in builtin]
+
+    categories = [
+        (l3_interfaces.get("physical_default_vrf") or [], "physical", "default"),
+        (l3_interfaces.get("physical_custom_vrf") or [], "physical", "custom"),
+        (l3_interfaces.get("vlan_default_vrf") or [], "vlan", "default"),
+        (l3_interfaces.get("vlan_custom_vrf") or [], "vlan", "custom"),
+        (l3_interfaces.get("lag_default_vrf") or [], "lag", "default"),
+        (l3_interfaces.get("lag_custom_vrf") or [], "lag", "custom"),
+        (l3_interfaces.get("subinterface_default_vrf")
+         or [], "subinterface", "default"),
+        (l3_interfaces.get("subinterface_custom_vrf")
+         or [], "subinterface", "custom"),
+        (loopback_default, "loopback", "default"),
+        (loopback_custom, "loopback", "custom"),
+    ]
+
+    result = {}
+    for items, itype, vrf in categories:
+        for item in group_interface_ips(items):
+            lines = build_l3_config_lines(
+                item, itype, vrf, l3_counters_enable
+            )
+            iname = format_interface_name(item["interface_name"], itype)
+            result[iname] = lines
+
+    return result

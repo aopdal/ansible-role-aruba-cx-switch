@@ -1583,3 +1583,104 @@ class TestSubinterfaceEncapsulationChangeDetection:
         )
         assert len(result["l3"]) == 0
         assert len(result["no_changes"]) == 1
+
+
+class TestGetInterfacesNeedingConfigChangesDoesNotMutateInputs:
+    """docs/CODE_AUDIT.md F5: the function must not mutate its `interfaces`
+    argument. Every `_ip_changes` write must land on a copy returned via
+    `result`, never on the caller's original interface objects."""
+
+    def test_new_interface_ip_population_does_not_mutate_input(self):
+        """The 'interface doesn't exist on device yet' path used to call
+        populate_ip_changes() directly on the caller's dict."""
+        original = {
+            "name": "vlan200",
+            "type": {"value": "virtual"},
+            "ip_addresses": [{"address": "10.2.0.1/24"}],
+        }
+        interfaces = [original]
+        # Non-empty facts_by_interface (but no entry for vlan200) is required
+        # to reach the per-interface "not found on device" branch rather than
+        # the whole-function "no interface facts at all" early return.
+        device_facts = {
+            "network_resources": {"interfaces": {"1/1/1": {"admin": "up"}}}
+        }
+
+        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+
+        assert "_ip_changes" not in original
+        assert "_ip_changes" not in interfaces[0]
+        assert result["l3"][0]["_ip_changes"]["ipv4_to_add"] == ["10.2.0.1/24"]
+
+    def test_l3_ip_comparison_does_not_mutate_input(self):
+        """The IPv4/IPv6/VRF/anycast comparison block (now in
+        interface_ip_comparisons.compute_l3_ip_changes) used to write
+        `_ip_changes` straight onto the interface passed in by the caller."""
+        original = {
+            "name": "1/1/1",
+            "type": {"value": "1000base-t"},
+            "enabled": True,
+            "ip_addresses": [{"address": "10.0.0.5/24"}],
+        }
+        interfaces = [original]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {"admin": "up", "ip4_address": "10.0.0.9/24"}
+                }
+            }
+        }
+
+        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+
+        assert "_ip_changes" not in original
+        assert "_ip_changes" not in interfaces[0]
+        assert result["l3"][0]["_ip_changes"]["ipv4_to_add"] == ["10.0.0.5/24"]
+
+    def test_dhcp_relay_comparison_does_not_mutate_input(self):
+        """The DHCP relay block (now compute_dhcp_relay_changes) used to
+        write `_ip_changes` straight onto the caller's dict."""
+        original = {
+            "name": "1/1/1",
+            "type": {"value": "1000base-t"},
+            "enabled": True,
+            "custom_fields": {"if_ip_helper": True},
+        }
+        interfaces = [original]
+        device_facts = {
+            "network_resources": {"interfaces": {"1/1/1": {"admin": "up"}}}
+        }
+
+        result = get_interfaces_needing_config_changes(
+            interfaces,
+            device_facts,
+            dhcp_relay_facts={},
+            ip_helper_addresses={"default": {"1": "10.0.0.53"}},
+        )
+
+        assert "_ip_changes" not in original
+        assert "_ip_changes" not in interfaces[0]
+        # No `mode`/`ip_addresses` set, so this physical interface lands in
+        # "physical" rather than "l2"/"l3" - _categorize_interface_for_changes
+        # only adds to l2/l3 when NetBox has that config present.
+        assert result["physical"][0]["_ip_changes"]["dhcp_relay_change"] is True
+
+    def test_no_changes_interface_input_unmodified(self):
+        """An interface that ends up in no_changes must also be untouched -
+        the returned object is a copy, not the caller's original dict."""
+        original = {
+            "name": "1/1/1",
+            "type": {"value": "1000base-t"},
+            "enabled": True,
+        }
+        interfaces = [original]
+        device_facts = {
+            "network_resources": {"interfaces": {"1/1/1": {"admin": "up"}}}
+        }
+
+        result = get_interfaces_needing_config_changes(interfaces, device_facts)
+
+        assert len(result["no_changes"]) == 1
+        assert result["no_changes"][0] is not original
+        assert interfaces[0] is original
+        assert "_ip_changes" not in original

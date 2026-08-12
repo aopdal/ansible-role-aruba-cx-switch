@@ -283,33 +283,28 @@ build_l3_config_lines(
 ```python
 # Dual-stack VLAN interface with link-local anycast gateway (HPE Aruba recommended)
 [
-  'active-gateway ip mac 00:00:5e:00:01:01',
-  'active-gateway ip 10.0.0.1',
-  'ip address 10.0.0.2/24',
-  'ipv6 address link-local fe80::1/64',   # auto-added when anycast is link-local
-  'active-gateway ipv6 mac 00:00:5e:00:01:01',
-  'active-gateway ipv6 fe80::1',
-  'ipv6 address 2001:db8::2/64',
-  'ip mtu 9000',
-  'l3-counters',
-  'ip ospf 1 area 0.0.0.0',
-  'ip ospf network point-to-point'
+    "active-gateway ip mac 00:00:5e:00:01:01",
+    "active-gateway ip 10.0.0.1",
+    "ip address 10.0.0.2/24",
+    "ipv6 address link-local fe80::1/64",  # auto-added when anycast is link-local
+    "active-gateway ipv6 mac 00:00:5e:00:01:01",
+    "active-gateway ipv6 fe80::1",
+    "ipv6 address 2001:db8::2/64",
+    "ip mtu 9000",
+    "l3-counters",
+    "ip ospf 1 area 0.0.0.0",
+    "ip ospf network point-to-point",
 ]
 
 # Regular IPv4 in custom VRF, no OSPF
-[
-  'vrf attach CUSTOMER_A',
-  'ip address 192.168.1.1/24',
-  'ip mtu 1500',
-  'l3-counters'
-]
+["vrf attach CUSTOMER_A", "ip address 192.168.1.1/24", "ip mtu 1500", "l3-counters"]
 
 # LAG sub-interface with encapsulation
 [
-  'encapsulation dot1q 100',
-  'vrf attach CUSTOMER_A',
-  'ip address 10.1.1.1/30',
-  'l3-counters'
+    "encapsulation dot1q 100",
+    "vrf attach CUSTOMER_A",
+    "ip address 10.1.1.1/30",
+    "l3-counters",
 ]
 ```
 
@@ -345,31 +340,34 @@ The filters are used by `tasks/configure_l3_interface_common.yml`, a single reus
     label: "Interface: {{ item.interface_name }}"
   when: _grouped_interfaces | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
     _grouped_interfaces: "{{ interface_list | group_interface_ips }}"
 ```
 
 ### Usage in Interface-Specific Tasks
 
-Each interface type file calls the common task once per VRF type:
+`tasks/configure_l3_interfaces.yml` iterates over every
+`(interface_list, interface_type, vrf_type)` category and calls the common
+task once per non-empty category:
 
 ```yaml
-# tasks/configure_l3_physical.yml
-- ansible.builtin.include_tasks:
+# tasks/configure_l3_interfaces.yml
+- name: Configure L3 interfaces by category
+  ansible.builtin.include_tasks:
     file: configure_l3_interface_common.yml
   vars:
-    interface_list: "{{ l3_interfaces.physical_default_vrf }}"
-    interface_type: physical
-    vrf_type: default
-  when: l3_interfaces.physical_default_vrf | default([]) | length > 0
-
-- ansible.builtin.include_tasks:
-    file: configure_l3_interface_common.yml
-  vars:
-    interface_list: "{{ l3_interfaces.physical_custom_vrf }}"
-    interface_type: physical
-    vrf_type: custom
-  when: l3_interfaces.physical_custom_vrf | default([]) | length > 0
+    interface_list: "{{ item.list }}"
+    interface_type: "{{ item.itype }}"
+    vrf_type: "{{ item.vrf_type }}"
+  loop:
+    - list: "{{ l3_interfaces.physical_default_vrf }}"
+      itype: physical
+      vrf_type: default
+    - list: "{{ l3_interfaces.physical_custom_vrf }}"
+      itype: physical
+      vrf_type: custom
+    # ... subinterface / vlan / lag / loopback × default|custom ...
+  when: item.list | length > 0
 ```
 
 ### OSPF Interface Config Eliminated
@@ -382,12 +380,12 @@ Previously, `configure_ospf.yml` contained two `aoscx_ospf_interface` tasks that
 
 | Component | Before | After | Reduction |
 |-----------|--------|-------|-----------|
-| configure_l3_physical.yml | 85 lines (4 includes) | 20 lines (2 includes) | **-76%** |
-| configure_l3_lag.yml | 85 lines (4 includes) | 20 lines (2 includes) | **-76%** |
-| configure_l3_vlan.yml | 105 lines (4 includes) | 20 lines (2 includes) | **-81%** |
-| configure_l3_subinterface.yml | 85 lines (4 includes) | 20 lines (2 includes) | **-76%** |
+| configure_l3_physical.yml | 85 lines (4 includes) | (deleted, folded into loop) | **-100%** |
+| configure_l3_lag.yml | 85 lines (4 includes) | (deleted, folded into loop) | **-100%** |
+| configure_l3_vlan.yml | 105 lines (4 includes) | (deleted, folded into loop) | **-100%** |
+| configure_l3_subinterface.yml | 85 lines (4 includes) | (deleted, folded into loop) | **-100%** |
 | configure_ospf.yml (interface tasks) | 30 lines removed | 0 | **-100%** |
-| **Total task duplication** | **390 lines** | **80 lines** | **-79%** |
+| **Total task duplication** | **390 lines** | **~45 lines (one loop)** | **-88%** |
 
 **Added**: `configure_l3_interface_common.yml`: ~20 lines (reusable task)
 
@@ -403,20 +401,42 @@ All helper functions have comprehensive unit tests in `tests/unit/test_l3_config
 
 ```python
 # Test grouping
-result = group_interface_ips([
-    {"interface_name": "vlan108", "interface": {}, "address": "10.0.0.1/24",
-     "ip_role": "anycast", "anycast_mac": "00:00:5e:00:01:01", "_needs_add": True},
-    {"interface_name": "vlan108", "interface": {}, "address": "2001:db8::1/64",
-     "ip_role": None, "anycast_mac": None, "_needs_add": True},
-])
+result = group_interface_ips(
+    [
+        {
+            "interface_name": "vlan108",
+            "interface": {},
+            "address": "10.0.0.1/24",
+            "ip_role": "anycast",
+            "anycast_mac": "00:00:5e:00:01:01",
+            "_needs_add": True,
+        },
+        {
+            "interface_name": "vlan108",
+            "interface": {},
+            "address": "2001:db8::1/64",
+            "ip_role": None,
+            "anycast_mac": None,
+            "_needs_add": True,
+        },
+    ]
+)
 assert len(result) == 1
 assert result[0]["interface_name"] == "vlan108"
 assert len(result[0]["addresses"]) == 2
 
 # Test config line building (new grouped API)
-item = {"interface_name": "vlan108", "interface": {"mtu": 9000}, "addresses": [
-    {"address": "10.0.0.1/24", "ip_role": "anycast", "anycast_mac": "00:00:5e:00:01:01"},
-]}
+item = {
+    "interface_name": "vlan108",
+    "interface": {"mtu": 9000},
+    "addresses": [
+        {
+            "address": "10.0.0.1/24",
+            "ip_role": "anycast",
+            "anycast_mac": "00:00:5e:00:01:01",
+        },
+    ],
+}
 lines = build_l3_config_lines(item, "vlan", "default", True)
 assert "active-gateway ip mac 00:00:5e:00:01:01" in lines
 assert "active-gateway ip 10.0.0.1" in lines

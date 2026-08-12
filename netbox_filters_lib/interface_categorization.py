@@ -5,7 +5,7 @@ Interface categorization filters
 Provides functions to categorize interfaces by type (L2/L3) and configuration.
 """
 
-from .utils import _debug
+from .utils import _debug, get_interface_type_value
 
 
 def categorize_l2_interfaces(interfaces):
@@ -58,16 +58,15 @@ def categorize_l2_interfaces(interfaces):
         if not mode_obj or mode_obj is None:
             continue
 
-        mode_value = mode_obj.get("value") if isinstance(mode_obj, dict) else None
+        mode_value = mode_obj.get("value") if isinstance(
+            mode_obj, dict) else None
         if not mode_value:
             continue
 
         # Skip virtual interfaces
-        type_obj = intf.get("type")
-        if type_obj and isinstance(type_obj, dict):
-            type_value = type_obj.get("value")
-            if type_value == "virtual":
-                continue
+        type_value = get_interface_type_value(intf)
+        if type_value == "virtual":
+            continue
 
         # Determine interface characteristics
         mode = mode_value
@@ -93,9 +92,7 @@ def categorize_l2_interfaces(interfaces):
             has_tagged = len(valid_tagged) > 0
 
         # Determine if LAG
-        is_lag = False
-        if type_obj and isinstance(type_obj, dict):
-            is_lag = type_obj.get("value") == "lag"
+        is_lag = type_value == "lag"
 
         # Determine if MCLAG
         custom_fields = intf.get("custom_fields")
@@ -118,7 +115,8 @@ def categorize_l2_interfaces(interfaces):
                 if has_untagged:
                     categorized[f"{prefix}access"].append(intf)
                 else:
-                    _debug(f"Skipping {intf_name} - access mode but no untagged VLAN")
+                    _debug(
+                        f"Skipping {intf_name} - access mode but no untagged VLAN")
             elif mode == "tagged":
                 if has_untagged and has_tagged:
                     categorized[f"{prefix}tagged_with_untagged"].append(intf)
@@ -130,7 +128,8 @@ def categorize_l2_interfaces(interfaces):
                     )
             elif mode == "tagged-all":
                 if has_untagged:
-                    categorized[f"{prefix}tagged_all_with_untagged"].append(intf)
+                    categorized[f"{prefix}tagged_all_with_untagged"].append(
+                        intf)
                 else:
                     categorized[f"{prefix}tagged_all_no_untagged"].append(intf)
         except Exception as e:
@@ -180,7 +179,8 @@ def categorize_l3_interfaces(interfaces):
     }
 
     # Built-in, non-configurable VRFs
-    builtin_vrfs = {"default", "Default", "Global", "global", "mgmt", "MGMT", None}
+    builtin_vrfs = {"default", "Default",
+                    "Global", "global", "mgmt", "MGMT", None}
 
     if not interfaces:
         return result
@@ -191,12 +191,14 @@ def categorize_l3_interfaces(interfaces):
 
         # Skip management interfaces
         if intf.get("mgmt_only"):
-            interface_name = intf.get("interface_name") or intf.get("name", "unknown")
+            interface_name = intf.get(
+                "interface_name") or intf.get("name", "unknown")
             _debug(f"Skipping management interface: {interface_name}")
             continue
 
         # Skip mgmt interface by name (special case not handled by L3 workflow)
-        interface_name = intf.get("interface_name") or intf.get("name", "unknown")
+        interface_name = intf.get(
+            "interface_name") or intf.get("name", "unknown")
         if interface_name.lower() == "mgmt":
             _debug(f"Skipping mgmt interface: {interface_name}")
             continue
@@ -211,9 +213,7 @@ def categorize_l3_interfaces(interfaces):
             name = intf.get("interface_name", "").lower()
         # Check for original NetBox interface format
         else:
-            type_obj = intf.get("type")
-            if type_obj and isinstance(type_obj, dict):
-                type_value = type_obj.get("value", "")
+            type_value = get_interface_type_value(intf) or ""
             name = intf.get("name", "").lower()
 
         if not type_value:
@@ -239,7 +239,8 @@ def categorize_l3_interfaces(interfaces):
         is_builtin_vrf = vrf_name in builtin_vrfs
 
         # Get interface name for logging
-        interface_name = intf.get("interface_name") or intf.get("name", "unknown")
+        interface_name = intf.get(
+            "interface_name") or intf.get("name", "unknown")
 
         # Check if this is a sub-interface (virtual with parent interface)
         has_parent = False
@@ -316,8 +317,10 @@ def categorize_l3_interfaces(interfaces):
     _debug(f"  VLAN (custom VRF): {len(result['vlan_custom_vrf'])}")
     _debug(f"  LAG (built-in VRF): {len(result['lag_default_vrf'])}")
     _debug(f"  LAG (custom VRF): {len(result['lag_custom_vrf'])}")
-    _debug(f"  Sub-interface (built-in VRF): {len(result['subinterface_default_vrf'])}")
-    _debug(f"  Sub-interface (custom VRF): {len(result['subinterface_custom_vrf'])}")
+    _debug(
+        f"  Sub-interface (built-in VRF): {len(result['subinterface_default_vrf'])}")
+    _debug(
+        f"  Sub-interface (custom VRF): {len(result['subinterface_custom_vrf'])}")
     _debug(f"  Loopback: {len(result['loopback'])}")
 
     return result

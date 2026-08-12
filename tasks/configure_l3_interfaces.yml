@@ -68,39 +68,10 @@
         if item.0.custom_fields is defined
         and item.0.custom_fields.if_anycast_gateway_mac is defined
         else none }}"
-      # Track if this specific IP needs to be added (for performance optimization)
-      # VRF-change shortcut: when the interface is moving between VRFs, the switch
-      #   wipes ALL L3 config (including active-gateway/anycast entries). Every
-      #   address — including anycast IPs that are excluded from the ipv4_to_add
-      #   diff list — must be re-applied. Check this flag first.
-      # IPv4 Logic:
-      #   0. If vrf_change=True: TRUE (all addresses must be reconfigured)
-      #   1. If ipv4_to_add exists: Check if address is in list
-      #   2. If _ip_changes exists but no ipv4_to_add: FALSE (checked, no changes needed)
-      #   3. If no _ip_changes at all: TRUE (new interface, needs config)
-      # IPv6 Logic:
-      #   0. If vrf_change=True: TRUE (all addresses must be reconfigured)
-      #   1. If ipv6_to_add exists (from enhanced facts): Check if address is in list
-      #   2. If _ip_changes exists but no ipv6_to_add: TRUE (no enhanced facts, configure all)
-      #   3. If no _ip_changes at all: TRUE (new interface, needs config)
-      _needs_add: >-
-        {{
-          true
-          if (item.0._ip_changes is defined and item.0._ip_changes.vrf_change | default(false))
-          else (
-            item.1.address in item.0._ip_changes.ipv4_to_add
-            if (':' not in item.1.address and item.0._ip_changes is defined and 'ipv4_to_add' in item.0._ip_changes)
-            else (
-              false
-              if (':' not in item.1.address and item.0._ip_changes is defined)
-              else (
-                item.1.address in item.0._ip_changes.ipv6_to_add
-                if (':' in item.1.address and item.0._ip_changes is defined and 'ipv6_to_add' in item.0._ip_changes)
-                else true
-              )
-            )
-          )
-        }}
+      # Whether this specific IP needs to be pushed. Logic (VRF-change short-circuit,
+      # IPv4 diff, IPv6 with/without enhanced facts) lives in should_add_interface_ip
+      # (netbox_filters_lib/l3_config_helpers.py) — see its docstring for full semantics.
+      _needs_add: "{{ item.0 | should_add_interface_ip(item.1.address) }}"
   loop: "{{ interfaces_with_ips | subelements('ip_addresses', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }} - {{ item.1.address }}"
@@ -188,32 +159,13 @@
   when: l3_interfaces.loopback | length > 0
 
 # Build a preview of config lines per interface before applying changes.
-# Uses group_interface_ips to group per-IP items by interface and filter
-# to _needs_add=true, then calls build_l3_config_lines once per interface.
+# Delegates to build_l3_config_preview (netbox_filters_lib/l3_config_helpers.py),
+# which iterates every (interface_type, VRF) category, groups per-IP items,
+# and calls build_l3_config_lines — the same helpers the live push uses.
 - name: Build L3 config lines preview
   ansible.builtin.set_fact:
-    _l3_config_preview: >-
-      {%- set result = {} -%}
-      {%- set categories = [
-        (l3_interfaces.physical_default_vrf,    'physical',     'default'),
-        (l3_interfaces.physical_custom_vrf,     'physical',     'custom'),
-        (l3_interfaces.vlan_default_vrf,        'vlan',         'default'),
-        (l3_interfaces.vlan_custom_vrf,         'vlan',         'custom'),
-        (l3_interfaces.lag_default_vrf,         'lag',          'default'),
-        (l3_interfaces.lag_custom_vrf,          'lag',          'custom'),
-        (l3_interfaces.subinterface_default_vrf,'subinterface', 'default'),
-        (l3_interfaces.subinterface_custom_vrf, 'subinterface', 'custom'),
-        (l3_interfaces.loopback | selectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list, 'loopback', 'default'),
-        (l3_interfaces.loopback | rejectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list, 'loopback', 'custom')
-      ] -%}
-      {%- for items, itype, vrf in categories -%}
-        {%- for item in items | group_interface_ips -%}
-          {%- set lines = item | build_l3_config_lines(itype, vrf, aoscx_l3_counters_enable | default(true)) -%}
-          {%- set iname = item.interface_name | format_interface_name(itype) -%}
-          {%- set _ = result.update({iname: lines}) -%}
-        {%- endfor -%}
-      {%- endfor -%}
-      {{ result }}
+    _l3_config_preview: "{{ l3_interfaces | build_l3_config_preview(
+      aoscx_builtin_vrfs, aoscx_l3_counters_enable | default(true)) }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: Debug - Show L3 config lines to be applied
@@ -246,7 +198,7 @@
         else ('loopback' if 'loopback' in item.name.lower() else 'physical')
       ) }}
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
   loop: "{{ interface_changes.l3 | default([]) }}"
   loop_control:
     label: "Interface: {{ item.name }} link-local: {{ item._ip_changes.link_local_ipv6_to_add | default([]) }}"
@@ -269,7 +221,7 @@
         else ('loopback' if 'loopback' in item.name.lower() else 'physical')
       ) }}
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
   loop: "{{ interface_changes.l3 | default([]) }}"
   loop_control:
     label: "Interface: {{ item.name }} remove: {{ item._ip_changes.ipv6_to_remove | default([]) }}"
@@ -295,7 +247,7 @@
         else ('loopback' if 'loopback' in item.name.lower() else 'physical'))
       ) }}
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
   loop: "{{ interface_changes.l3 | default([]) }}"
   loop_control:
     label: "Interface: {{ item.name }} remove helpers: {{ item._ip_changes.dhcp_relay_to_remove | default([]) }}"
@@ -319,7 +271,7 @@
         else ('loopback' if 'loopback' in item.name.lower() else 'physical')
       ) }}
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
   loop: "{{ interface_changes.l3 | default([]) }}"
   loop_control:
     label: "Interface: {{ item.name }}"
@@ -328,22 +280,52 @@
     ((item._ip_changes.anycast_ipv4_to_remove | default([]) | length > 0) or
      (item._ip_changes.anycast_ipv6_to_remove | default([]) | length > 0))
 
-# Configure physical interfaces
-- name: Include physical L3 interface configuration
-  ansible.builtin.include_tasks: configure_l3_physical.yml
-
-# Configure sub-interfaces
-- name: Include sub-interface L3 configuration
-  ansible.builtin.include_tasks: configure_l3_subinterface.yml
-
-# Configure VLAN interfaces
-- name: Include VLAN L3 interface configuration
-  ansible.builtin.include_tasks: configure_l3_vlan.yml
-
-# Configure LAG interfaces
-- name: Include LAG L3 interface configuration
-  ansible.builtin.include_tasks: configure_l3_lag.yml
-
-# Configure loopback interfaces
-- name: Include loopback interface configuration
-  ansible.builtin.include_tasks: configure_l3_loopback.yml
+# Configure L3 interfaces for every (type, VRF) category via a single common include.
+# Loopbacks are split by VRF here because categorize_l3_interfaces emits a single
+# `loopback` list; every other type is already pre-split into *_default_vrf / *_custom_vrf.
+# Include order (physical → subinterface → vlan → lag → loopback) preserves prior behavior.
+# The loop var is renamed to `_l3_cat` so the outer `when:` (propagated to every inner
+# task by include_tasks) does not collide with the inner `item` used by
+# `configure_l3_interface_common.yml`'s own `loop: _grouped_interfaces`.
+- name: Configure L3 interfaces by category
+  ansible.builtin.include_tasks:
+    file: configure_l3_interface_common.yml
+  vars:
+    interface_list: "{{ _l3_cat.list }}"
+    interface_type: "{{ _l3_cat.itype }}"
+    vrf_type: "{{ _l3_cat.vrf_type }}"
+  loop:
+    - list: "{{ l3_interfaces.physical_default_vrf }}"
+      itype: physical
+      vrf_type: default
+    - list: "{{ l3_interfaces.physical_custom_vrf }}"
+      itype: physical
+      vrf_type: custom
+    - list: "{{ l3_interfaces.subinterface_default_vrf }}"
+      itype: subinterface
+      vrf_type: default
+    - list: "{{ l3_interfaces.subinterface_custom_vrf }}"
+      itype: subinterface
+      vrf_type: custom
+    - list: "{{ l3_interfaces.vlan_default_vrf }}"
+      itype: vlan
+      vrf_type: default
+    - list: "{{ l3_interfaces.vlan_custom_vrf }}"
+      itype: vlan
+      vrf_type: custom
+    - list: "{{ l3_interfaces.lag_default_vrf }}"
+      itype: lag
+      vrf_type: default
+    - list: "{{ l3_interfaces.lag_custom_vrf }}"
+      itype: lag
+      vrf_type: custom
+    - list: "{{ l3_interfaces.loopback | selectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
+      itype: loopback
+      vrf_type: default
+    - list: "{{ l3_interfaces.loopback | rejectattr('vrf', 'in', aoscx_builtin_vrfs + [none]) | list }}"
+      itype: loopback
+      vrf_type: custom
+  loop_control:
+    loop_var: _l3_cat
+    label: "{{ _l3_cat.itype }} L3 interfaces ({{ _l3_cat.vrf_type }} VRF) - {{ _l3_cat.list | length }} items"
+  when: _l3_cat.list | length > 0

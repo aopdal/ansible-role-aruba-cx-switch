@@ -9,6 +9,8 @@ from netbox_filters_lib.l3_config_helpers import (
     get_interface_vrf,
     group_interface_ips,
     build_l3_config_lines,
+    should_add_interface_ip,
+    build_l3_config_preview,
 )
 
 
@@ -1169,3 +1171,205 @@ class TestGroupInterfaceIpsEncapsulationChange:
             "custom_fields": {},
         })
         assert group_interface_ips([item]) == []
+
+
+class TestShouldAddInterfaceIp:
+    """Tests for should_add_interface_ip — replaces the _needs_add ternary."""
+
+    # --- No _ip_changes at all (new interface) — always True.
+
+    def test_no_ip_changes_ipv4(self):
+        assert should_add_interface_ip({}, "10.0.0.1/24") is True
+
+    def test_no_ip_changes_ipv6(self):
+        assert should_add_interface_ip({}, "2001:db8::1/64") is True
+
+    def test_interface_not_dict(self):
+        """Non-dict input is treated as new interface → True."""
+        assert should_add_interface_ip(None, "10.0.0.1/24") is True
+        assert should_add_interface_ip("bogus", "10.0.0.1/24") is True
+
+    # --- VRF change short-circuit.
+
+    def test_vrf_change_forces_true_ipv4(self):
+        intf = {"_ip_changes": {"vrf_change": True, "ipv4_to_add": []}}
+        assert should_add_interface_ip(intf, "10.0.0.1/24") is True
+
+    def test_vrf_change_forces_true_ipv6(self):
+        intf = {"_ip_changes": {"vrf_change": True, "ipv6_to_add": []}}
+        assert should_add_interface_ip(intf, "2001:db8::1/64") is True
+
+    def test_vrf_change_forces_true_anycast_excluded_from_diff(self):
+        intf = {"_ip_changes": {"vrf_change": True,
+                                "ipv4_to_add": ["10.0.0.2/24"]}}
+        assert should_add_interface_ip(intf, "10.0.0.1/24") is True
+
+    # --- IPv4.
+
+    def test_ipv4_in_to_add(self):
+        intf = {"_ip_changes": {"ipv4_to_add": ["10.0.0.1/24", "10.0.0.2/24"]}}
+        assert should_add_interface_ip(intf, "10.0.0.1/24") is True
+
+    def test_ipv4_not_in_to_add(self):
+        intf = {"_ip_changes": {"ipv4_to_add": ["10.0.0.2/24"]}}
+        assert should_add_interface_ip(intf, "10.0.0.1/24") is False
+
+    def test_ipv4_ip_changes_but_no_ipv4_to_add(self):
+        """_ip_changes present but no ipv4_to_add → no change needed."""
+        intf = {"_ip_changes": {"ipv6_to_add": ["2001:db8::1/64"]}}
+        assert should_add_interface_ip(intf, "10.0.0.1/24") is False
+
+    def test_ipv4_empty_to_add(self):
+        intf = {"_ip_changes": {"ipv4_to_add": []}}
+        assert should_add_interface_ip(intf, "10.0.0.1/24") is False
+
+    # --- IPv6.
+
+    def test_ipv6_in_to_add(self):
+        intf = {"_ip_changes": {"ipv6_to_add": ["2001:db8::1/64"]}}
+        assert should_add_interface_ip(intf, "2001:db8::1/64") is True
+
+    def test_ipv6_not_in_to_add(self):
+        intf = {"_ip_changes": {"ipv6_to_add": ["2001:db8::2/64"]}}
+        assert should_add_interface_ip(intf, "2001:db8::1/64") is False
+
+    def test_ipv6_ip_changes_but_no_ipv6_to_add(self):
+        """_ip_changes present but no ipv6_to_add → no enhanced facts, configure all."""
+        intf = {"_ip_changes": {"ipv4_to_add": ["10.0.0.1/24"]}}
+        assert should_add_interface_ip(intf, "2001:db8::1/64") is True
+
+    def test_ipv6_link_local(self):
+        intf = {"_ip_changes": {"ipv6_to_add": ["fe80::1/64"]}}
+        assert should_add_interface_ip(intf, "fe80::1/64") is True
+
+
+class TestBuildL3ConfigPreview:
+    """Tests for build_l3_config_preview — replaces the _l3_config_preview Jinja block."""
+
+    BUILTIN_VRFS = ["default", "mgmt"]
+
+    def _phys_item(self, name, address, vrf="default"):
+        return {
+            "interface_name": name,
+            "interface": {"name": name, "vrf": {"name": vrf} if vrf else None},
+            "address": address,
+            "ip_role": None,
+            "anycast_mac": None,
+            "_needs_add": True,
+        }
+
+    def test_empty_dict(self):
+        assert build_l3_config_preview({}, self.BUILTIN_VRFS) == {}
+
+    def test_none_input(self):
+        assert build_l3_config_preview(None, self.BUILTIN_VRFS) == {}
+
+    def test_non_dict_input(self):
+        assert build_l3_config_preview("bogus", self.BUILTIN_VRFS) == {}
+
+    def test_missing_categories_treated_as_empty(self):
+        assert build_l3_config_preview(
+            {"physical_default_vrf": []}, self.BUILTIN_VRFS) == {}
+
+    def test_single_physical_interface(self):
+        l3 = {"physical_default_vrf": [
+            self._phys_item("1/1/1", "10.0.0.1/24")]}
+        result = build_l3_config_preview(l3, self.BUILTIN_VRFS)
+        assert "1/1/1" in result
+        assert isinstance(result["1/1/1"], list)
+        assert any(
+            "ip address 10.0.0.1/24" in line for line in result["1/1/1"])
+
+    def test_lag_name_gets_space(self):
+        """format_interface_name is applied — lag256 → 'lag 256'."""
+        l3 = {"lag_default_vrf": [self._phys_item("lag256", "10.1.0.1/24")]}
+        result = build_l3_config_preview(l3, self.BUILTIN_VRFS)
+        assert "lag 256" in result
+        assert "lag256" not in result
+
+    def test_loopback_name_gets_space(self):
+        """Loopback in default VRF is placed and formatted."""
+        l3 = {
+            "loopback": [
+                {
+                    "interface_name": "loopback0",
+                    "interface": {"name": "loopback0", "vrf": None},
+                    "address": "10.255.0.1/32",
+                    "ip_role": None,
+                    "anycast_mac": None,
+                    "vrf": "default",
+                    "_needs_add": True,
+                }
+            ]
+        }
+        result = build_l3_config_preview(l3, self.BUILTIN_VRFS)
+        assert "loopback 0" in result
+
+    def test_loopback_split_by_vrf(self):
+        """Loopback with a custom VRF ends up in the custom bucket (still keyed by name)."""
+        l3 = {
+            "loopback": [
+                {
+                    "interface_name": "loopback0",
+                    "interface": {"name": "loopback0", "vrf": {"name": "RED"}},
+                    "address": "10.255.0.1/32",
+                    "ip_role": None,
+                    "anycast_mac": None,
+                    "vrf": "RED",
+                    "_needs_add": True,
+                },
+                {
+                    "interface_name": "loopback1",
+                    "interface": {"name": "loopback1", "vrf": None},
+                    "address": "10.255.0.2/32",
+                    "ip_role": None,
+                    "anycast_mac": None,
+                    "vrf": "default",
+                    "_needs_add": True,
+                },
+            ]
+        }
+        result = build_l3_config_preview(l3, self.BUILTIN_VRFS)
+        assert "loopback 0" in result
+        assert "loopback 1" in result
+        # RED VRF loopback should have a vrf attach line
+        assert any("vrf attach RED" in line for line in result["loopback 0"])
+        # default VRF loopback should NOT have vrf attach
+        assert not any("vrf attach" in line for line in result["loopback 1"])
+
+    def test_multiple_categories(self):
+        l3 = {
+            "physical_default_vrf": [self._phys_item("1/1/1", "10.0.0.1/24")],
+            "vlan_default_vrf": [self._phys_item("vlan10", "10.10.0.1/24")],
+            "lag_default_vrf": [self._phys_item("lag1", "10.1.0.1/24")],
+        }
+        result = build_l3_config_preview(l3, self.BUILTIN_VRFS)
+        assert set(result.keys()) == {"1/1/1", "vlan10", "lag 1"}
+
+    def test_l3_counters_disabled(self):
+        l3 = {"physical_default_vrf": [
+            self._phys_item("1/1/1", "10.0.0.1/24")]}
+        with_counters = build_l3_config_preview(
+            l3, self.BUILTIN_VRFS, l3_counters_enable=True)
+        without = build_l3_config_preview(
+            l3, self.BUILTIN_VRFS, l3_counters_enable=False)
+        assert any(line == "l3-counters" for line in with_counters["1/1/1"])
+        assert not any(line == "l3-counters" for line in without["1/1/1"])
+
+    def test_builtin_vrfs_none(self):
+        """None for aoscx_builtin_vrfs is tolerated (loopbacks with vrf=None still go to default)."""
+        l3 = {
+            "loopback": [
+                {
+                    "interface_name": "loopback0",
+                    "interface": {"name": "loopback0", "vrf": None},
+                    "address": "10.255.0.1/32",
+                    "ip_role": None,
+                    "anycast_mac": None,
+                    "vrf": None,
+                    "_needs_add": True,
+                }
+            ]
+        }
+        result = build_l3_config_preview(l3, None)
+        assert "loopback 0" in result

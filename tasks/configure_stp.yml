@@ -56,7 +56,7 @@
     - _stp_global_diff is defined
     - _stp_global_diff.changed | bool
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: Skip global MSTP - no changes needed
   ansible.builtin.debug:
@@ -94,4 +94,4 @@
     label: "Interface {{ item.name }}: {{ item.lines | join(', ') }}"
   when: _stp_interface_changes | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli

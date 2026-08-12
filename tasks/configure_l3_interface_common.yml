@@ -39,7 +39,7 @@
     label: "Interface: {{ item.interface_name }}"
   when: _grouped_interfaces | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
     _grouped_interfaces: "{{ interface_list |
       group_interface_ips(aoscx_ospf_interface_facts | default(none),
       ospf_process_id | default(1)) }}"

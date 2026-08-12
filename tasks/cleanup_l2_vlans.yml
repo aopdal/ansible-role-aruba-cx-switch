@@ -11,7 +11,7 @@
     label: "Interface: {{ item.interface }} - Removing VLANs: {{ item.vlans_to_remove }}"
   when: item.vlans_to_remove | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: Remove VLANs from LAG interfaces
   arubanetworks.aoscx.aoscx_config:
@@ -23,7 +23,7 @@
     label: "Interface: {{ item.interface }} - Removing VLANs: {{ item.vlans_to_remove }}"
   when: item.vlans_to_remove | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: Remove VLANs from MCLAG interfaces
   arubanetworks.aoscx.aoscx_config:
@@ -35,4 +35,4 @@
     label: "Interface: {{ item.interface }} - Removing VLANs: {{ item.vlans_to_remove }}"
   when: item.vlans_to_remove | length > 0
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli

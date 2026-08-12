@@ -1,19 +1,14 @@
 ---
 # Main task file for aruba_cx_switch role
 
-- name: "[DEPRECATED] aoscx_fast_mode is deprecated and has no effect"
-  ansible.builtin.debug:
-    msg: >-
-      WARNING: aoscx_fast_mode is deprecated and will be removed in a future
-      version. It caused more API calls (not fewer) due to missing device state
-      for change detection. For faster fact gathering, use:
-      aoscx_gather_facts_rest_api: true
-  when: aoscx_fast_mode | default(false) | bool
-  tags:
-    - always
-
 - name: Include fact gathering tasks
-  ansible.builtin.include_tasks: gather_facts.yml
+  ansible.builtin.include_tasks:
+    file: gather_facts.yml
+    apply:
+      tags:
+        - always
+        - facts
+        - gather
   when:
     - aoscx_gather_facts | bool
   tags:
@@ -418,16 +413,12 @@
       tags:
         - ospf
         - routing
-        - layer3
   when:
     - aoscx_configure_ospf | bool
     - custom_fields.device_ospf | default(false) | bool
-    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
-      ansible_run_tags"
   tags:
     - ospf
     - routing
-    - layer3
 
 - name: Include OSPF configuration tasks
   ansible.builtin.include_tasks:
@@ -436,16 +427,12 @@
       tags:
         - ospf
         - routing
-        - layer3
   when:
     - aoscx_configure_ospf | bool
     - custom_fields.device_ospf | default(false) | bool
-    - "'ospf' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
-      ansible_run_tags"
   tags:
     - ospf
     - routing
-    - layer3
 
 - name: Include virtual interface cleanup tasks (before L3 config)
   ansible.builtin.include_tasks:
@@ -489,16 +476,12 @@
       tags:
         - static_routes
         - routing
-        - layer3
   when:
     - aoscx_configure_static_routes | bool
     - (static_routes | default({})) | length > 0
-    - "'static_routes' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
-      ansible_run_tags"
   tags:
     - static_routes
     - routing
-    - layer3
 
 - name: Include EVPN configuration tasks
   ansible.builtin.include_tasks:
@@ -638,16 +621,12 @@
       tags:
         - bgp
         - routing
-        - layer3
   when:
     - aoscx_configure_bgp | bool
     - custom_fields.device_bgp | default(false) | bool
-    - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in
-      ansible_run_tags"
   tags:
     - bgp
     - routing
-    - layer3
 
 - name: Include VSX configuration tasks
   ansible.builtin.include_tasks:
@@ -659,8 +638,6 @@
   when:
     - aoscx_configure_vsx | bool
     - custom_fields.device_vsx | default(false) | bool
-    - "'vsx' in ansible_run_tags or 'ha' in ansible_run_tags or 'all' in
-      ansible_run_tags"
   tags:
     - vsx
     - ha

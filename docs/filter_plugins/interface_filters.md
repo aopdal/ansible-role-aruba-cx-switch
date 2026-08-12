@@ -17,7 +17,7 @@ When configuring a switch from NetBox data, you need to sort interfaces into gro
 
 ## Overview
 
-Interface processing functionality is split into three focused modules that handle categorization, IP address matching, and change detection.
+Interface processing functionality is split into four focused modules that handle categorization, IP address matching, change detection, and (as of the F4 split below) the IP-related comparison logic that change detection calls into.
 
 ### Module Structure
 
@@ -25,10 +25,18 @@ Interface processing functionality is split into three focused modules that hand
 |--------|---------|-------|-------------|
 | `interface_categorization.py` | 2 | 294 | L2/L3 interface categorization |
 | `interface_ip_processing.py` | 1 | 106 | IP address to interface matching |
-| `interface_change_detection.py` | 1 | 814 | Idempotent change detection |
-| **Total** | **4** | **1,214** | |
+| `interface_change_detection.py` | 1 | 761 | Idempotent change detection (orchestration) |
+| `interface_ip_comparisons.py` | 0 (internal) | 682 | IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison |
+| **Total** | **4** | **1,843** | |
 
-**Dependencies**: All modules depend on [utils.py](utils.md) (`_debug`)
+**Dependencies**: All modules depend on [utils.py](utils.md) (`_debug`).
+`interface_change_detection.py` additionally depends on
+`interface_ip_comparisons.py` for the per-interface IP comparison logic
+(`compute_l3_ip_changes()`, `compute_dhcp_relay_changes()` — internal
+helpers, not separately registered as Ansible filters; split out per
+[docs/CODE_AUDIT.md](../CODE_AUDIT.md) finding F4, which also fixed finding
+F5 by making both functions pure instead of mutating the interface dict
+passed in).
 
 ---
 

@@ -23,7 +23,7 @@
         status_code: [200, 404]
         return_content: true
       register: netbox_bgp_sessions_raw
-      no_log: "{{ aoscx_no_log | default(false) }}"
+      no_log: true
 
     - name: Set BGP session facts for this device
       ansible.builtin.set_fact:
@@ -81,7 +81,7 @@
         status_code: [200, 404]
         return_content: true
       register: netbox_policy_rules_raw
-      no_log: "{{ aoscx_no_log | default(false) }}"
+      no_log: true
 
     - name: Query NetBox BGP plugin for prefix list rules
       ansible.builtin.uri:
@@ -94,7 +94,7 @@
         status_code: [200, 404]
         return_content: true
       register: netbox_prefix_list_rules_raw
-      no_log: "{{ aoscx_no_log | default(false) }}"
+      no_log: true
 
     - name: Set routing policy and prefix list facts
       ansible.builtin.set_fact:
@@ -705,7 +705,7 @@
         status_code: [200]
       register: _bgp_rest_login
       delegate_to: localhost
-      no_log: "{{ aoscx_no_log | default(true) }}"
+      no_log: true
 
     # Build the list of VRFs to check: always include default, plus any custom
     # VRFs referenced by bgp_vrf_sessions.

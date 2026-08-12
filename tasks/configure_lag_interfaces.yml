@@ -47,7 +47,7 @@
     - item.description != ""
     - not (item.custom_fields.if_mclag | default(false))
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 # Enable LAG interfaces (no shutdown, only those needing changes)
 - name: configure_lag_interfaces | Configure LAG interface enable (no shutdown, only those needing changes)
@@ -65,7 +65,7 @@
     - item.enabled | default(true)
     - not (item.custom_fields.if_mclag | default(false))
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 # Disable LAG interfaces (shutdown, only those needing changes)
 - name: configure_lag_interfaces | Configure LAG interface disable (shutdown, only those needing changes)
@@ -83,7 +83,7 @@
     - not (item.enabled | default(true))
     - not (item.custom_fields.if_mclag | default(false))
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 # Configure LACP mode active on LAG interfaces (only those needing changes)
 - name: configure_lag_interfaces | Configure LAG LACP mode active (only those needing changes)
@@ -101,7 +101,7 @@
     - item.custom_fields.if_lacp | default(false)
     - not (item.custom_fields.if_mclag | default(false))
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: configure_lag_interfaces | LAG configuration summary
   ansible.builtin.debug:

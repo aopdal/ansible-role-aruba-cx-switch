@@ -43,7 +43,7 @@
     - item.description is defined
     - item.description != ""
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 # Enable MCLAG interfaces (only those needing changes)
 - name: configure_mclag_interfaces | Configure MCLAG interface enable (no shutdown, only those needing changes)
@@ -61,7 +61,7 @@
     - item.custom_fields.if_mclag | default(false)
     - item.enabled | default(true)
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 # Disable MCLAG interfaces (only those needing changes)
 - name: configure_mclag_interfaces | Configure MCLAG interface disable (shutdown, only those needing changes)
@@ -79,7 +79,7 @@
     - item.custom_fields.if_mclag | default(false)
     - not (item.enabled | default(true))
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 # Configure LACP mode active on MCLAG interfaces (only those needing changes)
 - name: configure_mclag_interfaces | Configure MCLAG LACP mode active (only those needing changes)
@@ -97,7 +97,7 @@
     - item.custom_fields.if_mclag | default(false)
     - item.custom_fields.if_lacp | default(true)
   vars:
-    ansible_connection: "{{ aoscx_connection_type }}"
+    ansible_connection: network_cli
 
 - name: configure_mclag_interfaces | MCLAG configuration summary
   ansible.builtin.debug:
