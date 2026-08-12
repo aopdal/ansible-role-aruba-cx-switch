@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 OSPF-related filters for NetBox data transformation
 

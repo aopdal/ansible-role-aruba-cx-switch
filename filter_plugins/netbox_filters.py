@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
 """
 Custom Ansible filters for NetBox data transformation
 """
 
+# isort: skip_file
+# This file's import order is intentional, not alphabetical: sys.path
+# manipulation must run before the netbox_filters_lib imports below, and
+# those imports are grouped by topic/module (see the flake8/pylint/black
+# exemptions further down for the same reason).
 import sys
 import os
 
@@ -16,6 +20,7 @@ if _role_root not in sys.path:
 # These imports must come after sys.path manipulation above
 # pylint: disable=wrong-import-position
 # flake8: noqa: E402
+# ruff: noqa
 # fmt: off  # Tell Black to not reformat this section
 from netbox_filters_lib.utils import collapse_vlan_list, select_interfaces_to_configure
 from netbox_filters_lib.vlan_filters import (

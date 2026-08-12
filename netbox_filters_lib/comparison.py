@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Interface and VLAN comparison logic for determining configuration changes
 """

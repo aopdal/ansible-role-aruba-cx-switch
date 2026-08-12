@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 VRF-related filters for NetBox data transformation
 """

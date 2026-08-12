@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 L3 Interface Configuration Helpers
 
@@ -9,14 +8,14 @@ to reduce code duplication across physical, LAG, and VLAN interface types.
 from .utils import _debug, is_ipv4_address, is_ipv6_address
 
 __all__ = [
+    "build_l3_config_lines",
+    "build_l3_config_preview",
     "format_interface_name",
-    "is_ipv4_address",
-    "is_ipv6_address",
     "get_interface_vrf",
     "group_interface_ips",
-    "build_l3_config_lines",
+    "is_ipv4_address",
+    "is_ipv6_address",
     "should_add_interface_ip",
-    "build_l3_config_preview",
 ]
 
 
