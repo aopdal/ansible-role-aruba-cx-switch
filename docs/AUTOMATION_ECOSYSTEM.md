@@ -27,7 +27,7 @@ graph TB
     end
 
     subgraph Ansible["⚙️ Automation Layer - Ansible"]
-        Role["aopdal.aruba_cx_switch Role<br/><br/>Responsibilities:<br/>• Query NetBox API<br/>• Apply full configurations<br/>• Maintain idempotent state<br/>• Handle EVPN/VXLAN, BGP, OSPF, VSX"]
+        Role["aopdal.aruba_cx_switch Role<br/><br/>Responsibilities:<br/>• Query NetBox API<br/>• Apply full configurations<br/>• Maintain idempotent state<br/>• Handle EVPN/VXLAN, BGP, OSPF, VSX, STP, port-access, static routes"]
     end
 
     subgraph Deploy["📦 Deployment Paths"]
@@ -78,7 +78,7 @@ graph TB
 - ✅ **EVPN/VXLAN**: VNI mappings, EVPN instance configuration
 - ✅ **Virtual Chassis**: VSX configuration data
 - ✅ **Config Context**: System settings (NTP, DNS, timezone, banner)
-- ✅ **Custom Fields**: Feature flags (device_bgp, device_evpn, device_vxlan, device_vsx)
+- ✅ **Custom Fields**: Feature flags (device_bgp, device_evpn, device_vxlan, device_vsx, device_ospf, device_anycast_gateway)
 - ✅ **Tags**: Automation control (ztp_ready, production, staging)
 
 #### Out of Scope (Not Used by This Role, but Important)
@@ -108,7 +108,7 @@ While not used for configuration automation, these provide critical context for:
 - ✅ Query NetBox API for device configuration
 - ✅ Deploy complete switch configurations via SSH/HTTPS
 - ✅ Maintain idempotent configuration state
-- ✅ Handle complex features (EVPN, VXLAN, BGP, OSPF, VSX)
+- ✅ Handle complex features (EVPN, VXLAN, BGP, OSPF, VSX, STP, port-access, static routes)
 - ✅ Provide cleanup of removed configurations (idempotent mode)
 
 **Does NOT Handle:**
@@ -215,7 +215,7 @@ subclass "Vendor-Class" "Aruba JL719C 8360" {
 
 **Custom Fields**
 
-- Set feature flags (device_bgp, device_evpn, device_vxlan, device_vsx)
+- Set feature flags (device_bgp, device_evpn, device_vxlan, device_vsx, device_ospf, device_anycast_gateway)
 - Tag devices for automation (ztp_ready, staging, production)
 
 **Output:** Complete network design documented in NetBox.

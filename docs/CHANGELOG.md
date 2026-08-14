@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `meta/main.yml`: `min_ansible_version` corrected from `2.18` to `2.19` to
+  match the `ansible-core>=2.19.10,<2.20.0` pin already in `requirements.txt`
+  (required by arubanetworks.aoscx 4.5.1). Also added `ansible.utils` and
+  `ansible.netcommon` to the `collections` dependency list.
+- `requirements.yml`: `ansible.utils` raised to `>=6.0.0`; added
+  `ansible.netcommon >=8.0.0` (provides the `network_cli` connection plugin
+  used by `aoscx_config`/`aoscx_command` tasks).
+- `requirements.txt`: added `ansible-lint` (unpinned) alongside the existing
+  `ansible-core` pin.
+
+### Documentation
+
+- General documentation review: added `docs/STP_CONFIGURATION.md`,
+  `docs/PORT_ACCESS_CONFIGURATION.md`, and `docs/VSX_CONFIGURATION.md` —
+  STP and port-access previously had no dedicated topic page at all; VSX had
+  only a `README.md` section, inconsistent with every other feature of
+  comparable size (BGP/OSPF/static-routes/EVPN-VXLAN).
+- Linked 10 previously-orphaned doc pages (unreachable from both
+  `README.md` and `docs/README_DOCS.md`) into `docs/README_DOCS.md`:
+  `FILTER_PLUGINS_REUSE.md`, `AUTOMATION_ECOSYSTEM_DIAGRAMS.md`,
+  `GITHUB_ACTIONS_DEPLOYMENT.md`, `REQUIREMENTS.md`, `ANYCAST_GATEWAY.md`,
+  `CONTRIBUTING.md`, `L2_INTERFACE_MODES.md`, `EXAMPLES.md`,
+  `TEMPLATE_CONFIGURATION.md`, `ANSIBLE_CACHE_DIRECTORY.md`. Added
+  `TEMPLATE_CONFIGURATION.md` and the three new pages to `mkdocs.yml` nav
+  (`TEMPLATE_CONFIGURATION.md` was previously in neither the index nor the
+  nav — invisible on the built docs site).
+- Added STP/Port-Access/VSX rows to `CLAUDE.md` §4.5's doc-update table.
+- Trimmed `docs/CODE_AUDIT.md` from a 39KB, 20-finding audit report (19 of
+  20 findings already resolved) down to the one still-open finding plus a
+  one-line-per-finding resolved log; full history remains in git.
+- Fixed a wrong custom-field name in `docs/NETBOX_INTEGRATION.md`'s VSX
+  walkthrough (`device_vsx_enabled` → `device_vsx`, matching what
+  `tasks/main.yml` actually gates on — following the old walkthrough
+  verbatim would have created a custom field the role never reads).
+- Removed the placeholder Ansible Galaxy badge (`.../role/XXXXX`) from
+  `README.md` — the role isn't published to Galaxy yet.
+- `docs/AUTOMATION_ECOSYSTEM.md`: added STP/port-access/static-routes and
+  the `device_ospf`/`device_anycast_gateway` custom fields to the
+  feature/flag lists (present in code, missing from the doc).
+
+### Known issues (found during the documentation review, not yet fixed)
+
+- **`configure_port_access_mac_group.yml` is dead code.** AOS-CX
+  port-access `mac_groups` has a task file to push it, and
+  `netbox_filters_lib/port_access.py`'s docstrings reference it, but
+  `configure_port_access.yml` never includes the task, and
+  `port_access_diff`/`port_access_facts_from_device_profiles` don't
+  compare/flatten `mac_groups` either. Setting `mac_groups` or
+  `associate_mac_group` in the `port_access` config_context currently has
+  no effect. Documented in `docs/PORT_ACCESS_CONFIGURATION.md`.
+- **VSX `vsx_isl_lag` vs. `vsx_isl_port` inconsistency.**
+  `tasks/configure_vsx.yml`'s live `aoscx_vsx` push reads only
+  `vsx_isl_port` (default `lag256`); `vsx_config_diff`'s idempotency
+  comparison and `templates/vsx.j2`'s ZTP output both use `vsx_isl_lag`
+  instead. Setting only `vsx_isl_lag` (as this role's docs previously
+  showed) can silently push the wrong ISL port and never converge to "no
+  changes". `templates/vsx.j2` line 5 also checks
+  `'lag' in vsx_keepalive_src` (a source IP) where it almost certainly
+  meant to check `vsx_isl_lag`. Documented in `docs/VSX_CONFIGURATION.md`.
+
 ## [0.14.0] - 2026-08-12
 
 ### Removed

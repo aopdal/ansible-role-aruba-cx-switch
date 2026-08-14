@@ -24,7 +24,9 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 ## Getting Started
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide for development of the role
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference for common tasks
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference for testing/development commands
+- **[REQUIREMENTS.md](REQUIREMENTS.md)** - Which `requirements*` file to use and when
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute changes
 
 ## Examples (Recommended Starting Point)
 
@@ -37,10 +39,12 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 - **[FILTER_PLUGINS.md](FILTER_PLUGINS.md)** - Complete filter plugin reference
     - Custom filters for NetBox data transformation
-    - Detailed documentation for VLAN, VRF, interface, OSPF operations
+    - Detailed documentation for VLAN, VRF, interface, OSPF, BGP, port-access, STP, VSX, and static route operations
     - Real-world usage examples and complete workflows
     - Development guide and architecture
     - **Critical for understanding how the role processes NetBox data**
+- **[filter_plugins/index.md](filter_plugins/index.md)** - Per-filter reference (parameters/returns) grouped by module, plus a filter index by name and by use case
+- **[FILTER_PLUGINS_REUSE.md](FILTER_PLUGINS_REUSE.md)** - Which filters are portable to other vendors' devices vs. Aruba AOS-CX specific
 
 ## Configuration Guides
 
@@ -73,6 +77,14 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - Common patterns and best practices
     - Available facts and debugging
 
+- **[L2_INTERFACE_MODES.md](L2_INTERFACE_MODES.md)** - L2 VLAN mode reference
+    - access / tagged / tagged-all categorization rules
+    - How NetBox `mode` + `tagged_vlans`/`untagged_vlan` map to AOS-CX `vlan_mode`
+
+- **[ANYCAST_GATEWAY.md](ANYCAST_GATEWAY.md)** - Anycast gateway (active-gateway) configuration
+    - IPv4/IPv6 anycast IP + MAC modelling in NetBox
+    - EVPN/VXLAN active-gateway interaction
+
 - **[VIRTUAL_INTERFACE_CLEANUP.md](VIRTUAL_INTERFACE_CLEANUP.md)** - Orphaned VLAN SVI/loopback/sub-interface removal
     - Runs before L3 interface configuration to avoid duplicate-IP failures
     - `aoscx_idempotent_mode` + `aoscx_cleanup_virtual_interfaces` variables
@@ -103,6 +115,30 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
   reference: NetBox modelling (`static_routes` config context, per VRF),
   forward/blackhole/reject route types, change detection and idempotency,
   cleanup behaviour, and known limitations (no ECMP).
+
+### Spanning Tree (STP)
+
+- **[STP_CONFIGURATION.md](STP_CONFIGURATION.md)** - Global MSTP settings and
+  per-interface BPDU filter/guard, root guard, and admin-edge configuration.
+
+### Port-Access
+
+- **[PORT_ACCESS_CONFIGURATION.md](PORT_ACCESS_CONFIGURATION.md)** -
+  LLDP-group / role / device-profile modelling, change detection, and
+  cleanup. Includes a known limitation around `mac_groups`.
+
+### VSX
+
+- **[VSX_CONFIGURATION.md](VSX_CONFIGURATION.md)** - VSX pairing
+  configuration, idempotency, and a known `vsx_isl_lag` vs. `vsx_isl_port`
+  inconsistency to be aware of.
+
+### Templates (ZTP / Starting-Point Config Generation)
+
+- **[TEMPLATE_CONFIGURATION.md](TEMPLATE_CONFIGURATION.md)** - The
+  `aoscx_generate_template_config: true` path that renders plain CLI
+  starting-point configs from the same NetBox data, for zero-touch
+  provisioning use cases.
 
 ### Tag-Dependent Configuration
 
@@ -135,6 +171,9 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 - **[PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md)** - Performance tuning guide
 - **[NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md)** - NetBox integration reference
 - **[AUTOMATION_ECOSYSTEM.md](AUTOMATION_ECOSYSTEM.md)** - Architecture overview
+- **[AUTOMATION_ECOSYSTEM_DIAGRAMS.md](AUTOMATION_ECOSYSTEM_DIAGRAMS.md)** - Visual reference diagrams for the architecture overview
+- **[EXAMPLES.md](EXAMPLES.md)** - Overview of the runnable examples under [examples/](../examples/)
+- **[CODE_AUDIT.md](CODE_AUDIT.md)** - Internal code-quality audit (mostly resolved; kept for the one open item and as a historical record)
 
 ### Release Process
 
@@ -145,3 +184,5 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 - **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** - How to use MkDocs
 - **[DOCS_SYNC_WORKFLOW.md](DOCS_SYNC_WORKFLOW.md)** - How README.md syncs to docs/
+- **[GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md)** - Deploying the built MkDocs site to your own server via GitHub Actions
+- **[ANSIBLE_CACHE_DIRECTORY.md](ANSIBLE_CACHE_DIRECTORY.md)** - What the `.ansible/` cache directory is and why it's gitignored

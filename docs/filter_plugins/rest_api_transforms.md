@@ -14,13 +14,13 @@ Think of it like a translator: the REST API speaks one dialect, the role's filte
 
 ## Overview
 
-The `rest_api_transforms.py` module is a **standalone filter plugin** (separate from `netbox_filters.py`). It provides 4 filters that convert REST API responses into the format expected by `aoscx_facts`-based logic.
+The `rest_api_transforms.py` module is a **standalone filter plugin** (separate from `netbox_filters.py`). It provides 5 filters that convert REST API responses into the format expected by `aoscx_facts`-based logic.
 
 **File Location**: `filter_plugins/rest_api_transforms.py`
 
 **Dependencies**: `urllib.parse` (Python standard library)
 
-**Filter Count**: 4 filters
+**Filter Count**: 5 filters
 
 ---
 
@@ -191,9 +191,56 @@ Takes the raw dict from `GET /system/virtual_network_ids?depth=1` where keys are
 
 ---
 
+### 5. `rest_api_to_aoscx_dhcp_relays(rest_data)`
+
+Flattens DHCP relay (`ip helper-address`) REST API data into a simple per-interface lookup.
+
+#### How It Works (Plain English)
+
+`GET /system/dhcp_relays?depth=2` returns entries keyed by `"vrf_name,interface_name"`, each holding the list of configured relay server IPs plus nested `port`/`vrf` reference dicts. The role's DHCP relay change detection (`compute_dhcp_relay_changes()` in [interface_ip_comparisons.py](interface_filters.md)) just wants "for this interface name, what servers are currently configured?" — this filter does that flattening once.
+
+#### Parameters
+
+- **rest_data** (dict): Raw response from `GET /rest/v10.xx/system/dhcp_relays?depth=2`. Keys are `"vrf_name,interface_name"` strings, e.g.:
+  ```json
+  {
+    "lab-blue,vlan101": {
+      "ipv4_ucast_server": ["172.16.3.10", "172.16.3.11"],
+      "port": {"vlan101": "/rest/v10.16/system/interfaces/vlan101"},
+      "vrf": {"lab-blue": "/rest/v10.16/system/vrfs/lab-blue"}
+    }
+  }
+  ```
+
+#### Returns
+
+- **dict**: Keyed by interface name, value is a sorted list of IPv4 server addresses. Example: `{"vlan101": ["172.16.3.10", "172.16.3.11"]}`.
+
+#### Usage Example
+
+```yaml
+- name: Get DHCP relay config from REST API
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}/rest/v10.16/system/dhcp_relays?depth=2"
+    headers:
+      Cookie: "{{ login_cookie }}"
+    validate_certs: false
+  register: rest_dhcp_relays
+
+- name: Flatten to per-interface server lists
+  set_fact:
+    dhcp_relay_facts: "{{ rest_dhcp_relays.json | rest_api_to_aoscx_dhcp_relays }}"
+
+- name: Use in change detection
+  set_fact:
+    interface_changes: "{{ interfaces | get_interfaces_needing_config_changes(ansible_facts, aoscx_enhanced_interface_facts, dhcp_relay_facts, ip_helper_addresses) }}"
+```
+
+---
+
 ## Complete Enhanced Facts Workflow
 
-This example shows how all four transforms work together to provide full device state for idempotent change detection:
+This example shows how these transforms work together to provide full device state for idempotent change detection:
 
 ```yaml
 ---

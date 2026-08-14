@@ -4,7 +4,9 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **38 custom filters** organized into 12 modules across 2 plugin files. The filters handle VLAN management, VRF configuration, interface categorization, interface IP processing, L3 configuration optimization, change detection, OSPF setup, BGP session enrichment, REST API data normalization, STP interface change detection, and state comparison between NetBox (source of truth) and device facts.
+This library provides **67 custom filters** organized into 17 modules in `netbox_filters_lib/`, registered across 2 Ansible filter plugin files (`netbox_filters.py` and `rest_api_transforms.py`). The filters handle VLAN management, VRF configuration and route targets, interface categorization, interface IP processing, L3 configuration optimization, interface/VLAN/VRF/OSPF/BGP/port-access/STP/VSX/static-route change detection, REST API data normalization, and state comparison between NetBox (source of truth) and device facts.
+
+For a full per-filter reference (parameters, return values, and one-line "what does this actually do" summaries) grouped the same way, see [docs/filter_plugins/index.md](filter_plugins/index.md) — that page is the better starting point if you don't already know which module you need.
 
 ## ⚠️ Important: NetBox Data Interpretation
 
@@ -309,21 +311,27 @@ ansible-playbook your-playbook.yml
 
 ```
 filter_plugins/
-├── netbox_filters.py                    # Main entry point (FilterModule class)
-└── netbox_filters_lib/                  # Package directory
+├── netbox_filters.py                    # Main entry point (FilterModule class, 62 filters)
+├── rest_api_transforms.py               # Separate FilterModule (5 filters)
+└── netbox_filters_lib/                  # Package directory (role root, not inside filter_plugins/)
     ├── __init__.py                      # Package initialization
-    ├── utils.py                         # Helper functions (176 lines)
-    ├── l3_config_helpers.py             # L3 configuration optimization (181 lines)
-    ├── vlan_filters.py                  # VLAN operations (454 lines)
-    ├── vrf_filters.py                   # VRF operations (450 lines)
-    ├── bgp_filters.py                   # BGP session enrichment (~350 lines)
-    ├── interface_categorization.py      # L2/L3 interface categorization (294 lines)
-    ├── interface_ip_processing.py       # IP address matching (106 lines)
-    ├── interface_change_detection.py    # Change detection orchestration (761 lines)
-    ├── interface_ip_comparisons.py      # IPv4/IPv6/VRF/anycast/DHCP relay comparison (682 lines)
-    ├── comparison.py                    # State comparison (295 lines)
-    ├── ospf_filters.py                  # OSPF operations (439 lines)
-    └── stp.py                           # STP interface change detection (1 filter)
+    ├── utils.py                         # Helper functions (246 lines)
+    ├── l3_config_helpers.py             # L3 configuration optimization (583 lines)
+    ├── vlan_filters.py                  # VLAN operations (952 lines)
+    ├── vrf_filters.py                   # VRF operations (428 lines)
+    ├── bgp_filters.py                   # BGP session enrichment, policy, redistribute, neighbor options, BFD (899 lines)
+    ├── interface_categorization.py      # L2/L3 interface categorization (325 lines)
+    ├── interface_ip_processing.py       # IP address matching (103 lines)
+    ├── interface_change_detection.py    # Change detection orchestration (760 lines)
+    ├── interface_ip_comparisons.py      # IPv4/IPv6/VRF/anycast/DHCP relay comparison (681 lines)
+    ├── interface_orphans.py             # Orphaned virtual interface (SVI/loopback/sub-if) cleanup (56 lines)
+    ├── comparison.py                    # State comparison (291 lines)
+    ├── ospf_filters.py                  # OSPF operations (438 lines)
+    ├── port_access.py                   # Port-access (device-profile) idempotency (355 lines)
+    ├── port_access_orphans.py           # Orphaned port-access object cleanup (36 lines)
+    ├── static_route_filters.py          # Static route change detection (136 lines)
+    ├── stp.py                           # Global + per-interface STP change detection (134 lines)
+    └── vsx.py                           # VSX config change detection (80 lines)
 ```
 
 **Recent Updates** (January 2025):
@@ -648,9 +656,10 @@ orchestration described below and calls into those helpers per interface.
       - `encapsulation_change`: `True` when a sub-interface's device-side `subintf_vlan` (REST API, requires `enhanced_facts`) differs from NetBox's `tagged_vlans[0].vid`, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` re-emits the `encapsulation dot1q <vid>` line. Without `enhanced_facts` this comparison is skipped (no false positives, but also no drift detection) since standard `aoscx_facts` does not expose `subintf_vlan`.
     - See "L3 Interface IP Address Idempotency" section for performance details
 
-### `bgp_filters.py` - BGP Session Enrichment
+### `bgp_filters.py` - BGP Session Enrichment, Policy, Redistribution, Neighbor Options, BFD
 
-BGP session enrichment with VRF and address-family metadata (2 filters):
+BGP session enrichment and config-building against the NetBox BGP plugin
+(8 filters, 899 lines):
 
 - **`get_bgp_session_vrf_info(sessions, interfaces)`**
     - Enrich BGP session objects with VRF and address-family by cross-referencing interface IP assignments
@@ -662,10 +671,64 @@ BGP session enrichment with VRF and address-family metadata (2 filters):
     - Route-map entries use `route-map NAME permit seq INDEX` syntax
     - Returns: Dict with `prefix_lists` and `route_map_rules` lists
 
+- **`get_bgp_redistribute_config(bgp_redistribute)`**
+    - Flattens the `bgp_redistribute` config_context (keyed by VRF name, each
+      mapping an address family to a list of protocols) into a list of
+      per-VRF, per-AF, per-protocol entries
+    - Unknown/invalid address families or protocols are skipped rather than raised
+    - Returns: `[{"vrf": str, "af": "ipv4"|"ipv6", "protocol": str}, ...]`
+
+- **`get_stale_bgp_redistribute(bgp_redistribute, running_config, local_asn)`**
+    - `aoscx_config` (used to push the entries from `get_bgp_redistribute_config`)
+      only ever adds missing lines — it never removes ones deleted from
+      config_context. Diffs `show running-config` text against the desired
+      state to find explicit `no redistribute` candidates for idempotent cleanup
+    - Returns: `[{"vrf": str, "af": str, "protocol": str}, ...]` to remove
+
+- **`get_bgp_neighbor_options_config(bgp_neighbor_options, sessions)`**
+    - Flattens the `bgp_neighbor_options` config_context (keyed by neighbor
+      IP, each mapping a scope `ipv4`/`ipv6`/`general` to a list of raw CLI
+      option strings) into per-VRF, per-scope, per-neighbor entries
+    - Matches each neighbor IP against live session data (`_vrf`/`_af` from
+      `get_bgp_session_vrf_info`) so only IPs actually peered are pushed;
+      lines already managed by other BGP tasks (`remote-as`, `route-map`,
+      `activate`, ...) are skipped so this can't fight those tasks
+    - Returns: `[{"vrf": str, "af": str|None, "neighbor_ip": str, "command": str}, ...]`
+
+- **`get_stale_bgp_neighbor_options(bgp_neighbor_options, sessions, running_config, local_asn)`**
+    - Cleanup counterpart to `get_bgp_neighbor_options_config`: diffs
+      `show running-config` against the desired neighbor options to find
+      lines that were removed from config_context and must be un-configured
+    - Returns: Same shape as `get_bgp_neighbor_options_config`, entries to remove
+
+- **`get_bgp_bfd_enabled(bgp_neighbor_options, sessions)`**
+    - AOS-CX's `bfd` command is a single global, top-level toggle — not
+      per-VRF/neighbor — and must be enabled before any neighbor's
+      `fall-over bfd` has effect. Derives whether it's needed from any
+      neighbor declaring `fall-over bfd` in the `general` scope of
+      `bgp_neighbor_options`, rather than requiring a second config_context entry
+    - **Note**: `bfd` is also usable by OSPF/static routes — if those start
+      managing it too, this and `get_stale_bgp_bfd()` must be combined with
+      their equivalent checks before pushing `no bfd`
+    - Returns: `bool` — `True` if the global `bfd` line must be present
+
+- **`get_stale_bgp_bfd(bgp_neighbor_options, sessions, running_config)`**
+    - Cleanup counterpart: `True` when `bfd` is currently configured on the
+      device but no neighbor declares `fall-over bfd` anymore, so `no bfd`
+      should be pushed
+
 ### `port_access.py` - Port-Access Diff
 
 Idempotency comparison for port-access (device-profile) configuration
-(1 filter):
+(2 filters, 355 lines):
+
+- **`port_access_facts_from_device_profiles(profiles_payload)`**
+    - Flattens the `/system/device_profiles?depth=4` REST payload (which
+      nests each profile's `role` and `lldp_groups` inline) into the
+      `aoscx_port_access_facts` shape expected by `port_access_diff` —
+      `{device_profiles, roles, lldp_groups}`, each a flat dict keyed by
+      object name
+    - Returns: Dict with keys `device_profiles`, `roles`, `lldp_groups`
 
 - **`port_access_diff(desired, current)`**
     - Compare the desired `port_access` config_context against
@@ -681,9 +744,60 @@ Idempotency comparison for port-access (device-profile) configuration
       When current facts are missing, returns every desired item (safe
       fallback).
 
-### `stp.py` - STP Interface Change Detection
+### `port_access_orphans.py` - Port-Access Cleanup
 
-Per-interface STP configuration change detection (1 filter):
+Identifies orphaned port-access objects for idempotent cleanup (1 filter,
+36 lines):
+
+- **`port_access_orphans(desired, current)`**
+    - Compares `aoscx_port_access_facts` (`current`) against the desired
+      `port_access` config_context (`desired`) per object kind
+      (`device_profiles`, `roles`, `lldp_groups`) and returns names present
+      on the device but no longer in NetBox — orphan = present on device but
+      not in NetBox
+    - Returns: `{"device_profiles": [...], "roles": [...], "lldp_groups": [...]}`
+      (sorted name lists); `current` missing/not-a-dict returns all-empty lists
+
+### `vsx.py` - VSX Config Change Detection
+
+Idempotency comparison for VSX (MCLAG peer-switch) configuration (1 filter,
+80 lines):
+
+- **`vsx_config_diff(desired, facts)`**
+    - Compares desired VSX settings from config_context (`vsx_role`,
+      `vsx_system_mac`, `vsx_isl_lag`/`vsx_isl_port`, `vsx_keepalive_vrf`,
+      `vsx_keepalive_src`, `vsx_keepalive_peer`) against `aoscx_vsx_facts`
+      (REST API; may be empty/`None`)
+    - Returns: `{"changed": bool, "changes": [{"field": str, "expected": ..., "actual": ...}, ...]}`
+
+### `interface_orphans.py` - Virtual Interface Cleanup
+
+Identifies orphaned virtual interfaces for idempotent cleanup (1 filter, 56
+lines):
+
+- **`get_virtual_interfaces_to_delete(desired_interfaces, device_interfaces)`**
+    - Unlike physical/LAG/MCLAG interfaces (which always exist in hardware
+      regardless of NetBox), VLAN SVIs, loopbacks, and sub-interfaces are
+      logical objects this role creates and destroys. If NetBox is
+      misconfigured — e.g. an interface renamed or reparented — the stale
+      device-side object is never referenced again and can hold the same IP
+      as its replacement, breaking L3 configuration with a duplicate-IP error
+    - Matches device interface names against a `vlan<N>` / `loopback<N>` /
+      `<parent>.<N>` regex to identify which device interfaces are virtual,
+      then returns those present on the device but absent from NetBox
+    - Returns: Sorted list of virtual interface names to delete. Physical
+      and LAG/MCLAG interfaces are never included (they can't be deleted)
+
+### `stp.py` - Global and Per-Interface STP Change Detection
+
+STP configuration change detection (2 filters, 134 lines):
+
+- **`stp_global_config_diff(desired, facts)`**
+    - Compares desired global MSTP config (`mstp_config_name`,
+      `mstp_config_revision`, `mstp_priority` from config_context) against
+      `aoscx_stp_global_facts` (the `stp_config` object from
+      `/system?attributes=stp_config&depth=1`)
+    - Returns: `{"changed": bool, "changes": [{"field", "expected", "actual"}, ...], "lines": [str, ...]}`
 
 - **`stp_interface_changes(interfaces, enhanced_facts)`**
     - Compare NetBox interface STP custom fields against device `stp_config` facts
@@ -1103,6 +1217,10 @@ All filters are available through the standard Ansible filter syntax:
     - L3 configuration helpers → `l3_config_helpers.py`
     - General utilities → `utils.py`
     - STP operations → `stp.py`
+    - Port-access (device-profile) operations → `port_access.py` / `port_access_orphans.py`
+    - VSX operations → `vsx.py`
+    - Static route operations → `static_route_filters.py`
+    - Virtual interface (SVI/loopback/sub-interface) cleanup → `interface_orphans.py`
 
 2. **Write your function** with proper docstring:
    ```python
@@ -1197,7 +1315,7 @@ Debug messages show:
 ### Module Dependencies
 
 ```
-netbox_filters.py (main entry point)
+netbox_filters.py (main entry point, 62 filters)
     ├── utils.py (no dependencies)
     ├── vlan_filters.py → utils
     ├── vrf_filters.py → utils
@@ -1206,10 +1324,17 @@ netbox_filters.py (main entry point)
     ├── interface_ip_processing.py → utils
     ├── interface_change_detection.py → utils, interface_ip_comparisons
     ├── interface_ip_comparisons.py → utils
+    ├── interface_orphans.py (no dependencies)
     ├── l3_config_helpers.py → utils
     ├── comparison.py → utils
     ├── ospf_filters.py → utils
-    └── stp.py (no dependencies)
+    ├── port_access.py (no dependencies)
+    ├── port_access_orphans.py (no dependencies)
+    ├── static_route_filters.py (no dependencies)
+    ├── stp.py (no dependencies)
+    └── vsx.py (no dependencies)
+
+rest_api_transforms.py (separate entry point, 5 filters — no dependency on netbox_filters_lib)
 ```
 
 ### Performance Considerations
@@ -1221,29 +1346,42 @@ netbox_filters.py (main entry point)
 
 ## Statistics
 
-- **Total Filters**: 38
-- **Total Lines**: ~3,165 (including docstrings and comments)
-- **Modules**: 12 (11 feature modules + 1 utility)
-- **Test Coverage**: Used in production for 100+ switches
-- **Code Quality**: Pylint score 9.30/10
+- **Total Filters**: 67 (62 in `netbox_filters.py` + 5 in `rest_api_transforms.py`)
+- **Total Lines**: ~6,500 in `netbox_filters_lib/` (including docstrings and comments), plus ~460 across the two plugin entry-point files
+- **Modules**: 17 in `netbox_filters_lib/`, across 2 plugin files
+- **Test Coverage**: Unit-tested per module under `tests/unit/`; used in production for 100+ switches
+- **Code Quality**: Pylint-checked via pre-commit
 
 ### Filter Distribution
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| `interface_change_detection.py` | 1 | 761 | Change detection orchestration & idempotency |
-| `interface_ip_comparisons.py` | 0 (internal) | 682 | IPv4/IPv6/VRF/anycast/DHCP relay comparison |
-| `vlan_filters.py` | 8 | 454 | VLAN lifecycle management |
-| `comparison.py` | 2 | 295 | State comparison logic |
-| `interface_categorization.py` | 2 | 294 | Interface categorization |
-| `vrf_filters.py` | 8 | 450 | VRF operations |
-| `l3_config_helpers.py` | 6 | 181 | L3 configuration optimization (incl. ip helper-address) |
-| `utils.py` | 5 | 176 | Helper functions |
-| `ospf_filters.py` | 8 | 439 | OSPF configuration |
-| `bgp_filters.py` | 2 | 350 | BGP session enrichment |
-| `interface_ip_processing.py` | 1 | 106 | IP address matching |
-| `stp.py` | 1 | ~65 | STP interface change detection |
-| **Total** | **38** | **~3,165** | **12 modules** |
+| `vlan_filters.py` | 14 | 952 | VLAN lifecycle management (incl. IGMP/voice/name change detection, VLAN-group exclusion) |
+| `bgp_filters.py` | 8 | 899 | BGP session enrichment, policy, redistribute, neighbor options, BFD |
+| `interface_change_detection.py` | 1 | 760 | Change detection orchestration & idempotency |
+| `interface_ip_comparisons.py` | 0 (internal) | 681 | IPv4/IPv6/VRF/anycast/DHCP relay comparison |
+| `l3_config_helpers.py` | 8 | 583 | L3 configuration optimization (incl. ip helper-address) |
+| `port_access.py` | 2 | 355 | Port-access (device-profile) idempotency |
+| `interface_categorization.py` | 2 | 325 | Interface categorization |
+| `comparison.py` | 2 | 291 | State comparison logic |
+| `vrf_filters.py` | 8 | 428 | VRF operations, route targets, change detection |
+| `ospf_filters.py` | 8 | 438 | OSPF configuration and change detection |
+| `utils.py` | 4 | 246 | Helper functions (incl. IP version detection, data-shape normalisation) |
+| `static_route_filters.py` | 1 | 136 | Static route change detection |
+| `stp.py` | 2 | 134 | Global + per-interface STP change detection |
+| `interface_ip_processing.py` | 1 | 103 | IP address matching |
+| `vsx.py` | 1 | 80 | VSX config change detection |
+| `interface_orphans.py` | 1 | 56 | Orphaned virtual interface cleanup |
+| `port_access_orphans.py` | 1 | 36 | Orphaned port-access object cleanup |
+| **Subtotal (`netbox_filters_lib/`, 17 modules)** | **62 unique** *(rows above sum to 64 — `is_ipv4_address`/`is_ipv6_address` appear in both `utils.py`'s row and `l3_config_helpers.py`'s row, see note)* | **~6,500** | |
+| `rest_api_transforms.py` *(separate plugin)* | 5 | 275 | REST API → `aoscx_facts` format normalization |
+| **Total** | **67** | **~6,960** | **17 lib modules + 1 separate plugin** |
+
+Note: `is_ipv4_address` / `is_ipv6_address` are implemented in `utils.py` but
+their Ansible filter names are registered from `l3_config_helpers.py` (which
+imports and re-exports them). They're listed under both rows above because
+both are true depending on what you're looking for ("where's the code" vs.
+"where's the filter name registered") — count them once when totaling.
 
 ## Migration Guide
 

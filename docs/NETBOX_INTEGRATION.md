@@ -137,10 +137,10 @@ Default: false
 Required: No
 ```
 
-#### 6. device_vsx_enabled (Boolean)
+#### 6. device_vsx (Boolean)
 
 ```
-Name: device_vsx_enabled
+Name: device_vsx
 Type: Boolean
 Object Type: dcim > device
 Label: Enable VSX
@@ -153,7 +153,7 @@ Required: No
 
 ```
 Customization → Custom Fields → Add
-├─ Name: device_vsx_enabled
+├─ Name: device_vsx
 ├─ Type: Boolean
 ├─ Content Types: dcim | device
 ├─ Label: Enable VSX

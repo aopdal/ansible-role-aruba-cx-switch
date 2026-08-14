@@ -21,9 +21,9 @@ The `vrf_filters.py` module provides VRF (Virtual Routing and Forwarding) extrac
 
 **File Location**: `netbox_filters_lib/vrf_filters.py`
 
-**Dependencies**: [utils.py](utils.md) (`_debug`)
+**Dependencies**: [utils.py](utils.md) (`_debug`, `_to_dict`)
 
-**Filter Count**: 6 filters
+**Filter Count**: 8 filters
 
 ## Built-in VRF Handling
 
@@ -592,6 +592,101 @@ customer-b:
       with_subelements:
         - "{{ vrf_rt_config | dict2items }}"
         - value.ipv4.export
+```
+
+---
+
+### 7. `get_vrf_rt_removals(vrf_rt_config, vrf_rt_facts=None)`
+
+#### How It Works (Plain English)
+
+`build_vrf_rt_config()` describes what route targets *should* exist; pushing them is idempotent for free because `aoscx_config`'s `match: line` mode just skips lines already present on the device. The gap that leaves is the opposite direction: a route target that used to be in NetBox and was removed is never un-configured, because nothing ever tells the device to remove it. This filter closes that gap by diffing the desired config against `aoscx_vrf_rt_facts` (gathered via REST API) and returning the route targets that are present on the device but no longer desired — the "stale" ones to remove with `no route-target ...`.
+
+#### Parameters
+
+- **vrf_rt_config** (dict): Desired config, as returned by `build_vrf_rt_config()` — keyed by VRF name, each `{'ipv4': {'export': [...], 'import': [...]}, 'ipv6': {...}}`.
+- **vrf_rt_facts** (dict, optional): Current device state (`aoscx_vrf_rt_facts`), same per-VRF shape. When `None` (REST API fact gathering disabled), there's no reliable device state to diff against, so the filter returns `[]` rather than guessing.
+
+#### Returns
+
+- **list**: `[{'vrf': str, 'address_family': 'ipv4'|'ipv6', 'direction': 'export'|'import', 'rt': str}, ...]`
+
+#### Usage Example
+
+```yaml
+- name: Find route targets to remove
+  set_fact:
+    rt_removals: "{{ vrf_rt_config | get_vrf_rt_removals(aoscx_vrf_rt_facts | default(None)) }}"
+
+- name: Remove stale route targets
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no route-target {{ item.direction }} {{ item.rt }}"
+    parents:
+      - "vrf {{ item.vrf }}"
+      - "address-family {{ item.address_family }} unicast"
+  loop: "{{ rt_removals }}"
+  when: aoscx_idempotent_mode | bool
+  vars:
+    ansible_connection: network_cli
+```
+
+---
+
+### 8. `get_vrf_changes(vrfs_in_use, vrf_rt_config, vrf_facts=None, vrf_rt_facts=None)`
+
+#### How It Works (Plain English)
+
+This is the "single source of truth" for what actually needs to change about
+VRFs on this run — it mirrors the same pattern used for interfaces
+(`identify_interface_changes.yml`) and VLANs (`identify_vlan_changes.yml`).
+Instead of just pushing every VRF/RD/route-target every time and relying on
+`aoscx_vrf`'s own idempotency and `aoscx_config`'s `match: line` to
+no-op the parts that already match, `tasks/identify_vrf_changes.yml` calls
+this filter once and `configure_vrfs.yml` only pushes the specific pieces
+that differ. This keeps `configure_vrfs.yml` in line with how the rest of
+the role reports "changed" — a genuinely no-op run should show 0 changed
+tasks, not "changed" on every VRF task because the module doesn't know it
+already matches.
+
+#### Parameters
+
+- **vrfs_in_use** (dict): Output of `get_vrfs_in_use()` — `{'vrf_names': [...], 'vrfs': {name: vrf_obj}}`. Each `vrf_obj` may carry an `rd` key (NetBox's nested VRF serializer includes it).
+- **vrf_rt_config** (dict): Output of `build_vrf_rt_config()`.
+- **vrf_facts** (dict, optional): Device REST facts (`aoscx_vrf_facts`) — `{name: {'rd': str|None}, ...}`, or `None` when REST API fact gathering is disabled.
+- **vrf_rt_facts** (dict, optional): Device REST facts (`aoscx_vrf_rt_facts`), same shape as `vrf_rt_config`, or `None` when unavailable.
+
+When `vrf_facts`/`vrf_rt_facts` are `None`, every desired VRF/RD/RT is
+returned for push — the same "push everything, let the module/CLI handle
+idempotency" fallback used by `get_vrf_rt_removals()` and
+`get_static_route_changes()` — so disabling REST API fact gathering doesn't
+silently skip configuration, it just gives up the fine-grained diff.
+
+#### Returns
+
+- **dict**:
+  ```python
+  {
+      "to_create": ["vrf_name", ...],
+      "rd_changes": [{"vrf": ..., "rd": ...}, ...],
+      "rt_additions": [{"vrf": ..., "address_family": ..., "direction": ..., "rt": ...}, ...],
+      "rt_removals": [... same shape as rt_additions ...],
+      "no_changes": ["vrf_name", ...],
+  }
+  ```
+
+#### Usage Example
+
+```yaml
+- name: Identify VRF changes
+  set_fact:
+    vrf_changes: "{{ vrfs_in_use | get_vrf_changes(vrf_rt_config, aoscx_vrf_facts | default(None), aoscx_vrf_rt_facts | default(None)) }}"
+
+- name: Create VRFs that don't exist yet
+  arubanetworks.aoscx.aoscx_vrf:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ vrf_changes.to_create }}"
 ```
 
 ---

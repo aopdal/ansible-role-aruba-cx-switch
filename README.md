@@ -3,7 +3,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/aopdal/ansible-role-aruba-cx-switch/workflows/CI/badge.svg)](https://github.com/aopdal/ansible-role-aruba-cx-switch/actions)
 [![codecov](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch/branch/main/graph/badge.svg)](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch)
-[![Ansible Role](https://img.shields.io/ansible/role/XXXXX)](https://galaxy.ansible.com/aopdal/aruba_cx_switch)
 
 Comprehensive Ansible role for configuring Aruba AOS-CX switches with **NetBox as the source of truth**.
 
@@ -41,7 +40,7 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with **NetBox a
 - **Network devices** added to NetBox with required custom fields
 - **VLANs, interfaces, and IP addresses** configured in NetBox
 
-See [NetBox Integration](#netbox-configuration) below for detailed setup requirements and [docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md) for comprehensive integration documentation.
+See [NetBox Integration](#netbox-configuration) below for detailed setup requirements.
 
 ## Getting Started
 
@@ -149,7 +148,8 @@ The `aoscx_l3_interface` module limitations (no `ip mtu` or `l3-counters` suppor
 collections:
   - arubanetworks.aoscx >= 4.5.1
   - netbox.netbox >= 3.23.0
-  - ansible.utils >= 2.0.0
+  - ansible.utils >= 6.0.0
+  - ansible.netcommon >= 8.0.0
 ```
 
 Install with:
@@ -254,41 +254,19 @@ roles:
 
 ## 📚 Documentation
 
-### Quick Start & Usage
+### Quick Start
 
 - **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide for using the role
-- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Common tasks reference
-- **[docs/README_DOCS.md](docs/README_DOCS.md)** - Complete documentation index
 
-### NetBox Integration (Essential)
+### Developer / Environment Docs
 
-- **[docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md)** - **Required reading** - Comprehensive NetBox integration guide
-    - Custom fields required for device configuration
-    - Config context structure and examples
-    - NetBox inventory plugin setup
-    - Troubleshooting NetBox integration issues
+- **[docs/WORKSPACE.md](docs/WORKSPACE.md)** - Multi-folder devcontainer workspace setup
+- **[docs/DEVCONTAINER_MOUNTS.md](docs/DEVCONTAINER_MOUNTS.md)** - Mounting additional folders into the devcontainer
+- **[docs/DOCS_SYNC_WORKFLOW.md](docs/DOCS_SYNC_WORKFLOW.md)** - How this README syncs to `docs/index.md`
+- **[docs/GITHUB_ACTIONS_DEPLOYMENT.md](docs/GITHUB_ACTIONS_DEPLOYMENT.md)** - Deploying the docs site to your own server
+- **[docs/ANSIBLE_CACHE_DIRECTORY.md](docs/ANSIBLE_CACHE_DIRECTORY.md)** - What the `.ansible/` cache directory is
 
-- **[docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md)** - NetBox data transformation
-    - 36 custom filters for VLAN, VRF, interface, OSPF, BGP, and REST API operations
-    - Critical for understanding how the role processes NetBox data
-
-### Configuration Guides
-
-- **[docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md)** - Base system (banner, NTP, DNS, timezone)
-- **[docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN management workflow
-- **[docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)** - BGP/EVPN fabric configuration
-- **[docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md)** - Tag-dependent tasks (BGP, OSPF, VSX)
-
-### Developer Documentation
-
-For contributors and developers:
-
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Complete development guide
-    - Dev Container setup (recommended)
-    - Local development environment setup
-    - Testing and code standards
-
-- **[docs/TESTING.md](docs/TESTING.md)** - Consolidated testing guide (unit tests, lab setup, integration, scripts, tag tests)
+> **Note:** Feature-specific configuration guides (NetBox integration, filter plugins, VLAN, BGP, OSPF, EVPN/VXLAN, STP, VSX, port-access, etc.) haven't been written yet - `docs/` currently only covers the dev environment and quick start. This section will grow as those are added.
 
 ### Documentation Site
 
@@ -354,7 +332,7 @@ aoscx_configure_vlans_all: false
 
 # NetBox VLAN group slugs to exclude from the aoscx_configure_vlans_all
 # catalog (e.g. a region-scoped linknet VLAN group that shouldn't be
-# configured on access switches). See docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
+# configured on access switches).
 aoscx_configure_vlans_all_exclude_vlan_groups: []
 
 # Save configuration after changes
@@ -397,11 +375,6 @@ Plus device custom field `device_ospf: true` and
 `device_ospf_1_routerid: "10.0.0.1"`, and per-interface custom
 fields `if_ip_ospf_1_area` (and optional `if_ip_ospf_network`).
 
-For the **complete reference** — router and area configuration,
-interface custom fields, per-VRF MD5 authentication with vault
-indirection, cleartext-to-ciphertext migration, and operational
-notes — see [docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md).
-
 ### Static Routes Configuration
 
 Static routes (`forward`, `blackhole`, `reject`) are configured from a
@@ -421,9 +394,7 @@ Static routes (`forward`, `blackhole`, `reject`) are configured from a
 }
 ```
 
-Only a single next-hop per prefix is supported (no ECMP). See
-[docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)
-for the complete data model, all route fields, and idempotency notes.
+Only a single next-hop per prefix is supported (no ECMP).
 
 ### Loopback Configuration
 
@@ -589,6 +560,9 @@ vsx_keepalive_vrf: "mgmt"
 4. **ISL**: Configure ISL LAG interfaces
 5. **MCLAG**: Multi-Chassis LAG interfaces require VSX to be configured first
 
+**Note:** there's a known `vsx_isl_lag` vs. `vsx_isl_port` naming
+inconsistency to be aware of when configuring the ISL LAG interface.
+
 #### Tag-Dependent Execution
 
 VSX configuration only runs when explicitly requested:
@@ -727,7 +701,7 @@ ansible-playbook site.yml -e aoscx_save_config=false
 - `services` - VRF-dependent services (NTP, DNS)
 - `layer1` - Physical interface configuration
 - `layer2` - All L2 configuration (VLANs, L2 interfaces, LAG, STP, port-access)
-- `layer3` - L3 interface configuration (VRFs, L3 interfaces, loopbacks) - **does NOT include OSPF/BGP/static routes**; those live under `routing`. This narrowing is deliberate: `-t layer3` should not push routing-protocol changes. See [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md).
+- `layer3` - L3 interface configuration (VRFs, L3 interfaces, loopbacks) - **does NOT include OSPF/BGP/static routes**; those live under `routing`. This narrowing is deliberate: `-t layer3` should not push routing-protocol changes.
 - `interfaces` - All interface configuration (physical, LAG, MCLAG, L2, L3)
 - `routing` - All routing protocol configuration (VRFs, OSPF, BGP, static routes)
 - `overlay` - All overlay configuration (EVPN, VXLAN)
@@ -747,8 +721,6 @@ when no `--tags` are supplied, and can be run explicitly:
 - **BGP** - Runs on `--tags bgp`, `--tags routing`, or no tags (full run). Skipped by `--tags layer3`.
 - **Static routes** - Runs on `--tags static_routes`, `--tags routing`, or no tags (full run). Skipped by `--tags layer3`.
 - **VSX** - Runs on `--tags vsx`, `--tags ha`, or no tags (full run). Skipped by `--tags interfaces`/`--tags layer3`.
-
-See [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md) for the full rationale and every meaningful `--tags` invocation walked through.
 
 ## VRF Handling
 
@@ -802,7 +774,7 @@ The role supports two configuration modes controlled by the `aoscx_idempotent_mo
     - EVPN configuration for VLANs being removed
     - VXLAN VNI and VLAN-to-VNI mappings for VLANs being removed
     - BGP neighbours ot in NetBox
-    - Orphaned VLAN SVI/loopback/sub-interfaces not in NetBox (see [`aoscx_cleanup_virtual_interfaces`](docs/VIRTUAL_INTERFACE_CLEANUP.md), default `true`) - removed **before** L3 interface configuration to avoid duplicate-IP failures when an interface is renamed in NetBox
+    - Orphaned VLAN SVI/loopback/sub-interfaces not in NetBox (see `aoscx_cleanup_virtual_interfaces`, default `true`) - removed **before** L3 interface configuration to avoid duplicate-IP failures when an interface is renamed in NetBox
 - ✅ **Intelligent cleanup** - Only removes configs not referenced in NetBox
 - ✅ **Proper cleanup order** - EVPN → VXLAN → VLAN (prevents orphaned configurations)
 - ✅ **Use case**: Ongoing management, drift detection, compliance enforcement
@@ -830,12 +802,14 @@ Both modes use `configure_l2_interfaces.yml` which intelligently handles standar
 
 ## Testing
 
-This role includes comprehensive testing. For detailed testing information, see:
+This role includes unit tests (`tests/unit/`), integration tests (`tests/integration.yml`), and Molecule tests. Run them with:
 
-- **[docs/TESTING.md](docs/TESTING.md)** - Consolidated testing guide (unit tests, lab setup, integration, scripts, tag tests)
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Development setup and workflow
-- **[tests/unit/README.md](tests/unit/README.md)** - Pointer to unit-test section
-- **[testing-scripts/README.md](testing-scripts/README.md)** - Pointer to scripts section
+```bash
+make test-quick   # lint + syntax
+make test         # full suite, includes molecule
+```
+
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for setup. A dedicated testing guide and development guide aren't written yet.
 
 ## License
 

@@ -21,11 +21,11 @@ The `vlan_filters.py` module provides comprehensive VLAN lifecycle management fu
 
 **File Location**: `netbox_filters_lib/vlan_filters.py`
 
-**Lines of Code**: 455 lines
+**Lines of Code**: 952 lines
 
 **Dependencies**: [utils.py](utils.md) (`_debug`)
 
-**Filter Count**: 8 filters + 1 parser
+**Filter Count**: 14 filters (8 documented below as numbered filters, plus `filter_out_vlan_groups`, `get_vlans_needing_igmp_update`, `get_vlans_needing_voice_update`, and `get_vlans_needing_name_update` further down, plus the two port-access helpers at the end)
 
 ## Filters
 
@@ -801,6 +801,92 @@ L2VNI : 10100020
         state: absent
       loop: "{{ vlan_changes.vlans_to_delete }}"
       when: allow_vlan_deletion | default(false)
+```
+
+---
+
+## VLAN Group Filtering
+
+### `filter_out_vlan_groups(vlans, group_slugs)`
+
+#### How It Works (Plain English)
+
+Some deployments use `aoscx_configure_vlans_all: true`, which treats *every* VLAN available to the device as "in use" (rather than only VLANs actually assigned to an interface — see [README.md](../../README.md) for that variable). That's convenient, but it also means VLANs from a region-scoped or purely organisational NetBox VLAN group (e.g. a shared "linknet" group used only for point-to-point routed links, never as a switch VLAN) get swept in and pushed to the device too. This filter removes VLANs that belong to one of the named NetBox VLAN groups (matched by group *slug*) from the list, while leaving alone any VLAN that isn't in one of those groups — including VLANs that are genuinely referenced by an interface, which this filter doesn't know or care about.
+
+#### Parameters
+
+- **vlans** (list): List of VLAN objects from NetBox. Each may have a `group` dict with a `slug` key; VLANs with no `group` are always kept.
+- **group_slugs** (list): List of NetBox VLAN group slugs to exclude. A falsy/empty list means no filtering (all VLANs are kept).
+
+#### Returns
+
+- **list**: VLAN objects whose group slug is *not* in `group_slugs`.
+
+#### Usage Example
+
+```yaml
+- name: Get all VLANs available to this device
+  set_fact:
+    all_device_vlans: "{{ netbox_vlans }}"  # aoscx_configure_vlans_all: true
+
+- name: Drop the shared linknet VLAN group from the catalog
+  set_fact:
+    device_vlans: "{{ all_device_vlans | filter_out_vlan_groups(['linknet-vlans']) }}"
+```
+
+---
+
+## Idempotent Setting Updates (IGMP / Voice / Name)
+
+These three filters all follow the same shape as `get_vlans_needing_changes`
+(compare NetBox's desired state to the device's current state, return only
+what differs) but for a single setting each, so `configure_vlans.yml` only
+pushes CLI for VLANs where that specific setting is actually wrong — instead
+of unconditionally re-pushing every VLAN's IGMP/voice/name config on every
+run. All three require **enhanced facts** (`aoscx_gather_facts_rest_api:
+true`) to compare against current device state; without them, standard
+`aoscx_facts` doesn't expose these fields and the filters have nothing to
+compare against.
+
+### `get_vlans_needing_igmp_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None)`
+
+#### Purpose
+
+Find VLANs whose NetBox `vlan_ip_igmp_snooping` custom field disagrees with
+the device's current IGMP snooping setting.
+
+#### Parameters
+
+- **device_vlans** (list): VLAN objects available for this device from NetBox.
+- **vlans_in_use_dict** (dict): Output of `get_vlans_in_use()`.
+- **enhanced_vlan_facts** (dict, optional): REST API VLAN facts (keyed by VLAN ID string), e.g. `{"101": {"igmp_snooping_enable": true, ...}, ...}`.
+
+#### Returns
+
+- **list**: VLAN objects that (a) are in use, (b) have `vlan_ip_igmp_snooping` set in NetBox, and (c) whose desired value differs from the device (when facts are available).
+
+### `get_vlans_needing_voice_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None)`
+
+Same shape as above, but compares the `vlan_voice_vlan` custom field against
+the device's voice-VLAN setting.
+
+### `get_vlans_needing_name_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None)`
+
+Same shape again, but compares NetBox's `name`/`description` against the
+device's current VLAN name/description.
+
+#### Usage Example (all three)
+
+```yaml
+- name: Determine which in-use VLANs need an IGMP snooping change
+  set_fact:
+    vlans_igmp_update: "{{ device_vlans | get_vlans_needing_igmp_update(vlans_in_use, aoscx_enhanced_vlan_facts | default(None)) }}"
+
+- name: Push IGMP snooping only where it actually changed
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: "{{ item.vid }}"
+    ip_igmp_snooping: "{{ item.custom_fields.vlan_ip_igmp_snooping }}"
+  loop: "{{ vlans_igmp_update }}"
 ```
 
 ---

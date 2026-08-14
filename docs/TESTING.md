@@ -18,10 +18,12 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 - [Testing Scripts](#testing-scripts)
 - [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
 - [Tag-Dependent Task Testing](#tag-dependent-task-testing)
+- [Real-Device Validation (Sibling Projects)](#real-device-validation-sibling-projects)
 
 ## Overview
 
-This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
+This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**,
+all of which run inside this repository:
 
 1. ✅ **Python Unit Tests** (`pytest`) - Tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
@@ -31,6 +33,14 @@ This role includes comprehensive CI/CD testing infrastructure with **8 layers of
 6. ✅ **Integration Testing** - Full playbook testing
 7. ✅ **Pre-commit Hooks** - Automated checks before commits
 8. ✅ **CI/CD Pipeline** - GitHub Actions automation
+
+None of these 8 layers run the role against a real (or realistically
+simulated) AOS-CX device with real NetBox data — they catch syntax, style,
+and logic errors, not "does this actually configure the switch the way an
+operator would expect." That's what the **sibling projects** described in
+[Real-Device Validation](#real-device-validation-sibling-projects) are for,
+and it's the step that actually matters when building or changing a
+feature — see that section before considering a feature done.
 
 ### Key Benefits
 
@@ -463,7 +473,8 @@ ansible-playbook test.yml -i inventory -v
 
 ### Network Device Testing
 
-For testing against real or simulated network devices:
+For ad-hoc testing against real or simulated network devices from within
+this repo:
 
 ```bash
 # With GNS3/EVE-NG or physical switches
@@ -472,6 +483,96 @@ ansible-playbook tests/test.yml -i production_inventory --check
 # Dry-run mode (no changes)
 ansible-playbook tests/test.yml -i production_inventory --check --diff
 ```
+
+This is useful for a quick one-off check, but it's not the role's actual
+real-device validation gate — see the next section.
+
+## Real-Device Validation (Sibling Projects)
+
+The 8 layers above run entirely inside this repository and never touch a
+real switch or a real NetBox instance. Two sibling projects (not part of
+this repo, not checked out inside the devcontainer by default — they live
+on the host, e.g. `~/code/aruba-role-testing` and `~/code/autotest-aoscx`)
+provide the testing that actually matters: does the role, run the way a
+real operator would run it, produce the config a real operator expects,
+against real (or lab) hardware and real NetBox data.
+
+### `aruba-role-testing`
+
+The lab / real-device environment: NetBox bootstrap playbooks, group_vars,
+ZTP configs, and firmware for standing up a test lab and pointing this
+role at it. See [DEVCONTAINER_MOUNTS.md](DEVCONTAINER_MOUNTS.md) and
+[WORKSPACE.md](WORKSPACE.md) for how to mount it alongside this repo in
+the devcontainer. `aoscx_test_mode: true` (see
+[PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md#selective-fact-gathering-with-aoscx_test_mode))
+is the role-side variable this workspace's report/verify-only playbooks
+rely on.
+
+### `autotest-aoscx`
+
+The **real** test suite: automation built on **StackStorm** (event-driven
+orchestration) and **Semaphore UI** (the Ansible run frontend) that
+exercises this role the way an actual operator would — applying it to
+real/lab devices via NetBox-driven inventory, not mocked facts.
+
+**The concept:** this pipeline is a *checking* harness, not where testing
+happens, in the [Rapid Software Testing](https://www.satisfice.com/rapid-software-testing)
+sense — testing is the sapient, exploratory activity of building a role
+feature (or building a report playbook's expected-vs-actual comparison)
+and finding out how AOS-CX/NetBox actually behave; checking is the
+algorithmic rerun that confirms what's already understood still holds.
+Both matter, but a green pipeline rerun is not a substitute for having
+actually explored the feature while building it.
+
+Four systems make up the pipeline:
+
+| Layer                  | Tool                          | Role in the pipeline                                                    |
+| ----------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| Source of truth          | NetBox                          | A **dedicated test instance** (not production) with device/interface/VLAN/VRF/routing config, refreshed from a production backup on demand |
+| Lab / device simulation  | EVE-NG                          | Hosts the virtual AOS-CX nodes and an OOB router; each device's NetBox `eve_ng_node` custom field maps it to a topology node |
+| Playbook execution       | Semaphore UI                    | Runs the role itself (a "configure" template) and the verification playbooks under `playbooks/report/` (a "report" template) |
+| Orchestration            | StackStorm (Orquesta workflows) | Sequences lab prep → per-feature configure/verify cycles → connectivity test → report generation, via the `aoscx_test` pack (entry workflow `run_tests_l2_fabric`, input `region_name`) |
+
+StackStorm orchestration is split across four packs — only `aoscx_test`
+has AOS-CX-testing-specific logic, the rest are generic, swagger-generated
+REST wrappers or lab control that regenerate when the underlying product's
+API version changes:
+
+| Pack          | Purpose                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| `aoscx_test`   | Test-specific workflows: lab prep, per-feature configure+report cycles, connectivity test, report index |
+| `netbox`       | Generic REST wrappers for every NetBox endpoint; queries lab devices and injects change-management drift |
+| `semaphoreui`  | Generic REST wrappers for the Semaphore UI API; starts a template and polls it to success/error/stopped  |
+| `eveng`        | Lab/node lifecycle in the EVE-NG simulator (`start_node`, `wipe_list_nodes`, `start_list_nodes`)         |
+
+This is already referenced from a few places in this repo's own docs even
+though it isn't part of it:
+
+- `report_interfaces.yml` — a report-only playbook that verifies device
+  state against NetBox intent without pushing changes (see the
+  `_ip_changes.dhcp_relay_expected`/`_actual` note in
+  [CHANGELOG.md](CHANGELOG.md)).
+- Tag-selection tests that verify the tag-narrowing behaviour described in
+  [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#testing).
+- An **idempotency-rerun check** — run the role once to apply a change,
+  then immediately run it again and assert the second run reports no
+  changes. This is the "prove nothing is broken" check: a feature that
+  looks correct on the first pass but isn't actually idempotent (pushes
+  the same command every run, or flips a setting back and forth) fails
+  here even though every layer in this repo passed.
+
+**When adding or changing a feature, `autotest-aoscx` is where the real
+verification happens** — not `make test` in this repo. The workflow is:
+build the feature here (with unit tests / molecule as usual), then add or
+update the corresponding `autotest-aoscx` scenario and run it against the
+lab (or real hardware) via Semaphore, including an idempotency rerun,
+before considering the change done. `make test-quick` / `make test` in
+this repo catch syntax and logic errors early and cheaply; they are not a
+substitute for this step.
+
+CLAUDE.md's rule not to touch `aruba-role-testing/` when fixing this role
+(unless asked) applies equally to `autotest-aoscx` — they're both external,
+environment-specific projects, not part of this role's own test suite.
 
 ## Test Data Structure
 
@@ -754,6 +855,11 @@ make test
 make pre-commit
 ```
 
+For anything beyond a docs/lint-only change, also run the change through
+`autotest-aoscx` (including an idempotency rerun) before opening the PR —
+see [Real-Device Validation](#real-device-validation-sibling-projects).
+`make test` passing does not mean the feature actually works on a switch.
+
 ## Continuous Improvement
 
 ### Suggested Testing Workflow
@@ -772,6 +878,11 @@ When adding new features:
 2. Add integration tests in `tests/`
 3. Update this documentation
 4. Ensure CI pipeline passes
+5. Add or update the corresponding scenario in `autotest-aoscx` and run it
+   (including an idempotency rerun) against the lab — see
+   [Real-Device Validation](#real-device-validation-sibling-projects). This
+   is the step that actually proves the feature works, and shouldn't be
+   skipped just because steps 1-4 passed.
 
 ## Resources
 
@@ -795,6 +906,7 @@ If you encounter issues:
 
 - [Filter-Plugin Unit Tests](#filter-plugin-unit-tests) - Filter plugin unit test reference (pytest)
 - [Testing Scripts](#testing-scripts) - Helper scripts for test environment setup
+- [Real-Device Validation](#real-device-validation-sibling-projects) - `aruba-role-testing` + `autotest-aoscx`, the sibling projects that actually validate a feature against real/lab hardware
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and workflow
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command cheat sheet
 - [CHANGELOG.md](CHANGELOG.md) - Version history and changes
@@ -1201,7 +1313,7 @@ docker-compose up -d
 ## Software stack
 os: "Ubuntu 22.04 LTS" or "Debian 12"
 python: "3.10+"
-ansible: "2.18"
+ansible-core: ">=2.19.10,<2.20.0"
 
 ## Python packages
 packages:
