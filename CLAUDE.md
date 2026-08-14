@@ -50,8 +50,12 @@ Makefile                   # Canonical entry point for lint / test / docs.
 
 The companion workspace folder `aruba-role-testing/` (sibling repo) holds the
 real-device test environment (NetBox bootstrap playbooks, group vars, ZTP
-configs, firmware). It is **not** part of this role and must not be modified
-when working on role changes unless explicitly asked.
+configs, firmware). Another sibling, `autotest-aoscx/` (StackStorm +
+Semaphore UI), is the role's actual validation gate — it applies this role
+the way a real operator would, against real/lab devices, and includes an
+idempotency-rerun check. Neither is part of this role and neither must be
+modified when working on role changes unless explicitly asked — see
+[docs/TESTING.md](docs/TESTING.md#real-device-validation-sibling-projects).
 
 ## 3. Task Orchestration (tasks/main.yml)
 
@@ -245,18 +249,21 @@ Update the relevant topic page when you touch its area:
 | Area touched                                  | Doc to update                                                                                |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Any new/changed variable in `defaults/main.yml` | [README.md](README.md) "Role Variables" + the topic doc for that feature                   |
-| VLANs / VLAN cleanup                          | [docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md), [docs/VLAN_DEVELOPER_GUIDE.md](docs/VLAN_DEVELOPER_GUIDE.md) |
+| VLANs / VLAN cleanup                          | [docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md) (includes "For Developers" section) |
 | L2 interfaces                                 | [docs/L2_INTERFACE_MODES.md](docs/L2_INTERFACE_MODES.md)                                     |
 | L3 / anycast / loopback                       | [docs/ANYCAST_GATEWAY.md](docs/ANYCAST_GATEWAY.md)                                           |
 | BGP                                           | [docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)                                       |
 | OSPF                                          | [docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md)                                     |
 | Static routes                                 | [docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)                   |
 | EVPN / VXLAN                                  | [docs/EVPN_VXLAN_CONFIGURATION.md](docs/EVPN_VXLAN_CONFIGURATION.md)                         |
+| STP                                           | [docs/STP_CONFIGURATION.md](docs/STP_CONFIGURATION.md)                                       |
+| Port-access (device-profile)                  | [docs/PORT_ACCESS_CONFIGURATION.md](docs/PORT_ACCESS_CONFIGURATION.md)                       |
+| VSX                                           | [docs/VSX_CONFIGURATION.md](docs/VSX_CONFIGURATION.md)                                       |
 | DNS / NTP / banner / timezone                 | [docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md), [docs/DNS_CONFIGURATION.md](docs/DNS_CONFIGURATION.md) |
 | Filter plugins                                | [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md), [docs/FILTER_PLUGINS_REUSE.md](docs/FILTER_PLUGINS_REUSE.md) |
 | NetBox custom fields / config context         | [docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md)                                     |
 | Tag-driven inclusion / new tag                | [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md), [docs/TESTING.md](docs/TESTING.md) (Tag-Dependent Task Testing section) |
-| Performance / fact gathering                  | [docs/PERFORMANCE_OPTIMIZATION.md](docs/PERFORMANCE_OPTIMIZATION.md), [docs/ANSIBLE_CACHE_DIRECTORY.md](docs/ANSIBLE_CACHE_DIRECTORY.md) |
+| Performance / fact gathering                  | [docs/PERFORMANCE_OPTIMIZATION.md](docs/PERFORMANCE_OPTIMIZATION.md) |
 | Templates                                     | [docs/TEMPLATE_CONFIGURATION.md](docs/TEMPLATE_CONFIGURATION.md)                             |
 | Testing infra                                 | [docs/TESTING.md](docs/TESTING.md) (single consolidated guide — includes unit tests, lab setup, scripts, tag tests) |
 | Releases                                      | [CHANGELOG.md](CHANGELOG.md), [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)             |
@@ -430,8 +437,8 @@ When acting on this repo:
 8. **Don't reorder `tasks/main.yml`** without an explicit reason; ordering
    is load-bearing (VRFs before L3, VLAN identify before VLAN config,
    cleanup last, save last).
-9. **Don't touch `aruba-role-testing/`** when fixing the role unless the
-   user asks.
+9. **Don't touch `aruba-role-testing/` or `autotest-aoscx/`** when fixing
+   the role unless the user asks.
 10. **Run `make lint` and `make test-unit`** before declaring the task
     done.
 

@@ -17,17 +17,18 @@ When configuring a switch from NetBox data, you need to sort interfaces into gro
 
 ## Overview
 
-Interface processing functionality is split into four focused modules that handle categorization, IP address matching, change detection, and (as of the F4 split below) the IP-related comparison logic that change detection calls into.
+Interface processing functionality is split into five focused modules that handle categorization, IP address matching, change detection, (as of the F4 split below) the IP-related comparison logic that change detection calls into, and orphaned virtual-interface cleanup.
 
 ### Module Structure
 
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
-| `interface_categorization.py` | 2 | 294 | L2/L3 interface categorization |
-| `interface_ip_processing.py` | 1 | 106 | IP address to interface matching |
-| `interface_change_detection.py` | 1 | 761 | Idempotent change detection (orchestration) |
-| `interface_ip_comparisons.py` | 0 (internal) | 682 | IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison |
-| **Total** | **4** | **1,843** | |
+| `interface_categorization.py` | 2 | 325 | L2/L3 interface categorization |
+| `interface_ip_processing.py` | 1 | 103 | IP address to interface matching |
+| `interface_change_detection.py` | 1 | 760 | Idempotent change detection (orchestration) |
+| `interface_ip_comparisons.py` | 0 (internal) | 681 | IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison |
+| `interface_orphans.py` | 1 | 56 | Orphaned VLAN SVI/loopback/sub-interface cleanup |
+| **Total** | **5** | **1,925** | |
 
 **Dependencies**: All modules depend on [utils.py](utils.md) (`_debug`).
 `interface_change_detection.py` additionally depends on
@@ -492,23 +493,29 @@ NetBox stores interfaces and IP addresses separately. This filter combines them 
 
 ---
 
-### 4. `get_interfaces_needing_config_changes(interfaces, device_facts)`
+### 4. `get_interfaces_needing_config_changes(interfaces, device_facts, enhanced_facts=None, dhcp_relay_facts=None, ip_helper_addresses=None)`
 
 Compares NetBox interfaces with device facts to identify which interfaces need configuration changes.
 
 #### Purpose
 
 Enables idempotent interface configuration by detecting:
-- Enabled/disabled state changes
-- Description changes
+- Enabled/disabled state changes (physical, LAG, MCLAG)
+- Description changes (all interface types, incl. virtual)
 - MTU changes
 - LAG membership changes
-- VLAN configuration changes
+- L2 VLAN configuration changes
+- L3 IP address changes (IPv4 by specific address; IPv6 fully compared when `enhanced_facts` is supplied)
+- Sub-interface encapsulation VLAN drift (requires `enhanced_facts`)
+- DHCP relay / `ip helper-address` drift (requires `dhcp_relay_facts` + `ip_helper_addresses`)
 
 #### Parameters
 
 - **interfaces** (list): List of interface objects from NetBox
-- **device_facts** (dict): Device facts from `ansible_facts`
+- **device_facts** (dict): Device facts from `ansible_facts` (i.e. `aoscx_facts`)
+- **enhanced_facts** (dict, optional): `aoscx_enhanced_interface_facts`, populated by `tasks/gather_facts_rest_api.yml` when `aoscx_gather_facts_rest_api: true`. Provides actual IPv6 addresses, VSX virtual IPs, and sub-interface `subintf_vlan` — data the plain REST/httpapi facts don't expose. Without it, IPv6 comparison and encapsulation-drift detection are skipped (IPv6 is always pushed; encapsulation changes aren't detected).
+- **dhcp_relay_facts** (dict, optional): Per-interface current relay server list, from `rest_api_to_aoscx_dhcp_relays()` — see [REST API Transforms](rest_api_transforms.md).
+- **ip_helper_addresses** (dict, optional): The `ip_helper_addresses` config_context, keyed by VRF name. Used together with `dhcp_relay_facts` for idempotent DHCP relay comparison — without both, any interface with `if_ip_helper: true` conservatively always shows as needing a change.
 
 #### Returns
 
@@ -517,9 +524,17 @@ Enables idempotent interface configuration by detecting:
   - `lag` - LAG interfaces needing changes
   - `mclag` - MCLAG interfaces needing changes
   - `l2` - L2 interfaces needing VLAN changes
-  - `l3` - L3 interfaces needing IP changes
+  - `l3` - L3 interfaces needing IP address, description, encapsulation, or DHCP relay changes (also includes VLAN SVI/loopback/sub-interface entries that only need a description update)
   - `lag_members` - Physical interfaces needing LAG assignment
   - `no_changes` - Interfaces that don't need changes
+
+  L3 entries additionally carry an `_ip_changes` dict (`ipv4_to_add`,
+  `ipv6_addresses`, `dhcp_relay_change`, `dhcp_relay_to_remove`,
+  `description_change`, `encapsulation_change`, `vrf_change`, ...) —
+  consumed by `l3_config_helpers.group_interface_ips()` /
+  `build_l3_config_lines()`. See
+  [FILTER_PLUGINS.md "L3 Interface IP Address Idempotency"](../FILTER_PLUGINS.md#l3-interface-ip-address-idempotency)
+  for the full field reference.
 
 #### Checks Performed
 
@@ -687,6 +702,58 @@ Example: Interface `1/1/10` with description `AP_Aruba` expects device descripti
         # ... L2 configuration ...
       loop: "{{ changes.l2 }}"
       when: enable_idempotent
+```
+
+---
+
+### 5. `get_virtual_interfaces_to_delete(desired_interfaces, device_interfaces)`
+
+*(module: `interface_orphans.py`)*
+
+#### Purpose
+
+Physical, LAG, and MCLAG interfaces always exist in hardware regardless of
+NetBox — you can't delete a physical port. VLAN SVIs, loopbacks, and
+sub-interfaces are different: this role creates and destroys them as
+logical objects. If NetBox is misconfigured — an interface renamed, or
+moved to a different parent — the old device-side object is never
+referenced again, but it doesn't go away on its own, and it can hold the
+same IP address as its replacement, breaking L3 configuration with a
+duplicate-IP error. This filter finds those leftovers so idempotent cleanup
+can remove them.
+
+#### How It Works (Plain English)
+
+Compares the interface names NetBox says should exist against every
+interface name the device currently reports, matches device names against
+simple patterns for "this looks like a VLAN SVI / loopback / sub-interface"
+(`vlan<N>`, `loopback<N>`, `<parent>.<N>`), and returns the ones that match
+one of those patterns but aren't in NetBox's list. Physical and LAG/MCLAG
+names never match the patterns, so they're never returned — deleting them
+isn't possible and isn't attempted.
+
+#### Parameters
+
+- **desired_interfaces** (list): NetBox `interfaces` list — dicts with a `name` key.
+- **device_interfaces** (dict): `ansible_facts.network_resources.interfaces`, keyed by interface name.
+
+#### Returns
+
+- **list**: Sorted list of virtual interface names present on the device but absent from NetBox.
+
+#### Usage Example
+
+```yaml
+- name: Identify orphaned virtual interfaces
+  set_fact:
+    orphaned_virtual_interfaces: "{{ netbox_interfaces | get_virtual_interfaces_to_delete(ansible_facts.network_resources.interfaces) }}"
+
+- name: Remove orphaned virtual interfaces
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ item }}"
+    state: absent
+  loop: "{{ orphaned_virtual_interfaces }}"
+  when: aoscx_idempotent_mode | bool
 ```
 
 ---

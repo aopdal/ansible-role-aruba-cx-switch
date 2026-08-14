@@ -72,7 +72,6 @@ nav:
         - Documentation Index: README_DOCS.md
         - Architecture:
                   - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
-                  - Visual Reference: AUTOMATION_ECOSYSTEM_DIAGRAMS.md
         - NetBox Integration:
                   - Integration Reference: NETBOX_INTEGRATION.md
                   - Filter Plugins:
@@ -88,14 +87,16 @@ nav:
                             - BGP Filters: filter_plugins/bgp_filters.md
                             - L3 Config Helpers: filter_plugins/l3_config_helpers.md
                             - REST API Transforms: filter_plugins/rest_api_transforms.md
+                            - Port Access: filter_plugins/port_access.md
+                            - Static routes: filter_plugins/static_route_filters.md
+                            - STP: filter_plugins/stp.md
+                            - VSX: filter_plugins/vsx.md
         - Configuration:
                   - Base System:
                             - Overview: BASE_CONFIGURATION.md
                             - DNS: DNS_CONFIGURATION.md
                   - VLAN Management:
                             - Workflow Overview: VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
-                            - Visual Diagrams: VLAN_WORKFLOW_DIAGRAMS.md
-                            - Developer Guide: VLAN_DEVELOPER_GUIDE.md
                             - L2 Interface Modes: L2_INTERFACE_MODES.md
                             - Anycast Gateway: ANYCAST_GATEWAY.md
                             - Virtual Interface Cleanup: VIRTUAL_INTERFACE_CLEANUP.md
@@ -105,6 +106,10 @@ nav:
                   - OSPF: OSPF_CONFIGURATION.md
                   - Static Routes: STATIC_ROUTES_CONFIGURATION.md
                   - Tag-Dependent Tasks: TAG_DEPENDENT_INCLUDES.md
+                  - VSX Configuration: VSX_CONFIGURATION.md
+                  - Port access configuration: PORT_ACCESS_CONFIGURATION.md
+                  - STP Configuration: STP_CONFIGURATION.md
+                  - Generate configs: TEMPLATE_CONFIGURATION.md
         - Development:
                   - Quick Start: QUICKSTART.md
                   - Requirements: REQUIREMENTS.md
@@ -115,13 +120,12 @@ nav:
                   - BGP EVPN Fabric: examples/bgp-evpn-fabric.md
         - Testing:
                   - Testing Guide: TESTING.md
-                  - .ansible/ Directory: ANSIBLE_CACHE_DIRECTORY.md
         - Reference:
                   - Quick Reference: QUICK_REFERENCE.md
                   - Performance Optimization: PERFORMANCE_OPTIMIZATION.md
                   - Release Process:
                             - Guide: RELEASE_PROCESS.md
-                            - Changelog: CHANGELOG.md
+                  - Code Audit: CODE_AUDIT.md
                   - Documentation Site: DOCUMENTATION_SITE.md # How to use MkDocs
                   - Documentation Sync: DOCS_SYNC_WORKFLOW.md # How README.md syncs to docs/
                   - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md

@@ -2,7 +2,7 @@
 {% if custom_fields.device_vsx == true %}
 vsx
     system-mac {{ vsx_system_mac }}
-{%   if 'lag' in vsx_keepalive_src %}
+{%   if 'lag' in vsx_isl_lag %}
     inter-switch-link {{ vsx_isl_lag | replace("lag", "lag ") }}
 {%   else %}
     inter-switch-link {{ vsx_isl_lag }}

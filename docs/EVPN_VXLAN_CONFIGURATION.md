@@ -381,4 +381,4 @@ The VXLAN task runs in three steps. If the task was interrupted between Step 2 (
 
 - [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP EVPN control plane configuration and fabric examples
 - [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md) - Base system and VLAN configuration
-- [VLAN_WORKFLOW_DIAGRAMS.md](VLAN_WORKFLOW_DIAGRAMS.md) - VLAN lifecycle and facts flow
+- [VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md#diagrams) - VLAN lifecycle and facts flow diagrams

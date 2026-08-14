@@ -19,7 +19,8 @@ This project uses multiple requirements files for different purposes. This docum
 
 **Contains:**
 
-- `ansible` >= 11.0.0, < 12.0.0 - Ansible automation platform (Ansible 11.x required; arubanetworks.aoscx collection is not compatible with Ansible 12)
+- `ansible-core` >= 2.19.10, < 2.20.0 - Ansible automation platform (pinned to 2.19.x; arubanetworks.aoscx 4.5.1 is not compatible with newer cores)
+- `ansible-lint` - Ansible best practices linter (unpinned; also present, version-pinned, in `requirements-test.txt` — see the note under [Version Pinning](#version-pinning))
 - `pyaoscx` - Aruba AOS-CX Python SDK (required by arubanetworks.aoscx collection)
 - `pynetbox` - NetBox API client (required by netbox.netbox collection)
 - `paramiko` - SSH library (required by arubanetworks.aoscx collection)
@@ -49,6 +50,10 @@ pip install -r requirements.txt
 
 - `arubanetworks.aoscx` >= 4.5.1 - Aruba AOS-CX modules
 - `netbox.netbox` >= 3.23.0 - NetBox inventory and modules
+- `ansible.utils` >= 6.0.0 - `ipaddr` and other filters used throughout tasks/templates
+- `ansible.netcommon` >= 8.0.0 - Provides the `network_cli` connection plugin used by `aoscx_config`/`aoscx_command` tasks (see [CLAUDE.md §4.2](../CLAUDE.md))
+- `community.docker` >= 3.10.2 - Molecule Docker driver (development/testing only)
+- `ansible.posix` >= 1.4.0 - Development/testing only
 
 **Install:**
 ```bash
@@ -225,8 +230,8 @@ ansible-galaxy collection install arubanetworks.aoscx --force
 
 ### Version Pinning
 
-- **requirements.txt**: Uses minimum versions (`>=`) for flexibility
-- **requirements-test.txt**: Uses compatible releases (`~=`) for stability
+- **requirements.txt**: Uses minimum versions (`>=`) for flexibility, except `ansible-core` which is capped (`>=2.19.10,<2.20.0`) because arubanetworks.aoscx 4.5.1 isn't compatible with newer cores. `ansible-lint` is listed here unpinned (for convenience when installing just `requirements.txt`); it's also listed, version-pinned, in `requirements-test.txt` — if you install both, pip resolves to whichever pin is stricter, so keep the two roughly in sync when bumping either.
+- **requirements-test.txt**: Uses minimum versions (`>=`) for flexibility, same as requirements.txt
 - **requirements.yml**: Uses minimum versions (`>=`) for collections
 
 ### Testing New Versions

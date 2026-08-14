@@ -21,11 +21,11 @@ The `ospf_filters.py` module provides OSPF (Open Shortest Path First) interface 
 
 **File Location**: `netbox_filters_lib/ospf_filters.py`
 
-**Lines of Code**: 187 lines
+**Lines of Code**: 438 lines
 
 **Dependencies**: None (standalone module)
 
-**Filter Count**: 6 filters
+**Filter Count**: 8 filters
 
 ## NetBox Custom Fields
 
@@ -638,6 +638,76 @@ Result:
   valid: true
   warnings: []
   errors: []
+```
+
+---
+
+### 7. `get_ospf_router_changes(ospf_config, ospf_router_facts=None)`
+
+#### How It Works (Plain English)
+
+Pushing OSPF router-id and area config with `aoscx_ospf_router`/`aoscx_ospf_area` on every run "works", but it means every run reports "changed" even when nothing actually needs to change, and it can't tell you *which* VRF's router-id was wrong. This filter compares the router-id/areas this role wants (`ospf_config`, built by `tasks/identify_ospf_changes.yml`) against what the device REST facts (`aoscx_ospf_router_facts`) actually report, and returns only the VRFs/areas that differ — mirroring `vrf_filters.get_vrf_changes()`.
+
+#### Parameters
+
+- **ospf_config** (dict): Normalized OSPF config as built in `tasks/identify_ospf_changes.yml` — `{'process_id': int, 'router_id': str, 'vrfs': [{'vrf': str, 'areas': [{'area': str}, ...]}, ...]}`.
+- **ospf_router_facts** (dict, optional): Device REST facts (`aoscx_ospf_router_facts`) — `{vrf: {process_id_str: {'router_id': str, 'areas': [...], 'passive_interfaces': [...]}}}`. When `None` or not a dict (REST facts unavailable, or OSPF facts weren't gathered for this device), every desired VRF/area is returned for push — same "push everything" fallback used elsewhere in the role.
+
+#### Returns
+
+- **dict**:
+  - `router_changes`: VRF entries (from `ospf_config['vrfs']`) whose router-id needs (re)configuring
+  - `area_additions`: `{'vrf': str, 'area': str}` entries for areas not yet present on the device
+  - `no_changes`: VRF names with nothing to push
+
+#### Usage Example
+
+```yaml
+- name: Determine OSPF router/area changes
+  set_fact:
+    ospf_router_changes: "{{ ospf_config | get_ospf_router_changes(aoscx_ospf_router_facts | default(None)) }}"
+
+- name: Configure router-id where it differs
+  arubanetworks.aoscx.aoscx_ospf_router:
+    vrf: "{{ item.vrf }}"
+    process_id: "{{ ospf_config.process_id }}"
+    router_id: "{{ ospf_config.router_id }}"
+  loop: "{{ ospf_router_changes.router_changes }}"
+```
+
+---
+
+### 8. `get_ospf_interface_changes(ospf_interface_items, ospf_interface_facts=None, ospf_router_facts=None, process_id=1)`
+
+#### How It Works (Plain English)
+
+The per-interface counterpart to `get_ospf_router_changes()`: compares the OSPF settings this role wants on each interface (area, network type, MD5 authentication presence, passive) against device REST facts, so only interfaces whose OSPF config actually drifted get pushed. It reuses the same network-type enum mapping and MD5-auth-presence semantics as `l3_config_helpers.group_interface_ips()` (see [L3 Config Helpers](l3_config_helpers.md)), so the two stay consistent about what counts as "OSPF auth is on" for a given interface.
+
+#### Parameters
+
+- **ospf_interface_items** (list): Desired per-interface OSPF settings.
+- **ospf_interface_facts** (dict, optional): Device REST facts (`aoscx_ospf_interface_facts`).
+- **ospf_router_facts** (dict, optional): Device REST facts (`aoscx_ospf_router_facts`) — used to resolve passive-interface state.
+- **process_id** (int, default `1`): OSPF process ID to compare against.
+
+When facts are unavailable, every item is returned for push (same fallback convention as `get_ospf_router_changes`).
+
+#### Returns
+
+- **dict**: `{"config_changes": [...], "passive_set": [...], "passive_clear": [...], "no_changes": [...]}`
+
+#### Usage Example
+
+```yaml
+- name: Determine per-interface OSPF changes
+  set_fact:
+    ospf_intf_changes: "{{ ospf_interface_items | get_ospf_interface_changes(aoscx_ospf_interface_facts | default(None), aoscx_ospf_router_facts | default(None), ospf_config.process_id) }}"
+
+- name: Push OSPF interface config only where it changed
+  arubanetworks.aoscx.aoscx_ospf_interface:
+    interface: "{{ item.name }}"
+    area: "{{ item.area }}"
+  loop: "{{ ospf_intf_changes.config_changes }}"
 ```
 
 ---

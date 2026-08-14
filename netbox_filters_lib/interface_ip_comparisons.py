@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 L3 IP-related comparison helpers for interface change detection.
 

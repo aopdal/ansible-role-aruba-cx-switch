@@ -9,20 +9,24 @@ This is the "toolbox" module that all other filter modules rely on. It provides 
 - **Debugging**: Print diagnostic messages when troubleshooting (controlled by an environment variable, so there's zero overhead in production)
 - **VLAN formatting**: Turn a list of VLAN numbers like `[10, 11, 12, 20, 21, 30]` into a compact range string `"10-12,20-21,30"` that switches understand
 - **Interface selection**: Choose which interfaces to configure based on whether you're running in standard mode (configure everything) or idempotent mode (only configure what changed)
+- **IP version checks**: Tell whether an address string is IPv4 or IPv6 (a colon means IPv6) — used everywhere an interface's addresses need to be split or filtered by version
 - **IP address extraction**: Pull IPv4 and IPv6 addresses from NetBox interface data and categorize them
 - **IP change tracking**: Tag interfaces with which IP addresses need to be added, so downstream tasks know what to configure
+- **Data shape normalisation**: Smooth over two recurring NetBox/Ansible data-shape quirks — `interface.type` sometimes arriving as a dict and sometimes as a plain string, and nested facts sometimes arriving as a JSON-encoded string instead of an already-parsed dict — so every other module can just assume "normal" Python types
 
 ---
 
 ## Overview
 
-The `utils.py` module provides core utility functions used across all filter modules. These helpers enable debugging, VLAN list formatting, interface selection logic, and IP address processing.
+The `utils.py` module provides core utility functions used across all filter modules. These helpers enable debugging, VLAN list formatting, interface selection logic, IP version detection, and IP address processing.
 
 **File Location**: `netbox_filters_lib/utils.py`
 
 **Dependencies**: None (base module)
 
-**Function Count**: 5 (2 exposed as Ansible filters, 3 internal helpers used by other modules)
+**Function Count**: 10 (4 exposed as Ansible filters — `collapse_vlan_list`, `select_interfaces_to_configure`, `is_ipv4_address`, `is_ipv6_address` — 6 internal helpers used by other modules)
+
+**Note on `is_ipv4_address` / `is_ipv6_address`**: these two functions live here, but the Ansible filter names are registered via `netbox_filters_lib/l3_config_helpers.py` (which imports them from this module and re-exports them). If you're looking for their filter-facing documentation (parameters, return value, playbook examples), see [L3 Config Helpers](l3_config_helpers.md#3-is_ipv4_address) — they're covered here only because this is where the code actually lives.
 
 ## Functions
 
@@ -497,15 +501,100 @@ populate_ip_changes(nb_interface, ipv4_to_add, ipv6_to_add)
 
 ---
 
+### `get_interface_type_value(interface)`
+
+Internal helper that reads a NetBox interface's `type` value regardless of how it was serialized.
+
+#### How It Works (Plain English)
+
+NetBox sometimes hands back `interface["type"]` as a dict (`{"value": "lag", "label": "Link Aggregation Group (LAG)"}`, the normal NetBox API shape) and sometimes as a bare string (`"lag"`, e.g. after some Ansible filtering steps flatten it). Every caller that needs to know "is this a loopback / LAG / virtual interface?" would otherwise have to special-case both shapes. This function does that once.
+
+#### Parameters
+
+- **interface** (dict): A NetBox interface object.
+
+#### Returns
+
+- **str | None**: The type string (e.g. `"lag"`, `"virtual"`), or `None` if `interface` isn't a dict or has no usable `type` field.
+
+#### Usage Example (In Python Filter Code)
+
+```python
+from .utils import get_interface_type_value
+
+if get_interface_type_value(nb_intf) == "virtual":
+    # VLAN SVI, loopback, or sub-interface
+    ...
+```
+
+---
+
+### `normalize_ipv6(addr)`
+
+Internal helper that normalizes an IPv6 address to its canonical (fully-reduced) form, so two different textual spellings of the same address compare as equal.
+
+#### How It Works (Plain English)
+
+IPv6 addresses can be written in multiple equivalent ways — `2001:db8::1` and `2001:0db8:0000:0000:0000:0000:0000:0001` are the same address. NetBox and the device's REST API don't always agree on which form they use, which would otherwise cause the idempotency comparison to see a "change" that isn't real. This function parses the address with Python's `ipaddress` module and returns its canonical string form so both sides of a comparison can be normalized before being compared.
+
+#### Parameters
+
+- **addr** (str): An IPv6 address, with or without a `/prefix` suffix.
+
+#### Returns
+
+- **tuple**: `(normalized_address_without_prefix, original_address)`. If `addr` can't be parsed as a valid IPv6 address, it falls back to `(addr_without_prefix, original_addr)` so callers can still fall back to a plain text comparison instead of crashing.
+
+#### Usage Example (In Python Filter Code)
+
+```python
+from .utils import normalize_ipv6
+
+normalized, original = normalize_ipv6("2001:db8:0:0::1/64")
+# normalized == "2001:db8::1"
+```
+
+---
+
+### `_to_dict(obj)`
+
+Internal helper that coerces a value into a `dict`, tolerating the case where Ansible handed back a JSON-encoded string instead of an already-parsed object.
+
+#### How It Works (Plain English)
+
+Ansible's fact system occasionally stores nested data (from `nb_lookup` results or REST API facts) as `AnsibleUnsafeText` — a string that happens to contain JSON — rather than a native Python dict. Code that expects `some_fact["key"]` would crash with a `TypeError` if it received the string form instead. This helper accepts either shape: if it's already a dict, it's returned unchanged; if it's a string, it's parsed as JSON; anything that fails to produce a dict returns an empty dict (`{}`) rather than raising.
+
+#### Parameters
+
+- **obj**: A dict, a JSON-encoded string, or anything else.
+
+#### Returns
+
+- **dict**: `obj` itself if already a dict; the parsed result if `obj` is a JSON string that decodes to a dict; otherwise `{}`.
+
+#### Usage Example (In Python Filter Code)
+
+```python
+from .utils import _to_dict
+
+vrf_obj = _to_dict(raw_vrf_fact)
+rd = vrf_obj.get("rd")
+```
+
+---
+
 ## Module Dependencies
 
 **Used By:**
 - [vlan_filters.py](vlan_filters.md) - VLAN operations
-- [vrf_filters.py](vrf_filters.md) - VRF operations
-- [interface_filters.py](interface_filters.md) - Interface categorization
+- [vrf_filters.py](vrf_filters.md) - VRF operations, via `_to_dict` for REST fact normalisation
+- [interface_filters.py](interface_filters.md) - Interface categorization and change detection, via `get_interface_type_value`
+- [l3_config_helpers.py](l3_config_helpers.md) - Re-exports `is_ipv4_address` / `is_ipv6_address` as their public filter names
 - [comparison.py](comparison.md) - State comparison
 
 **Imports:**
+- `ipaddress` - Standard library, used by `normalize_ipv6`
+- `json` - Standard library, used by `_to_dict`
 - `os` - Standard library for environment variable access
 
 ---
@@ -514,9 +603,15 @@ populate_ip_changes(nb_interface, ipv4_to_add, ipv6_to_add)
 
 ### Manual Testing
 
+The real unit tests for this module live in
+[tests/unit/test_utils.py](../../tests/unit/test_utils.py) and run via
+`make test-unit`. `netbox_filters_lib` sits at the role root (a sibling of
+`filter_plugins/`, not inside it — see [FILTER_PLUGINS.md](../FILTER_PLUGINS.md)
+"Structure"), so it's imported directly, not through `filter_plugins`:
+
 ```python
 # Test collapse_vlan_list
-from filter_plugins.netbox_filters_lib.utils import collapse_vlan_list
+from netbox_filters_lib.utils import collapse_vlan_list
 
 # Test cases
 assert collapse_vlan_list([10, 11, 12]) == "10-12"
@@ -552,6 +647,9 @@ ansible-playbook -i inventory site.yml
 - **`_debug()`**: Near-zero overhead when disabled (single environment variable check)
 - **`collapse_vlan_list()`**: O(n log n) due to sorting; efficient for typical VLAN counts (< 1000)
 - **`select_interfaces_to_configure()`**: O(1) list selection
+- **`is_ipv4_address()` / `is_ipv6_address()`**: O(1) — a single substring check, no parsing
+- **`normalize_ipv6()`**: One `ipaddress` parse per call; cheap at the scale (tens of addresses per device) this role runs at
+- **`_to_dict()`**: O(1) for already-dict input (the common case); a JSON parse only when Ansible handed back a string
 
 ---
 
@@ -561,6 +659,7 @@ ansible-playbook -i inventory site.yml
 2. **VLAN Ranges**: Use `collapse_vlan_list()` when displaying VLAN lists to users
 3. **Idempotent Mode**: Use `select_interfaces_to_configure()` for performance optimization
 4. **Environment Variables**: Set `DEBUG_ANSIBLE=true` only during development/troubleshooting
+5. **IP version checks**: Use `is_ipv4_address()` / `is_ipv6_address()` (via `l3_config_helpers`) instead of re-implementing the colon check inline — keeps the "IPv6 has a colon" rule in one place
 
 ---
 
@@ -569,4 +668,5 @@ ansible-playbook -i inventory site.yml
 - [Filter Plugins Overview](../FILTER_PLUGINS.md) - Main filter documentation
 - [VLAN Filters](vlan_filters.md) - VLAN operations using these utilities
 - [VRF Filters](vrf_filters.md) - VRF operations using these utilities
+- [L3 Config Helpers](l3_config_helpers.md) - Public filter docs for `is_ipv4_address` / `is_ipv6_address`
 - [Development Guide](../DEVELOPMENT.md) - Contributing to filter plugins

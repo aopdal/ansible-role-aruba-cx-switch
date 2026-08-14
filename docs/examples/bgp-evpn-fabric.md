@@ -376,10 +376,11 @@ evpn:
 vxlan:
   source_interface: "loopback0"
   udp_port: 4789
-
-bgp:
-  route_reflector_client: false  # true for leafs, false for spines
 ```
+
+Route-reflector behavior is not set via config_context — it is derived
+automatically from each device's `device_roles` (spines become route
+reflectors; see [BGP_CONFIGURATION.md](../BGP_CONFIGURATION.md#route-reflector-configuration)).
 
 See `netbox-export-sample.json` for complete example.
 

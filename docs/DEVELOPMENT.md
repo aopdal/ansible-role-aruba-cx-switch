@@ -117,48 +117,7 @@ deactivate
 
 ### Dev Container Details
 
-The dev container includes:
-
-**Base Image:** Python 3.12 (Debian-based)
-
-**Installed Tools:**
-
-- Python 3.12 with pip
-- Ansible and ansible-lint
-- yamllint
-- molecule with Docker driver
-- pre-commit
-- Git with Git LFS
-- Network tools (ping, netcat, curl)
-- Text editors (vim)
-- Utilities (jq, bash-completion)
-
-**VS Code Extensions:**
-
-- Ansible (redhat.ansible) - Syntax highlighting and validation
-- YAML (redhat.vscode-yaml) - YAML language support
-- Python (ms-python.python) - Python development
-- Pylance (ms-python.vscode-pylance) - Python type checking
-- Black Formatter (ms-python.black-formatter) - Code formatting
-- Ruff (charliermarsh.ruff) - Fast Python linting
-- GitLens (eamodio.gitlens) - Enhanced Git features
-- Error Lens (usernamehw.errorlens) - Inline error display
-- Code Spell Checker (streetsidesoftware.code-spell-checker)
-
-**Environment Variables:**
-```bash
-ANSIBLE_FORCE_COLOR=true
-ANSIBLE_HOST_KEY_CHECKING=false
-PY_COLORS=1
-PYTHONUNBUFFERED=1
-```
-
-**Useful Aliases:**
-```bash
-ansible-test      # Runs molecule test
-ansible-converge  # Runs molecule converge
-ll                # List files with details
-```
+See [DEVCONTAINER_SETUP.md](DEVCONTAINER_SETUP.md) for the full devcontainer tooling reference.
 
 ### Customizing the Dev Container
 
@@ -320,42 +279,9 @@ Then create a pull request on GitHub.
 
 ## Testing
 
-See [TESTING.md](TESTING.md) for comprehensive testing documentation.
-
-### Quick Test Commands
-
-**In Dev Container:**
-```bash
-# All commands work out of the box
-make test-quick          # Fast: lint + syntax check
-make test                # Full: includes molecule tests
-molecule test            # Full molecule test cycle
-ansible-lint             # Ansible best practices
-yamllint .               # YAML syntax and style
-pre-commit run -a        # All pre-commit checks
-```
-
-**In Virtual Environment:**
-```bash
-# Activate venv first
-source .venv/bin/activate
-
-# Then run tests
-make test-quick
-make test
-```
-
-### Test Before Commit
-
-Always run tests before committing:
-
-```bash
-# Minimum recommended
-make test-quick
-
-# Full test suite (recommended before PR)
-make test
-```
+See [TESTING.md](TESTING.md) for comprehensive testing documentation and
+[QUICK_REFERENCE.md](QUICK_REFERENCE.md) for the test-command cheat sheet
+(quick test commands, dev container vs. venv usage, pre-commit checks).
 
 ### Writing Tests
 
@@ -778,40 +704,8 @@ pip install --upgrade ansible-lint
 
 ## Quick Reference
 
-### Essential Commands
-
-```bash
-# Dev Container
-# F1 → "Dev Containers: Reopen in Container"
-
-# Virtual Environment
-source .venv/bin/activate
-
-# Testing
-make test-quick              # Fast tests
-make test                    # Full tests
-ansible-lint                 # Lint Ansible
-yamllint .                   # Lint YAML
-molecule test                # Full molecule cycle
-pre-commit run --all-files   # All pre-commit checks
-
-# Molecule Development
-molecule create              # Create test instance
-molecule converge            # Apply role
-molecule verify              # Run verification
-molecule destroy             # Clean up
-
-# Git
-git checkout -b feature/name # Create branch
-git add .                    # Stage changes
-git commit -m "message"      # Commit
-git push origin feature/name # Push
-
-# Help
-make help                    # See all make targets
-molecule --help              # Molecule help
-ansible-lint --help          # Ansible-lint help
-```
+For the full command cheat sheet (testing, molecule, git workflow), see
+[QUICK_REFERENCE.md](QUICK_REFERENCE.md).
 
 ---
 

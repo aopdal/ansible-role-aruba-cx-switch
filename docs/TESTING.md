@@ -13,15 +13,18 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 - [Test Types](#test-types)
 - [Common Commands](#common-commands)
 - [Troubleshooting](#troubleshooting)
-- [Quick Start (lab bring-up)](#quick-start-lab-bring-up)
-- [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox)
-- [Testing Scripts](#testing-scripts)
-- [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
-- [Tag-Dependent Task Testing](#tag-dependent-task-testing)
+- [Lab Environment Setup (Legacy)](#lab-environment-setup-legacy)
+  - [Quick Start (lab bring-up)](#quick-start-lab-bring-up)
+  - [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox)
+  - [Testing Scripts](#testing-scripts)
+  - [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
+  - [Tag-Dependent Task Testing](#tag-dependent-task-testing)
+- [Real-Device Validation (Sibling Projects)](#real-device-validation-sibling-projects)
 
 ## Overview
 
-This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**:
+This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**,
+all of which run inside this repository:
 
 1. ✅ **Python Unit Tests** (`pytest`) - Tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
@@ -31,6 +34,14 @@ This role includes comprehensive CI/CD testing infrastructure with **8 layers of
 6. ✅ **Integration Testing** - Full playbook testing
 7. ✅ **Pre-commit Hooks** - Automated checks before commits
 8. ✅ **CI/CD Pipeline** - GitHub Actions automation
+
+None of these 8 layers run the role against a real (or realistically
+simulated) AOS-CX device with real NetBox data — they catch syntax, style,
+and logic errors, not "does this actually configure the switch the way an
+operator would expect." That's what the **sibling projects** described in
+[Real-Device Validation](#real-device-validation-sibling-projects) are for,
+and it's the step that actually matters when building or changing a
+feature — see that section before considering a feature done.
 
 ### Key Benefits
 
@@ -463,7 +474,8 @@ ansible-playbook test.yml -i inventory -v
 
 ### Network Device Testing
 
-For testing against real or simulated network devices:
+For ad-hoc testing against real or simulated network devices from within
+this repo:
 
 ```bash
 # With GNS3/EVE-NG or physical switches
@@ -472,6 +484,96 @@ ansible-playbook tests/test.yml -i production_inventory --check
 # Dry-run mode (no changes)
 ansible-playbook tests/test.yml -i production_inventory --check --diff
 ```
+
+This is useful for a quick one-off check, but it's not the role's actual
+real-device validation gate — see the next section.
+
+## Real-Device Validation (Sibling Projects)
+
+The 8 layers above run entirely inside this repository and never touch a
+real switch or a real NetBox instance. Two sibling projects (not part of
+this repo, not checked out inside the devcontainer by default — they live
+on the host, e.g. `~/code/aruba-role-testing` and `~/code/autotest-aoscx`)
+provide the testing that actually matters: does the role, run the way a
+real operator would run it, produce the config a real operator expects,
+against real (or lab) hardware and real NetBox data.
+
+### `aruba-role-testing`
+
+The lab / real-device environment: NetBox bootstrap playbooks, group_vars,
+ZTP configs, and firmware for standing up a test lab and pointing this
+role at it. See [DEVCONTAINER_MOUNTS.md](DEVCONTAINER_MOUNTS.md) and
+[WORKSPACE.md](WORKSPACE.md) for how to mount it alongside this repo in
+the devcontainer. `aoscx_test_mode: true` (see
+[PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md#selective-fact-gathering-with-aoscx_test_mode))
+is the role-side variable this workspace's report/verify-only playbooks
+rely on.
+
+### `autotest-aoscx`
+
+The **real** test suite: automation built on **StackStorm** (event-driven
+orchestration) and **Semaphore UI** (the Ansible run frontend) that
+exercises this role the way an actual operator would — applying it to
+real/lab devices via NetBox-driven inventory, not mocked facts.
+
+**The concept:** this pipeline is a *checking* harness, not where testing
+happens, in the [Rapid Software Testing](https://www.satisfice.com/rapid-software-testing)
+sense — testing is the sapient, exploratory activity of building a role
+feature (or building a report playbook's expected-vs-actual comparison)
+and finding out how AOS-CX/NetBox actually behave; checking is the
+algorithmic rerun that confirms what's already understood still holds.
+Both matter, but a green pipeline rerun is not a substitute for having
+actually explored the feature while building it.
+
+Four systems make up the pipeline:
+
+| Layer                  | Tool                          | Role in the pipeline                                                    |
+| ----------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| Source of truth          | NetBox                          | A **dedicated test instance** (not production) with device/interface/VLAN/VRF/routing config, refreshed from a production backup on demand |
+| Lab / device simulation  | EVE-NG                          | Hosts the virtual AOS-CX nodes and an OOB router; each device's NetBox `eve_ng_node` custom field maps it to a topology node |
+| Playbook execution       | Semaphore UI                    | Runs the role itself (a "configure" template) and the verification playbooks under `playbooks/report/` (a "report" template) |
+| Orchestration            | StackStorm (Orquesta workflows) | Sequences lab prep → per-feature configure/verify cycles → connectivity test → report generation, via the `aoscx_test` pack (entry workflow `run_tests_l2_fabric`, input `region_name`) |
+
+StackStorm orchestration is split across four packs — only `aoscx_test`
+has AOS-CX-testing-specific logic, the rest are generic, swagger-generated
+REST wrappers or lab control that regenerate when the underlying product's
+API version changes:
+
+| Pack          | Purpose                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| `aoscx_test`   | Test-specific workflows: lab prep, per-feature configure+report cycles, connectivity test, report index |
+| `netbox`       | Generic REST wrappers for every NetBox endpoint; queries lab devices and injects change-management drift |
+| `semaphoreui`  | Generic REST wrappers for the Semaphore UI API; starts a template and polls it to success/error/stopped  |
+| `eveng`        | Lab/node lifecycle in the EVE-NG simulator (`start_node`, `wipe_list_nodes`, `start_list_nodes`)         |
+
+This is already referenced from a few places in this repo's own docs even
+though it isn't part of it:
+
+- `report_interfaces.yml` — a report-only playbook that verifies device
+  state against NetBox intent without pushing changes (see the
+  `_ip_changes.dhcp_relay_expected`/`_actual` note in
+  [CHANGELOG.md](../CHANGELOG.md)).
+- Tag-selection tests that verify the tag-narrowing behaviour described in
+  [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#testing).
+- An **idempotency-rerun check** — run the role once to apply a change,
+  then immediately run it again and assert the second run reports no
+  changes. This is the "prove nothing is broken" check: a feature that
+  looks correct on the first pass but isn't actually idempotent (pushes
+  the same command every run, or flips a setting back and forth) fails
+  here even though every layer in this repo passed.
+
+**When adding or changing a feature, `autotest-aoscx` is where the real
+verification happens** — not `make test` in this repo. The workflow is:
+build the feature here (with unit tests / molecule as usual), then add or
+update the corresponding `autotest-aoscx` scenario and run it against the
+lab (or real hardware) via Semaphore, including an idempotency rerun,
+before considering the change done. `make test-quick` / `make test` in
+this repo catch syntax and logic errors early and cheaply; they are not a
+substitute for this step.
+
+CLAUDE.md's rule not to touch `aruba-role-testing/` when fixing this role
+(unless asked) applies equally to `autotest-aoscx` — they're both external,
+environment-specific projects, not part of this role's own test suite.
 
 ## Test Data Structure
 
@@ -754,6 +856,11 @@ make test
 make pre-commit
 ```
 
+For anything beyond a docs/lint-only change, also run the change through
+`autotest-aoscx` (including an idempotency rerun) before opening the PR —
+see [Real-Device Validation](#real-device-validation-sibling-projects).
+`make test` passing does not mean the feature actually works on a switch.
+
 ## Continuous Improvement
 
 ### Suggested Testing Workflow
@@ -772,6 +879,11 @@ When adding new features:
 2. Add integration tests in `tests/`
 3. Update this documentation
 4. Ensure CI pipeline passes
+5. Add or update the corresponding scenario in `autotest-aoscx` and run it
+   (including an idempotency rerun) against the lab — see
+   [Real-Device Validation](#real-device-validation-sibling-projects). This
+   is the step that actually proves the feature works, and shouldn't be
+   skipped just because steps 1-4 passed.
 
 ## Resources
 
@@ -795,9 +907,10 @@ If you encounter issues:
 
 - [Filter-Plugin Unit Tests](#filter-plugin-unit-tests) - Filter plugin unit test reference (pytest)
 - [Testing Scripts](#testing-scripts) - Helper scripts for test environment setup
+- [Real-Device Validation](#real-device-validation-sibling-projects) - `aruba-role-testing` + `autotest-aoscx`, the sibling projects that actually validate a feature against real/lab hardware
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and workflow
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command cheat sheet
-- [CHANGELOG.md](CHANGELOG.md) - Version history and changes
+- [CHANGELOG.md](../CHANGELOG.md) - Version history and changes
 
 ---
 
@@ -807,7 +920,18 @@ All testing infrastructure is now in place with proper virtual environment isola
 
 ---
 
-# Quick Start (lab bring-up)
+## Lab Environment Setup (Legacy)
+
+This section is the canonical home for lab bring-up and EVE-NG + NetBox
+test-environment content that previously lived in separate files
+(`docs/TESTING_QUICK_START.md`, `docs/TESTING_ENVIRONMENT.md`,
+`docs/TESTING_SCRIPTS.md`, `docs/UNIT_TESTING.md`, and
+`docs/TAG_DEPENDENT_TESTING.md`). Those standalone files are now stubs that
+point back here. It documents simulated-lab setup (EVE-NG + Docker
+NetBox); for the "does this actually work against a real device" step, see
+[Real-Device Validation](#real-device-validation-sibling-projects) instead.
+
+### Quick Start (lab bring-up)
 
 > Originally `docs/TESTING_QUICK_START.md` — condensed environment bring-up. See [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox) for full details.
 
@@ -1101,7 +1225,7 @@ flowchart TB
 
 ---
 
-# Test Environment (EVE-NG + NetBox)
+### Test Environment (EVE-NG + NetBox)
 
 > Originally `docs/TESTING_ENVIRONMENT.md` — full lab setup.
 
@@ -1201,7 +1325,7 @@ docker-compose up -d
 ## Software stack
 os: "Ubuntu 22.04 LTS" or "Debian 12"
 python: "3.10+"
-ansible: "2.18"
+ansible-core: ">=2.19.10,<2.20.0"
 
 ## Python packages
 packages:
@@ -1773,7 +1897,7 @@ To do for complete testing:
 
 ---
 
-# Testing Scripts
+### Testing Scripts
 
 > Originally `docs/TESTING_SCRIPTS.md` — helper scripts under `testing-scripts/`.
 
@@ -1902,7 +2026,7 @@ When using these scripts, organize your test environment like this:
 
 ---
 
-# Filter-Plugin Unit Tests
+### Filter-Plugin Unit Tests
 
 > Originally `docs/UNIT_TESTING.md` — pytest suite under `tests/unit/`.
 
@@ -2058,90 +2182,18 @@ See [TESTING.md](TESTING.md) for the full testing guide covering Molecule, integ
 
 ---
 
-# Tag-Dependent Task Testing
+### Tag-Dependent Task Testing
 
-> Originally `docs/TAG_DEPENDENT_TESTING.md` — verifying tag-driven inclusion.
+> Originally `docs/TAG_DEPENDENT_TESTING.md`.
 
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l production-switches -t vlans
-```
-
-#### Scenario 2: Updating BGP Neighbors
-
-```bash
-## Explicit - only BGP changes
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l border-routers -t bgp
-```
-
-#### Scenario 3: Initial Switch Deployment
-
-```bash
-## Full run - everything including routing
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l new-switch
-```
-
-#### Scenario 4: Emergency Interface Fix
-
-```bash
-## Quick - no routing protocol risk
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l problematic-switch -t interfaces
-```
-
-#### Scenario 5: Apply STP Settings Only
-
-```bash
-## Configure spanning-tree settings (global MSTP + per-interface bpdu-guard / edge-port / root-guard)
-## without touching VLANs, interfaces, or routing protocols
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l access-switches -t stp
-```
-
-### Verification Script
-
-Create a test script to verify tag behavior:
-
-```bash
-#!/bin/bash
-## test-tag-dependencies.sh
-
-INVENTORY="netbox_inv_int.yml"
-PLAYBOOK="configure_aoscx.yml"
-LIMIT="z13-cx3"
-
-echo "=== Testing Tag Dependencies ==="
-echo
-
-echo "1. Testing -t vlans (should NOT show routing):"
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t vlans --list-tasks | grep -E "(OSPF|BGP|VSX)" && echo "❌ FAIL: Routing tasks included" || echo "✅ PASS: No routing tasks"
-echo
-
-echo "2. Testing -t routing (should show OSPF and BGP):"
-ROUTING_COUNT=$(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t routing --list-tasks | grep -E "(OSPF|BGP)" | wc -l)
-if [ "$ROUTING_COUNT" -eq 2 ]; then
-    echo "✅ PASS: Both routing protocols included (VRFs also run but not grep'd here)"
-else
-    echo "❌ FAIL: Expected 2 routing tasks, got $ROUTING_COUNT (ensure device_ospf and device_bgp custom fields are true)"
-fi
-echo
-
-echo "3. Testing -t stp (should show STP tasks only):"
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t stp --list-tasks | grep -E "STP|spanning" \
-    && echo "✅ PASS: STP tasks included" || echo "❌ FAIL: No STP tasks found"
-echo
-
-echo "4. Testing no tags (should show everything):"
-ALL_COUNT=$(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" --list-tasks | grep -E "(OSPF|BGP|VSX)" | wc -l)
-if [ "$ALL_COUNT" -eq 3 ]; then
-    echo "✅ PASS: All high-impact tasks included"
-else
-    echo "❌ FAIL: Expected 3 tasks, got $ALL_COUNT"
-fi
-echo
-
-echo "=== Test Complete ==="
-```
-
-Make it executable:
-
-```bash
-chmod +x test-tag-dependencies.sh
-./test-tag-dependencies.sh
-```
+Testing for the tag-narrowing design — which `--tags` include or exclude
+the BGP, OSPF, VSX, and static-route includes — is documented in
+[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#testing), including
+the full scenario walkthrough, the verification command matrix, and the
+`test-tag-dependencies.sh` script, in its
+["Verifying Tag Behavior"](TAG_DEPENDENT_INCLUDES.md#verifying-tag-behavior)
+section. Note that BGP inclusion there (and everywhere in this role) is
+gated by the NetBox BGP plugin data (`netbox_bgp_plugin_available` and
+`device_bgp_sessions | length > 0`), not by a `device_bgp` custom field —
+see [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md). See that document rather
+than duplicating the scenarios here.

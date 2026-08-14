@@ -80,7 +80,7 @@ Recommended for readable history:
 
 ## Changelog Management
 
-All changes are tracked in [`CHANGELOG.md`](CHANGELOG.md) following
+All changes are tracked in [`CHANGELOG.md`](../CHANGELOG.md) following
 [Keep a Changelog](https://keepachangelog.com/) format.
 
 ### During Development
@@ -322,4 +322,4 @@ ansible-galaxy role install aopdal.aruba_cx_switch,v0.6.0
 - [Keep a Changelog](https://keepachangelog.com/)
 - [GitHub Releases Documentation](https://docs.github.com/en/repositories/releasing-projects-on-github)
 - [Contributing Guide](CONTRIBUTING.md)
-- [CHANGELOG.md](CHANGELOG.md)
+- [CHANGELOG.md](../CHANGELOG.md)

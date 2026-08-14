@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 BGP-related filters for NetBox data transformation.
 

@@ -156,17 +156,15 @@ Edit `ansible-workspace.code-workspace` to:
 **Note:** After editing the workspace file, reload the window (F1 → "Developer: Reload Window") to see changes.
 
 ### Alternative: Add Folders Manually
-  }
-}
-```
 
-### Step 2: Open Workspace
+If you don't want to maintain a `.code-workspace` file, you can add mounted folders to the workspace directly from within VS Code:
 
-1. File → Open Workspace from File
-2. Select `ansible-workspace.code-workspace`
-3. Reopen in Container when prompted
+1. Open the devcontainer as usual (single-folder mode)
+2. **File** → **Add Folder to Workspace...**
+3. Browse to the mounted folder (e.g., `/workspaces/aruba-role-testing`) and select it
+4. VS Code prompts you to save the workspace — choose **Save Workspace As...** to persist it for next time, or leave it unsaved for a one-off session
 
-**Note:** With this method, only the first folder gets mounted in the container by default. You still need mounts for other folders.
+**Note:** Folders added this way must already be mounted (see Method 1) or cloned into the container (see Method 3) — this only adds them to the Explorer view, it does not create a bind mount. Only the main workspace folder is opened automatically when reopening in the container; additional folders added manually need to be re-added unless saved to a `.code-workspace` file.
 
 ## Method 3: Git Clone Inside Container
 

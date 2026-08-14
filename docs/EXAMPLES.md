@@ -1,14 +1,16 @@
 # Examples
 
-The `examples/` directory contains complete, runnable examples demonstrating how to use the `ansible-role-aruba-cx-switch` role.
+This page walks through documented examples showing how to use the `ansible-role-aruba-cx-switch` role. Each example has a narrative guide here plus a runnable project under the repository's [`examples/`](../examples/) directory — you can copy that directory as a starting point, or just read the narrative guide and adapt the snippets into your own project structure.
 
 ## Available Examples
 
 ### [BGP EVPN Fabric](examples/bgp-evpn-fabric.md)
 
+**Runnable project:** [`examples/bgp-evpn-fabric/`](../examples/bgp-evpn-fabric/)
+
 **Best for:** Production BGP/EVPN deployments
 
-A complete EVPN/VXLAN fabric example showing:
+A complete EVPN/VXLAN fabric walkthrough showing:
 
 - Multi-tier inventory (spines, leafs, border leafs)
 - BGP route reflector configuration
@@ -17,6 +19,16 @@ A complete EVPN/VXLAN fabric example showing:
 - Production-grade playbooks
 
 **Use this to:** Deploy a full data center fabric with EVPN/VXLAN.
+
+### OSPF Authentication
+
+**Runnable project:** [`examples/ospf-authentication/`](../examples/ospf-authentication/)
+
+**Best for:** Adding per-VRF OSPF MD5 authentication to existing deployments
+
+Shows the recommended var layout for supplying per-VRF OSPF MD5 keys to the role: an encrypted `vault.yml` holding the keys, plus a plaintext indirection layer the role consumes. Covers the cleartext-then-ciphertext workflow for rotating keys without breaking idempotency.
+
+**Use this to:** Add OSPF authentication to your inventory's `group_vars`.
 
 ## Prerequisites
 
@@ -45,8 +57,8 @@ All examples assume you have:
 
 ## Quick Start
 
-1. Choose an example directory
-2. Copy it to your working directory
+1. Read through the [BGP EVPN Fabric](examples/bgp-evpn-fabric.md) guide
+2. Copy `examples/bgp-evpn-fabric/` into your own working directory (or work from it directly)
 3. Update the inventory with your switches
 4. Configure NetBox URL and credentials
 5. Review and customize group_vars
@@ -54,14 +66,15 @@ All examples assume you have:
 
 ```bash
 cd examples/bgp-evpn-fabric
-cp inventory/hosts.yml.example inventory/hosts.yml
-# Edit inventory/hosts.yml with your switches
-ansible-playbook -i inventory/hosts.yml playbook.yml
+pip install -r requirements.txt
+ansible-galaxy install -r requirements.yml
+# Edit netbox_inventory.yml / group_vars with your NetBox URL and switches
+ansible-playbook playbook.yml
 ```
 
 ## NetBox Integration
 
-Each example includes sample NetBox data exports showing how to structure your NetBox data. You can:
+The example includes sample NetBox data showing how to structure your NetBox data. You can:
 
 - **Use the samples** to understand required NetBox data structure
 - **Import samples** into your test NetBox instance

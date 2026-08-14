@@ -23,9 +23,11 @@ The `bgp_filters.py` module provides BGP session enrichment functionality. It ta
 
 **File Location**: `netbox_filters_lib/bgp_filters.py`
 
+**Lines of Code**: 899 lines
+
 **Dependencies**: [utils.py](utils.md) (`_debug`)
 
-**Filter Count**: 2 filters
+**Filter Count**: 8 filters — `get_bgp_session_vrf_info` and `collect_ebgp_vrf_policy_config` are documented in detail below; the other six (redistribute, neighbor-options, and BFD config-building/cleanup) are documented in [Redistribution, Neighbor Options, and BFD](#redistribution-neighbor-options-and-bfd) further down.
 
 ---
 
@@ -388,6 +390,124 @@ route-map contexts.
 | Rule's `prefix` FK is null | Falls back to `prefix_custom` string |
 | `match_ip_address` is empty | Route-map entry generated without match command |
 | `set_actions` dict is empty | Route-map entry generated without set commands |
+
+---
+
+## Redistribution, Neighbor Options, and BFD
+
+The netbox-bgp plugin's session model covers neighbors, remote-AS, and
+policies, but not everything an AOS-CX BGP config can express. These six
+filters let three more things be driven from NetBox `config_context`
+instead: route redistribution, arbitrary per-neighbor CLI options, and the
+BFD toggle that per-neighbor `fall-over bfd` depends on. Each "get the
+config" filter has a matching "get the stale entries" filter, because
+`aoscx_config` only ever *adds* missing lines — something removed from
+config_context is never un-configured unless one of these cleanup filters
+finds it in `show running-config` and explicitly issues the `no` form.
+
+### `get_bgp_redistribute_config(bgp_redistribute)`
+
+#### How It Works (Plain English)
+
+Flattens the `bgp_redistribute` config_context — keyed by VRF name (`default` for the global `router bgp` instance), each mapping an address family (`ipv4`/`ipv6`) to a list of protocols to redistribute (e.g. `connected`, `static`) — into one entry per (VRF, address-family, protocol) combination, ready to loop over. Unknown/invalid address families or protocols are skipped rather than raised, matching this role's tolerant handling of malformed config_context elsewhere.
+
+#### Parameters
+
+- **bgp_redistribute** (dict): The `bgp_redistribute` config_context value.
+
+#### Returns
+
+- **list**: `[{"vrf": "default", "af": "ipv4", "protocol": "connected"}, ...]`, sorted for deterministic ordering.
+
+#### Usage Example
+
+```yaml
+- name: Build redistribute entries
+  set_fact:
+    bgp_redistribute_entries: "{{ bgp_redistribute | default({}) | get_bgp_redistribute_config }}"
+
+- name: Push redistribute config
+  arubanetworks.aoscx.aoscx_config:
+    lines: ["redistribute {{ item.protocol }}"]
+    parents: >-
+      {{ ['router bgp ' ~ local_asn] if item.vrf == 'default'
+         else ['router bgp ' ~ local_asn, 'vrf ' ~ item.vrf] }}
+  loop: "{{ bgp_redistribute_entries | selectattr('af', 'equalto', 'ipv4') | list }}"
+  vars:
+    ansible_connection: network_cli
+```
+
+### `get_stale_bgp_redistribute(bgp_redistribute, running_config, local_asn)`
+
+Cleanup counterpart to `get_bgp_redistribute_config`. Diffs the actual `show running-config` text against the desired state to find `redistribute` lines present on the device but no longer in `bgp_redistribute`, for use in idempotent cleanup.
+
+- **Parameters**: `bgp_redistribute` (same as above), `running_config` (full `show running-config` text from the device), `local_asn` (the device's BGP ASN, e.g. `device_bgp_sessions[0].local_as.asn`).
+- **Returns**: `list` of `{"vrf": str, "af": str, "protocol": str}` entries to remove.
+
+---
+
+### `get_bgp_neighbor_options_config(bgp_neighbor_options, sessions)`
+
+#### How It Works (Plain English)
+
+For CLI options the netbox-bgp plugin's session model has no field for (e.g. `soft-reconfiguration inbound`, `fall-over bfd`), this lets you list them per-neighbor in a `bgp_neighbor_options` config_context entry instead of extending the plugin. Two scopes are supported per neighbor: `ipv4`/`ipv6` (options that go inside the matching `address-family ... unicast` block, resolved against sessions matching that address family) and `general` (options that go directly under `router bgp`/`vrf <name>`, resolved against every VRF the neighbor is peered under, regardless of address family). Each neighbor IP is matched against live session data — enriched with `_vrf`/`_af` by `get_bgp_session_vrf_info` — so an IP with no matching session is skipped rather than blindly pushed to a VRF it isn't actually peered in. Lines starting with a keyword already managed elsewhere in `tasks/configure_bgp.yml` (`remote-as`, `route-map`, `activate`, ...) are also skipped, so this can't fight those tasks.
+
+#### Parameters
+
+- **bgp_neighbor_options** (dict): Keyed by neighbor IP (no CIDR), each mapping a scope (`ipv4`/`ipv6`/`general`) to a list of CLI option strings — everything after `neighbor <ip> `.
+- **sessions** (list): BGP session objects, already enriched with `_vrf`/`_af` by `get_bgp_session_vrf_info`.
+
+#### Returns
+
+- **list**: `[{"vrf": str, "af": str|None, "neighbor_ip": str, "command": str}, ...]`, sorted for deterministic ordering. `af` is `None` for `general`-scope entries.
+
+#### Usage Example
+
+```yaml
+bgp_neighbor_options:
+  172.27.250.32:
+    general:
+      - "fall-over bfd"
+    ipv4:
+      - "soft-reconfiguration inbound"
+```
+
+```yaml
+- name: Build per-neighbor CLI option lines
+  set_fact:
+    neighbor_option_lines: "{{ bgp_neighbor_options | default({}) | get_bgp_neighbor_options_config(bgp_sessions) }}"
+```
+
+### `get_stale_bgp_neighbor_options(bgp_neighbor_options, sessions, running_config, local_asn)`
+
+Cleanup counterpart to `get_bgp_neighbor_options_config`: diffs `show running-config` against the desired neighbor options to find lines that were removed from config_context and must be un-configured.
+
+- **Returns**: Same shape as `get_bgp_neighbor_options_config`, entries to remove.
+
+---
+
+### `get_bgp_bfd_enabled(bgp_neighbor_options, sessions)`
+
+#### How It Works (Plain English)
+
+AOS-CX's `bfd` command is global — a single top-level line (alongside things like `clock timezone`), not nested under `router bgp`/`vrf` and not per-VRF. It has to be enabled before any neighbor's `fall-over bfd` has any effect. Rather than requiring a second, easy-to-forget `config_context` entry that could drift out of sync with the neighbor options, this filter derives whether `bfd` is needed directly from whether any neighbor declares `fall-over bfd` in the `general` scope of `bgp_neighbor_options`.
+
+> **Note**: `bfd` is a switch-wide toggle also usable by OSPF and static routes. If those features start managing it too, this filter and `get_stale_bgp_bfd()` must be combined with their equivalent checks before deciding to push `no bfd`, so BGP's cleanup logic doesn't disable BFD for a feature it has no visibility into.
+
+#### Parameters
+
+- **bgp_neighbor_options** (dict): Same shape as `get_bgp_neighbor_options_config`.
+- **sessions** (list): BGP session objects, enriched with `_vrf`/`_af`.
+
+#### Returns
+
+- **bool**: `True` if any neighbor declares `fall-over bfd`, meaning the global `bfd` line must be present.
+
+### `get_stale_bgp_bfd(bgp_neighbor_options, sessions, running_config)`
+
+Determine whether the global `bfd` line is currently configured on the device but no BGP neighbor declares `fall-over bfd` anymore, so `no bfd` should be pushed.
+
+- **Returns**: `bool` — `True` if `no bfd` should be pushed.
 
 ---
 
