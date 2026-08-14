@@ -577,9 +577,6 @@ vsx_keepalive_vrf: "mgmt"
 4. **ISL**: Configure ISL LAG interfaces
 5. **MCLAG**: Multi-Chassis LAG interfaces require VSX to be configured first
 
-**Note:** there's a known `vsx_isl_lag` vs. `vsx_isl_port` naming
-inconsistency to be aware of when configuring the ISL LAG interface.
-
 #### Tag-Dependent Execution
 
 VSX configuration only runs when explicitly requested:

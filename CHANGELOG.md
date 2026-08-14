@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **VSX `vsx_isl_lag` vs. `vsx_isl_port` inconsistency.** Standardized on
+  `vsx_isl_lag` everywhere: `tasks/configure_vsx.yml`'s live `aoscx_vsx`
+  push now reads `vsx_isl_lag` (previously read `vsx_isl_port`, which the
+  idempotency comparison and ZTP template never used), and
+  `vsx_config_diff` no longer falls back to `vsx_isl_port`. Also fixed
+  `templates/vsx.j2` line 5, which checked `'lag' in vsx_keepalive_src` (a
+  source IP) instead of `vsx_isl_lag`. `vsx_isl_port` is no longer read
+  anywhere in the role — set `vsx_isl_lag` in config_context. Docs
+  (`docs/VSX_CONFIGURATION.md` and others) updated to match.
+
 ### Changed
 
 - `meta/main.yml`: `min_ansible_version` corrected from `2.18` to `2.19` to
@@ -59,15 +71,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compare/flatten `mac_groups` either. Setting `mac_groups` or
   `associate_mac_group` in the `port_access` config_context currently has
   no effect. Documented in `docs/PORT_ACCESS_CONFIGURATION.md`.
-- **VSX `vsx_isl_lag` vs. `vsx_isl_port` inconsistency.**
-  `tasks/configure_vsx.yml`'s live `aoscx_vsx` push reads only
-  `vsx_isl_port` (default `lag256`); `vsx_config_diff`'s idempotency
-  comparison and `templates/vsx.j2`'s ZTP output both use `vsx_isl_lag`
-  instead. Setting only `vsx_isl_lag` (as this role's docs previously
-  showed) can silently push the wrong ISL port and never converge to "no
-  changes". `templates/vsx.j2` line 5 also checks
-  `'lag' in vsx_keepalive_src` (a source IP) where it almost certainly
-  meant to check `vsx_isl_lag`. Documented in `docs/VSX_CONFIGURATION.md`.
 
 ## [0.14.0] - 2026-08-12
 

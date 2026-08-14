@@ -502,7 +502,7 @@ Config context provides **configuration data** for features. This is JSON data a
 | | `bgp_neighbor_options` | Dict (per neighbor IP) | Arbitrary per-neighbor CLI options (e.g. `fall-over bfd`) — supplements netbox-bgp plugin sessions | ✅ Active |
 | **VSX** | `vsx_system_mac` | String | VSX system MAC address | ✅ Active |
 | | `vsx_role` | String | VSX role (primary or secondary) | ✅ Active |
-| | `vsx_isl_ports` | List | Inter-Switch Link ports | ✅ Active |
+| | `vsx_isl_lag` | String | Inter-Switch Link LAG interface (e.g. `lag256`) | ✅ Active |
 | | `vsx_keepalive_peer` | String | VSX peer keepalive IP address | ✅ Active |
 | | `vsx_keepalive_src` | String | Source IP for keepalive | ✅ Active |
 | | `vsx_keepalive_vrf` | String | VRF for keepalive (default: mgmt) | ✅ Active |
@@ -1188,7 +1188,7 @@ curl -H "Authorization: Token $TOKEN" \
 
 **VSX (Stable):**
 
-- `vsx_system_mac`, `vsx_role`, `vsx_isl_ports`, `vsx_keepalive_peer`, `vsx_keepalive_src`, `vsx_keepalive_vrf`
+- `vsx_system_mac`, `vsx_role`, `vsx_isl_lag`, `vsx_keepalive_peer`, `vsx_keepalive_src`, `vsx_keepalive_vrf`
 
 **DHCP Relay (Stable):**
 

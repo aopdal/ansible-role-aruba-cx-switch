@@ -26,7 +26,7 @@ def vsx_config_diff(desired, facts):
 
     Args:
         desired: dict with keys from NetBox config_context:
-            vsx_role, vsx_system_mac, vsx_isl_lag (or vsx_isl_port),
+            vsx_role, vsx_system_mac, vsx_isl_lag,
             vsx_keepalive_vrf, vsx_keepalive_src, vsx_keepalive_peer
         facts: ``aoscx_vsx_facts`` dict from REST API (may be empty/None).
 
@@ -46,7 +46,7 @@ def vsx_config_diff(desired, facts):
         ("system_mac", desired.get("vsx_system_mac"), facts.get("system_mac")),
         (
             "isl_port",
-            desired.get("vsx_isl_lag") or desired.get("vsx_isl_port"),
+            desired.get("vsx_isl_lag"),
             _extract_dict_key(facts.get("isl_port")),
         ),
         (

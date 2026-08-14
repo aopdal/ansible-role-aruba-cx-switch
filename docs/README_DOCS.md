@@ -123,8 +123,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 ### VSX
 
 - **[VSX_CONFIGURATION.md](VSX_CONFIGURATION.md)** - VSX pairing
-  configuration, idempotency, and a known `vsx_isl_lag` vs. `vsx_isl_port`
-  inconsistency to be aware of.
+  configuration and idempotency.
 
 ### Templates (ZTP / Starting-Point Config Generation)
 

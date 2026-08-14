@@ -126,15 +126,16 @@ class TestVsxConfigDiff:
         result = vsx_config_diff(desired, facts)
         assert result["changed"] is False
 
-    def test_vsx_isl_port_fallback(self):
-        """vsx_isl_port is used when vsx_isl_lag is absent."""
+    def test_vsx_isl_port_not_read(self):
+        """vsx_isl_port is no longer a recognized key; only vsx_isl_lag is compared."""
         desired = {
             "vsx_role": "primary",
             "vsx_system_mac": "02:00:00:00:01:00",
             "vsx_isl_port": "lag256",
         }
-        result = vsx_config_diff(desired, self._FACTS_MATCH)
-        assert result["changed"] is False
+        facts = {**self._FACTS_MATCH, "isl_port": {"lag999": "/rest/v10.16/system/interfaces/lag999"}}
+        result = vsx_config_diff(desired, facts)
+        assert not any(c["field"] == "isl_port" for c in result["changes"])
 
     def test_skip_undefined_desired_fields(self):
         """Fields not in desired dict are not compared."""

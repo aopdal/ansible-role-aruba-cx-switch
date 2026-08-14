@@ -33,7 +33,6 @@
         'vsx_role': vsx_role | default(None),
         'vsx_system_mac': vsx_system_mac | default(None),
         'vsx_isl_lag': vsx_isl_lag | default(None),
-        'vsx_isl_port': vsx_isl_port | default(None),
         'vsx_keepalive_vrf': vsx_keepalive_vrf | default(None),
         'vsx_keepalive_src': vsx_keepalive_src | default(None),
         'vsx_keepalive_peer': vsx_keepalive_peer | default(None),
@@ -67,7 +66,7 @@
         keepalive_peer_ip: "{{ vsx_keepalive_peer | default('not set') }}"
         device_role: "{{ vsx_role | default('not set') }}"
         split_recovery_disable: true
-        isl_port: "{{ vsx_isl_port | default('lag256') }}"
+        isl_port: "{{ vsx_isl_lag | default('lag256') }}"
         config_sync_disable: false
         config_sync_features:
           - vsx-global

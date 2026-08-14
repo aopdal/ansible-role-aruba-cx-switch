@@ -765,7 +765,7 @@ Idempotency comparison for VSX (MCLAG peer-switch) configuration (1 filter,
 
 - **`vsx_config_diff(desired, facts)`**
     - Compares desired VSX settings from config_context (`vsx_role`,
-      `vsx_system_mac`, `vsx_isl_lag`/`vsx_isl_port`, `vsx_keepalive_vrf`,
+      `vsx_system_mac`, `vsx_isl_lag`, `vsx_keepalive_vrf`,
       `vsx_keepalive_src`, `vsx_keepalive_peer`) against `aoscx_vsx_facts`
       (REST API; may be empty/`None`)
     - Returns: `{"changed": bool, "changes": [{"field": str, "expected": ..., "actual": ...}, ...]}`

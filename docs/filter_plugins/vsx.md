@@ -51,9 +51,7 @@ parameter at once) when there's an actual change to make.
 #### Parameters
 
 - **desired** (dict): VSX settings sourced from config_context —
-  `{"vsx_role": str, "vsx_system_mac": str, "vsx_isl_lag": str|None, "vsx_isl_port": str|None, "vsx_keepalive_vrf": str, "vsx_keepalive_src": str, "vsx_keepalive_peer": str}`.
-  Either `vsx_isl_lag` or `vsx_isl_port` is used depending on how the ISL is
-  modeled in config_context.
+  `{"vsx_role": str, "vsx_system_mac": str, "vsx_isl_lag": str|None, "vsx_keepalive_vrf": str, "vsx_keepalive_src": str, "vsx_keepalive_peer": str}`.
 - **facts** (dict): `aoscx_vsx_facts` from the REST API. May be empty/`None` (e.g. `aoscx_gather_facts_rest_api: false`, or VSX facts weren't gathered for this device).
 
 #### Returns
@@ -72,7 +70,6 @@ parameter at once) when there's an actual change to make.
         'vsx_role': vsx_role | default(None),
         'vsx_system_mac': vsx_system_mac | default(None),
         'vsx_isl_lag': vsx_isl_lag | default(None),
-        'vsx_isl_port': vsx_isl_port | default(None),
         'vsx_keepalive_vrf': vsx_keepalive_vrf | default(None),
         'vsx_keepalive_src': vsx_keepalive_src | default(None),
         'vsx_keepalive_peer': vsx_keepalive_peer | default(None),
@@ -89,7 +86,7 @@ parameter at once) when there's an actual change to make.
     keepalive_src_ip: "{{ vsx_keepalive_src | default('mgmt') }}"
     keepalive_peer_ip: "{{ vsx_keepalive_peer | default('not set') }}"
     device_role: "{{ vsx_role | default('not set') }}"
-    isl_port: "{{ vsx_isl_port | default('lag256') }}"
+    isl_port: "{{ vsx_isl_lag | default('lag256') }}"
   when: vsx_diff.changed | bool
 ```
 

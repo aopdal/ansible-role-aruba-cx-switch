@@ -7,9 +7,8 @@ configuration with this role. It covers:
 2. [Config context fields](#config-context-fields)
 3. [Complete example (primary + secondary)](#complete-example-primary--secondary)
 4. [Change detection and idempotency](#change-detection-and-idempotency)
-5. [Known issue: `vsx_isl_lag` vs. `vsx_isl_port`](#known-issue-vsx_isl_lag-vs-vsx_isl_port)
-6. [Task ordering and tags](#task-ordering-and-tags)
-7. [Operational notes](#operational-notes)
+5. [Task ordering and tags](#task-ordering-and-tags)
+6. [Operational notes](#operational-notes)
 
 ## How VSX is modelled in NetBox
 
@@ -21,7 +20,7 @@ device custom field plus a set of config_context keys:
 | NetBox object | Field | Purpose |
 |---|---|---|
 | Device custom field | `device_vsx` (Boolean) | Enable/disable VSX configuration on this device |
-| Device config_context | `vsx_role`, `vsx_system_mac`, `vsx_isl_lag`/`vsx_isl_port`, `vsx_keepalive_vrf`, `vsx_keepalive_src`, `vsx_keepalive_peer` | VSX pairing parameters |
+| Device config_context | `vsx_role`, `vsx_system_mac`, `vsx_isl_lag`, `vsx_keepalive_vrf`, `vsx_keepalive_src`, `vsx_keepalive_peer` | VSX pairing parameters |
 
 Both the custom field and config_context must be set — VSX tasks are
 skipped entirely unless `custom_fields.device_vsx` is `true` **and**
@@ -35,8 +34,7 @@ unlike most others in this role). Task file:
 |---|---|---|
 | `vsx_role` | Yes | `primary` or `secondary` — exactly one of each per pair |
 | `vsx_system_mac` | Yes | Shared MAC address, identical on both peers |
-| `vsx_isl_port` | Recommended | Inter-Switch Link interface — **this is the field that actually gets pushed**, see [Known issue](#known-issue-vsx_isl_lag-vs-vsx_isl_port) below. Defaults to `lag256` if unset. |
-| `vsx_isl_lag` | Legacy/comparison-only | See [Known issue](#known-issue-vsx_isl_lag-vs-vsx_isl_port) — do not rely on this alone. |
+| `vsx_isl_lag` | Recommended | Inter-Switch Link LAG interface (e.g. `lag256`). Used for both the live `aoscx_vsx` push and idempotency comparison. Defaults to `lag256` if unset. |
 | `vsx_keepalive_peer` | Yes | IP address of the VSX peer's keepalive interface |
 | `vsx_keepalive_src` | Yes | This switch's source IP for the keepalive link |
 | `vsx_keepalive_vrf` | No (default `mgmt`) | VRF the keepalive link runs in |
@@ -54,13 +52,13 @@ device_vsx: true
 # Device config context
 vsx_role: "primary"
 vsx_system_mac: "02:00:00:00:01:00"
-vsx_isl_port: "lag256"
+vsx_isl_lag: "lag256"
 vsx_keepalive_peer: "192.168.100.2"
 vsx_keepalive_src: "192.168.100.1"
 vsx_keepalive_vrf: "mgmt"
 ```
 
-**Secondary switch** — same `vsx_system_mac` and `vsx_isl_port`, role and
+**Secondary switch** — same `vsx_system_mac` and `vsx_isl_lag`, role and
 keepalive addresses swapped:
 
 ```yaml
@@ -70,7 +68,7 @@ device_vsx: true
 ```yaml
 vsx_role: "secondary"
 vsx_system_mac: "02:00:00:00:01:00"   # identical to primary
-vsx_isl_port: "lag256"
+vsx_isl_lag: "lag256"
 vsx_keepalive_peer: "192.168.100.1"   # peer is the primary
 vsx_keepalive_src: "192.168.100.2"    # this switch's IP
 vsx_keepalive_vrf: "mgmt"
@@ -104,34 +102,6 @@ module call entirely when nothing differs.
 There is no cleanup step for VSX — disabling `device_vsx` in NetBox does
 not un-configure VSX on the device; VSX is a structural, high-impact
 setting this role deliberately never removes automatically.
-
-## Known issue: `vsx_isl_lag` vs. `vsx_isl_port`
-
-The config_context field that actually reaches the device is
-**`vsx_isl_port`** — `tasks/configure_vsx.yml`'s `aoscx_vsx` module call
-reads `vsx_isl_port | default('lag256')` and nothing else. `vsx_isl_lag` is
-**not** read by that push at all.
-
-However:
-
-- `vsx_config_diff`'s idempotency comparison prefers `vsx_isl_lag` over
-  `vsx_isl_port` (`desired.get("vsx_isl_lag") or desired.get("vsx_isl_port")`)
-  when deciding whether the ISL port "changed".
-- The ZTP template path (`templates/vsx.j2`, used only when
-  `aoscx_generate_template_config: true`) renders `vsx_isl_lag`, not
-  `vsx_isl_port`.
-
-**Practical effect**: if you set only `vsx_isl_lag` (matching the style of
-older examples of this doc) and leave `vsx_isl_port` unset, the live
-`aoscx_vsx` push silently applies the default `lag256` regardless of what
-`vsx_isl_lag` says, while the diff/idempotency check compares against your
-`vsx_isl_lag` value — a combination that can both push the wrong ISL port
-*and* never converge to "no changes" on repeat runs. **Always set
-`vsx_isl_port` explicitly** to the LAG you actually want; treat
-`vsx_isl_lag` as not currently reliable for the live push path. This is a
-known inconsistency in the role, not intended behavior — check
-`tasks/configure_vsx.yml` and `netbox_filters_lib/vsx.py` before relying on
-either variable if this hasn't been resolved yet.
 
 ## Task ordering and tags
 
