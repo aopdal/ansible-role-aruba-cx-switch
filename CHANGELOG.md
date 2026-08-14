@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-08-14
+
 ### Fixed
 
 - **VSX `vsx_isl_lag` vs. `vsx_isl_port` inconsistency.** Standardized on
