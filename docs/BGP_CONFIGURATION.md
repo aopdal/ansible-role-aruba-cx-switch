@@ -64,43 +64,6 @@ flowchart TB
 
 ## NetBox Setup
 
-### Custom Fields
-
-Two custom fields must exist on every `dcim > device` object:
-
-#### 1. Enable BGP (Boolean)
-
-```
-Name: device_bgp
-Type: Boolean
-Object Types: dcim > device
-Label: Enable BGP
-Description: Enable BGP routing on this device
-Default: False
-```
-
-#### 2. BGP Router ID (Text)
-
-```
-Name: device_bgp_routerid
-Type: Text
-Object Types: dcim > device
-Label: BGP Router ID
-Description: BGP router ID (typically loopback 0 IP address)
-Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$
-```
-
-Set per device:
-
-```yaml
-device_bgp: true
-device_bgp_routerid: "10.255.255.11"
-```
-
-Both conditions must be `true` for BGP to be configured on a device.
-
----
-
 ### NetBox BGP Plugin
 
 The [netbox-bgp](https://github.com/netbox-community/netbox-bgp) plugin provides structured BGP
@@ -312,18 +275,6 @@ flowchart TB
 | leaf-4 | spine-1, spine-2 | 2 | RR Client |
 
 **Total BGP Sessions: 8 (4 leafs × 2 spines)**
-
-### NetBox Custom Fields (Per Device)
-
-```yaml
-# spine-1
-device_bgp: true
-device_bgp_routerid: "10.255.255.1"
-
-# leaf-1
-device_bgp: true
-device_bgp_routerid: "10.255.255.11"
-```
 
 ### NetBox BGP Plugin Sessions
 
@@ -912,8 +863,9 @@ ansible spine*,leaf* -m shell -a "show bgp l2vpn evpn summary"
 # 1. Role variable enabled
 aoscx_configure_bgp: true
 
-# 2. NetBox custom field set
-device_bgp: true
+# 2. netbox-bgp plugin reachable and has active/staged/planned
+#    sessions for this device
+#    (netbox_bgp_plugin_available and device_bgp_sessions must be non-empty)
 
 # 3. Tags used correctly
 ansible-playbook configure_aoscx.yml -t bgp  # or -t routing, or no tags
@@ -921,10 +873,11 @@ ansible-playbook configure_aoscx.yml -t bgp  # or -t routing, or no tags
 
 ### Router ID Not Set
 
-Set `device_bgp_routerid` in NetBox custom fields:
+The router ID comes from the `local_address` of the device's first BGP
+session in the netbox-bgp plugin — set it there:
 
 ```
-Device → Custom Fields → device_bgp_routerid = "10.255.255.11"
+NetBox → Plugins → BGP → Sessions → <session> → Local Address = 10.255.255.11/32
 ```
 
 ### Neighbors Established but No Routes Exported
@@ -1000,8 +953,8 @@ BGP EVPN works with VXLAN configuration in this order:
 4. **Consistent Router IDs** — Use loopback IP as router ID
 5. **VRF naming** — Use consistent naming scheme across fabric
 6. **Route distinguishers** — Use format `loopback-ip:vrf-id` for uniqueness
-7. **Use netbox-bgp plugin** — For large/complex fabrics; use `config_context` only for simple
-   or quick deployments
+7. **Use netbox-bgp plugin** — It is the primary and only supported mechanism for BGP session
+   data; `config_context` is used only to supplement it (redistribution, per-neighbor options)
 
 ---
 

@@ -258,15 +258,32 @@ roles:
 
 - **[docs/QUICKSTART.md](QUICKSTART.md)** - Quick start guide for using the role
 
+### Feature / Configuration Guides
+
+Comprehensive per-feature configuration guides now exist under `docs/`.
+See **[docs/README_DOCS.md](README_DOCS.md)** for the full annotated
+index. Highlights:
+
+- **[docs/NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md)** - NetBox integration reference
+- **[docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md)** - Filter plugin reference
+- **[docs/BASE_CONFIGURATION.md](BASE_CONFIGURATION.md)** - Base system configuration (banner, timezone, NTP, DNS)
+- **[docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN change workflow
+- **[docs/EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md)** - EVPN/VXLAN configuration
+- **[docs/BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)** - BGP/EVPN configuration guide
+- **[docs/OSPF_CONFIGURATION.md](OSPF_CONFIGURATION.md)** - OSPF configuration reference
+- **[docs/STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)** - Static routes configuration
+- **[docs/STP_CONFIGURATION.md](STP_CONFIGURATION.md)** - Spanning tree configuration
+- **[docs/PORT_ACCESS_CONFIGURATION.md](PORT_ACCESS_CONFIGURATION.md)** - Port-access configuration
+- **[docs/VSX_CONFIGURATION.md](VSX_CONFIGURATION.md)** - VSX configuration
+- **[docs/TEMPLATE_CONFIGURATION.md](TEMPLATE_CONFIGURATION.md)** - ZTP starting-point config generation
+
 ### Developer / Environment Docs
 
 - **[docs/WORKSPACE.md](WORKSPACE.md)** - Multi-folder devcontainer workspace setup
 - **[docs/DEVCONTAINER_MOUNTS.md](DEVCONTAINER_MOUNTS.md)** - Mounting additional folders into the devcontainer
 - **[docs/DOCS_SYNC_WORKFLOW.md](DOCS_SYNC_WORKFLOW.md)** - How this README syncs to `docs/index.md`
 - **[docs/GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md)** - Deploying the docs site to your own server
-- **[docs/ANSIBLE_CACHE_DIRECTORY.md](ANSIBLE_CACHE_DIRECTORY.md)** - What the `.ansible/` cache directory is
-
-> **Note:** Feature-specific configuration guides (NetBox integration, filter plugins, VLAN, BGP, OSPF, EVPN/VXLAN, STP, VSX, port-access, etc.) haven't been written yet - `docs/` currently only covers the dev environment and quick start. This section will grow as those are added.
+- **[docs/DEVELOPMENT.md](DEVELOPMENT.md)** - Complete development guide (dev container, coding standards, testing)
 
 ### Documentation Site
 
@@ -809,7 +826,7 @@ make test-quick   # lint + syntax
 make test         # full suite, includes molecule
 ```
 
-See [docs/QUICKSTART.md](QUICKSTART.md) for setup. A dedicated testing guide and development guide aren't written yet.
+See [docs/QUICKSTART.md](QUICKSTART.md) for setup, and [docs/TESTING.md](TESTING.md) for the full testing guide (unit tests, lab setup, helper scripts, tag-dependent tests).
 
 ## License
 

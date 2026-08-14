@@ -13,11 +13,12 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 - [Test Types](#test-types)
 - [Common Commands](#common-commands)
 - [Troubleshooting](#troubleshooting)
-- [Quick Start (lab bring-up)](#quick-start-lab-bring-up)
-- [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox)
-- [Testing Scripts](#testing-scripts)
-- [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
-- [Tag-Dependent Task Testing](#tag-dependent-task-testing)
+- [Lab Environment Setup (Legacy)](#lab-environment-setup-legacy)
+  - [Quick Start (lab bring-up)](#quick-start-lab-bring-up)
+  - [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox)
+  - [Testing Scripts](#testing-scripts)
+  - [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
+  - [Tag-Dependent Task Testing](#tag-dependent-task-testing)
 - [Real-Device Validation (Sibling Projects)](#real-device-validation-sibling-projects)
 
 ## Overview
@@ -551,7 +552,7 @@ though it isn't part of it:
 - `report_interfaces.yml` — a report-only playbook that verifies device
   state against NetBox intent without pushing changes (see the
   `_ip_changes.dhcp_relay_expected`/`_actual` note in
-  [CHANGELOG.md](CHANGELOG.md)).
+  [CHANGELOG.md](../CHANGELOG.md)).
 - Tag-selection tests that verify the tag-narrowing behaviour described in
   [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#testing).
 - An **idempotency-rerun check** — run the role once to apply a change,
@@ -909,7 +910,7 @@ If you encounter issues:
 - [Real-Device Validation](#real-device-validation-sibling-projects) - `aruba-role-testing` + `autotest-aoscx`, the sibling projects that actually validate a feature against real/lab hardware
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and workflow
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command cheat sheet
-- [CHANGELOG.md](CHANGELOG.md) - Version history and changes
+- [CHANGELOG.md](../CHANGELOG.md) - Version history and changes
 
 ---
 
@@ -919,7 +920,18 @@ All testing infrastructure is now in place with proper virtual environment isola
 
 ---
 
-# Quick Start (lab bring-up)
+## Lab Environment Setup (Legacy)
+
+This section is the canonical home for lab bring-up and EVE-NG + NetBox
+test-environment content that previously lived in separate files
+(`docs/TESTING_QUICK_START.md`, `docs/TESTING_ENVIRONMENT.md`,
+`docs/TESTING_SCRIPTS.md`, `docs/UNIT_TESTING.md`, and
+`docs/TAG_DEPENDENT_TESTING.md`). Those standalone files are now stubs that
+point back here. It documents simulated-lab setup (EVE-NG + Docker
+NetBox); for the "does this actually work against a real device" step, see
+[Real-Device Validation](#real-device-validation-sibling-projects) instead.
+
+### Quick Start (lab bring-up)
 
 > Originally `docs/TESTING_QUICK_START.md` — condensed environment bring-up. See [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox) for full details.
 
@@ -1213,7 +1225,7 @@ flowchart TB
 
 ---
 
-# Test Environment (EVE-NG + NetBox)
+### Test Environment (EVE-NG + NetBox)
 
 > Originally `docs/TESTING_ENVIRONMENT.md` — full lab setup.
 
@@ -1885,7 +1897,7 @@ To do for complete testing:
 
 ---
 
-# Testing Scripts
+### Testing Scripts
 
 > Originally `docs/TESTING_SCRIPTS.md` — helper scripts under `testing-scripts/`.
 
@@ -2014,7 +2026,7 @@ When using these scripts, organize your test environment like this:
 
 ---
 
-# Filter-Plugin Unit Tests
+### Filter-Plugin Unit Tests
 
 > Originally `docs/UNIT_TESTING.md` — pytest suite under `tests/unit/`.
 
@@ -2170,90 +2182,18 @@ See [TESTING.md](TESTING.md) for the full testing guide covering Molecule, integ
 
 ---
 
-# Tag-Dependent Task Testing
+### Tag-Dependent Task Testing
 
-> Originally `docs/TAG_DEPENDENT_TESTING.md` — verifying tag-driven inclusion.
+> Originally `docs/TAG_DEPENDENT_TESTING.md`.
 
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l production-switches -t vlans
-```
-
-#### Scenario 2: Updating BGP Neighbors
-
-```bash
-## Explicit - only BGP changes
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l border-routers -t bgp
-```
-
-#### Scenario 3: Initial Switch Deployment
-
-```bash
-## Full run - everything including routing
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l new-switch
-```
-
-#### Scenario 4: Emergency Interface Fix
-
-```bash
-## Quick - no routing protocol risk
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l problematic-switch -t interfaces
-```
-
-#### Scenario 5: Apply STP Settings Only
-
-```bash
-## Configure spanning-tree settings (global MSTP + per-interface bpdu-guard / edge-port / root-guard)
-## without touching VLANs, interfaces, or routing protocols
-ansible-playbook -i netbox_inv_int.yml configure_aoscx.yml -l access-switches -t stp
-```
-
-### Verification Script
-
-Create a test script to verify tag behavior:
-
-```bash
-#!/bin/bash
-## test-tag-dependencies.sh
-
-INVENTORY="netbox_inv_int.yml"
-PLAYBOOK="configure_aoscx.yml"
-LIMIT="z13-cx3"
-
-echo "=== Testing Tag Dependencies ==="
-echo
-
-echo "1. Testing -t vlans (should NOT show routing):"
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t vlans --list-tasks | grep -E "(OSPF|BGP|VSX)" && echo "❌ FAIL: Routing tasks included" || echo "✅ PASS: No routing tasks"
-echo
-
-echo "2. Testing -t routing (should show OSPF and BGP):"
-ROUTING_COUNT=$(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t routing --list-tasks | grep -E "(OSPF|BGP)" | wc -l)
-if [ "$ROUTING_COUNT" -eq 2 ]; then
-    echo "✅ PASS: Both routing protocols included (VRFs also run but not grep'd here)"
-else
-    echo "❌ FAIL: Expected 2 routing tasks, got $ROUTING_COUNT (ensure device_ospf and device_bgp custom fields are true)"
-fi
-echo
-
-echo "3. Testing -t stp (should show STP tasks only):"
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" -t stp --list-tasks | grep -E "STP|spanning" \
-    && echo "✅ PASS: STP tasks included" || echo "❌ FAIL: No STP tasks found"
-echo
-
-echo "4. Testing no tags (should show everything):"
-ALL_COUNT=$(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -l "$LIMIT" --list-tasks | grep -E "(OSPF|BGP|VSX)" | wc -l)
-if [ "$ALL_COUNT" -eq 3 ]; then
-    echo "✅ PASS: All high-impact tasks included"
-else
-    echo "❌ FAIL: Expected 3 tasks, got $ALL_COUNT"
-fi
-echo
-
-echo "=== Test Complete ==="
-```
-
-Make it executable:
-
-```bash
-chmod +x test-tag-dependencies.sh
-./test-tag-dependencies.sh
-```
+Testing for the tag-narrowing design — which `--tags` include or exclude
+the BGP, OSPF, VSX, and static-route includes — is documented in
+[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#testing), including
+the full scenario walkthrough, the verification command matrix, and the
+`test-tag-dependencies.sh` script, in its
+["Verifying Tag Behavior"](TAG_DEPENDENT_INCLUDES.md#verifying-tag-behavior)
+section. Note that BGP inclusion there (and everywhere in this role) is
+gated by the NetBox BGP plugin data (`netbox_bgp_plugin_available` and
+`device_bgp_sessions | length > 0`), not by a `device_bgp` custom field —
+see [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md). See that document rather
+than duplicating the scenarios here.

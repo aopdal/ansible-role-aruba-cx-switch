@@ -67,15 +67,8 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - Configuration and cleanup phases
     - Integration with EVPN/VXLAN
     - Benefits and safety features
-
-- **[VLAN_WORKFLOW_DIAGRAMS.md](VLAN_WORKFLOW_DIAGRAMS.md)** - Visual workflow diagrams
-    - Mermaid diagrams for configuration and cleanup phases
-    - Fact dependencies visualization
-
-- **[VLAN_DEVELOPER_GUIDE.md](VLAN_DEVELOPER_GUIDE.md)** - Developer quick reference
-    - Adding new VLAN-related tasks
-    - Common patterns and best practices
-    - Available facts and debugging
+    - [Diagrams](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md#diagrams) - Mermaid diagrams for configuration/cleanup phases and fact dependencies
+    - [For Developers](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md#for-developers) - Adding new VLAN-related tasks, common patterns, available facts
 
 - **[L2_INTERFACE_MODES.md](L2_INTERFACE_MODES.md)** - L2 VLAN mode reference
     - access / tagged / tagged-all categorization rules
@@ -147,7 +140,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - Behavior matrix for different tag combinations
     - Safety improvements for daily operations
 
-- **[TAG_DEPENDENT_TESTING](TESTING.md#tag-dependent-task-testing)** - Testing tag-dependent tasks (now a section of `TESTING.md`)
+- **[Verifying Tag Behavior](TAG_DEPENDENT_INCLUDES.md#verifying-tag-behavior)** - Testing tag-dependent tasks (now a section of `TAG_DEPENDENT_INCLUDES.md`)
 
 ## Development
 
@@ -170,19 +163,17 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 - **[PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md)** - Performance tuning guide
 - **[NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md)** - NetBox integration reference
-- **[AUTOMATION_ECOSYSTEM.md](AUTOMATION_ECOSYSTEM.md)** - Architecture overview
-- **[AUTOMATION_ECOSYSTEM_DIAGRAMS.md](AUTOMATION_ECOSYSTEM_DIAGRAMS.md)** - Visual reference diagrams for the architecture overview
+- **[AUTOMATION_ECOSYSTEM.md](AUTOMATION_ECOSYSTEM.md)** - Architecture overview, with diagrams inlined next to the sections they illustrate
 - **[EXAMPLES.md](EXAMPLES.md)** - Overview of the runnable examples under [examples/](../examples/)
 - **[CODE_AUDIT.md](CODE_AUDIT.md)** - Internal code-quality audit (mostly resolved; kept for the one open item and as a historical record)
 
 ### Release Process
 
 - **[RELEASE_PROCESS.md](RELEASE_PROCESS.md)** - Release guide, versioning, changelog, workflow details
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+- **[CHANGELOG.md](../CHANGELOG.md)** - Version history
 
 ### Documentation Management
 
 - **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** - How to use MkDocs
 - **[DOCS_SYNC_WORKFLOW.md](DOCS_SYNC_WORKFLOW.md)** - How README.md syncs to docs/
 - **[GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md)** - Deploying the built MkDocs site to your own server via GitHub Actions
-- **[ANSIBLE_CACHE_DIRECTORY.md](ANSIBLE_CACHE_DIRECTORY.md)** - What the `.ansible/` cache directory is and why it's gitignored

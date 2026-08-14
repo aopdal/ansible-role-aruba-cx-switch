@@ -12,7 +12,7 @@ This role relies heavily on **NetBox** as the source of truth for network config
 
 ### 3. NetBox Standard Objects (VLANs, Interfaces, L2VPNs)
 
-### 4. NetBox Plugins (Optional: BGP Plugin)
+### 4. NetBox Plugins (netbox-bgp Plugin — required for BGP)
 
 ---
 
@@ -25,8 +25,7 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | Custom Field Name | Type | Object | Required | Purpose | Used By |
 |-------------------|------|--------|----------|---------|---------|
 | `device_anycast_gateway` | Boolean | Device | No | Enable/disable Anycast Gateway global settings | `configure_anycast_gateway.yml` |
-| `device_bgp` | Boolean | Device | Yes (for BGP) | Enable/disable BGP configuration | `configure_bgp.yml` |
-| `device_bgp_routerid` | Text | Device | Yes (for BGP) | BGP Router ID (typically loopback IP) | `configure_bgp.yml` (config_context mode) |
+| `device_bgp` | Boolean | Device | Yes (for BGP) | Enable/disable inclusion of BGP configuration tasks | `main.yml` (gates whether `configure_bgp.yml` runs at all) |
 | `device_evpn` | Boolean | Device | Yes (for EVPN) | Enable/disable EVPN configuration and cleanup | `configure_evpn.yml`, `cleanup_evpn.yml` |
 | `device_vxlan` | Boolean | Device | Yes (for VXLAN) | Enable/disable VXLAN configuration and cleanup | `configure_vxlan.yml`, `cleanup_vxlan.yml` |
 | `device_vsx` | Boolean | Device | Yes (for VSX) | Enable/disable VSX configuration | `configure_vsx.yml` |
@@ -88,32 +87,15 @@ Customization → Custom Fields → Add
 └─ Default: ☐ (unchecked)
 ```
 
-#### 3. device_bgp_routerid (Text)
+**Purpose:** Gates whether `tasks/main.yml` includes `configure_bgp.yml` at all
+(`when: aoscx_configure_bgp | bool` and `custom_fields.device_bgp | default(false) | bool`).
+There is no companion "router ID" custom field — all BGP session data (ASN, peers,
+local/remote addresses) comes exclusively from the **netbox-bgp plugin**. The router ID is
+derived at runtime from the `local_address` of the device's first BGP plugin session
+(`device_bgp_sessions[0].local_address`) — see
+[BGP_CONFIGURATION.md](BGP_CONFIGURATION.md).
 
-```
-Name: device_bgp_routerid
-Type: Text
-Object Type: dcim > device
-Label: BGP Router ID
-Description: BGP Router ID (typically loopback IP address)
-Required: No
-Validation Regex: ^(\d{1,3}\.){3}\d{1,3}$ (optional)
-```
-
-**NetBox UI:**
-
-```
-Customization → Custom Fields → Add
-├─ Name: device_bgp_routerid
-├─ Type: Text
-├─ Content Types: dcim | device
-├─ Label: BGP Router ID
-└─ Validation: ^(\d{1,3}\.){3}\d{1,3}$
-```
-
-**Note:** Only required when using `config_context` for BGP. Not needed if using netbox-bgp plugin.
-
-#### 4. device_evpn (Boolean)
+#### 3. device_evpn (Boolean)
 
 ```
 Name: device_evpn
@@ -125,7 +107,7 @@ Default: false
 Required: No
 ```
 
-#### 5. device_vxlan (Boolean)
+#### 4. device_vxlan (Boolean)
 
 ```
 Name: device_vxlan
@@ -137,7 +119,7 @@ Default: false
 Required: No
 ```
 
-#### 6. device_vsx (Boolean)
+#### 5. device_vsx (Boolean)
 
 ```
 Name: device_vsx
@@ -160,7 +142,7 @@ Customization → Custom Fields → Add
 └─ Default: ☐ (unchecked)
 ```
 
-#### 7. vlan_ip_igmp_snooping (Boolean)
+#### 6. vlan_ip_igmp_snooping (Boolean)
 
 ```
 Name: vlan_ip_igmp_snooping
@@ -203,7 +185,7 @@ custom_fields:
   vlan_ip_igmp_snooping: false  # or omit field
 ```
 
-#### 8. vlan_voice_vlan (Boolean)
+#### 7. vlan_voice_vlan (Boolean)
 
 ```
 Name: vlan_voice_vlan
@@ -246,7 +228,7 @@ custom_fields:
   vlan_voice_vlan: false  # or omit field
 ```
 
-#### 9. if_stp_bpdu_filter (Boolean — Interface)
+#### 8. if_stp_bpdu_filter (Boolean — Interface)
 
 ```
 Name: if_stp_bpdu_filter
@@ -271,7 +253,7 @@ Customization → Custom Fields → Add
 
 **Purpose:** When `true`, configures `spanning-tree bpdu-filter` on the interface — BPDUs are neither sent nor received. When `false`, configures `no spanning-tree bpdu-filter`. When null (unset), the device setting is left unchanged.
 
-#### 10. if_stp_bpdu_guard (Boolean — Interface)
+#### 9. if_stp_bpdu_guard (Boolean — Interface)
 
 ```
 Name: if_stp_bpdu_guard
@@ -296,7 +278,7 @@ Customization → Custom Fields → Add
 
 **Purpose:** When `true`, configures `spanning-tree bpdu-guard` on the interface — if a BPDU is received the port is error-disabled. Recommended on access ports facing end-hosts. When `false`, configures `no spanning-tree bpdu-guard`.
 
-#### 11. if_stp_edge_port (Boolean — Interface)
+#### 10. if_stp_edge_port (Boolean — Interface)
 
 ```
 Name: if_stp_edge_port
@@ -321,7 +303,7 @@ Customization → Custom Fields → Add
 
 **Purpose:** When `true`, configures `spanning-tree port-type admin-edge` — the port transitions directly to forwarding without going through listening/learning states (equivalent to PortFast). Recommended on access ports facing end-hosts. When `false`, configures `no spanning-tree port-type admin-edge`.
 
-#### 12. if_stp_root_guard (Boolean — Interface)
+#### 11. if_stp_root_guard (Boolean — Interface)
 
 ```
 Name: if_stp_root_guard
@@ -391,7 +373,7 @@ interface 1/1/49
     no spanning-tree bpdu-guard
 ```
 
-#### 13. if_ip_helper (Boolean — Interface)
+#### 12. if_ip_helper (Boolean — Interface)
 
 ```
 Name: if_ip_helper
@@ -446,7 +428,6 @@ interface vlan101
 custom_fields:
   device_anycast_gateway: true
   device_bgp: true
-  device_bgp_routerid: "10.255.255.11"
   device_evpn: true
   device_vxlan: true
 
@@ -454,7 +435,6 @@ custom_fields:
 custom_fields:
   device_anycast_gateway: false
   device_bgp: true
-  device_bgp_routerid: "10.255.255.1"
   device_evpn: false
   device_vxlan: false
 
@@ -475,11 +455,12 @@ Custom fields control task execution:
 when:
   - custom_fields.device_anycast_gateway | default(false) | bool
 
-# BGP configuration
+# BGP configuration (gates whether configure_bgp.yml is included at all;
+# tasks inside configure_bgp.yml additionally require the netbox-bgp plugin
+# to be reachable and to return sessions for this device)
 when:
   - aoscx_configure_bgp | bool
   - custom_fields.device_bgp | default(false) | bool
-  - "'bgp' in ansible_run_tags or 'routing' in ansible_run_tags or 'all' in ansible_run_tags"
 
 # EVPN configuration
 when:
@@ -511,8 +492,14 @@ Config context provides **configuration data** for features. This is JSON data a
 | **Base System** | `motd` | String | Message of the Day banner | ✅ Active |
 | | `timezone` | String | System timezone | ✅ Active |
 | | `ntp.servers` | List | NTP server IPs | ✅ Active |
-| | `dns.domain` | String | DNS domain name | ✅ Active |
-| | `dns.servers` | List | DNS server IPs | ✅ Active |
+| | `dns_domain_name` | String | Primary DNS domain name | ✅ Active |
+| | `dns_mgmt_nameservers` | Dict | Management-VRF nameservers (descriptive keys) | ✅ Active |
+| | `dns_name_servers` | Dict of dicts | DNS nameservers per VRF (VRF name → numeric-key dict of IPs) | ✅ Active |
+| | `dns_domain_list` | Dict | Additional DNS search domains (numeric keys) | ✅ Active |
+| | `dns_host_v4_address_mapping` | Dict | Static host-to-IPv4 mappings | ✅ Active |
+| | `dns_vrf` | String | VRF for domain/host/mgmt DNS settings | ✅ Active |
+| **BGP (supplement only)** | `bgp_redistribute` | Dict (per VRF) | Redistribute connected/static/ospf/etc. into BGP — supplements netbox-bgp plugin sessions, does not define peers/ASN | ✅ Active |
+| | `bgp_neighbor_options` | Dict (per neighbor IP) | Arbitrary per-neighbor CLI options (e.g. `fall-over bfd`) — supplements netbox-bgp plugin sessions | ✅ Active |
 | **VSX** | `vsx_system_mac` | String | VSX system MAC address | ✅ Active |
 | | `vsx_role` | String | VSX role (primary or secondary) | ✅ Active |
 | | `vsx_isl_ports` | List | Inter-Switch Link ports | ✅ Active |
@@ -566,26 +553,46 @@ Ansible access: `ntp.servers`
 
 #### DNS Configuration
 
+DNS config_context keys are **top-level, flat keys** (not nested under a `dns` object). See
+[DNS_CONFIGURATION.md](DNS_CONFIGURATION.md) for the full reference.
+
 ```json
 {
-  "dns": {
-    "domain": "example.com",
-    "servers": [
-      "10.0.0.53",
-      "10.0.0.54"
-    ],
-    "hosts": {
-      "router1": "10.0.1.1",
-      "router2": "10.0.1.2"
+  "dns_domain_name": "example.com",
+  "dns_mgmt_nameservers": {
+    "Primary": "10.0.0.53",
+    "Secondary": "10.0.0.54"
+  },
+  "dns_name_servers": {
+    "default": {
+      "0": "10.0.0.53",
+      "1": "10.0.0.54"
+    },
+    "mgmt": {
+      "0": "8.8.8.8",
+      "1": "1.1.1.1"
     }
-  }
+  },
+  "dns_domain_list": {
+    "0": "example.com",
+    "1": "corp.example.com"
+  },
+  "dns_host_v4_address_mapping": {
+    "router1": "10.0.1.1",
+    "router2": "10.0.1.2"
+  },
+  "dns_vrf": "mgmt"
 }
 ```
 
-Ansible access:
-- `dns.domain`
-- `dns.servers`
-- `dns.hosts`
+Ansible access (all top-level, consumed directly by `tasks/configure_dns.yml` via the
+`arubanetworks.aoscx.aoscx_dns` module):
+- `dns_domain_name`
+- `dns_mgmt_nameservers`
+- `dns_name_servers` — dict keyed by VRF name; each value is a numeric-key dict of server IPs
+- `dns_domain_list`
+- `dns_host_v4_address_mapping`
+- `dns_vrf`
 
 
 ### STP (MSTP) Config Context
@@ -747,9 +754,9 @@ Device Config Context (highest priority)
   "ntp": {
     "servers": ["10.0.0.1", "10.0.0.2"]
   },
-  "dns": {
-    "domain": "dc1.example.com",
-    "servers": ["10.0.0.53"]
+  "dns_domain_name": "dc1.example.com",
+  "dns_name_servers": {
+    "default": {"0": "10.0.0.53"}
   }
 }
 ```
@@ -758,26 +765,32 @@ Device Config Context (highest priority)
 
 ```json
 {
-  "bgp_as": 65000,
-  "bgp_peers": [
-    {"peer": "10.255.255.1", "remote_as": 65000}
-  ]
+  "bgp_redistribute": {
+    "default": {
+      "ipv4": ["connected", "static"]
+    }
+  }
 }
 ```
+
+Note: `bgp_redistribute` only adds redistribution config on top of the BGP sessions/peers/ASN
+that come from the **netbox-bgp plugin** — it does not define peers or an ASN itself. There is
+no config_context key that defines BGP peers or ASN; that data only comes from the plugin.
 
 **Merged Result (what Ansible sees):**
 
 ```json
 {
   "ntp": {"servers": ["10.0.0.1", "10.0.0.2"]},
-  "dns": {
-    "domain": "dc1.example.com",
-    "servers": ["10.0.0.53"]
+  "dns_domain_name": "dc1.example.com",
+  "dns_name_servers": {
+    "default": {"0": "10.0.0.53"}
   },
-  "bgp_as": 65000,
-  "bgp_peers": [
-    {"peer": "10.255.255.1", "remote_as": 65000}
-  ]
+  "bgp_redistribute": {
+    "default": {
+      "ipv4": ["connected", "static"]
+    }
+  }
 }
 ```
 
@@ -865,11 +878,17 @@ vlan.l2vpn_termination.id  # Termination exists check
 
 ## NetBox Plugins
 
-### netbox-bgp Plugin (Optional)
+### netbox-bgp Plugin (Optional but required for BGP)
 
-**Purpose:** Structured BGP data models (preferred over config_context)
+**Purpose:** Structured BGP data models — the **only** source of BGP session/peer/ASN data used
+by this role.
 
-**Status:** Hybrid mode - plugin preferred, config_context fallback
+**Status:** Required for BGP. If the plugin is not installed/reachable, or returns no sessions
+for a device, BGP configuration is simply skipped for that device (`configure_bgp.yml`'s tasks
+are all gated on `netbox_bgp_plugin_available` and `device_bgp_sessions | length > 0`). There is
+**no config_context fallback** — `config_context` can only *supplement* plugin-derived sessions
+(via `bgp_redistribute` and `bgp_neighbor_options`), it can never replace the plugin as the
+source of BGP peers or ASN. See [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md).
 
 **Plugin URL:** https://github.com/netbox-community/netbox-bgp
 
@@ -892,32 +911,40 @@ GET /api/plugins/bgp/session/?device=leaf1&status=active
 GET /api/plugins/bgp/session/?device_id=123&status=active
 ```
 
-#### Role's Hybrid Approach
+#### How the Role Queries the Plugin
 
 ```yaml
-# 1. Try netbox-bgp plugin first
-- name: Query netbox-bgp plugin
+# tasks/configure_bgp.yml queries the plugin for this device's sessions...
+- name: Query NetBox BGP plugin for sessions for this device
   ansible.builtin.uri:
-    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/"
+    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/?device={{ inventory_hostname }}&limit=0"
     headers:
       Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-  register: bgp_sessions_api
+  register: netbox_bgp_sessions_raw
   delegate_to: localhost
-  run_once: true
 
-# 2. Use plugin data if available
-- name: Configure BGP from plugin
+# ...and records whether the plugin is available and which sessions are usable.
+- name: Set BGP session facts for this device
+  ansible.builtin.set_fact:
+    netbox_bgp_plugin_available: "{{ netbox_bgp_sessions_raw.status == 200 }}"
+    device_bgp_sessions: >-
+      {{ netbox_bgp_sessions_raw.json.results | default([]) |
+         selectattr('status.value', 'in', ['active', 'staged', 'planned']) |
+         list }}
+
+# Every subsequent BGP task in configure_bgp.yml requires both of these to be true.
+# If the plugin is unreachable or returns zero usable sessions, BGP is simply not
+# configured for this device — there is no config_context-based alternative.
+- name: Configure BGP router process from netbox-bgp plugin
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - router bgp {{ device_bgp_sessions[0].local_as.asn }}
+      - bgp router-id {{ device_bgp_sessions[0].local_address.address.split('/')[0] }}
+    match: line
   when:
-    - bgp_sessions_api.status == 200
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
-  # ... configure from plugin data
-
-# 3. Fall back to config_context if plugin unavailable
-- name: Configure BGP from config_context
-  when:
-    - bgp_sessions_api.status == 404 or device_bgp_sessions | length == 0
-    - bgp_as is defined
-  # ... configure from config_context
 ```
 
 **See:** [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) for complete details.
@@ -942,7 +969,6 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 ```json
 {
   "device_bgp": true,
-  "device_bgp_routerid": "10.255.255.11",
   "device_evpn": true,
   "device_vxlan": true
 }
@@ -967,10 +993,15 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
   "ntp": {
     "servers": ["10.0.0.1"]
   },
-  "bgp_as": 65000,
-  "bgp_peers": [...]
+  "dns_domain_name": "example.com",
+  "bgp_redistribute": {
+    "default": {"ipv4": ["connected", "static"]}
+  }
 }
 ```
+
+Note: BGP peers and ASN never appear in config_context — they only come from the netbox-bgp
+plugin's session data (`/api/plugins/bgp/session/`), queried separately by `configure_bgp.yml`.
 
 ### Checking in Ansible Inventory
 
@@ -1009,31 +1040,29 @@ custom_fields:
   "ntp": {
     "servers": ["10.0.0.1", "10.0.0.2"]
   },
-  "dns": {
-    "domain": "site1.example.com",
-    "servers": ["10.0.0.53"]
+  "dns_domain_name": "site1.example.com",
+  "dns_name_servers": {
+    "default": {"0": "10.0.0.53"}
   }
 }
 ```
 
-### Pattern 3: Role-Based Configuration
+### Pattern 3: Role-Based BGP Redistribution
+
+Route reflector behaviour is **not** set via config_context — it is derived automatically from
+the device's NetBox device role (`spine`, `route-reflector`, or `rr` → all BGP neighbors become
+RR clients). BGP peers and ASN always come from the netbox-bgp plugin. The only role-based
+config_context pattern for BGP is supplementing sessions with redistribution or neighbor
+options, e.g.:
 
 ```json
-// Device Role: spine (config_context)
+// Device Role: leaf (config_context) — supplements plugin-derived sessions only
 {
-  "bgp_rr_clients": [
-    "10.255.255.11",
-    "10.255.255.12",
-    "10.255.255.13"
-  ]
-}
-
-// Device Role: leaf (config_context)
-{
-  "bgp_peers": [
-    {"peer": "10.255.255.1", "remote_as": 65000},
-    {"peer": "10.255.255.2", "remote_as": 65000}
-  ]
+  "bgp_redistribute": {
+    "default": {
+      "ipv4": ["connected", "static"]
+    }
+  }
 }
 ```
 
@@ -1081,36 +1110,37 @@ curl -H "Authorization: Token $TOKEN" \
 
 ### BGP Plugin Not Working
 
-**Symptom:** Falls back to config_context when it shouldn't
+**Symptom:** BGP is not configured on a device even though `device_bgp` is enabled
 
 **Check:**
 
 ```bash
 # Test plugin API endpoint
 curl -H "Authorization: Token $TOKEN" \
-  "$NETBOX_API/api/plugins/bgp/session/"
+  "$NETBOX_API/api/plugins/bgp/session/?device=DEVICE_NAME"
 ```
 
 **Common causes:**
 
-- Plugin not installed
-- No BGP sessions created
-- BGP sessions not in "active" or "planned" status
-- BGP sessions not assigned to device
+- Plugin not installed (all BGP tasks are skipped — there is no config_context fallback)
+- No BGP sessions created for the device
+- BGP sessions not in "active", "staged", or "planned" status
+- BGP sessions not assigned to the device
+- `device_bgp` custom field not set to `true` (gates whether `configure_bgp.yml` is
+  included at all, in `tasks/main.yml`)
 
 ---
 
 ## Summary
 
-### Custom Fields (11 total)
+### Custom Fields (12 total)
 
 **Device-level (Boolean):**
 
 | Field | Purpose |
 |-------|---------|
 | `device_anycast_gateway` | Enable Anycast Gateway global settings |
-| `device_bgp` | Enable BGP |
-| `device_bgp_routerid` | BGP Router ID (Text, config_context mode) |
+| `device_bgp` | Gate inclusion of BGP configuration tasks (`configure_bgp.yml`); actual BGP data always comes from the netbox-bgp plugin |
 | `device_evpn` | Enable EVPN |
 | `device_vxlan` | Enable VXLAN |
 | `device_vsx` | Enable VSX |
@@ -1141,7 +1171,16 @@ curl -H "Authorization: Token $TOKEN" \
 
 **Base System (Stable):**
 
-- `motd`, `timezone`, `ntp.servers`, `dns.domain`, `dns.servers`
+- `motd`, `timezone`, `ntp.servers`
+- `dns_domain_name`, `dns_mgmt_nameservers`, `dns_name_servers`, `dns_domain_list`,
+  `dns_host_v4_address_mapping`, `dns_vrf` — see [DNS_CONFIGURATION.md](DNS_CONFIGURATION.md)
+
+**BGP (Stable, supplement-only — never a peer/ASN source):**
+
+- `bgp_redistribute` — dict keyed by VRF name, redistributes connected/static/ospf/etc. into BGP
+- `bgp_neighbor_options` — dict keyed by neighbor IP, arbitrary per-neighbor CLI options
+- Both keys only add extra configuration on top of sessions/peers/ASN sourced from the
+  **netbox-bgp plugin** — see [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md)
 
 **STP / MSTP (Stable):**
 
@@ -1215,7 +1254,9 @@ The top-level key is the **VRF name** as it appears on the switch (must match th
 - ✅ **Use config_context** for configuration data
 - ✅ **Use site/region level** config_context for common settings
 - ✅ **Use device level** config_context for device-specific overrides
-- ✅ **Use netbox-bgp plugin** for BGP when possible
+- ✅ **Use netbox-bgp plugin** for BGP — it is the only supported source of BGP
+  sessions/peers/ASN; use `config_context` (`bgp_redistribute`, `bgp_neighbor_options`)
+  only to supplement plugin-derived sessions
 - ✅ **Keep config_context** for base system configuration
 - ✅ **Use L2VPN objects** for EVPN/VXLAN VNI mapping
 
@@ -1224,6 +1265,7 @@ The top-level key is the **VRF name** as it appears on the switch (must match th
 ## Related Documentation
 
 - [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md) - Base system configuration details
+- [DNS_CONFIGURATION.md](DNS_CONFIGURATION.md) - Full DNS config_context schema and examples
 - [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md) - BGP configuration and netbox-bgp plugin details
 - [EVPN_VXLAN_CONFIGURATION.md](EVPN_VXLAN_CONFIGURATION.md) - EVPN/VXLAN with L2VPNs
 - [L2_INTERFACE_MODES.md](L2_INTERFACE_MODES.md) - L2 interface configuration modes and STP interface settings

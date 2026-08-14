@@ -282,12 +282,7 @@ When making changes, update relevant documentation:
 
 ## Release Process
 
-Maintainers handle releases:
-
-1. Update version in `galaxy.yml`
-2. Update `CHANGELOG.md`
-3. Create git tag: `vX.Y.Z`
-4. GitHub Actions publishes to Ansible Galaxy
+See [RELEASE_PROCESS.md](RELEASE_PROCESS.md) for the release process.
 
 ## Getting Help
 

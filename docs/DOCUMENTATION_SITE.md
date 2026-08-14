@@ -6,7 +6,7 @@ This role uses **MkDocs with Material theme** to generate a beautiful documentat
 
 While `antsibull-docs` is excellent for Ansible Collections (modules, plugins), this role benefits more from MkDocs because:
 
-- ✅ **Rich narrative docs** - EVPN/VXLAN guides, BGP hybrid setup, migration guides0
+- ✅ **Rich narrative docs** - EVPN/VXLAN guides, BGP configuration guides
 - ✅ **Flexible organization** - Can structure docs to tell a story
 - ✅ **Beautiful presentation** - Material theme is stunning
 - ✅ **Easy maintenance** - All your existing `.md` files work directly
@@ -56,7 +56,7 @@ make docs-build
 
 When the repo becomes public or you upgrade to a paid GitHub plan, documentation can be **automatically published** to GitHub Pages:
 
-1. **Uncomment** the workflow in `.github/workflows/docs.yml`
+1. **Uncomment** the workflow in `.github/workflows/deploy-docs.yml`
 2. **Enable GitHub Pages** in repo settings:
     - Go to Settings → Pages
     - Source: Deploy from a branch
@@ -84,7 +84,6 @@ nav:
   - Home: README.md
   - Getting Started:
     - Quick Start: docs/QUICKSTART.md
-    - Setup Guide: docs/SETUP_COMPLETE.md
   - Configuration:
     - EVPN & VXLAN:
       - Configuration Guide: docs/EVPN_VXLAN_CONFIGURATION.md
@@ -194,4 +193,4 @@ Your docs will look like:
 
 ---
 
-**TL;DR:** MkDocs is the better choice for this role because you have excellent narrative documentation that tells the story of BGP hybrid setup, EVPN/VXLAN configuration, and cleanup processes. antsibull-docs is designed for collections with lots of modules/plugins to document automatically.
+**TL;DR:** MkDocs is the better choice for this role because you have excellent narrative documentation that tells the story of BGP configuration, EVPN/VXLAN configuration, and cleanup processes. antsibull-docs is designed for collections with lots of modules/plugins to document automatically.

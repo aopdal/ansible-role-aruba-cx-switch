@@ -763,15 +763,6 @@ silently skip configuration, it just gives up the fine-grained diff.
         description: "{{ item.description | default('Tenant ' + target_tenant) }}"
         state: present
       loop: "{{ safe_tenant_vrfs }}"
-
-    # Configure BGP for VRFs
-    - name: Configure BGP for VRFs
-      arubanetworks.aoscx.aoscx_bgp:
-        vrf_name: "{{ item.name }}"
-        asn: "{{ device.custom_fields.bgp_asn }}"
-        router_id: "{{ item.rd.split(':')[0] | default(loopback_ip) }}"
-      loop: "{{ safe_tenant_vrfs }}"
-      when: enable_bgp | default(false)
 ```
 
 ### VRF Validation and Cleanup

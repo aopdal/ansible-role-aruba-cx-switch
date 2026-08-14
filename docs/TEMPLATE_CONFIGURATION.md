@@ -43,7 +43,9 @@ The `aoscx.j2` master template includes:
 
 ## Not Included
 
-- **bgp.j2** - BGP template (requires NetBox BGP plugin integration - future enhancement)
+- **bgp.j2** - No BGP template exists. BGP is fully implemented via `tasks/configure_bgp.yml`,
+  which queries the NetBox BGP plugin directly rather than rendering a Jinja2 template — see
+  [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md).
 
 ## Configuration Generation
 
@@ -338,7 +340,8 @@ ansible-playbook site.yml --tags template_config -e "aoscx_debug=true" -vvv
 
 ## Limitations & Known Issues
 
-1. **BGP Support**: BGP template not included (requires plugin integration)
+1. **BGP Support**: No BGP template — BGP is configured directly via `tasks/configure_bgp.yml`
+   and the NetBox BGP plugin, not via this templating system
 2. **No Cleanup**: Template generation is one-way (no rollback)
 3. **Manual Testing**: Generated config must be manually validated
 4. **Variable Dependency**: Requires all necessary NetBox data and custom_fields

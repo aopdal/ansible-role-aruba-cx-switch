@@ -101,13 +101,9 @@ ansible-playbook configure_aoscx.yml -l switch-name -t vlans --list-tasks
 
 ### Verify Tag Behavior
 
-```bash
-# Verify VLANs won't include routing (should be empty)
-ansible-playbook configure_aoscx.yml -l switch-name -t vlans --list-tasks | grep -E "(BGP|OSPF|VSX)"
-
-# Verify routing tag includes BGP and OSPF (should show 2 lines)
-ansible-playbook configure_aoscx.yml -l switch-name -t routing --list-tasks | grep -E "(BGP|OSPF)"
-```
+For the full verification command matrix (per-tag `--list-tasks` checks) and
+the `test-tag-dependencies.sh` script, see
+[TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#verifying-tag-behavior).
 
 ### Important Notes
 
@@ -216,24 +212,15 @@ cat .github/workflows/ci.yml
 
 ### Adding a New Feature
 
+See [DEVELOPMENT.md](DEVELOPMENT.md#development-workflow) for the full
+branch → edit → test → commit → PR workflow. Quick version:
+
 ```bash
-# 0. Activate venv
 source .venv/bin/activate
-
-# 1. Create branch
 git checkout -b feature/my-feature
-
-# 2. Make changes
 # ... edit files ...
-
-# 3. Test locally
 make test-quick
-
-# 4. Commit (pre-commit runs automatically)
-git add .
-git commit -m "feat: add my feature"
-
-# 5. Push and create PR
+git add . && git commit -m "feat: add my feature"   # pre-commit runs automatically
 git push origin feature/my-feature
 ```
 

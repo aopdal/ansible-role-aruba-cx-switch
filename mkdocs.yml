@@ -72,10 +72,8 @@ nav:
         - Documentation Index: README_DOCS.md
         - Architecture:
                   - Automation Ecosystem: AUTOMATION_ECOSYSTEM.md
-                  - Visual Reference: AUTOMATION_ECOSYSTEM_DIAGRAMS.md
         - NetBox Integration:
                   - Integration Reference: NETBOX_INTEGRATION.md
-                  - NetBox BGP Plugin: NETBOX_BGP_PLUGIN.md
                   - Filter Plugins:
                             - Overview: FILTER_PLUGINS.md
                             - Reuse filters: FILTER_PLUGINS_REUSE.md
@@ -99,8 +97,6 @@ nav:
                             - DNS: DNS_CONFIGURATION.md
                   - VLAN Management:
                             - Workflow Overview: VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
-                            - Visual Diagrams: VLAN_WORKFLOW_DIAGRAMS.md
-                            - Developer Guide: VLAN_DEVELOPER_GUIDE.md
                             - L2 Interface Modes: L2_INTERFACE_MODES.md
                             - Anycast Gateway: ANYCAST_GATEWAY.md
                             - Virtual Interface Cleanup: VIRTUAL_INTERFACE_CLEANUP.md
@@ -124,14 +120,12 @@ nav:
                   - BGP EVPN Fabric: examples/bgp-evpn-fabric.md
         - Testing:
                   - Testing Guide: TESTING.md
-                  - Quick Start: TESTING_QUICK_START.md
-                  - Testing environment: TESTING_ENVIRONMENT.md
         - Reference:
                   - Quick Reference: QUICK_REFERENCE.md
                   - Performance Optimization: PERFORMANCE_OPTIMIZATION.md
                   - Release Process:
                             - Guide: RELEASE_PROCESS.md
-                            - Changelog: CHANGELOG.md
+                  - Code Audit: CODE_AUDIT.md
                   - Documentation Site: DOCUMENTATION_SITE.md # How to use MkDocs
                   - Documentation Sync: DOCS_SYNC_WORKFLOW.md # How README.md syncs to docs/
                   - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md

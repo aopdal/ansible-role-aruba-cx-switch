@@ -205,6 +205,304 @@ Debug output includes:
 - VLANs to delete
 - Protected VLANs (in use, cannot delete)
 
+## Diagrams
+
+### Configuration Phase Flow
+
+```mermaid
+graph TD
+    A[Start: tasks/main.yml] --> B[identify_vlan_changes.yml]
+
+    B --> B1[Fetch VLANs from NetBox]
+    B1 --> B2[Gather device VLAN facts]
+    B2 --> B3[Calculate vlans_in_use]
+    B3 --> B4[Determine vlan_changes]
+    B4 --> B5{Facts Set}
+
+    B5 -->|vlans| C[configure_vlans.yml]
+    B5 -->|vlans_in_use| D[configure_evpn.yml]
+    B5 -->|vlan_changes| C
+    B5 -->|vlans| D
+    B5 -->|vlans_in_use| E[configure_vxlan.yml]
+    B5 -->|vlans| E
+
+    C --> C1[Assert prerequisites]
+    C1 --> C2[Create VLANs]
+
+    D --> D1[Assert prerequisites]
+    D1 --> D2[Gather existing EVPN config]
+    D2 --> D3[Filter VLANs needing EVPN]
+    D3 --> D4[Configure EVPN]
+
+    E --> E1[Assert prerequisites]
+    E1 --> E2[Gather existing VXLAN config]
+    E2 --> E3[Filter VLANs needing VXLAN]
+    E3 --> E4[Configure VXLAN/VNI]
+
+    C2 --> F[Interface Configuration]
+    D4 --> F
+    E4 --> F
+
+    F --> G[End Configuration Phase]
+```
+
+### Cleanup Phase Flow (Idempotent Mode Only)
+
+```mermaid
+graph TD
+    A[Start: Cleanup Phase] --> B[identify_vlan_changes.yml]
+
+    B --> B1[Re-fetch VLANs from NetBox]
+    B1 --> B2[Re-gather device VLAN facts]
+    B2 --> B3[Re-calculate vlans_in_use]
+    B3 --> B4[Re-determine vlan_changes]
+    B4 --> B5{Facts Set}
+
+    B5 -->|vlan_changes.vlans_to_delete| C[cleanup_evpn.yml]
+    B5 -->|vlans| C
+
+    C --> C1[Assert prerequisites]
+    C1 --> C2[Filter VLANs to remove]
+    C2 --> C3[Remove EVPN config]
+
+    C3 --> D[cleanup_vxlan.yml]
+    B5 -->|vlan_changes.vlans_to_delete| D
+    B5 -->|vlans| D
+
+    D --> D1[Assert prerequisites]
+    D1 --> D2[Filter VLANs to remove]
+    D2 --> D3[Remove VLAN from VNI]
+    D3 --> D4[Remove VNI from VXLAN interface]
+
+    D4 --> E[cleanup_vlans.yml]
+    B5 -->|vlan_changes.vlans_to_delete| E
+
+    E --> E1[Assert prerequisites]
+    E1 --> E2[Delete VLANs]
+
+    E2 --> F[End Cleanup Phase]
+```
+
+### Fact Dependencies
+
+```mermaid
+graph LR
+    A[identify_vlan_changes.yml] -->|vlans| B[configure_vlans.yml]
+    A -->|vlans| C[configure_evpn.yml]
+    A -->|vlans| D[configure_vxlan.yml]
+    A -->|vlans_in_use| C
+    A -->|vlans_in_use| D
+    A -->|vlan_changes| B
+
+    A -->|vlan_changes.vlans_to_delete| E[cleanup_evpn.yml]
+    A -->|vlan_changes.vlans_to_delete| F[cleanup_vxlan.yml]
+    A -->|vlan_changes.vlans_to_delete| G[cleanup_vlans.yml]
+    A -->|vlans| E
+    A -->|vlans| F
+
+    style A fill:#e1f5ff,stroke:#01579b,stroke-width:3px
+    style B fill:#f3e5f5,stroke:#4a148c
+    style C fill:#f3e5f5,stroke:#4a148c
+    style D fill:#f3e5f5,stroke:#4a148c
+    style E fill:#ffebee,stroke:#b71c1c
+    style F fill:#ffebee,stroke:#b71c1c
+    style G fill:#ffebee,stroke:#b71c1c
+```
+
+## For Developers
+
+### Adding a New VLAN-Related Task
+
+If you're adding a new task that needs to work with VLANs, follow this pattern:
+
+#### 1. Add Assertion at the Start
+
+```yaml
+- name: Verify VLAN analysis has been performed
+  ansible.builtin.assert:
+    that:
+      - vlans is defined
+      - vlans_in_use is defined
+      # Add vlan_changes if you need to know what to create/delete
+      - vlan_changes is defined
+    fail_msg: "ERROR: identify_vlan_changes.yml must run before YOUR_TASK.yml"
+    success_msg: "VLAN analysis completed - proceeding with YOUR_TASK"
+```
+
+#### 2. Use the Facts (Don't Recalculate)
+
+**DON'T DO THIS:**
+
+```yaml
+# ❌ BAD: Recalculating vlans_in_use
+- name: Get VLANs in use
+  ansible.builtin.set_fact:
+    vlans_in_use: "{{ interfaces | get_vlans_in_use(...) }}"
+```
+
+**DO THIS:**
+
+```yaml
+# ✅ GOOD: Use existing fact
+- name: Filter VLANs for my task
+  ansible.builtin.set_fact:
+    my_vlans: "{{ vlans | selectattr('vid', 'in', vlans_in_use.vids) | list }}"
+```
+
+#### 3. Add to main.yml After identify_vlan_changes.yml
+
+```yaml
+# In tasks/main.yml, after the "Identify VLAN changes (before configuration)" task
+- name: Include my new VLAN task
+  ansible.builtin.include_tasks:
+    file: my_vlan_task.yml
+    apply:
+      tags:
+        - my_tag
+        - vlans
+  when: aoscx_configure_my_feature | bool
+  tags:
+    - my_tag
+    - vlans
+```
+
+### Available Facts (Examples)
+
+#### `vlans` - VLANs from NetBox
+
+```yaml
+vlans:
+  - vid: 10
+    name: "Data"
+    description: "Data VLAN"
+    l2vpn_termination:
+      id: 123
+      l2vpn:
+        identifier: 10010  # VNI
+```
+
+#### `vlans_in_use` - VLANs on Interfaces
+
+```yaml
+vlans_in_use:
+  vids: [1, 10, 20, 30]  # List of VLAN IDs
+```
+
+#### `vlan_changes` - What Needs to Change
+
+```yaml
+vlan_changes:
+  vlans_to_create:
+    - vid: 40
+      name: "Voice"
+  vlans_to_delete: [50, 60]  # VLAN IDs to delete
+  vlans_in_use: [10, 20]     # Protected from deletion
+```
+
+### Common Patterns
+
+#### Pattern 1: Configure Feature for VLANs with L2VPN
+
+```yaml
+- name: Filter VLANs with L2VPN termination
+  ansible.builtin.set_fact:
+    vlans_with_l2vpn: "{{ vlans |
+      selectattr('vid', 'in', vlans_in_use.vids) |
+      selectattr('l2vpn_termination', 'defined') |
+      selectattr('l2vpn_termination.id', 'defined') |
+      list }}"
+```
+
+#### Pattern 2: Cleanup Feature for Deleted VLANs
+
+```yaml
+- name: Filter VLANs to clean up
+  ansible.builtin.set_fact:
+    vlans_to_cleanup: "{{ vlans |
+      selectattr('vid', 'in', vlan_changes.vlans_to_delete) |
+      selectattr('l2vpn_termination.id', 'defined') |
+      list }}"
+```
+
+#### Pattern 3: Check if VLAN is in Use
+
+```yaml
+- name: Only process unused VLANs
+  some_module:
+    vlan_id: "{{ item.vid }}"
+  loop: "{{ vlans }}"
+  when: item.vid not in vlans_in_use.vids
+```
+
+### Testing EVPN/VXLAN Detection
+
+The role runs `show evpn evi` on the switch and passes the output through the
+`parse_evpn_evi_output` filter plugin (`netbox_filters_lib/vlan_filters.py`):
+
+```yaml
+- name: Get existing EVPN/VXLAN configuration
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show evpn evi
+  register: evpn_config_output
+
+- name: Parse EVPN EVI output
+  ansible.builtin.set_fact:
+    evpn_parsed: "{{ evpn_config_output.stdout[0] | parse_evpn_evi_output }}"
+```
+
+The filter returns:
+
+```python
+{
+  "evpn_vlans":    [10, 20, 30],          # VLAN IDs with EVPN configured
+  "vxlan_vlans":   [10, 20, 30],          # VLAN IDs with VXLAN configured
+  "vxlan_vnis":    [10100010, 10100020],  # VNI values
+  "vxlan_mappings": [[10100010, 10], [10100020, 20]]  # [VNI, VLAN] pairs
+}
+```
+
+**Expected `show evpn evi` output format:**
+
+```
+L2VNI : 10100010
+    Route Distinguisher        : 172.20.1.33:10
+    VLAN                       : 10
+    Status                     : up
+    RT Import                  : 65005:10
+    RT Export                  : 65005:10
+```
+
+**To test the filter locally:**
+
+```python
+import re
+
+output = """
+L2VNI : 10100010
+    Route Distinguisher        : 172.20.1.33:10
+    VLAN                       : 10
+L2VNI : 10100020
+    VLAN                       : 20
+"""
+
+# VNI pattern (used by the filter)
+vnis = re.findall(r'^L2VNI\s+:\s+(\d+)', output, re.MULTILINE)
+print(f"VNIs: {vnis}")   # ['10100010', '10100020']
+
+# VLAN pattern (used by the filter)
+vlans = re.findall(r'^\s+VLAN\s+:\s+(\d+)', output, re.MULTILINE)
+print(f"VLANs: {vlans}") # ['10', '20']
+```
+
+### File Locations
+
+- **Single Source**: `tasks/identify_vlan_changes.yml`
+- **Configuration**: `tasks/configure_*.yml`
+- **Cleanup**: `tasks/cleanup_*.yml`
+- **Orchestration**: `tasks/main.yml`
+- **Documentation**: `docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md`
+
 ## Related Documentation
 
 - [BGP Configuration](BGP_CONFIGURATION.md)
