@@ -162,19 +162,21 @@ Tags: `port_access`, `device_profile`, `layer2` for configuration;
 [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md) — treated as
 routine L2 configuration.
 
-## Known limitation: mac-groups
+## Not yet implemented: mac-groups
 
 The AOS-CX CLI and REST API also support **mac-groups** (matching
 connected devices by MAC address/OUI instead of LLDP) as a `port_access`
-object kind, and a `configure_port_access_mac_group.yml` task file exists
-in the role to push them. **This is not currently wired up**:
-`configure_port_access.yml` never includes it, so a `mac_groups` list or a
-role's `associate_mac_group` in config_context has **no effect** today —
-nothing will be pushed, diffed, or cleaned up for it. `port_access_diff`
-and `port_access_facts_from_device_profiles` also don't yet compare/flatten
-`mac_groups`. Don't rely on `mac_groups` or `associate_mac_group` in
-config_context until this is finished; use `lldp_groups` for device
-matching in the meantime.
+object kind. A `configure_port_access_mac_group.yml` task file and
+matching template logic exist in the role as a starting point, but
+mac-group support is **not yet implemented**: `configure_port_access.yml`
+doesn't call the task, so a `mac_groups` list or a role's
+`associate_mac_group` in config_context has **no effect** today — nothing
+will be pushed, diffed, or cleaned up for it. `port_access_diff` and
+`port_access_facts_from_device_profiles` also don't yet compare/flatten
+`mac_groups`. This is unfinished rather than broken — there's no working
+lab/example setup yet to validate the implementation against real
+hardware. Use `lldp_groups` for device matching until mac-groups support
+is completed.
 
 ## Operational notes
 

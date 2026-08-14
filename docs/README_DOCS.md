@@ -118,7 +118,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 - **[PORT_ACCESS_CONFIGURATION.md](PORT_ACCESS_CONFIGURATION.md)** -
   LLDP-group / role / device-profile modelling, change detection, and
-  cleanup. Includes a known limitation around `mac_groups`.
+  cleanup. Notes that `mac_groups` support is not yet implemented.
 
 ### VSX
 

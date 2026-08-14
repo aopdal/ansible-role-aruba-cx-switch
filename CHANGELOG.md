@@ -61,16 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `device_ospf`/`device_anycast_gateway` custom fields to the
   feature/flag lists (present in code, missing from the doc).
 
-### Known issues (found during the documentation review, not yet fixed)
+### Known limitations
 
-- **`configure_port_access_mac_group.yml` is dead code.** AOS-CX
-  port-access `mac_groups` has a task file to push it, and
-  `netbox_filters_lib/port_access.py`'s docstrings reference it, but
-  `configure_port_access.yml` never includes the task, and
-  `port_access_diff`/`port_access_facts_from_device_profiles` don't
-  compare/flatten `mac_groups` either. Setting `mac_groups` or
-  `associate_mac_group` in the `port_access` config_context currently has
-  no effect. Documented in `docs/PORT_ACCESS_CONFIGURATION.md`.
+- **Port-access mac-groups are not yet implemented.** AOS-CX port-access
+  `mac_groups` has a task file (`configure_port_access_mac_group.yml`) and
+  template logic as a starting point, but `configure_port_access.yml`
+  doesn't call the task, and `port_access_diff`/
+  `port_access_facts_from_device_profiles` don't compare/flatten
+  `mac_groups` either. Unfinished, not broken — there's no working
+  lab/example setup yet to validate it against real hardware. Setting
+  `mac_groups` or `associate_mac_group` in the `port_access` config_context
+  currently has no effect. Documented in `docs/PORT_ACCESS_CONFIGURATION.md`.
 
 ## [0.14.0] - 2026-08-12
 
