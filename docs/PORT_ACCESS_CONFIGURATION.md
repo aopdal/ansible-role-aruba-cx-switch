@@ -119,7 +119,7 @@ idempotent VLAN cleanup — see
 
 ## Change detection and idempotency
 
-Requires [REST API fact gathering](PERFORMANCE_OPTIMIZATION.md)
+Requires [REST API fact gathering](FACT_GATHERING.md)
 (`aoscx_gather_facts_rest_api: true`) for accurate comparison; without it,
 every object in `port_access` is pushed unconditionally on every run.
 

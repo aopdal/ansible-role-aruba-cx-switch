@@ -87,7 +87,7 @@ Deployment rules:
 
 ## Change detection and idempotency
 
-Requires [REST API fact gathering](PERFORMANCE_OPTIMIZATION.md)
+Requires [REST API fact gathering](FACT_GATHERING.md)
 (`aoscx_gather_facts_rest_api: true`) for accurate comparison; without it,
 `vsx_diff` is never computed and the `aoscx_vsx` module call runs
 unconditionally every time (still idempotent at the module level, but

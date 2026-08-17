@@ -160,7 +160,8 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 ## Reference
 
-- **[PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md)** - Performance tuning guide
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[FACT_GATHERING.md](FACT_GATHERING.md)** - Fact-gathering modes (`aoscx_facts` vs REST API), `aoscx_test_mode`, and the `identify_*_changes` change-detection pattern
 - **[NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md)** - NetBox integration reference
 - **[AUTOMATION_ECOSYSTEM.md](AUTOMATION_ECOSYSTEM.md)** - Architecture overview, with diagrams inlined next to the sections they illustrate
 - **[EXAMPLES.md](EXAMPLES.md)** - Overview of the runnable examples under [examples/](../examples/)
@@ -169,7 +170,6 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 ### Release Process
 
 - **[RELEASE_PROCESS.md](RELEASE_PROCESS.md)** - Release guide, versioning, changelog, workflow details
-- **[CHANGELOG.md](../CHANGELOG.md)** - Version history
 
 ### Documentation Management
 

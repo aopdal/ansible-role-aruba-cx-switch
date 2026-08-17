@@ -42,7 +42,7 @@ this role exports.
 
 ## Resolved findings log
 
-All resolved via the changes recorded in [CHANGELOG.md](../CHANGELOG.md) and
+All resolved via the changes recorded in [CHANGELOG.md](CHANGELOG.md) and
 git history. Kept as a one-line index so a future audit doesn't re-flag
 the same thing; full original writeups are in git history if the "why"
 is needed again.
@@ -80,4 +80,4 @@ is needed again.
 - Docs consistency (cross-links, coverage of each variable in
   `defaults/main.yml`) was not systematically checked in the original
   pass — see the 2026-08-13 documentation review (referenced from
-  [CHANGELOG.md](../CHANGELOG.md) Unreleased) for that coverage instead.
+  [CHANGELOG.md](CHANGELOG.md) Unreleased) for that coverage instead.
