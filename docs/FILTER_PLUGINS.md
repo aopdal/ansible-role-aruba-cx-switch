@@ -180,11 +180,11 @@ IPv4 addresses are compared between NetBox and device facts:
 - With filtering: Only tasks for actual changes
 - Time saved: Significant reduction in L3 configuration phase
 
-### IPv6 Address Performance Trade-off
+### IPv6 Address Handling
 
-**Default implementation**: Always configure, suppress false positives
-
-IPv6 addresses in AOS-CX device facts are returned as REST API URL references:
+IPv6 addresses are a special case because the `aoscx_facts` module (the
+default fact-gathering path) only returns them as REST API URL
+references, not the actual addresses:
 
 ```json
 {
@@ -192,33 +192,36 @@ IPv6 addresses in AOS-CX device facts are returned as REST API URL references:
 }
 ```
 
-**Challenge**: The actual IPv6 addresses are not available in facts, only URL references to where they can be fetched.
+Without real addresses to compare against, the role has no way to know
+whether a given IPv6 address is already configured. **Without REST API
+fact gathering enabled, IPv6 configuration is therefore always pushed
+unconditionally** - still idempotent at the CLI level (duplicate commands
+have no effect), but every run reports `changed: true` for these tasks
+even when nothing actually changed.
 
-**Solution — REST API Facts** (`aoscx_gather_facts_rest_api: true`):
-
-`tasks/gather_facts_rest_api.yml` queries the REST API at `depth=2`, which returns actual IPv6 addresses (and VSX virtual IPs) instead of URL references. The result is stored in `aoscx_enhanced_interface_facts` and passed to `get_interfaces_needing_config_changes()` as the `enhanced_facts` argument. When present, the filter performs full IPv6 comparison and only configures addresses that are missing.
+**Fix — REST API fact gathering** (`aoscx_gather_facts_rest_api: true`):
+`tasks/gather_facts_rest_api.yml` queries the REST API at `depth=2`, which
+returns actual IPv6 addresses (and VSX virtual IPs) instead of URL
+references. The result is stored in `aoscx_enhanced_interface_facts` and
+passed to `get_interfaces_needing_config_changes()` as the
+`enhanced_facts` argument. When present, the filter performs full IPv6
+comparison against NetBox's intended state and only configures addresses
+that are actually missing - the same compare-device-facts-to-NetBox
+approach used for IPv4 and everywhere else in the role. See
+[FACT_GATHERING.md](FACT_GATHERING.md) for why REST API fact gathering
+exists and how it works.
 
 ```yaml
 # Enable in host_vars or group_vars:
 aoscx_gather_facts_rest_api: true
 ```
 
-**Why Not Always Fetch IPv6 Data Without Enhanced Facts?**
+**Without enhanced facts (default)**:
 
-Testing confirmed that fetching IPv6 addresses via CLI for comparison is **slower** than just applying configuration:
-
-| Approach | Time Cost | Benefit |
-|----------|-----------|---------|
-| Fetch IPv6 via CLI | ~2-3s per interface | Skip config only if no changes |
-| Apply idempotent config | ~0.5s per interface | Always correct, no overhead |
-| Enhanced facts (REST depth=2) | ~2-3s total (one call) | Full comparison for all interfaces |
-
-**Decision without enhanced facts**: For 20+ interfaces, CLI checking would take 40-60 seconds, while applying takes 10-15 seconds.
-
-**Default implementation (enhanced facts disabled)**:
-
-- IPv6 tasks **always execute** (no pre-comparison performed)
-- Configuration remains idempotent at CLI level (duplicate commands have no effect)
+- IPv6 tasks **always execute** (no pre-comparison possible - the base
+  facts module simply doesn't have the data)
+- Configuration remains idempotent at CLI level (duplicate commands have
+  no effect)
 
 **With enhanced facts enabled**:
 
@@ -273,8 +276,13 @@ Tasks in `configure_l3_*.yml` files then:
 
 **IPv6 Configuration**:
 
-- ✅ Default: Apply idempotent configuration without pre-checking (fastest for most environments)
-- ✅ With `aoscx_gather_facts_rest_api: true`: Full IPv6 comparison via one REST API call — worth enabling when IPv6 changes are infrequent and skipping unchanged interfaces matters
+- ✅ Without `aoscx_gather_facts_rest_api: true`: the `aoscx_facts` module
+  can't provide real IPv6 addresses to compare against, so configuration
+  is applied unconditionally every run (idempotent at the CLI level, but
+  always reports `changed`)
+- ✅ With `aoscx_gather_facts_rest_api: true`: full IPv6 comparison
+  against NetBox via one REST API call - the recommended setting; see
+  [FACT_GATHERING.md](FACT_GATHERING.md)
 
 **Debugging**:
 
@@ -287,25 +295,6 @@ ansible-playbook your-playbook.yml
 # "Interface vlan11: IPv4 changes needed: ['10.1.1.1/24']"
 # "Interface vlan11: IPv6 addresses present: ['2001:db8::1/64']"
 ```
-
-### Technical Background
-
-**Why IPv6 is a URL Reference**:
-
-- AOS-CX REST API structure: IPv6 addresses stored in separate endpoint
-- Device facts use httpapi connection: Only returns URL references
-- Retrieving actual data requires:
-    - Switching to network_cli connection (SSH)
-    - Executing CLI commands (`show ipv6 interface`)
-    - Parsing unstructured output
-    - Connection overhead: 2-3 seconds per interface
-
-**Architecture Decision**:
-- Primary connection: `arubanetworks.aoscx.aoscx` (REST API) for facts
-- CLI tasks: Temporary switch to `network_cli` for configuration
-- Performance: Per-interface CLI checking requires connection switching (~2-3s each)
-- Default conclusion: Direct idempotent configuration is faster than check + configure
-- With `aoscx_gather_facts_rest_api: true`: `tasks/gather_facts_rest_api.yml` queries REST API once at `depth=2` to get actual IPv6 addresses for all interfaces, enabling comparison without any CLI connection switching
 
 ## Structure
 

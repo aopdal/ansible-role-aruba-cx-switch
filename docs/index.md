@@ -21,7 +21,7 @@ Comprehensive Ansible role for configuring Aruba AOS-CX switches with **NetBox a
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Documentation](#-documentation)
+- [Documentation](#documentation)
 - [Role Variables](#role-variables)
 - [Example Playbook](#example-playbook)
 - [Usage Examples](#usage-examples)
@@ -44,7 +44,7 @@ See [NetBox Integration](#netbox-configuration) below for detailed setup require
 
 ## Getting Started
 
-This section covers using the role for network configuration. For development setup, see [Developer Documentation](#developer-documentation).
+This section covers using the role for network configuration. For development setup, see [Developer Documentation](#developer-environment-docs).
 
 ### Prerequisites
 

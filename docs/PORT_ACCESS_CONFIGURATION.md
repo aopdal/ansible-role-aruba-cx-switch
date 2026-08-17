@@ -9,7 +9,7 @@ configuration with this role. It covers:
 4. [Change detection and idempotency](#change-detection-and-idempotency)
 5. [Cleanup](#cleanup)
 6. [Task ordering and tags](#task-ordering-and-tags)
-7. [Known limitation: mac-groups](#known-limitation-mac-groups)
+7. [Not yet implemented: mac-groups](#not-yet-implemented-mac-groups)
 8. [Operational notes](#operational-notes)
 
 ## How port-access is modelled in NetBox

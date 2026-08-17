@@ -1,8 +1,13 @@
 # Fact Gathering
 
-The role supports two ways of gathering device facts, and a per-feature
-change-detection layer built on top of them that keeps idempotent reruns
-fast. This page documents both.
+The role supports two ways of gathering device facts. The key difference
+between them is **data completeness**: the default `aoscx_facts` module
+(pyaoscx-based) is missing information the role needs for several
+features, and REST API fact gathering exists to fill those gaps. It also
+happens to be faster, but that's a secondary benefit - the actual
+mechanism that keeps idempotent reruns fast is a separate layer, covered
+in [Change detection](#change-detection-identify__changesyml) below, that
+compares whichever facts were gathered against NetBox's intended state.
 
 > **History**: an earlier `aoscx_fast_mode` variable tried to speed things
 > up by skipping fact gathering entirely. That made runs *slower* in
@@ -11,27 +16,34 @@ fast. This page documents both.
 > (and making more API calls) than a normal run. It was deprecated and
 > fully removed in v0.7.0; see [CHANGELOG.md](CHANGELOG.md) if you're
 > looking for it. Use `aoscx_gather_facts_rest_api: true` below instead —
-> it's a genuine speedup, because it keeps device-state comparison intact.
+> it fills in data the default module can't provide, which is what makes
+> accurate comparison (and therefore a genuine speedup) possible.
 
 ## Two fact-gathering modes
 
 | | `aoscx_facts` module (default) | REST API direct (`aoscx_gather_facts_rest_api: true`) |
 |---|---|---|
+| IPv6 addresses | URI references only, not usable for comparison | Actual addresses |
+| VSX virtual IPs | Not included | Included |
+| EVPN/VXLAN facts | Separate queries | Same session |
 | Compatibility | All supported firmware versions | Requires REST API v10.15+ |
 | Typical time (50 interfaces) | 15-30 seconds | 3-5 seconds |
 | API calls | Multiple (per resource) | 2-4 total (single session) |
-| IPv6 addresses | URI references only | Actual addresses |
-| VSX virtual IPs | Not included | Included |
-| EVPN/VXLAN facts | Separate queries | Same session |
 
 Both modes populate the same `network_resources` facts structure the rest
 of the role reads from, so nothing downstream needs to know which mode
-gathered them.
+gathered them. Where a mode can't provide real data for a field (IPv6
+addresses being the main case - see
+[FILTER_PLUGINS.md](FILTER_PLUGINS.md#ipv6-address-handling)), the role
+falls back to pushing that config unconditionally rather than silently
+getting it wrong.
 
 ## REST API-based fact gathering (recommended)
 
-For faster gathering with more complete data, enable direct REST API
-calls instead of the `aoscx_facts` module:
+The `aoscx_facts` module doesn't expose everything the role needs -
+notably real IPv6 addresses (only URL references) and VSX virtual IPs.
+Enable direct REST API calls instead to get complete data in a single
+session, which is also faster:
 
 ```yaml
 # group_vars or playbook

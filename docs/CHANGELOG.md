@@ -135,6 +135,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unresolvable inside the built MkDocs site now that `CHANGELOG.md` is a
   real page - to the in-site `CHANGELOG.md` path instead. Also removed a
   README_DOCS.md entry that duplicated the new Reference-section one.
+- **Removed a legacy CLI-based-IPv6-fetching narrative from
+  `docs/FILTER_PLUGINS.md`.** The "IPv6 Address Performance Trade-off" and
+  "Technical Background" sections described benchmarking a "fetch IPv6
+  via CLI (`show ipv6 interface`)" approach and framed skipping IPv6
+  comparison as a deliberate speed trade-off - no such CLI-fetch code
+  exists anywhere in the role, and this predates REST API fact gathering.
+  Rewrote as "IPv6 Address Handling": the actual reason IPv6 config is
+  pushed unconditionally without `aoscx_gather_facts_rest_api: true` is
+  that the `aoscx_facts` module simply can't return real IPv6 addresses
+  (URL references only) - not a chosen performance trade-off. REST API
+  fact gathering fixes this by providing real addresses to compare
+  against, same as it does for VSX virtual IPs and EVPN/VXLAN facts.
+  Cross-referenced the new `docs/FACT_GATHERING.md`. Also reordered and
+  reframed `docs/FACT_GATHERING.md`'s intro: the REST API path exists
+  primarily because the `aoscx_facts` module is missing data the role
+  needs (IPv6 addresses, VSX virtual IPs), not primarily for speed - the
+  actual mechanism keeping reruns fast is the separate
+  `identify_*_changes.yml` comparison-against-NetBox layer, which the
+  intro now points to explicitly.
 
 ### Removed
 
