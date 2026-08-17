@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Unit test coverage for previously-untested L2 VLAN idempotency
+  comparison paths.** `get_interfaces_needing_changes()`
+  (`netbox_filters_lib/comparison.py`, used by
+  `tasks/configure_l2_interfaces.yml`) and
+  `get_interfaces_needing_config_changes()`
+  (`netbox_filters_lib/interface_change_detection.py`) gate whether trunk
+  VLAN config gets pushed to real switches; several of their decision
+  branches had no test coverage. Added tests for: empty/`None`
+  `interfaces`/`device_facts` guard clauses; the `ansible_network_resources`
+  and `ansible_net_interfaces` (line-card) device-fact formats, not just the
+  `network_resources` path already covered; per-interface skip logic (no
+  name, `mgmt_only`, missing mode); the `except Exception` fallback that
+  defaults to "needs configuration" on malformed device facts; LAG/MCLAG
+  flagging on cleanup entries; native-VLAN-inside-`vlan_trunks` detection
+  under native-untagged mode; native-tagged/native-untagged trunk mode
+  mismatch detection; the `vlans_to_remove` change reason; and the entire
+  `tagged-all` trunk mode branch. Raises measured coverage of
+  `comparison.py` from 77% to 94% and `interface_change_detection.py` from
+  79% to 87%.
+- **`tests/unit/test_netbox_filters.py`**: smoke test for
+  `filter_plugins/netbox_filters.py`'s `FilterModule`. Every other unit
+  test imports straight from `netbox_filters_lib`, bypassing the public
+  Jinja2 filter registration layer entirely, so a typo'd import, a rename
+  left stale in the re-export, or a filter implemented but never added to
+  `FilterModule.filters()` would pass the whole suite and only surface
+  when Ansible loads the plugin. Asserts the exact set of registered
+  filter names and that each resolves to a real, callable function.
+  Raises `filter_plugins/netbox_filters.py` from 0% to 96% coverage
+  (suite-wide: 89% to 92%).
+
+### Fixed
+
+- **Unit test coverage measurement scoped to the wrong package.** CI, `make
+  test-unit-coverage`, and `pytest.ini` all measured coverage of
+  `filter_plugins/` only. That package is a thin re-export shim
+  (`filter_plugins/netbox_filters.py` showed 0% coverage — it's never
+  imported directly by tests); the actual filter logic lives in
+  `netbox_filters_lib/` (93% of the testable code), which was excluded
+  entirely. Reported/Codecov coverage is now measured across both
+  `filter_plugins` and `netbox_filters_lib`
+  (`.github/workflows/ci.yml`, `Makefile`, `pytest.ini`), so the badge
+  reflects real coverage (89%, not the previous meaningless 68% over 106
+  statements).
+
 ## [0.14.1] - 2026-08-14
 
 ### Fixed

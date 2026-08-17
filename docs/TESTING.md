@@ -416,7 +416,7 @@ pytest tests/unit/
 pytest tests/unit/test_l3_config_helpers.py
 
 # Run with coverage report
-pytest tests/unit/ --cov=filter_plugins --cov-report=html
+pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib --cov-report=html
 
 # Verbose output with test names
 pytest tests/unit/ -v
@@ -432,6 +432,9 @@ pytest tests/unit/ -v
 | `test_bgp_filters.py` | BGP session enrichment and policy collection |
 | `test_vlan_filters.py` | VLAN lifecycle (creation, deletion, IGMP snooping, protection) |
 | `test_interface_filters.py` | Interface categorization and metadata extraction |
+| `test_interface_ip_processing.py` | Interface IP address extraction from NetBox data |
+| `test_interface_ip_comparisons.py` | IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison logic |
+| `test_interface_orphans.py` | Orphaned virtual interface detection |
 | `test_rest_api_transforms.py` | REST API response normalization (interfaces, VLANs, DHCP relays) |
 | `test_port_access_vlans.py` | Port-access VLAN extraction and validation |
 | `test_stp_filters.py` | STP interface change detection |
@@ -440,9 +443,16 @@ pytest tests/unit/ -v
 | `test_port_access_diff.py` | Port-access device state diff |
 | `test_port_access_facts.py` | Port-access REST API fact flattening |
 | `test_port_access_orphans.py` | Orphaned port-access object detection |
+| `test_static_route_filters.py` | Static route change/removal detection |
+| `test_vsx.py` | VSX config diff |
+| `test_netbox_filters.py` | `FilterModule` registration smoke test - every filter resolves under its expected name |
 | `test_utils.py` | Utility function helpers |
 
-**Configuration**: `pytest.ini` defines test discovery and coverage settings
+**Configuration**: `pytest.ini` defines test discovery and coverage settings.
+Coverage is measured across both `filter_plugins/` (the public filter
+entry points) and `netbox_filters_lib/` (the actual filter implementations,
+imported directly by the tests above) — the former alone is a thin
+re-export layer and reports near-zero coverage on its own.
 
 ### Molecule Tests (Role Validation)
 
@@ -611,7 +621,7 @@ make help              # Show all commands
 # Python Unit Tests (NEW)
 pytest tests/unit/                           # Run all unit tests
 pytest tests/unit/ -v                        # Verbose output
-pytest tests/unit/ --cov=filter_plugins      # With coverage
+pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib  # With coverage
 pytest tests/unit/test_l3_config_helpers.py  # Specific test file
 pytest tests/unit/ -m l3_config              # By marker
 
@@ -677,7 +687,7 @@ For a complete command reference, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md).
    pytest tests/unit/test_my_new_filters.py -v
 
    # Run with coverage
-   pytest tests/unit/test_my_new_filters.py --cov=filter_plugins.netbox_filters_lib.my_new_filters
+   pytest tests/unit/test_my_new_filters.py --cov=netbox_filters_lib.my_new_filters
    ```
 
 4. **Add test markers** in `pytest.ini` if needed
@@ -2054,7 +2064,7 @@ pytest tests/unit/test_utils.py::TestCollapseVlanList::test_consecutive_vlans
 
 #### Run with Coverage Report
 ```bash
-pytest tests/unit/ --cov=filter_plugins --cov-report=html
+pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib --cov-report=html
 ## Open htmlcov/index.html to view coverage
 
 ## Or using make
@@ -2118,7 +2128,7 @@ Located in `tests/unit/fixtures.py`:
 Target: **>= 90% code coverage** for all filter plugins
 
 ```bash
-pytest tests/unit/ --cov=filter_plugins --cov-report=term-missing
+pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib --cov-report=term-missing
 ```
 
 ### Writing New Tests

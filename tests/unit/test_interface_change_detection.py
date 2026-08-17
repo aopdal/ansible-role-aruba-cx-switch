@@ -473,6 +473,244 @@ class TestGetInterfacesNeedingConfigChanges:
         assert len(result["l3"]) == 1
         assert result["l3"][0]["name"] == "loopback0"
 
+    def test_native_vlan_matches_via_vlan_trunks_in_native_untagged_mode(self):
+        """In native-untagged mode, AOS-CX can report the native VLAN inside
+        vlan_trunks instead of vlan_tag. That must still count as a match,
+        not a false-positive 'native VLAN mismatch'."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged"},
+                "untagged_vlan": {"vid": 100},
+                "tagged_vlans": [{"vid": 200}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-untagged",
+                        # No vlan_tag - native VLAN 100 only shows up in
+                        # vlan_trunks, as AOS-CX does for native-untagged.
+                        "vlan_trunks": {"100": {}, "200": {}},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 0
+        assert len(result["no_changes"]) == 1
+
+    def test_native_tagged_already_matches_with_no_untagged_vlan(self):
+        """When NetBox has no untagged_vlan (all-tagged), a device already in
+        native-tagged mode with matching trunks is correctly configured."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged"},
+                "untagged_vlan": None,
+                "tagged_vlans": [{"vid": 200}, {"vid": 300}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-tagged",
+                        "vlan_trunks": {"200": {}, "300": {}},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 0
+        assert len(result["no_changes"]) == 1
+
+    def test_native_tagged_desired_but_device_is_native_untagged(self):
+        """NetBox wants native-tagged (no untagged_vlan) but the device is in
+        native-untagged mode - this must be flagged as a trunk mode
+        mismatch even though the VLAN membership itself matches."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged"},
+                "untagged_vlan": None,
+                "tagged_vlans": [{"vid": 200}, {"vid": 300}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-untagged",
+                        "vlan_trunks": {"200": {}, "300": {}},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 1
+
+    def test_native_untagged_desired_but_device_is_native_tagged(self):
+        """NetBox wants native-untagged (untagged_vlan set) but the device
+        is in native-tagged mode with no matching native VLAN anywhere -
+        must be flagged as a native VLAN mismatch."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged"},
+                "untagged_vlan": {"vid": 100},
+                "tagged_vlans": [{"vid": 200}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-tagged",
+                        "vlan_trunks": {"100": {}, "200": {}},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 1
+
+    def test_trunk_vlan_to_remove_change_reason(self):
+        """Device has a trunk VLAN that NetBox no longer wants - must be
+        detected as needing a change (vlans_to_remove path)."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged"},
+                "untagged_vlan": {"vid": 100},
+                "tagged_vlans": [{"vid": 200}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-untagged",
+                        "vlan_tag": {"100": {}},
+                        # VLAN 999 is on the device but no longer desired
+                        "vlan_trunks": {"200": {}, "999": {}},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 1
+
+    def test_tagged_all_native_vlan_mismatch(self):
+        """tagged-all mode only cares about the native VLAN; a mismatch
+        there must still be flagged even though all VLANs are implicitly
+        allowed."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": {"vid": 100},
+                "tagged_vlans": [],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-tagged",
+                        "vlan_tag": {"200": {}},
+                        "vlan_trunks": {},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 1
+
+    def test_tagged_all_no_native_vlan_mode_mismatch(self):
+        """tagged-all with no untagged_vlan means NetBox wants native-tagged;
+        a device left in native-untagged mode must be flagged even with no
+        native VLAN configured on either side."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": None,
+                "tagged_vlans": [],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-untagged",
+                        "vlan_trunks": {},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 1
+
+    def test_tagged_all_already_correct(self):
+        """tagged-all with a matching native VLAN and native-tagged device
+        mode needs no change."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "tagged-all"},
+                "untagged_vlan": {"vid": 100},
+                "tagged_vlans": [],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "vlan_mode": "native-tagged",
+                        "vlan_tag": {"100": {}},
+                        "vlan_trunks": {},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l2"]) == 0
+        assert len(result["no_changes"]) == 1
+
 
 class TestEnhancedFacts:
     """Tests for get_interfaces_needing_config_changes with enhanced_facts parameter"""

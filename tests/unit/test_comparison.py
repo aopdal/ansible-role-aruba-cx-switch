@@ -306,6 +306,194 @@ class TestGetInterfacesNeedingChanges:
         result = get_interfaces_needing_changes(interfaces, ansible_facts)
         assert len(result["configure"]) == 1
 
+    def test_empty_interfaces_returns_empty_result(self):
+        """Empty interfaces list short-circuits before touching device_facts"""
+        result = get_interfaces_needing_changes([], {"network_resources": {}})
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_none_interfaces_returns_empty_result(self):
+        """None interfaces short-circuits the same as an empty list"""
+        result = get_interfaces_needing_changes(None, {"network_resources": {}})
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_empty_device_facts_returns_empty_result(self):
+        """Empty device_facts short-circuits before any comparison"""
+        interfaces = [{"name": "1/1/1", "mode": {"value": "access"}}]
+        result = get_interfaces_needing_changes(interfaces, {})
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_none_device_facts_returns_empty_result(self):
+        """None device_facts short-circuits the same as empty device_facts"""
+        interfaces = [{"name": "1/1/1", "mode": {"value": "access"}}]
+        result = get_interfaces_needing_changes(interfaces, None)
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_unrecognized_fact_format_returns_empty_result(self):
+        """device_facts present but matching none of the known shapes yields
+        an empty facts_by_interface, so every interface is silently skipped
+        rather than treated as needing configuration"""
+        interfaces = [{"name": "1/1/1", "mode": {"value": "access"}}]
+        ansible_facts = {"some_other_key": {"interfaces": {}}}
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_ansible_network_resources_fact_path(self):
+        """Interface facts found under the primary
+        ansible_network_resources.interfaces path (not the alternate
+        network_resources path used by other tests in this file)"""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "mode": {"value": "access"},
+                "untagged_vlan": {"vid": 10},
+                "tagged_vlans": [],
+                "mgmt_only": False,
+            }
+        ]
+        ansible_facts = {
+            "ansible_network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "vlan_mode": "access",
+                        "vlan_tag": {"20": "/rest/v10.09/system/vlans/20"},
+                        "vlan_trunks": {},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert len(result["configure"]) == 1
+        assert result["configure"][0]["name"] == "1/1/1"
+
+    def test_ansible_net_interfaces_line_card_fact_path(self):
+        """Interface facts found under the raw ansible_net_interfaces
+        line-card format (Aruba aoscx_facts, not the resource-module path)"""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "mode": {"value": "access"},
+                "untagged_vlan": {"vid": 10},
+                "tagged_vlans": [],
+                "mgmt_only": False,
+            }
+        ]
+        ansible_facts = {
+            "ansible_net_interfaces": {
+                "line_card,1/1": {
+                    "1/1/1": {
+                        "vlan_mode": "access",
+                        "vlan_tag": {"20": "/rest/v10.09/system/vlans/20"},
+                        "vlan_trunks": {},
+                    }
+                },
+                # Non line-card entries must be ignored, not merged in
+                "chassis_info": {"not": "an interface"},
+            }
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert len(result["configure"]) == 1
+        assert result["configure"][0]["name"] == "1/1/1"
+
+    def test_none_interface_entry_is_skipped(self):
+        """A None entry in the interfaces list is skipped, not dereferenced"""
+        interfaces = [
+            None,
+            {
+                "name": "1/1/1",
+                "mode": {"value": "access"},
+                "untagged_vlan": {"vid": 20},
+                "tagged_vlans": [],
+            },
+        ]
+        # Non-empty facts_by_interface so the function doesn't short-circuit
+        # before reaching the per-interface loop; VLAN 10 vs. desired 20
+        # forces a real diff so we know iteration actually happened.
+        ansible_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "vlan_mode": "access",
+                        "vlan_tag": {"10": "/rest/v10.09/system/vlans/10"},
+                        "vlan_trunks": {},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        # The None entry must not have raised, and the real interface's
+        # VLAN mismatch is still detected
+        assert len(result["configure"]) == 1
+        assert result["configure"][0]["name"] == "1/1/1"
+
+    def test_interface_without_name_is_skipped(self):
+        """An interface with no name cannot be matched against device facts
+        and must be skipped rather than added to configure"""
+        interfaces = [{"mode": {"value": "access"}}]
+        # Non-empty facts so the function reaches the per-interface loop
+        # instead of short-circuiting on an empty facts_by_interface.
+        ansible_facts = {
+            "network_resources": {"interfaces": {"1/1/1": {"vlan_mode": "access"}}}
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_mgmt_only_interface_is_skipped(self):
+        """mgmt_only interfaces are not L2 and must not be evaluated, even
+        when device facts exist for them"""
+        interfaces = [
+            {"name": "mgmt", "mode": {"value": "access"}, "mgmt_only": True}
+        ]
+        ansible_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "mgmt": {
+                        "vlan_mode": "access",
+                        "vlan_tag": {"999": "/rest/v10.09/system/vlans/999"},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_interface_without_mode_is_skipped(self):
+        """An interface with no (or non-dict) mode has nothing to compare
+        and must be skipped rather than flagged for configuration"""
+        interfaces = [{"name": "1/1/1", "mode": None}]
+        ansible_facts = {
+            "network_resources": {"interfaces": {"1/1/1": {"vlan_mode": "access"}}}
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert result == {"cleanup": [], "configure": []}
+
+    def test_comparison_error_defaults_to_configure(self):
+        """If compare_interface_vlans blows up on malformed device facts,
+        get_interfaces_needing_changes must not propagate the exception -
+        it should log and fall back to treating the interface as needing
+        configuration"""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "mode": {"value": "access"},
+                "untagged_vlan": {"vid": 10},
+                "tagged_vlans": [],
+            }
+        ]
+        ansible_facts = {
+            "network_resources": {
+                "interfaces": {
+                    # Malformed: a list instead of a dict of device facts,
+                    # so device_facts_interface.get(...) raises AttributeError
+                    "1/1/1": ["not", "a", "dict"]
+                }
+            }
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert len(result["configure"]) == 1
+        assert result["configure"][0]["name"] == "1/1/1"
+
 
 class TestGetInterfacesNeedingChangesCleanup:
     """Tests for cleanup functionality in get_interfaces_needing_changes"""
@@ -385,3 +573,70 @@ class TestGetInterfacesNeedingChangesCleanup:
         ansible_facts = {"network_resources": {"interfaces": {}}}
         result = get_interfaces_needing_changes(interfaces, ansible_facts)
         assert len(result["cleanup"]) == 0  # Can't cleanup what doesn't exist
+
+    def test_cleanup_entry_marks_lag_and_mclag(self):
+        """Cleanup entries must flag is_lag/is_mclag from the NetBox
+        interface's type and custom_fields.if_mclag, not just the VLAN diff"""
+        interfaces = [
+            {
+                "name": "lag1",
+                "type": {"value": "lag"},
+                "mode": {"value": "tagged"},
+                "untagged_vlan": None,
+                "tagged_vlans": [{"vid": 10}],
+                "custom_fields": {"if_mclag": True},
+            }
+        ]
+        ansible_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "lag1": {
+                        "vlan_mode": "native-tagged",
+                        "vlan_tag": None,
+                        "vlan_trunks": {
+                            "10": "/rest/v10.09/system/vlans/10",
+                            "99": "/rest/v10.09/system/vlans/99",
+                        },
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert len(result["cleanup"]) == 1
+        entry = result["cleanup"][0]
+        assert entry["is_lag"] is True
+        assert entry["is_mclag"] is True
+        assert 99 in entry["vlans_to_remove"]
+
+    def test_cleanup_entry_non_mclag_physical_interface(self):
+        """A plain physical interface's cleanup entry reports is_lag/is_mclag
+        as False rather than leaving them unset or truthy by accident"""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "mode": {"value": "tagged"},
+                "untagged_vlan": None,
+                "tagged_vlans": [{"vid": 10}],
+                "custom_fields": {"if_mclag": False},
+            }
+        ]
+        ansible_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "vlan_mode": "native-tagged",
+                        "vlan_tag": None,
+                        "vlan_trunks": {
+                            "10": "/rest/v10.09/system/vlans/10",
+                            "99": "/rest/v10.09/system/vlans/99",
+                        },
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_changes(interfaces, ansible_facts)
+        assert len(result["cleanup"]) == 1
+        entry = result["cleanup"][0]
+        assert entry["is_lag"] is False
+        assert entry["is_mclag"] is False
