@@ -41,16 +41,19 @@ verifier:
 
 scenario:
   name: default
+  # cleanup and side_effect are intentionally omitted: this scenario has no
+  # external state to clean up beyond destroy, and no failure/side-effect
+  # playbook to simulate between converge and idempotence. Molecule's
+  # default sequence includes both; without a cleanup.yml/side_effect.yml
+  # playbook they'd otherwise print a benign "Missing playbook" notice on
+  # every run.
   test_sequence:
     - dependency
-    - cleanup
     - destroy
     - syntax
     - create
     - prepare
     - converge
     - idempotence
-    - side_effect
     - verify
-    - cleanup
     - destroy

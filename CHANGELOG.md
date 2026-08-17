@@ -39,6 +39,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Raises `filter_plugins/netbox_filters.py` from 0% to 96% coverage
   (suite-wide: 89% to 92%).
 
+### Changed
+
+- **`molecule/default/verify.yml` trimmed to what it can actually prove.**
+  This scenario has no real AOS-CX device or simulator, and
+  `converge.yml` disables every `aoscx_configure_*` flag, so it was never
+  exercising any device-facing task logic. The previous `verify.yml`
+  re-implemented ~20 filter *behavior* checks (VLAN diffing, OSPF area
+  extraction, REST transform field values, etc.) that
+  `tests/unit/` already covers far more thoroughly. Replaced with a
+  focused loader/registration smoke test: one minimal call per
+  `netbox_filters_lib` module (plus `rest_api_transforms.py`) proving
+  Ansible's real plugin loader discovers and can invoke each filter —
+  the one guarantee `tests/unit/test_netbox_filters.py`'s pytest-based
+  check (Python `import`, not Ansible's loader) can't provide on its own.
+  577 lines → ~150. See the "Molecule Tests" section of
+  `docs/TESTING.md` for what this scenario is and isn't for.
+- `molecule/default/molecule.yml`'s `test_sequence` no longer includes
+  `cleanup`/`side_effect` steps. Neither has a corresponding playbook
+  (`cleanup.yml`/`side_effect.yml` don't exist and aren't mapped under
+  `provisioner.playbooks`), so Molecule printed a harmless but confusing
+  `Executed: Missing playbook` notice on every `make test` run. This
+  scenario has nothing to clean up beyond `destroy` and no side-effect
+  playbook to simulate, so both steps are removed rather than stubbed out.
+
 ### Fixed
 
 - **Unit test coverage measurement scoped to the wrong package.** CI, `make

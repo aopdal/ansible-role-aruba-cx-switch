@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Unit test coverage for previously-untested L2 VLAN idempotency
+  comparison paths.** `get_interfaces_needing_changes()`
+  (`netbox_filters_lib/comparison.py`, used by
+  `tasks/configure_l2_interfaces.yml`) and
+  `get_interfaces_needing_config_changes()`
+  (`netbox_filters_lib/interface_change_detection.py`) gate whether trunk
+  VLAN config gets pushed to real switches; several of their decision
+  branches had no test coverage. Added tests for: empty/`None`
+  `interfaces`/`device_facts` guard clauses; the `ansible_network_resources`
+  and `ansible_net_interfaces` (line-card) device-fact formats, not just the
+  `network_resources` path already covered; per-interface skip logic (no
+  name, `mgmt_only`, missing mode); the `except Exception` fallback that
+  defaults to "needs configuration" on malformed device facts; LAG/MCLAG
+  flagging on cleanup entries; native-VLAN-inside-`vlan_trunks` detection
+  under native-untagged mode; native-tagged/native-untagged trunk mode
+  mismatch detection; the `vlans_to_remove` change reason; and the entire
+  `tagged-all` trunk mode branch. Raises measured coverage of
+  `comparison.py` from 77% to 94% and `interface_change_detection.py` from
+  79% to 87%.
+- **`tests/unit/test_netbox_filters.py`**: smoke test for
+  `filter_plugins/netbox_filters.py`'s `FilterModule`. Every other unit
+  test imports straight from `netbox_filters_lib`, bypassing the public
+  Jinja2 filter registration layer entirely, so a typo'd import, a rename
+  left stale in the re-export, or a filter implemented but never added to
+  `FilterModule.filters()` would pass the whole suite and only surface
+  when Ansible loads the plugin. Asserts the exact set of registered
+  filter names and that each resolves to a real, callable function.
+  Raises `filter_plugins/netbox_filters.py` from 0% to 96% coverage
+  (suite-wide: 89% to 92%).
+
+### Changed
+
+- **`molecule/default/verify.yml` trimmed to what it can actually prove.**
+  This scenario has no real AOS-CX device or simulator, and
+  `converge.yml` disables every `aoscx_configure_*` flag, so it was never
+  exercising any device-facing task logic. The previous `verify.yml`
+  re-implemented ~20 filter *behavior* checks (VLAN diffing, OSPF area
+  extraction, REST transform field values, etc.) that
+  `tests/unit/` already covers far more thoroughly. Replaced with a
+  focused loader/registration smoke test: one minimal call per
+  `netbox_filters_lib` module (plus `rest_api_transforms.py`) proving
+  Ansible's real plugin loader discovers and can invoke each filter —
+  the one guarantee `tests/unit/test_netbox_filters.py`'s pytest-based
+  check (Python `import`, not Ansible's loader) can't provide on its own.
+  577 lines → ~150. See the "Molecule Tests" section of
+  `docs/TESTING.md` for what this scenario is and isn't for.
+- `molecule/default/molecule.yml`'s `test_sequence` no longer includes
+  `cleanup`/`side_effect` steps. Neither has a corresponding playbook
+  (`cleanup.yml`/`side_effect.yml` don't exist and aren't mapped under
+  `provisioner.playbooks`), so Molecule printed a harmless but confusing
+  `Executed: Missing playbook` notice on every `make test` run. This
+  scenario has nothing to clean up beyond `destroy` and no side-effect
+  playbook to simulate, so both steps are removed rather than stubbed out.
+
+### Fixed
+
+- **Unit test coverage measurement scoped to the wrong package.** CI, `make
+  test-unit-coverage`, and `pytest.ini` all measured coverage of
+  `filter_plugins/` only. That package is a thin re-export shim
+  (`filter_plugins/netbox_filters.py` showed 0% coverage — it's never
+  imported directly by tests); the actual filter logic lives in
+  `netbox_filters_lib/` (93% of the testable code), which was excluded
+  entirely. Reported/Codecov coverage is now measured across both
+  `filter_plugins` and `netbox_filters_lib`
+  (`.github/workflows/ci.yml`, `Makefile`, `pytest.ini`), so the badge
+  reflects real coverage (89%, not the previous meaningless 68% over 106
+  statements).
+
 ## [0.14.1] - 2026-08-14
 
 ### Fixed

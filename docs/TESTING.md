@@ -458,12 +458,32 @@ re-export layer and reports near-zero coverage on its own.
 
 Located in: `molecule/default/`
 
-Tests individual role functionality in isolation:
+There is no real AOS-CX device or simulator here, so this scenario cannot
+exercise any `arubanetworks.aoscx` module, CLI push, or real idempotency.
+`converge.yml` disables every `aoscx_configure_*` flag, so `tasks/main.yml`'s
+config-push task files are never even included during `converge`. What this
+scenario actually proves:
 
-- Role structure validation
-- Task file existence
-- Variable handling
-- Template rendering
+- The role is structurally loadable end-to-end by a real Ansible engine
+  (`meta/main.yml`, Galaxy-name role resolution via the `roles/` symlink in
+  `prepare.yml`, `tasks/main.yml`'s own top-level `when:` conditions
+  actually get evaluated) — a stronger check than `ansible-playbook
+  --syntax-check` (`make syntax`), which parses but doesn't reliably
+  evaluate conditionals/undefined variables.
+- `filter_plugins/netbox_filters.py`'s `FilterModule` and
+  `filter_plugins/rest_api_transforms.py` are discovered and loaded by
+  Ansible's real plugin loader (`verify.yml`) — a different code path from
+  pytest's `sys.path` + `import` (see `tests/unit/test_netbox_filters.py`,
+  which proves the Python-import side of the same guarantee).
+
+`verify.yml` is deliberately a loader/registration smoke test, not a
+behavior test — each filter is called once with minimal input and checked
+only for "didn't error / returned the expected type". Filter *behavior*
+(edge cases, VLAN diff logic, idempotency branches, etc.) is the pytest
+suite's job (`tests/unit/`); real functional/idempotency validation against
+actual hardware is `autotest-aoscx`'s job (see
+[Real-Device Validation](#real-device-validation-sibling-projects)) — this
+scenario duplicates neither.
 
 ### Integration Tests
 
@@ -885,7 +905,11 @@ see [Real-Device Validation](#real-device-validation-sibling-projects).
 
 When adding new features:
 
-1. Add task tests in `molecule/default/verify.yml`
+1. Add unit tests for any new/changed filter in `tests/unit/` (behavior
+   coverage lives there, not in Molecule - see the Molecule section above).
+   Only touch `molecule/default/verify.yml` if you add a brand new
+   `netbox_filters_lib` module and want a one-line loader smoke check for
+   it; don't add behavioral assertions there.
 2. Add integration tests in `tests/`
 3. Update this documentation
 4. Ensure CI pipeline passes

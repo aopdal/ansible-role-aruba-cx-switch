@@ -190,17 +190,17 @@ ansible-galaxy install -r requirements.yml
 pip install -r requirements.txt
 ```
 
-### From GitHub (Private Repository)
+### From GitHub
 
-Since this role is currently private on GitHub, you'll need SSH access. Add the following to your project's `requirements.yml`:
+Since this role is currently on GitHub and not published on Ansible Galaxy, add the following to your project's `requirements.yml`:
 
 ```yaml
 ---
 roles:
   - name: aopdal.aruba_cx_switch
-    src: git@github.com:aopdal/ansible-role-aruba-cx-switch.git
+    src: https://github.com/aopdal/ansible-role-aruba-cx-switch
     version: main  # or specify a tag like 'v1.0.0'
-    scm: git
+
 
 collections:
   - name: arubanetworks.aoscx
@@ -215,23 +215,10 @@ Install with:
 ansible-galaxy install -r requirements.yml
 ```
 
-**Note:** Ensure you have SSH access to the repository:
-
-```bash
-# Test SSH connection
-ssh -T git@github.com
-
-# If needed, add your SSH key
-ssh-add ~/.ssh/id_rsa
-```
-
 ### Direct Installation
 
 ```bash
-# Install directly from GitHub (SSH)
-ansible-galaxy install git+git@github.com:aopdal/ansible-role-aruba-cx-switch.git,main
-
-# Or using HTTPS (requires authentication for private repos)
+# Or using HTTPS
 ansible-galaxy install git+https://github.com/aopdal/ansible-role-aruba-cx-switch.git,main
 ```
 
@@ -308,7 +295,6 @@ interfaces: true
 fetch_all: true
 
 compose:
-  ansible_network_os: custom_fields.ansible_network_os
   device_id: id
 
 group_by:
@@ -326,6 +312,18 @@ See [defaults/main.yml](defaults/main.yml) for all available variables.
 ```yaml
 # Enable/disable fact gathering
 aoscx_gather_facts: true
+
+# REST API-based fact gathering (v10.15+ recommended)
+# When true, uses direct REST API calls (gather_facts_rest_api.yml) instead of aoscx_facts module
+# Benefits:
+#   - 3-5x faster fact gathering (single authenticated session)
+#   - IPv6 addresses included (not just URI references)
+#   - VSX virtual IPs for anycast/active-gateway
+#   - EVPN/VXLAN facts in same session
+# Requirements:
+#   - aoscx_rest_api_version: "10.15" or later
+#   - REST API credentials (defaults to ansible_user/ansible_password)
+aoscx_gather_facts_rest_api: false
 
 # Enable/disable features
 aoscx_configure_vrfs: true
@@ -512,7 +510,7 @@ device_vsx: true  # Enable VSX on this device
 # VSX configuration parameters
 vsx_system_mac: "02:00:00:00:01:00"  # Shared system MAC for VSX pair
 vsx_role: "primary"                   # Role: primary or secondary
-vsx_isl_lag: "isl"                    # ISL LAG interface name
+vsx_isl_lag: "lag256"                    # ISL LAG interface name
 vsx_keepalive_peer: "192.168.1.2"     # IP address of VSX peer
 vsx_keepalive_src: "192.168.1.1"      # Source IP for keepalive
 vsx_keepalive_vrf: "mgmt"             # VRF for keepalive (default: mgmt)
@@ -533,7 +531,7 @@ Device config context:
 ```yaml
 vsx_system_mac: "02:00:00:00:01:00"
 vsx_role: "primary"
-vsx_isl_lag: "isl"
+vsx_isl_lag: "lag256"
 vsx_keepalive_peer: "192.168.100.2"
 vsx_keepalive_src: "192.168.100.1"
 vsx_keepalive_vrf: "mgmt"
@@ -545,7 +543,7 @@ Generated configuration:
 vsx-sync vsx-global
 vsx
   system-mac 02:00:00:00:01:00
-  inter-switch-link lag isl
+  inter-switch-link lag 256
   role primary
   keepalive peer 192.168.100.2 source 192.168.100.1 vrf mgmt
 ```
@@ -563,7 +561,7 @@ Device config context:
 ```yaml
 vsx_system_mac: "02:00:00:00:01:00"  # Same MAC as primary
 vsx_role: "secondary"                 # Different role
-vsx_isl_lag: "isl"
+vsx_isl_lag: "lag256"
 vsx_keepalive_peer: "192.168.100.1"  # Peer is primary
 vsx_keepalive_src: "192.168.100.2"   # This switch's IP
 vsx_keepalive_vrf: "mgmt"
