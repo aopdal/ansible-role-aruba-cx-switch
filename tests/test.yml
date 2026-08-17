@@ -201,7 +201,14 @@
       block:
         - name: Include the Aruba CX Switch role
           ansible.builtin.include_role:
-            name: aruba_cx_switch
+            # This repo IS the role (tasks/, defaults/, etc. live at repo
+            # root, not under a roles/<name>/ subdirectory), so it must be
+            # referenced by path relative to this playbook rather than by
+            # bare name - a bare "aruba_cx_switch" is never found via
+            # roles_path and silently gets swallowed by the rescue below,
+            # masking every other failure this block was meant to catch.
+            # Matches the pattern already used in test_real_data.yml.
+            name: "{{ playbook_dir }}/../"
       rescue:
         - name: Handle expected failures
           ansible.builtin.debug:

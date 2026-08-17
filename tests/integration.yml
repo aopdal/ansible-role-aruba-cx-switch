@@ -10,7 +10,8 @@
       block:
         - name: Test VRF configuration task inclusion
           ansible.builtin.include_role:
-            name: aruba_cx_switch
+            # Path-relative, not bare name - see tests/test.yml for why.
+            name: "{{ playbook_dir }}/../"
             tasks_from: configure_vrfs.yml
           vars:
             aoscx_configure_vrfs: true
@@ -22,8 +23,12 @@
           ansible.builtin.debug:
             msg: "VRF config failed as expected without real hardware"
 
----
 # Integration test playbook - Tests VLAN configuration
+# NOTE: a playbook file is one YAML document containing a *list* of plays,
+# not multiple `---`-separated documents - a second `---` here makes
+# ansible-playbook reject the whole file with "Expected a single document
+# in the stream but found another document" and this second play never
+# runs at all.
 - name: Integration Test - VLAN Configuration
   hosts: localhost
   gather_facts: false
@@ -34,7 +39,8 @@
       block:
         - name: Test VLAN configuration task inclusion
           ansible.builtin.include_role:
-            name: aruba_cx_switch
+            # Path-relative, not bare name - see tests/test.yml for why.
+            name: "{{ playbook_dir }}/../"
             tasks_from: configure_vlans.yml
           vars:
             aoscx_configure_vlans: true

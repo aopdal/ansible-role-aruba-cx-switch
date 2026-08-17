@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`tests/test.yml` and `tests/integration.yml` could never actually find
+  the role.** Both used `include_role: name: aruba_cx_switch` - a bare
+  name, which Ansible resolves by searching `roles_path` for a
+  subdirectory literally called `aruba_cx_switch`. This repo *is* the
+  role (`tasks/`, `defaults/`, etc. live at repo root, not under a
+  `roles/<name>/` subdirectory), so that subdirectory never existed and
+  `include_role` always failed with `the role 'aruba_cx_switch' was not
+  found in ...`. The failure was silently swallowed by each task's
+  `rescue:` block (written to catch "no real hardware to connect to",
+  not "role couldn't even be located"), so `make integration` printed an
+  alarming `[ERROR]` block on every run but still exited 0 - masking the
+  bug instead of failing loudly. Fixed by switching to
+  `name: "{{ playbook_dir }}/../"`, the path-relative form
+  `tests/test_real_data.yml` already used correctly. Both playbooks now
+  actually execute role tasks and only hit the intended
+  no-hardware/no-facts failures (verified: `tests/test.yml` now reaches a
+  live `paramiko` connection error in `configure_hostname.yml`;
+  `tests/integration.yml` now reaches `vrf_changes`/`vlans` prerequisite
+  errors from invoking a single task file via `tasks_from` outside the
+  role's normal orchestration - both expected given how these playbooks
+  test in isolation).
+- `tests/integration.yml` also had two plays separated by a second `---`
+  YAML document marker. A playbook file is one YAML document containing a
+  *list* of plays, not multiple `---`-separated documents; the second
+  `---` made `ansible-playbook tests/integration.yml` reject the whole
+  file with `Expected a single document in the stream but found another
+  document`, so the file could never run standalone (it isn't wired into
+  `make`/CI, which is why this went unnoticed). Merged into a single
+  document.
+
 ### Added
 
 - **Unit test coverage for previously-untested L2 VLAN idempotency
