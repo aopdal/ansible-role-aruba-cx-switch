@@ -3,24 +3,26 @@
 # Copy this to your project as requirements.yml and customize as needed
 
 roles:
-  # Aruba CX Switch Role (Private GitHub Repository)
+  # Aruba CX Switch Role (From GitHub Repository)
   - name: aopdal.aruba_cx_switch
-    src: git@github.com:aopdal/ansible-role-aruba-cx-switch.git
-    version: main  # Use 'main' for latest, or specify a tag like 'v1.0.0'
-    scm: git
+    src: https://github.com/aopdal/ansible-role-aruba-cx-switch
+    version: main # Use 'main' for latest, or specify a tag like 'v1.0.0'
 
 collections:
   # Required Aruba AOS-CX collection
   - name: arubanetworks.aoscx
-    version: ">=4.0.0"
+    version: ">=4.5.1"
 
   # Required NetBox collection
   - name: netbox.netbox
-    version: ">=3.0.0"
+    version: ">=3.22.0"
+
+  # Required Ansible utility collections
+  - name: ansible.utils
+    version: ">=6.0.0"
+  - name: ansible.netcommon
+    version: ">=8.0.0"
 
 # Installation:
 # ansible-galaxy install -r requirements.yml
 #
-# For private repositories, ensure SSH access:
-# ssh -T git@github.com
-# ssh-add ~/.ssh/id_rsa (if needed)
