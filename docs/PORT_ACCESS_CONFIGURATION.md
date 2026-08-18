@@ -9,7 +9,7 @@ configuration with this role. It covers:
 4. [Change detection and idempotency](#change-detection-and-idempotency)
 5. [Cleanup](#cleanup)
 6. [Task ordering and tags](#task-ordering-and-tags)
-7. [Known limitation: mac-groups](#known-limitation-mac-groups)
+7. [Not yet implemented: mac-groups](#not-yet-implemented-mac-groups)
 8. [Operational notes](#operational-notes)
 
 ## How port-access is modelled in NetBox
@@ -119,7 +119,7 @@ idempotent VLAN cleanup — see
 
 ## Change detection and idempotency
 
-Requires [REST API fact gathering](PERFORMANCE_OPTIMIZATION.md)
+Requires [REST API fact gathering](FACT_GATHERING.md)
 (`aoscx_gather_facts_rest_api: true`) for accurate comparison; without it,
 every object in `port_access` is pushed unconditionally on every run.
 

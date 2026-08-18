@@ -7,6 +7,211 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-08-18
+
+### Fixed
+
+- **`tests/test.yml` and `tests/integration.yml` could never actually find
+  the role.** Both used `include_role: name: aruba_cx_switch` - a bare
+  name, which Ansible resolves by searching `roles_path` for a
+  subdirectory literally called `aruba_cx_switch`. This repo *is* the
+  role (`tasks/`, `defaults/`, etc. live at repo root, not under a
+  `roles/<name>/` subdirectory), so that subdirectory never existed and
+  `include_role` always failed with `the role 'aruba_cx_switch' was not
+  found in ...`. The failure was silently swallowed by each task's
+  `rescue:` block (written to catch "no real hardware to connect to",
+  not "role couldn't even be located"), so `make integration` printed an
+  alarming `[ERROR]` block on every run but still exited 0 - masking the
+  bug instead of failing loudly. Fixed by switching to
+  `name: "{{ playbook_dir }}/../"`, the path-relative form
+  `tests/test_real_data.yml` already used correctly. Both playbooks now
+  actually execute role tasks and only hit the intended
+  no-hardware/no-facts failures (verified: `tests/test.yml` now reaches a
+  live `paramiko` connection error in `configure_hostname.yml`;
+  `tests/integration.yml` now reaches `vrf_changes`/`vlans` prerequisite
+  errors from invoking a single task file via `tasks_from` outside the
+  role's normal orchestration - both expected given how these playbooks
+  test in isolation).
+- `tests/integration.yml` also had two plays separated by a second `---`
+  YAML document marker. A playbook file is one YAML document containing a
+  *list* of plays, not multiple `---`-separated documents; the second
+  `---` made `ansible-playbook tests/integration.yml` reject the whole
+  file with `Expected a single document in the stream but found another
+  document`, so the file could never run standalone (it isn't wired into
+  `make`/CI, which is why this went unnoticed). Merged into a single
+  document.
+
+### Added
+
+- **Unit test coverage for previously-untested L2 VLAN idempotency
+  comparison paths.** `get_interfaces_needing_changes()`
+  (`netbox_filters_lib/comparison.py`, used by
+  `tasks/configure_l2_interfaces.yml`) and
+  `get_interfaces_needing_config_changes()`
+  (`netbox_filters_lib/interface_change_detection.py`) gate whether trunk
+  VLAN config gets pushed to real switches; several of their decision
+  branches had no test coverage. Added tests for: empty/`None`
+  `interfaces`/`device_facts` guard clauses; the `ansible_network_resources`
+  and `ansible_net_interfaces` (line-card) device-fact formats, not just the
+  `network_resources` path already covered; per-interface skip logic (no
+  name, `mgmt_only`, missing mode); the `except Exception` fallback that
+  defaults to "needs configuration" on malformed device facts; LAG/MCLAG
+  flagging on cleanup entries; native-VLAN-inside-`vlan_trunks` detection
+  under native-untagged mode; native-tagged/native-untagged trunk mode
+  mismatch detection; the `vlans_to_remove` change reason; and the entire
+  `tagged-all` trunk mode branch. Raises measured coverage of
+  `comparison.py` from 77% to 94% and `interface_change_detection.py` from
+  79% to 87%.
+- **`tests/unit/test_netbox_filters.py`**: smoke test for
+  `filter_plugins/netbox_filters.py`'s `FilterModule`. Every other unit
+  test imports straight from `netbox_filters_lib`, bypassing the public
+  Jinja2 filter registration layer entirely, so a typo'd import, a rename
+  left stale in the re-export, or a filter implemented but never added to
+  `FilterModule.filters()` would pass the whole suite and only surface
+  when Ansible loads the plugin. Asserts the exact set of registered
+  filter names and that each resolves to a real, callable function.
+  Raises `filter_plugins/netbox_filters.py` from 0% to 96% coverage
+  (suite-wide: 89% to 92%).
+
+### Changed
+
+- **`molecule/default/verify.yml` trimmed to what it can actually prove.**
+  This scenario has no real AOS-CX device or simulator, and
+  `converge.yml` disables every `aoscx_configure_*` flag, so it was never
+  exercising any device-facing task logic. The previous `verify.yml`
+  re-implemented ~20 filter *behavior* checks (VLAN diffing, OSPF area
+  extraction, REST transform field values, etc.) that
+  `tests/unit/` already covers far more thoroughly. Replaced with a
+  focused loader/registration smoke test: one minimal call per
+  `netbox_filters_lib` module (plus `rest_api_transforms.py`) proving
+  Ansible's real plugin loader discovers and can invoke each filter —
+  the one guarantee `tests/unit/test_netbox_filters.py`'s pytest-based
+  check (Python `import`, not Ansible's loader) can't provide on its own.
+  577 lines → ~150. See the "Molecule Tests" section of
+  `docs/TESTING.md` for what this scenario is and isn't for.
+- `molecule/default/molecule.yml`'s `test_sequence` no longer includes
+  `cleanup`/`side_effect` steps. Neither has a corresponding playbook
+  (`cleanup.yml`/`side_effect.yml` don't exist and aren't mapped under
+  `provisioner.playbooks`), so Molecule printed a harmless but confusing
+  `Executed: Missing playbook` notice on every `make test` run. This
+  scenario has nothing to clean up beyond `destroy` and no side-effect
+  playbook to simulate, so both steps are removed rather than stubbed out.
+- **Consolidated unit-test documentation in `docs/TESTING.md`.** The
+  "Python Unit Tests (Filter Plugins)" section now also carries the test
+  file/module map, `tests/unit/fixtures.py` fixture list, and current
+  coverage figure that previously lived only in an orphaned, unlinked
+  `tests/unit/TEST_STATUS.md` (removed - see below). Also removed a
+  second, stale copy of the same unit-test material ("Filter-Plugin Unit
+  Tests", merged in wholesale from a former `docs/UNIT_TESTING.md`) that
+  had drifted out of sync with the real `tests/unit/` file list and
+  contained a broken code fence. `docs/TESTING.md` is meant to be the
+  single consolidated testing guide per `CLAUDE.md` §4.5; having the
+  same information in three places (two of them stale) worked against
+  that. Updated the three links that pointed at the removed section's
+  anchor to point at the canonical one instead.
+- **Moved a misplaced `docs/TESTING.md` subsection.** A second
+  `### Writing New Tests` (naming convention, an example test skeleton,
+  best practices, debugging tips, a performance target, and a CI note)
+  lived nested under `## Lab Environment Setup (Legacy)` - unrelated to
+  that section's EVE-NG/lab-bring-up content, and shadowing the real
+  top-level `## Writing New Tests` section elsewhere in the same file.
+  Folded its non-redundant parts (naming convention, extra best-practice
+  points, "Debugging Failed Tests" with the performance target) into the
+  top-level `### Adding Python Unit Tests for Filters` subsection; dropped
+  the parts that duplicated content already covered elsewhere (a second,
+  generic test-skeleton example; a "Continuous Integration" note already
+  covered by the `## CI/CD Pipeline` section).
+- **`docs/CHANGELOG.md` (the synced copy of this file) is now reachable
+  from the docs site**, added to `mkdocs.yml` nav under Reference. It was
+  already generated by `make docs-sync` on every sync but nothing linked
+  to it. Doing so surfaced a real bug in the `docs-sync` Makefile target:
+  the CHANGELOG.md → docs/CHANGELOG.md step was a bare `cp` with no link
+  rewriting, unlike the README.md → docs/index.md step, so every
+  `docs/X.md`-style link inside changelog entries (correct from the repo
+  root, where `CHANGELOG.md` actually lives) rendered as a broken
+  `docs/docs/X.md`-depth link once copied into `docs/`. Added the same
+  `docs/` prefix-strip `sed` step the index.md sync already uses. Also
+  repointed the handful of docs (`CODE_AUDIT.md`, `RELEASE_PROCESS.md`,
+  `TESTING.md`, `FACT_GATHERING.md`) that linked to the changelog via
+  `../CHANGELOG.md` - correct for viewing raw Markdown on GitHub, but
+  unresolvable inside the built MkDocs site now that `CHANGELOG.md` is a
+  real page - to the in-site `CHANGELOG.md` path instead. Also removed a
+  README_DOCS.md entry that duplicated the new Reference-section one.
+- **Removed a legacy CLI-based-IPv6-fetching narrative from
+  `docs/FILTER_PLUGINS.md`.** The "IPv6 Address Performance Trade-off" and
+  "Technical Background" sections described benchmarking a "fetch IPv6
+  via CLI (`show ipv6 interface`)" approach and framed skipping IPv6
+  comparison as a deliberate speed trade-off - no such CLI-fetch code
+  exists anywhere in the role, and this predates REST API fact gathering.
+  Rewrote as "IPv6 Address Handling": the actual reason IPv6 config is
+  pushed unconditionally without `aoscx_gather_facts_rest_api: true` is
+  that the `aoscx_facts` module simply can't return real IPv6 addresses
+  (URL references only) - not a chosen performance trade-off. REST API
+  fact gathering fixes this by providing real addresses to compare
+  against, same as it does for VSX virtual IPs and EVPN/VXLAN facts.
+  Cross-referenced the new `docs/FACT_GATHERING.md`. Also reordered and
+  reframed `docs/FACT_GATHERING.md`'s intro: the REST API path exists
+  primarily because the `aoscx_facts` module is missing data the role
+  needs (IPv6 addresses, VSX virtual IPs), not primarily for speed - the
+  actual mechanism keeping reruns fast is the separate
+  `identify_*_changes.yml` comparison-against-NetBox layer, which the
+  intro now points to explicitly.
+
+### Removed
+
+- **`tests/unit/TEST_STATUS.md`.** Not linked from any doc
+  (`docs/README_DOCS.md`, `mkdocs.yml` nav, `docs/TESTING.md`) or from
+  the Makefile/CI, so nothing pointed a reader at it and nothing kept it
+  honest beyond incidental edits. Its content (test file list, coverage
+  target/current) was accurate at removal time but is now folded into
+  `docs/TESTING.md`'s "Python Unit Tests (Filter Plugins)" section - see
+  `Changed`, above.
+- **`docs/PERFORMANCE_OPTIMIZATION.md`.** Written early in the project as
+  a roadmap for speeding the role up; most of it (batch/async/template-
+  based bulk-push strategies, phased "Implementation Priority" plan, a
+  32-minute/6-switch benchmark) was never implemented and centered on
+  `aoscx_fast_mode`, which was tried, made runs *slower* (no device state
+  to compare against meant everything looked like it needed
+  configuration), and was fully removed in v0.7.0. What was left genuinely
+  current - REST API-based fact gathering, `aoscx_test_mode` - is now
+  [docs/FACT_GATHERING.md](docs/FACT_GATHERING.md), alongside a new
+  section on the `identify_*_changes.yml` change-detection pattern (the
+  actual mechanism, not a proposal, that keeps idempotent reruns fast
+  today). Updated the three docs that linked into the old file
+  (`STP_CONFIGURATION.md`, `PORT_ACCESS_CONFIGURATION.md`,
+  `VSX_CONFIGURATION.md`) plus `docs/TESTING.md`, `docs/README_DOCS.md`,
+  `mkdocs.yml` nav, and `CLAUDE.md`'s doc-map to point at the new file;
+  the `#selective-fact-gathering-with-aoscx_test_mode` anchor other docs
+  referenced is preserved verbatim.
+- **Seven orphaned doc stubs, not referenced from `mkdocs.yml` nav**:
+  `docs/AUTOMATION_ECOSYSTEM_DIAGRAMS.md`, `docs/NETBOX_BGP_PLUGIN.md`,
+  `docs/TAG_DEPENDENT_TESTING.md`, `docs/TESTING_ENVIRONMENT.md`,
+  `docs/TESTING_QUICK_START.md`, `docs/VLAN_DEVELOPER_GUIDE.md`,
+  `docs/VLAN_WORKFLOW_DIAGRAMS.md`. Each was a one-line redirect note left
+  behind after its content was merged into another doc
+  (`AUTOMATION_ECOSYSTEM.md`, `BGP_CONFIGURATION.md`,
+  `TAG_DEPENDENT_INCLUDES.md`, `TESTING.md`, or
+  `VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md` respectively) - the redirect
+  had already served its purpose and nothing linked to the stub itself.
+  Same treatment `docs/TESTING_SCRIPTS.md` and `docs/UNIT_TESTING.md`
+  already got. Updated the "Lab Environment Setup (Legacy)" intro in
+  `docs/TESTING.md`, which described these as still-existing stubs, to
+  reflect that they're gone.
+
+### Fixed
+
+- **Unit test coverage measurement scoped to the wrong package.** CI, `make
+  test-unit-coverage`, and `pytest.ini` all measured coverage of
+  `filter_plugins/` only. That package is a thin re-export shim
+  (`filter_plugins/netbox_filters.py` showed 0% coverage — it's never
+  imported directly by tests); the actual filter logic lives in
+  `netbox_filters_lib/` (93% of the testable code), which was excluded
+  entirely. Reported/Codecov coverage is now measured across both
+  `filter_plugins` and `netbox_filters_lib`
+  (`.github/workflows/ci.yml`, `Makefile`, `pytest.ini`), so the badge
+  reflects real coverage (89%, not the previous meaningless 68% over 106
+  statements).
+
 ## [0.14.1] - 2026-08-14
 
 ### Fixed

@@ -85,7 +85,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pytest tests/unit/ -v --cov=filter_plugins --cov-report=term-missing --cov-report=xml
+          pytest tests/unit/ -v --cov=filter_plugins --cov=netbox_filters_lib --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

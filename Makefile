@@ -94,7 +94,7 @@ test-unit: ## Run unit tests for filter plugins
 
 test-unit-coverage: ## Run unit tests with coverage report
 	@echo "$(BLUE)Running unit tests with coverage...$(NC)"
-	@pytest tests/unit/ --cov=filter_plugins --cov-report=term-missing --cov-report=html
+	@pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib --cov-report=term-missing --cov-report=html
 	@echo "$(GREEN)✅ Unit tests passed. Coverage report: htmlcov/index.html$(NC)"
 
 test-unit-quick: ## Run unit tests without coverage (faster)
@@ -197,7 +197,9 @@ docs-sync: ## Sync README.md to docs/index.md and CHANGELOG.md to docs/CHANGELOG
 	@echo "$(GREEN)✅ README.md synced to docs/index.md with fixed links$(NC)"
 	@echo "$(BLUE)Syncing CHANGELOG.md to docs/CHANGELOG.md...$(NC)"
 	@cp CHANGELOG.md docs/CHANGELOG.md
-	@echo "$(GREEN)✅ CHANGELOG.md synced to docs/CHANGELOG.md$(NC)"
+	@# Fix links: Remove 'docs/' prefix since CHANGELOG.md is now inside docs/
+	@sed -i 's|(docs/|(|g' docs/CHANGELOG.md
+	@echo "$(GREEN)✅ CHANGELOG.md synced to docs/CHANGELOG.md with fixed links$(NC)"
 
 docs-serve: ## Serve documentation locally at http://127.0.0.1:8000
 	@echo "$(BLUE)Starting documentation server...$(NC)"

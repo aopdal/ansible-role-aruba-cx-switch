@@ -122,7 +122,8 @@ nav:
                   - Testing Guide: TESTING.md
         - Reference:
                   - Quick Reference: QUICK_REFERENCE.md
-                  - Performance Optimization: PERFORMANCE_OPTIMIZATION.md
+                  - Fact Gathering: FACT_GATHERING.md
+                  - Changelog: CHANGELOG.md
                   - Release Process:
                             - Guide: RELEASE_PROCESS.md
                   - Code Audit: CODE_AUDIT.md

@@ -5,7 +5,7 @@ configuration with this role. It covers:
 
 1. [How VSX is modelled in NetBox](#how-vsx-is-modelled-in-netbox)
 2. [Config context fields](#config-context-fields)
-3. [Complete example (primary + secondary)](#complete-example-primary--secondary)
+3. [Complete example (primary + secondary)](#complete-example-primary-secondary)
 4. [Change detection and idempotency](#change-detection-and-idempotency)
 5. [Task ordering and tags](#task-ordering-and-tags)
 6. [Operational notes](#operational-notes)
@@ -87,7 +87,7 @@ Deployment rules:
 
 ## Change detection and idempotency
 
-Requires [REST API fact gathering](PERFORMANCE_OPTIMIZATION.md)
+Requires [REST API fact gathering](FACT_GATHERING.md)
 (`aoscx_gather_facts_rest_api: true`) for accurate comparison; without it,
 `vsx_diff` is never computed and the `aoscx_vsx` module call runs
 unconditionally every time (still idempotent at the module level, but

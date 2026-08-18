@@ -17,7 +17,6 @@ This document describes the comprehensive testing infrastructure for the Aruba A
   - [Quick Start (lab bring-up)](#quick-start-lab-bring-up)
   - [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox)
   - [Testing Scripts](#testing-scripts)
-  - [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
   - [Tag-Dependent Task Testing](#tag-dependent-task-testing)
 - [Real-Device Validation (Sibling Projects)](#real-device-validation-sibling-projects)
 
@@ -26,7 +25,7 @@ This document describes the comprehensive testing infrastructure for the Aruba A
 This role includes comprehensive CI/CD testing infrastructure with **8 layers of testing**,
 all of which run inside this repository:
 
-1. ✅ **Python Unit Tests** (`pytest`) - Tests for filter plugins — see [Filter-Plugin Unit Tests](#filter-plugin-unit-tests)
+1. ✅ **Python Unit Tests** (`pytest`) - Tests for filter plugins — see [Python Unit Tests (Filter Plugins)](#python-unit-tests-filter-plugins)
 2. ✅ **YAML Linting** (`yamllint`) - Validates YAML syntax and style
 3. ✅ **Ansible Linting** (`ansible-lint`) - Checks Ansible best practices
 4. ✅ **Syntax Checking** - Validates playbook syntax (multiple Ansible versions)
@@ -416,7 +415,7 @@ pytest tests/unit/
 pytest tests/unit/test_l3_config_helpers.py
 
 # Run with coverage report
-pytest tests/unit/ --cov=filter_plugins --cov-report=html
+pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib --cov-report=html
 
 # Verbose output with test names
 pytest tests/unit/ -v
@@ -432,6 +431,9 @@ pytest tests/unit/ -v
 | `test_bgp_filters.py` | BGP session enrichment and policy collection |
 | `test_vlan_filters.py` | VLAN lifecycle (creation, deletion, IGMP snooping, protection) |
 | `test_interface_filters.py` | Interface categorization and metadata extraction |
+| `test_interface_ip_processing.py` | Interface IP address extraction from NetBox data |
+| `test_interface_ip_comparisons.py` | IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison logic |
+| `test_interface_orphans.py` | Orphaned virtual interface detection |
 | `test_rest_api_transforms.py` | REST API response normalization (interfaces, VLANs, DHCP relays) |
 | `test_port_access_vlans.py` | Port-access VLAN extraction and validation |
 | `test_stp_filters.py` | STP interface change detection |
@@ -440,20 +442,97 @@ pytest tests/unit/ -v
 | `test_port_access_diff.py` | Port-access device state diff |
 | `test_port_access_facts.py` | Port-access REST API fact flattening |
 | `test_port_access_orphans.py` | Orphaned port-access object detection |
+| `test_static_route_filters.py` | Static route change/removal detection |
+| `test_vsx.py` | VSX config diff |
+| `test_netbox_filters.py` | `FilterModule` registration smoke test - every filter resolves under its expected name |
 | `test_utils.py` | Utility function helpers |
 
-**Configuration**: `pytest.ini` defines test discovery and coverage settings
+**Configuration**: `pytest.ini` defines test discovery and coverage settings.
+Coverage is measured across both `filter_plugins/` (the public filter
+entry points) and `netbox_filters_lib/` (the actual filter implementations,
+imported directly by the tests above) — the former alone is a thin
+re-export layer and reports near-zero coverage on its own.
+
+**Running a subset**:
+
+```bash
+# A single test file, class, or test
+pytest tests/unit/test_vlan_filters.py
+pytest tests/unit/test_utils.py::TestCollapseVlanList
+pytest tests/unit/test_utils.py::TestCollapseVlanList::test_consecutive_vlans
+```
+
+**Test structure**:
+
+```
+tests/unit/
+├── __init__.py                         # Package initialization
+├── conftest.py                         # Pytest configuration and sys.path setup
+├── fixtures.py                         # Shared test data and fixtures
+├── test_utils.py                       # utils.py
+├── test_vlan_filters.py                # vlan_filters.py
+├── test_vrf_filters.py                 # vrf_filters.py
+├── test_interface_filters.py           # interface_categorization.py, interface_ip_processing.py
+├── test_interface_ip_processing.py     # interface_ip_processing.py
+├── test_interface_ip_comparisons.py    # interface_ip_comparisons.py
+├── test_interface_orphans.py           # interface_orphans.py
+├── test_interface_change_detection.py  # interface_change_detection.py
+├── test_comparison.py                  # comparison.py
+├── test_l3_config_helpers.py           # l3_config_helpers.py
+├── test_ospf_filters.py                # ospf_filters.py (nested and flat config_context)
+├── test_bgp_filters.py                 # bgp_filters.py
+├── test_static_route_filters.py        # static_route_filters.py
+├── test_stp_filters.py                 # stp.py
+├── test_vsx.py                         # vsx.py
+├── test_port_access_diff.py            # port_access.py (port_access_diff)
+├── test_port_access_facts.py           # port_access.py (port_access_facts_from_device_profiles)
+├── test_port_access_vlans.py           # vlan_filters.py (port-access VLAN extraction)
+├── test_port_access_orphans.py         # port_access_orphans.py
+├── test_rest_api_transforms.py         # rest_api_transforms.py
+└── test_netbox_filters.py              # filter_plugins/netbox_filters.py (FilterModule smoke test)
+```
+
+**Test fixtures**, located in `tests/unit/fixtures.py`:
+
+- `get_sample_interfaces()` - Sample NetBox interface data
+- `get_sample_vlans()` - Sample NetBox VLAN data
+- `get_sample_vrfs()` - Sample NetBox VRF data
+- `get_sample_ip_addresses()` - Sample NetBox IP address data
+- `get_sample_ansible_facts()` - Sample Ansible device facts
+- `get_sample_ospf_config()` - Sample OSPF configuration data
+
+**Coverage goal**: >= 90%. Current coverage (`make test-unit-coverage`): ~92%.
 
 ### Molecule Tests (Role Validation)
 
 Located in: `molecule/default/`
 
-Tests individual role functionality in isolation:
+There is no real AOS-CX device or simulator here, so this scenario cannot
+exercise any `arubanetworks.aoscx` module, CLI push, or real idempotency.
+`converge.yml` disables every `aoscx_configure_*` flag, so `tasks/main.yml`'s
+config-push task files are never even included during `converge`. What this
+scenario actually proves:
 
-- Role structure validation
-- Task file existence
-- Variable handling
-- Template rendering
+- The role is structurally loadable end-to-end by a real Ansible engine
+  (`meta/main.yml`, Galaxy-name role resolution via the `roles/` symlink in
+  `prepare.yml`, `tasks/main.yml`'s own top-level `when:` conditions
+  actually get evaluated) — a stronger check than `ansible-playbook
+  --syntax-check` (`make syntax`), which parses but doesn't reliably
+  evaluate conditionals/undefined variables.
+- `filter_plugins/netbox_filters.py`'s `FilterModule` and
+  `filter_plugins/rest_api_transforms.py` are discovered and loaded by
+  Ansible's real plugin loader (`verify.yml`) — a different code path from
+  pytest's `sys.path` + `import` (see `tests/unit/test_netbox_filters.py`,
+  which proves the Python-import side of the same guarantee).
+
+`verify.yml` is deliberately a loader/registration smoke test, not a
+behavior test — each filter is called once with minimal input and checked
+only for "didn't error / returned the expected type". Filter *behavior*
+(edge cases, VLAN diff logic, idempotency branches, etc.) is the pytest
+suite's job (`tests/unit/`); real functional/idempotency validation against
+actual hardware is `autotest-aoscx`'s job (see
+[Real-Device Validation](#real-device-validation-sibling-projects)) — this
+scenario duplicates neither.
 
 ### Integration Tests
 
@@ -505,7 +584,7 @@ ZTP configs, and firmware for standing up a test lab and pointing this
 role at it. See [DEVCONTAINER_MOUNTS.md](DEVCONTAINER_MOUNTS.md) and
 [WORKSPACE.md](WORKSPACE.md) for how to mount it alongside this repo in
 the devcontainer. `aoscx_test_mode: true` (see
-[PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md#selective-fact-gathering-with-aoscx_test_mode))
+[FACT_GATHERING.md](FACT_GATHERING.md#selective-fact-gathering-with-aoscx_test_mode))
 is the role-side variable this workspace's report/verify-only playbooks
 rely on.
 
@@ -552,7 +631,7 @@ though it isn't part of it:
 - `report_interfaces.yml` — a report-only playbook that verifies device
   state against NetBox intent without pushing changes (see the
   `_ip_changes.dhcp_relay_expected`/`_actual` note in
-  [CHANGELOG.md](../CHANGELOG.md)).
+  [CHANGELOG.md](CHANGELOG.md)).
 - Tag-selection tests that verify the tag-narrowing behaviour described in
   [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#testing).
 - An **idempotency-rerun check** — run the role once to apply a change,
@@ -611,7 +690,7 @@ make help              # Show all commands
 # Python Unit Tests (NEW)
 pytest tests/unit/                           # Run all unit tests
 pytest tests/unit/ -v                        # Verbose output
-pytest tests/unit/ --cov=filter_plugins      # With coverage
+pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib  # With coverage
 pytest tests/unit/test_l3_config_helpers.py  # Specific test file
 pytest tests/unit/ -m l3_config              # By marker
 
@@ -643,7 +722,12 @@ For a complete command reference, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md).
 
 ### Adding Python Unit Tests for Filters
 
-**NEW**: When adding new filter plugins, create comprehensive unit tests:
+When adding new filter plugins, create comprehensive unit tests:
+
+**Naming convention**:
+- Test files: `test_<module_name>.py`
+- Test classes: `Test<FunctionName>`
+- Test methods: `test_<specific_behavior>`
 
 1. **Create test file** in `tests/unit/`:
    ```bash
@@ -677,16 +761,31 @@ For a complete command reference, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md).
    pytest tests/unit/test_my_new_filters.py -v
 
    # Run with coverage
-   pytest tests/unit/test_my_new_filters.py --cov=filter_plugins.netbox_filters_lib.my_new_filters
+   pytest tests/unit/test_my_new_filters.py --cov=netbox_filters_lib.my_new_filters
    ```
 
 4. **Add test markers** in `pytest.ini` if needed
 
 **Best Practices**:
 - Test normal inputs, edge cases, and error conditions
+- One assertion per test when possible
 - Use descriptive test names: `test_<what>_<condition>`
+- Use fixtures (`tests/unit/fixtures.py`) for common test data
+- Keep tests independent — no dependencies between tests
 - Aim for high code coverage (>80%)
 - Test both expected behavior and failure modes
+
+### Debugging Failed Tests
+
+```bash
+pytest tests/unit/ --pdb          # Drop into pdb on failure
+pytest tests/unit/ -l             # Show local variables on failure
+pytest tests/unit/ --lf           # Run only failed tests from last run
+pytest tests/unit/ -s             # Show print statements
+pytest tests/unit/ --durations=10 # Show 10 slowest tests
+```
+
+Performance target: < 5 seconds for the full unit test suite.
 
 ### Adding Molecule Scenarios
 
@@ -875,7 +974,11 @@ see [Real-Device Validation](#real-device-validation-sibling-projects).
 
 When adding new features:
 
-1. Add task tests in `molecule/default/verify.yml`
+1. Add unit tests for any new/changed filter in `tests/unit/` (behavior
+   coverage lives there, not in Molecule - see the Molecule section above).
+   Only touch `molecule/default/verify.yml` if you add a brand new
+   `netbox_filters_lib` module and want a one-line loader smoke check for
+   it; don't add behavioral assertions there.
 2. Add integration tests in `tests/`
 3. Update this documentation
 4. Ensure CI pipeline passes
@@ -905,12 +1008,12 @@ If you encounter issues:
 
 ### Related Documentation
 
-- [Filter-Plugin Unit Tests](#filter-plugin-unit-tests) - Filter plugin unit test reference (pytest)
+- [Python Unit Tests (Filter Plugins)](#python-unit-tests-filter-plugins) - Filter plugin unit test reference (pytest)
 - [Testing Scripts](#testing-scripts) - Helper scripts for test environment setup
 - [Real-Device Validation](#real-device-validation-sibling-projects) - `aruba-role-testing` + `autotest-aoscx`, the sibling projects that actually validate a feature against real/lab hardware
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and workflow
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command cheat sheet
-- [CHANGELOG.md](../CHANGELOG.md) - Version history and changes
+- [CHANGELOG.md](CHANGELOG.md) - Version history and changes
 
 ---
 
@@ -926,8 +1029,9 @@ This section is the canonical home for lab bring-up and EVE-NG + NetBox
 test-environment content that previously lived in separate files
 (`docs/TESTING_QUICK_START.md`, `docs/TESTING_ENVIRONMENT.md`,
 `docs/TESTING_SCRIPTS.md`, `docs/UNIT_TESTING.md`, and
-`docs/TAG_DEPENDENT_TESTING.md`). Those standalone files are now stubs that
-point back here. It documents simulated-lab setup (EVE-NG + Docker
+`docs/TAG_DEPENDENT_TESTING.md`). Those standalone files have been removed
+- the "Originally `docs/X.md`" notes below each subsection mark where
+their content now lives. It documents simulated-lab setup (EVE-NG + Docker
 NetBox); for the "does this actually work against a real device" step, see
 [Real-Device Validation](#real-device-validation-sibling-projects) instead.
 
@@ -2023,164 +2127,6 @@ When using these scripts, organize your test environment like this:
 - [Test Environment (EVE-NG + NetBox)](#test-environment-eve-ng-netbox) - Full testing environment documentation
 - [Quick Start (lab bring-up)](#quick-start-lab-bring-up) - Quick start guide
 - [TESTING.md](TESTING.md) - Complete testing guide
-
----
-
-### Filter-Plugin Unit Tests
-
-> Originally `docs/UNIT_TESTING.md` — pytest suite under `tests/unit/`.
-
-pytest tests/unit/
-
-## Or using make
-make test-unit
-```
-
-#### Run Specific Test File
-```bash
-pytest tests/unit/test_vlan_filters.py
-pytest tests/unit/test_vrf_filters.py
-```
-
-#### Run Specific Test Class
-```bash
-pytest tests/unit/test_utils.py::TestCollapseVlanList
-```
-
-#### Run Specific Test
-```bash
-pytest tests/unit/test_utils.py::TestCollapseVlanList::test_consecutive_vlans
-```
-
-#### Run with Coverage Report
-```bash
-pytest tests/unit/ --cov=filter_plugins --cov-report=html
-## Open htmlcov/index.html to view coverage
-
-## Or using make
-make test-unit-coverage
-```
-
-#### Run with Verbose Output
-```bash
-pytest tests/unit/ -v
-```
-
-#### Run Tests by Category
-```bash
-## Run only VLAN-related tests
-pytest tests/unit/ -m vlan
-
-## Run only VRF-related tests
-pytest tests/unit/ -m vrf
-
-## Run only fast tests (skip slow ones)
-pytest tests/unit/ -m "not slow"
-```
-
-### Test Structure
-
-```
-tests/unit/
-├── __init__.py                       # Package initialization
-├── conftest.py                       # Pytest configuration and setup
-├── fixtures.py                       # Shared test data and fixtures
-├── test_utils.py                     # Utility function tests
-├── test_vlan_filters.py              # VLAN filter tests
-├── test_vrf_filters.py               # VRF filter tests
-├── test_interface_filters.py         # Interface categorization and IP processing tests
-├── test_interface_change_detection.py # Change detection and idempotency tests
-├── test_comparison.py                # State comparison tests
-├── test_l3_config_helpers.py         # L3 configuration helper tests
-├── test_ospf_filters.py              # OSPF filter tests
-├── test_bgp_filters.py               # BGP filter tests
-├── test_rest_api_transforms.py       # REST API transform tests
-├── test_stp_filters.py               # STP interface change detection tests
-├── test_port_access_diff.py          # Port-access diff (desired vs device state)
-├── test_port_access_facts.py         # Port-access REST API fact flattening
-├── test_port_access_orphans.py       # Orphaned port-access object detection
-└── test_port_access_vlans.py         # Port-access VLAN extraction
-```
-
-### Test Fixtures
-
-Located in `tests/unit/fixtures.py`:
-
-- `get_sample_interfaces()` - Sample NetBox interface data
-- `get_sample_vlans()` - Sample NetBox VLAN data
-- `get_sample_vrfs()` - Sample NetBox VRF data
-- `get_sample_ip_addresses()` - Sample NetBox IP address data
-- `get_sample_ansible_facts()` - Sample Ansible device facts
-- `get_sample_ospf_config()` - Sample OSPF configuration data
-
-### Coverage Goals
-
-Target: **>= 90% code coverage** for all filter plugins
-
-```bash
-pytest tests/unit/ --cov=filter_plugins --cov-report=term-missing
-```
-
-### Writing New Tests
-
-#### Test Naming Convention
-- Test files: `test_<module_name>.py`
-- Test classes: `Test<FunctionName>`
-- Test methods: `test_<specific_behavior>`
-
-#### Example Test Structure
-```python
-class TestMyFunction:
-    """Tests for my_function"""
-
-    def test_normal_case(self):
-        result = my_function(valid_input)
-        assert result == expected_output
-
-    def test_edge_case(self):
-        result = my_function(edge_case_input)
-        assert result is not None
-
-    def test_error_handling(self):
-        with pytest.raises(ValueError):
-            my_function(invalid_input)
-```
-
-#### Best Practices
-1. One assertion per test when possible
-2. Clear test names that describe what's being tested
-3. Use fixtures for common test data
-4. Test edge cases and error conditions
-5. Keep tests independent — no dependencies between tests
-
-### Debugging Failed Tests
-
-```bash
-pytest tests/unit/ --pdb          # Drop into pdb on failure
-pytest tests/unit/ -l             # Show local variables on failure
-pytest tests/unit/ --lf           # Run only failed tests from last run
-pytest tests/unit/ -s             # Show print statements
-```
-
-### Performance
-
-Target: < 5 seconds for the full unit test suite.
-
-```bash
-pytest tests/unit/ --durations=10  # Show 10 slowest tests
-```
-
-### Continuous Integration
-
-Unit tests run automatically on:
-- Pre-commit hooks
-- Pull request creation
-- Main branch commits
-- Release tags
-
-See [TESTING.md](TESTING.md) for the full testing guide covering Molecule, integration tests, and CI/CD.
-
----
 
 ### Tag-Dependent Task Testing
 

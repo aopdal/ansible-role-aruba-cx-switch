@@ -100,7 +100,7 @@ if_stp_root_guard: true
 
 Both layers are idempotent — pushed only when device state actually
 differs from NetBox — but **both require
-[REST API fact gathering](PERFORMANCE_OPTIMIZATION.md)**
+[REST API fact gathering](FACT_GATHERING.md)**
 (`aoscx_gather_facts_rest_api: true`). Without it, every enabled setting is
 pushed unconditionally on every run (still functionally correct — the CLI
 commands are themselves idempotent — but every run reports `changed: true`

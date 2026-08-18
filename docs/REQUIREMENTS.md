@@ -8,8 +8,10 @@ This project uses multiple requirements files for different purposes. This docum
 |------|---------|-------------|
 | `requirements.txt` | Runtime dependencies for using the role | **Always** - Required for role to function |
 | `requirements.yml` | Ansible collections | **Always** - Required for role to function |
+| `requirements-example.yml` | Ansible example requirements | Using the role |
 | `requirements-test.txt` | Testing and development tools | Development and CI/CD only |
 | `requirements-docs.txt` | Documentation generation | Documentation development only |
+
 
 ---
 
