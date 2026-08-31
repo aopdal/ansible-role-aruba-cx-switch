@@ -195,7 +195,8 @@
     parents: >-
       interface {{ item.name | format_interface_name(
         'lag' if (item.type is defined and item.type.value is defined and item.type.value == 'lag')
-        else ('loopback' if 'loopback' in item.name.lower() else 'physical')
+        else ('vlan' if 'vlan' in item.name.lower()
+        else ('loopback' if 'loopback' in item.name.lower() else 'physical'))
       ) }}
   vars:
     ansible_connection: network_cli
@@ -218,7 +219,8 @@
     parents: >-
       interface {{ item.name | format_interface_name(
         'lag' if (item.type is defined and item.type.value is defined and item.type.value == 'lag')
-        else ('loopback' if 'loopback' in item.name.lower() else 'physical')
+        else ('vlan' if 'vlan' in item.name.lower()
+        else ('loopback' if 'loopback' in item.name.lower() else 'physical'))
       ) }}
   vars:
     ansible_connection: network_cli
@@ -268,7 +270,8 @@
     parents: >-
       interface {{ item.name | format_interface_name(
         'lag' if (item.type is defined and item.type.value is defined and item.type.value == 'lag')
-        else ('loopback' if 'loopback' in item.name.lower() else 'physical')
+        else ('vlan' if 'vlan' in item.name.lower()
+        else ('loopback' if 'loopback' in item.name.lower() else 'physical'))
       ) }}
   vars:
     ansible_connection: network_cli
