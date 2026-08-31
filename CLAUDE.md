@@ -77,7 +77,13 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
 8. **Interface change identification** (`identify_interface_changes.yml`) —
    sets `interface_changes` (categorised: physical / lag / mclag / l2 / l3 /
    no_changes). Required by all interface tasks.
-9. Interfaces: physical → LAG → MCLAG → assign-to-LAG → L2 → OSPF → L3.
+9. Interfaces: physical → LAG → MCLAG → assign-to-LAG → L2 → L3.
+9a. **OSPF** (tag-dependent — see
+    [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md)). Runs
+    after L3 interfaces: per-interface OSPF config (area/network-type/auth)
+    targets loopback/VLAN-SVI/physical interfaces that must already exist
+    (and, for VLAN SVIs, already be VRF-attached), or the CLI push has no
+    valid interface context to enter.
 10. **Static routes** (tag-dependent, like OSPF/BGP — see
     [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md)).
 11. EVPN, VXLAN.
