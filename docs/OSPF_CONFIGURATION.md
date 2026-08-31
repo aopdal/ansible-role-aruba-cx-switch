@@ -180,7 +180,7 @@ interface 1/1/10
 For passive interface with authentication disabled:
 
 ```text
-interface vlan100
+interface vlan 100
    ip ospf 1 area 0.0.0.0
    ip ospf network broadcast
    ip ospf passive
@@ -190,7 +190,34 @@ interface vlan100
   The role uses CLI commands (`aoscx_config`) for both new and
   existing OSPF interface configurations. Area/network/auth/passive
   are applied in a single path with connection override to
-  `ansible.netcommon.network_cli`.
+  `network_cli`.
+
+### Interaction with VRF changes
+
+Moving an interface to a different VRF in NetBox (`vrf:` on the interface)
+clears its L3 configuration on AOS-CX, including OSPF registration -
+area, network type, authentication, and passive state are all dropped
+along with IP addressing when the device processes `vrf attach`.
+
+Because OSPF change detection (`identify_ospf_changes.yml`) compares
+against `aoscx_ospf_interface_facts`/`aoscx_ospf_router_facts` gathered
+once at the start of the run - before this run's `vrf attach` push - it
+cannot see that the VRF move is about to wipe the interface's existing
+(and, per that snapshot, already-correct) OSPF registration. To handle
+this, the role tracks interfaces flagged with `_ip_changes.vrf_change`
+(set during L3 interface change detection - see
+`compute_l3_ip_changes()` in
+`netbox_filters_lib/interface_ip_comparisons.py`) and force-reconfigures
+their OSPF area/network-type/authentication (and passive, if desired)
+regardless of what the pre-run facts snapshot shows. This is why OSPF
+configuration runs *after* L3 interface configuration in `tasks/main.yml`
+(see [CLAUDE.md](../CLAUDE.md) task ordering) - the VRF-attach push (and
+the L3 addressing it clears and re-applies) must land first, and the
+tracked interface list it produces is what OSPF's forced reconfiguration
+reads.
+
+No NetBox configuration is needed to get this behavior - it applies
+automatically whenever an interface's `vrf` custom field changes.
 
 ## Interface MD5 authentication
 

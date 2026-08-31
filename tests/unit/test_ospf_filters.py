@@ -577,3 +577,53 @@ class TestGetOspfInterfaceChanges:
         router_facts = {"default": "https://example/ospf_routers"}
         result = get_ospf_interface_changes(items, interface_facts, router_facts)
         assert result["config_changes"] == items
+
+    def test_vrf_change_forces_config_reconfiguration(self):
+        """vrf_change=True forces area/network-type/auth reconfiguration even
+        though the pre-run facts snapshot shows the interface as already
+        registered - AOS-CX clears OSPF registration on a VRF move, but the
+        snapshot predates this run's VRF-attach push."""
+        items = [self._item(vrf_change=True)]
+        # Same "already correct" facts as test_matching_state_yields_no_changes,
+        # which would normally yield no_changes.
+        interface_facts = {
+            "default": {
+                "1": {
+                    "0.0.0.0": {
+                        "vlan10": {
+                            "ospf_if_type": None,
+                            "ospf_auth_type": "null",
+                        }
+                    }
+                }
+            }
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": []}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["config_changes"] == items
+        assert result["no_changes"] == []
+
+    def test_vrf_change_forces_passive_set_when_desired(self):
+        """vrf_change=True forces 'ip ospf passive' even though the pre-run
+        facts snapshot already shows the interface as passive."""
+        items = [self._item(vrf_change=True, passive=True)]
+        interface_facts = {
+            "default": {"1": {"0.0.0.0": {"vlan10": {"ospf_if_type": None}}}}
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": ["vlan10"]}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["passive_set"] == items
+
+    def test_vrf_change_does_not_force_passive_clear(self):
+        """vrf_change=True with passive not desired needs no explicit clear -
+        AOS-CX already drops passive along with the rest of OSPF registration
+        on a VRF move."""
+        items = [self._item(vrf_change=True, passive=False)]
+        interface_facts = {
+            "default": {"1": {"0.0.0.0": {"vlan10": {"ospf_if_type": None}}}}
+        }
+        router_facts = {"default": {"1": {"passive_interfaces": []}}}
+        result = get_ospf_interface_changes(items, interface_facts, router_facts)
+        assert result["passive_clear"] == []
+        # Still forced via config_changes (area/network-type/auth).
+        assert result["config_changes"] == items

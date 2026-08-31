@@ -411,7 +411,7 @@ custom_fields:
 Combined with the `ip_helper_addresses` config context (VRF `lab-blue`), this produces:
 
 ```
-interface vlan101
+interface vlan 101
     vrf attach lab-blue
     ip address 172.27.4.1/27
     ip helper-address 172.16.3.10
