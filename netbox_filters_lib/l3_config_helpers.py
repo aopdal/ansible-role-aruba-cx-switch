@@ -26,7 +26,7 @@ def format_interface_name(interface_name, interface_type):
     Different interface types require different formatting:
     - Physical: "1/1/1" stays as "1/1/1"
     - LAG: "lag1" becomes "lag 1" (space added)
-    - VLAN: "vlan10" stays as "vlan10"
+    - VLAN: "vlan10" becomes "vlan 10" (space added)
     - Loopback: "loopback0" becomes "loopback 0" (space added)
     - Sub-interface: "1/1/3.2000" stays as "1/1/3.2000"
 
@@ -40,10 +40,13 @@ def format_interface_name(interface_name, interface_type):
     if interface_type == "lag":
         # LAG interfaces need a space: "lag1" -> "lag 1"
         return interface_name.replace("lag", "lag ")
+    if interface_type == "vlan":
+        # VLAN interfaces need a space: "vlan10" -> "vlan 10"
+        return interface_name.replace("vlan", "vlan ")
     if interface_type == "loopback":
         # Loopback interfaces need a space: "loopback0" -> "loopback 0"
         return interface_name.replace("loopback", "loopback ")
-    # Physical, VLAN, and sub-interfaces use the name as-is
+    # Physical and sub-interfaces use the name as-is
     return interface_name
 
 
