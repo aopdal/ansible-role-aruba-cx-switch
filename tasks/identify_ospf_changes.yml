@@ -13,12 +13,26 @@
 # aoscx_ospf_interface_facts undefined), every desired router/area/interface
 # setting is returned for push - matching the role's previous behaviour.
 #
+# Runs after L3 interface configuration (see tasks/main.yml) so that
+# loopback/VLAN-SVI/physical interfaces referenced here already exist and
+# are VRF-attached. It also depends on identify_interface_changes.yml
+# (runs much earlier, before all interface tasks) for interface_changes.l3,
+# whose _ip_changes.vrf_change marks interfaces whose VRF assignment is
+# changing this run - AOS-CX clears OSPF registration on a VRF move, so
+# those interfaces must have their OSPF config force-reconfigured even
+# though the pre-run ospf_interface_facts/ospf_router_facts snapshot still
+# shows them as already registered (see _ospf_vrf_changed_interfaces below
+# and get_ospf_interface_changes() in netbox_filters_lib/ospf_filters.py).
+#
 # Facts created:
 # - ospf_interfaces: Interfaces from NetBox with OSPF configuration
 # - ospf_config: Normalized OSPF router/area config (process_id, router_id, vrfs)
+# - _ospf_vrf_changed_interfaces: Names of interfaces whose VRF is changing
+#   this run (from interface_changes.l3[]._ip_changes.vrf_change)
 # - _ospf_interface_items: Per-interface OSPF parameters, including the
 #   precomputed md5_auth_desired flag (reused by both get_ospf_interface_changes
 #   and configure_ospf.yml so the auth-key-presence logic lives in one place)
+#   and vrf_change (from _ospf_vrf_changed_interfaces)
 # - ospf_router_changes: Dict with categorized router/area changes
 #   - router_changes: VRF entries whose router-id needs (re)configuring
 #   - area_additions: {vrf, area} pairs not yet present on the device
@@ -71,6 +85,20 @@
       - "Interfaces to configure: {{ ospf_interfaces | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
+# Interfaces whose VRF is changing this run (per compute_l3_ip_changes()/
+# _ip_changes.vrf_change, computed in identify_interface_changes.yml, which
+# runs before OSPF - see tasks/main.yml). AOS-CX clears an interface's OSPF
+# registration when it is moved to a different VRF, but ospf_interface_facts/
+# ospf_router_facts were gathered before this run's VRF-attach push, so
+# without this, get_ospf_interface_changes() would see the (stale, pre-move)
+# "already registered" facts and skip reconfiguring it.
+- name: Identify interfaces with a VRF change this run
+  ansible.builtin.set_fact:
+    _ospf_vrf_changed_interfaces: "{{ (interface_changes.l3 | default([]))
+      | selectattr('_ip_changes.vrf_change', 'defined')
+      | selectattr('_ip_changes.vrf_change')
+      | map(attribute='name') | list }}"
+
 # Build per-interface OSPF parameters, including md5_auth_desired - precomputed
 # here (rather than in configure_ospf.yml) so both get_ospf_interface_changes
 # and the actual CLI push reference the exact same auth-key-presence logic.
@@ -102,6 +130,7 @@
           'passive': passive,
           'auth_enabled': auth_enabled,
           'md5_auth_desired': (auth_allowed and has_auth_key),
+          'vrf_change': (intf.name in _ospf_vrf_changed_interfaces),
         }) -%}
       {%- endfor -%} {{ out }}
   when: ospf_interfaces | length > 0

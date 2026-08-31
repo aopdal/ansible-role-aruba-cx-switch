@@ -63,7 +63,7 @@ HPE Aruba recommends using a link-local address (`fe80::`) as the IPv6 anycast g
 When the IPv6 anycast address is link-local, AOS-CX requires `ipv6 address link-local` to be explicitly configured **before** the `active-gateway ipv6` command:
 
 ```
-interface vlan11
+interface vlan 11
     ipv6 address link-local fe80::1/64
     active-gateway ipv6 mac 02:01:00:00:01:00
     active-gateway ipv6 fe80::1
@@ -76,7 +76,7 @@ The role handles this automatically — see [Generated Configuration](#generated
 For the example above, the role will generate:
 
 ```
-interface vlan11
+interface vlan 11
     vrf attach z13-cust_2
     ip address 172.20.4.2/27
     active-gateway ip mac 02:01:00:00:01:00
@@ -171,13 +171,13 @@ Matched IP 172.20.4.1/27 to interface vlan11 (VRF: z13-cust_2, Role: anycast, An
 ### Check Device Configuration
 
 ```
-show running-config interface vlan11
+show running-config interface vlan 11
 ```
 
 Should show:
 
 ```
-interface vlan11
+interface vlan 11
     ...
     ip address 172.20.4.2/27
     active-gateway ip mac 02:01:00:00:01:00

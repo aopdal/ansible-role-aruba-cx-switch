@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-08-31
+
+### Fixed
+
+- OSPF interface config (area/network-type/authentication/passive) was
+  never reconfigured when an interface's VRF changed, if the interface's
+  OSPF settings were already correct per the pre-run facts snapshot.
+  Moving an interface to a different VRF clears its OSPF registration on
+  AOS-CX, the same way it clears L3/IP addressing (already handled
+  correctly for addressing via `_ip_changes.vrf_change` in
+  `compute_l3_ip_changes()`/`should_add_interface_ip()` - this fix brings
+  OSPF interface config in line with that existing behavior), but
+  `identify_ospf_changes.yml`/`get_ospf_interface_changes()`
+  (`netbox_filters_lib/ospf_filters.py`) compared only against
+  `aoscx_ospf_interface_facts`/`aoscx_ospf_router_facts` gathered once at
+  the start of the run, before this run's `vrf attach` push - so an
+  interface already correctly registered in its OSPF area *before* the
+  VRF move was wrongly left in `no_changes` and never reconfigured after
+  losing that registration. `identify_ospf_changes.yml` now looks up
+  which interfaces have `_ip_changes.vrf_change` set (from
+  `identify_interface_changes.yml`, which already runs first) and passes
+  a `vrf_change` flag through `_ospf_interface_items`;
+  `get_ospf_interface_changes()` force-includes those interfaces in
+  `config_changes` (and `passive_set`, if passive is desired) regardless
+  of what the stale facts snapshot shows. See
+  [docs/OSPF_CONFIGURATION.md](OSPF_CONFIGURATION.md#interaction-with-vrf-changes).
+
+- `tasks/main.yml` included OSPF configuration (`identify_ospf_changes.yml`
+  + `configure_ospf.yml`) *before* L3 interface configuration
+  (`configure_l3_interfaces.yml`), even though OSPF's per-interface push
+  (area/network-type/auth on loopback/VLAN-SVI/physical interfaces) needs
+  those interfaces to already exist and, for VLAN SVIs, already be
+  VRF-attached — the opposite of the dependency this file's own table
+  documents (`OSPF, BGP | VRFs, L3 interfaces`). On a device where those
+  interfaces don't exist yet (a fresh device on its first run, or a
+  partial `-t ospf` run without `-t interfaces`/`-t vrfs`/`-t vlans`
+  first), `aoscx_config` has no valid `interface <name>` context to enter
+  and hangs until the connection's `command_timeout` (30s default),
+  failing with `unable to enter configuration mode` /
+  `unable to retrieve current config` instead of converging. OSPF's
+  `identify`/`configure` includes now run immediately after
+  "Include L3 interface configuration tasks", matching every other
+  routing feature (BGP already ran after L3; static routes, EVPN, and
+  VXLAN already did too). Tags on both includes (`ospf`, `routing`) are
+  unchanged, so `-t ospf`/`-t routing` tag-narrowing behavior is
+  unaffected — running `-t ospf` alone still requires the referenced
+  interfaces/VRFs to already exist on the device, same as before; a full
+  run or `-t vrfs,vlans,interfaces,ospf` now converges in one pass instead
+  of requiring OSPF to be applied in a separate, later run.
+
+- `format_interface_name()` (`netbox_filters_lib/l3_config_helpers.py`) did
+  not insert the space AOS-CX CLI requires between `vlan` and the VLAN
+  number (e.g. rendered `interface vlan300` instead of
+  `interface vlan 300`), even though `templates/int_vlan.j2` (the
+  template-based config generator) already inserted it correctly for the
+  same interface type. This is the same class of bug as the `loopback`
+  fix in 0.13.7, but for VLAN SVIs, and had a wider blast radius since
+  `format_interface_name` backs the `parents:` context for every live
+  `aoscx_config` push against a VLAN interface: per-interface OSPF
+  area/network-type/auth/passive (`tasks/configure_ospf.yml`), the main
+  L3 addressing/anycast-gateway push (`tasks/configure_l3_interface_common.yml`),
+  and orphaned-SVI cleanup (`tasks/cleanup_virtual_interfaces.yml`). As
+  with the loopback bug, the malformed command entered a no-op CLI
+  context - `aoscx_config` reported `changed: true` on every run without
+  the intended configuration ever landing on the device. Also fixed three
+  call sites in `tasks/configure_l3_interfaces.yml` (stale IPv6
+  link-local additions, stale IPv6 removal, stale anycast-gateway
+  removal) that classified VLAN interface names as `physical` instead of
+  `vlan` (missing the `vlan` branch that a fourth, correct call site in
+  the same file already had), so they now get the fix too. Doc examples
+  in `docs/ANYCAST_GATEWAY.md`, `docs/OSPF_CONFIGURATION.md`, and
+  `docs/NETBOX_INTEGRATION.md` updated to show the correct
+  `interface vlan 11`-style syntax.
+
 ## [0.14.2] - 2026-08-18
 
 ### Fixed

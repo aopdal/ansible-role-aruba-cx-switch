@@ -406,34 +406,6 @@
     - cleanup
     - idempotent
 
-- name: Identify OSPF changes (before configuration)
-  ansible.builtin.include_tasks:
-    file: identify_ospf_changes.yml
-    apply:
-      tags:
-        - ospf
-        - routing
-  when:
-    - aoscx_configure_ospf | bool
-    - custom_fields.device_ospf | default(false) | bool
-  tags:
-    - ospf
-    - routing
-
-- name: Include OSPF configuration tasks
-  ansible.builtin.include_tasks:
-    file: configure_ospf.yml
-    apply:
-      tags:
-        - ospf
-        - routing
-  when:
-    - aoscx_configure_ospf | bool
-    - custom_fields.device_ospf | default(false) | bool
-  tags:
-    - ospf
-    - routing
-
 - name: Include virtual interface cleanup tasks (before L3 config)
   ansible.builtin.include_tasks:
     file: cleanup_virtual_interfaces.yml
@@ -468,6 +440,38 @@
     - interfaces
     - l3_interfaces
     - layer3
+
+# OSPF runs after L3 interfaces: per-interface OSPF config (area, network
+# type, auth) targets loopback/VLAN-SVI/physical interfaces that must
+# already exist (and, for VLAN SVIs, already be VRF-attached) or the CLI
+# push in configure_ospf.yml has no valid interface context to enter.
+- name: Identify OSPF changes (before configuration)
+  ansible.builtin.include_tasks:
+    file: identify_ospf_changes.yml
+    apply:
+      tags:
+        - ospf
+        - routing
+  when:
+    - aoscx_configure_ospf | bool
+    - custom_fields.device_ospf | default(false) | bool
+  tags:
+    - ospf
+    - routing
+
+- name: Include OSPF configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_ospf.yml
+    apply:
+      tags:
+        - ospf
+        - routing
+  when:
+    - aoscx_configure_ospf | bool
+    - custom_fields.device_ospf | default(false) | bool
+  tags:
+    - ospf
+    - routing
 
 - name: Include static route configuration tasks
   ansible.builtin.include_tasks:

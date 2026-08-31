@@ -323,8 +323,18 @@ def get_ospf_interface_changes(
         ospf_interface_items: List of per-interface dicts as built in
             `tasks/identify_ospf_changes.yml` - each with keys
             ``interface_name``, ``interface_type``, ``vrf``, ``area_id``,
-            ``network_type``, ``passive`` (bool), and ``md5_auth_desired``
-            (bool, precomputed from ``ospf_auth_keys``/``ospf_auth_key_id``).
+            ``network_type``, ``passive`` (bool), ``md5_auth_desired``
+            (bool, precomputed from ``ospf_auth_keys``/``ospf_auth_key_id``),
+            and ``vrf_change`` (bool, precomputed from the interface's
+            ``_ip_changes.vrf_change`` set by `compute_l3_ip_changes`
+            (`interface_ip_comparisons.py`) during `identify_interface_changes.yml`).
+            When True, area/network-type/auth and (if desired) passive are
+            force-included in the result regardless of what the pre-run
+            OSPF facts snapshot shows - moving an interface to a different
+            VRF wipes its OSPF registration on AOS-CX, but that snapshot
+            was taken before this run's VRF-attach push, so it would
+            otherwise still show the interface as "already registered" and
+            skip reconfiguring it.
         ospf_interface_facts: Device REST facts
             (``aoscx_ospf_interface_facts``) - ``{vrf: {process_id_str:
             {area: {intf_name: {'ospf_if_type': ..., 'ospf_auth_type':
@@ -359,6 +369,7 @@ def get_ospf_interface_changes(
         passive = bool(item.get("passive"))
         md5_auth_desired = bool(item.get("md5_auth_desired"))
         is_loopback = "loopback" in (intf_name or "")
+        vrf_change = bool(item.get("vrf_change"))
 
         changed = False
 
@@ -368,7 +379,14 @@ def get_ospf_interface_changes(
             pid_facts = _to_dict(vrf_facts.get(pid_str))
             area_data = _to_dict(pid_facts.get(area_id))
 
-        if not facts_available or intf_name not in area_data:
+        if vrf_change:
+            _debug(
+                f"OSPF interface {intf_name} VRF is changing - AOS-CX clears "
+                f"OSPF registration on VRF move, forcing reconfiguration"
+            )
+            config_changes.append(item)
+            changed = True
+        elif not facts_available or intf_name not in area_data:
             _debug(f"OSPF interface {intf_name} not registered in area {area_id} - will configure")
             config_changes.append(item)
             changed = True
@@ -419,10 +437,13 @@ def get_ospf_interface_changes(
                 currently_passive = intf_name in actual_passive_interfaces
 
             if passive:
-                if not router_facts_available or not currently_passive:
+                if vrf_change or not router_facts_available or not currently_passive:
                     passive_set.append(item)
                     changed = True
             else:
+                # No need to force this on vrf_change: AOS-CX already clears
+                # passive along with the rest of OSPF registration on a VRF
+                # move, so a desired "not passive" state needs no push.
                 if not router_facts_available or currently_passive:
                     passive_clear.append(item)
                     changed = True

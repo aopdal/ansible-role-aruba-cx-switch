@@ -29,9 +29,9 @@ class TestFormatInterfaceName:
         assert format_interface_name("lag256", "lag") == "lag 256"
 
     def test_vlan_interface(self):
-        """Test VLAN interface name formatting"""
-        assert format_interface_name("vlan10", "vlan") == "vlan10"
-        assert format_interface_name("vlan100", "vlan") == "vlan100"
+        """Test VLAN interface name formatting (adds space)"""
+        assert format_interface_name("vlan10", "vlan") == "vlan 10"
+        assert format_interface_name("vlan100", "vlan") == "vlan 100"
 
     def test_loopback_interface(self):
         """Test loopback interface name formatting (adds space)"""
@@ -1344,7 +1344,7 @@ class TestBuildL3ConfigPreview:
             "lag_default_vrf": [self._phys_item("lag1", "10.1.0.1/24")],
         }
         result = build_l3_config_preview(l3, self.BUILTIN_VRFS)
-        assert set(result.keys()) == {"1/1/1", "vlan10", "lag 1"}
+        assert set(result.keys()) == {"1/1/1", "vlan 10", "lag 1"}
 
     def test_l3_counters_disabled(self):
         l3 = {"physical_default_vrf": [
