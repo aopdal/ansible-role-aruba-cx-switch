@@ -56,6 +56,42 @@ from .utils import (
 )
 
 
+def _get_device_enabled_state(device_intf):
+    """
+    Determine the device's actual admin-enabled state from aoscx facts.
+
+    Tries multiple fields in order of reliability, matching AOS-CX facts
+    quirks (particularly for LAG members, where "admin"/"admin_state" alone
+    can misreport):
+    - user_config.admin: most reliable for the configured (intended) state.
+    - forwarding_state.enablement: reliable operational fallback, especially
+      for LAG members where admin_state can show "up" even when the
+      interface is administratively down.
+    - admin / admin_state: last-resort fallback.
+
+    Args:
+        device_intf: Device interface facts dict (one entry from
+            ansible_facts.network_resources.interfaces).
+
+    Returns:
+        True/False if a usable field was found, otherwise None (caller
+        should skip the comparison when the device state is unknown).
+    """
+    device_admin_state = device_intf.get("admin") or device_intf.get("admin_state")
+
+    user_config = device_intf.get("user_config", {})
+    if isinstance(user_config, dict) and "admin" in user_config:
+        return user_config.get("admin") == "up"
+
+    forwarding_state = device_intf.get("forwarding_state")
+    if isinstance(forwarding_state, dict):
+        enablement = forwarding_state.get("enablement")
+        if enablement is not None:
+            return enablement
+
+    return device_admin_state == "up" if device_admin_state else None
+
+
 def get_interfaces_needing_config_changes(
     interfaces,
     device_facts,
@@ -92,7 +128,10 @@ def get_interfaces_needing_config_changes(
         - mclag: MCLAG interfaces needing changes
         - l2: L2 interfaces needing VLAN changes
         - l3: L3 interfaces needing IP address changes (also includes VLAN SVI /
-          loopback / sub-interface entries that only need a description update)
+          loopback / sub-interface entries that only need a description or MTU
+          update, and VLAN SVI / sub-interface entries that only need an
+          enabled (shutdown/no shutdown) state change - loopbacks don't
+          support the latter)
         - lag_members: Physical interfaces needing LAG assignment changes
         - no_changes: Interfaces that don't need any changes
     """
@@ -260,45 +299,7 @@ def get_interfaces_needing_config_changes(
         if type_value not in ["virtual"]:
             # Check enabled state
             nb_enabled = nb_intf.get("enabled", True)
-
-            # Try multiple fields to determine actual admin state
-            # admin_state can be unreliable for LAG members - it may show "up"
-            # even when the interface is administratively down (no explicit shutdown in config)
-            # The forwarding_state.enablement field is more reliable
-            device_admin_state = device_intf.get("admin") or device_intf.get(
-                "admin_state"
-            )
-
-            # Check user_config.admin first (most reliable for configured state)
-            user_config = device_intf.get("user_config", {})
-            if isinstance(user_config, dict) and "admin" in user_config:
-                device_admin_state = user_config.get("admin")
-                device_enabled = device_admin_state == "up"
-                _debug(
-                    f"Using user_config.admin for {intf_name}: {device_admin_state}")
-            # Check forwarding_state.enablement for more accurate admin state
-            # This is especially important for LAG member interfaces
-            elif "forwarding_state" in device_intf:
-                forwarding_state = device_intf.get("forwarding_state", {})
-                if isinstance(forwarding_state, dict):
-                    enablement = forwarding_state.get("enablement")
-                    if enablement is not None:
-                        # Use enablement field as the source of truth
-                        device_enabled = enablement
-                        device_admin_state = "up" if enablement else "down"
-                    else:
-                        # Fall back to admin_state
-                        device_enabled = (
-                            device_admin_state == "up" if device_admin_state else None
-                        )
-                else:
-                    device_enabled = (
-                        device_admin_state == "up" if device_admin_state else None
-                    )
-            else:
-                device_enabled = (
-                    device_admin_state == "up" if device_admin_state else None
-                )
+            device_enabled = _get_device_enabled_state(device_intf)
 
             # Only compare if we have device state information
             if device_enabled is not None and nb_enabled != device_enabled:
@@ -307,14 +308,9 @@ def get_interfaces_needing_config_changes(
                     f"enabled mismatch (NB: {nb_enabled}, device: {device_enabled})"
                 )
 
-            # Debug output showing which field was used
             _debug(
                 f"Interface {intf_name}: NB enabled={nb_enabled}, "
-                f"device admin_state={device_admin_state}, "
-                f"device_enabled={device_enabled}, "
-                f"user_config.admin="
-                f"{user_config.get('admin') if isinstance(user_config, dict) else 'N/A'}, "
-                f"needs_change={needs_change}"
+                f"device_enabled={device_enabled}, needs_change={needs_change}"
             )
 
             # Check description (only if NetBox has a description)
@@ -349,11 +345,12 @@ def get_interfaces_needing_config_changes(
                         f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
                     )
         else:
-            # Virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces) skip the
-            # admin/MTU checks above (those properties don't apply), but description
-            # is still pushed for them via build_l3_config_lines() in the L3 config
-            # path, so compare it here and flag it the same way as other L3 changes
-            # (vrf_change, dhcp_relay_change) that group_interface_ips() looks for.
+            # Virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces) get
+            # their own description/enabled/MTU checks below (mirroring, not
+            # reusing, the physical/LAG checks above - see per-check comments
+            # for the loopback exclusions that differ from physical/LAG), and
+            # flag each one the same way as other L3 changes (vrf_change,
+            # dhcp_relay_change) that group_interface_ips() looks for.
             nb_description = nb_intf.get("description", "")
             device_description = device_intf.get("description", "")
             if nb_description and nb_description != device_description:
@@ -365,6 +362,46 @@ def get_interfaces_needing_config_changes(
                 if "_ip_changes" not in nb_intf:
                     nb_intf["_ip_changes"] = {}
                 nb_intf["_ip_changes"]["description_change"] = True
+
+            # Check enabled state (shutdown/no shutdown) for VLAN SVIs and
+            # sub-interfaces. Loopback interfaces do NOT support admin
+            # shutdown on AOS-CX, so they are excluded here.
+            is_loopback = "loopback" in intf_name.lower()
+            if not is_loopback:
+                nb_enabled = nb_intf.get("enabled", True)
+                device_enabled = _get_device_enabled_state(device_intf)
+
+                if device_enabled is not None and nb_enabled != device_enabled:
+                    needs_change = True
+                    change_reasons.append(
+                        f"enabled mismatch (NB: {nb_enabled}, "
+                        f"device: {device_enabled})"
+                    )
+                    if "_ip_changes" not in nb_intf:
+                        nb_intf["_ip_changes"] = {}
+                    nb_intf["_ip_changes"]["enabled_change"] = True
+
+                _debug(
+                    f"Interface {intf_name}: NB enabled={nb_enabled}, "
+                    f"device_enabled={device_enabled}, needs_change={needs_change}"
+                )
+
+            # Check MTU (if specified in NetBox). Applies to all virtual
+            # types - VLAN SVI, sub-interface, AND loopback - since
+            # build_l3_config_lines() emits 'ip mtu' unconditionally for
+            # every interface type (unlike admin shutdown, which loopbacks
+            # don't support).
+            nb_mtu = nb_intf.get("mtu")
+            if nb_mtu and nb_mtu != "" and nb_mtu is not None:
+                device_mtu = device_intf.get("mtu")
+                if device_mtu and int(nb_mtu) != int(device_mtu):
+                    needs_change = True
+                    change_reasons.append(
+                        f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
+                    )
+                    if "_ip_changes" not in nb_intf:
+                        nb_intf["_ip_changes"] = {}
+                    nb_intf["_ip_changes"]["mtu_change"] = True
 
         # Check LAG membership
         # AOS-CX stores LAG membership in the LAG interface's "interfaces" dict,

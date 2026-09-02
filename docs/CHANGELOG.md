@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.4] - 2026-09-02
+
+### Fixed
+
+- VLAN SVI and sub-interface `enabled` state (NetBox `enabled: true`/`false`,
+  pushed as `no shutdown`/`shutdown`) was never checked or reconfigured
+  after interface creation. `get_interfaces_needing_config_changes()`
+  (`netbox_filters_lib/interface_change_detection.py`) explicitly skipped
+  the admin-state comparison for all `type: virtual` interfaces (VLAN SVIs,
+  loopbacks, sub-interfaces), so disabling/re-enabling an already-existing
+  VLAN interface or sub-interface in NetBox was silently ignored on
+  subsequent runs — only the one-time `aoscx_interface` creation task
+  (`tasks/configure_l3_interfaces.yml`) ever applied it, and only when the
+  interface didn't already exist on the device. Change detection now
+  compares `enabled` for VLAN SVIs and sub-interfaces (setting
+  `_ip_changes.enabled_change`, consumed by
+  `group_interface_ips()`/`build_l3_config_lines()` in
+  `netbox_filters_lib/l3_config_helpers.py` to emit `shutdown`/
+  `no shutdown` alongside the rest of the L3 config push). Loopback
+  interfaces are intentionally excluded — AOS-CX loopbacks don't support
+  admin shutdown. See
+  [docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md#l3-interface-ip-address-idempotency).
+
+- Same gap as above for MTU on virtual interfaces: `mtu` on a VLAN SVI,
+  loopback, or sub-interface was never compared against the device, so
+  changing an existing virtual interface's MTU in NetBox (with nothing else
+  about it changing) was silently ignored — `get_interfaces_needing_config_changes()`
+  skipped the MTU check entirely for `type: virtual` interfaces, even though
+  `build_l3_config_lines()` already emits `ip mtu <mtu>` unconditionally for
+  every interface type. Change detection now compares `mtu` for all virtual
+  interfaces, including loopbacks (unlike the enabled-state fix above, MTU
+  has no loopback exception — AOS-CX loopbacks do support `ip mtu`), setting
+  `_ip_changes.mtu_change` to pull the interface into the L3 config push. See
+  [docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md#l3-interface-ip-address-idempotency).
+
+- Routed physical/LAG interfaces disabled in NetBox (`enabled: false`) could
+  come back up on the device even though `configure_physical_interfaces.yml`/
+  `configure_lag_interfaces.yml` had already correctly pushed `shutdown` for
+  them earlier in the same run. Root cause: whenever an interface's L3
+  config also needs pushing in that same run (e.g. `routing` isn't yet
+  applied - observed after the earlier admin-disable step itself, but this
+  can happen for any reason `routing` ends up missing), AOS-CX has been
+  observed to reset the interface's admin-shutdown state back to enabled as
+  a side effect of (re)applying `routing` - and `build_l3_config_lines()`
+  (`netbox_filters_lib/l3_config_helpers.py`) never re-asserted admin state
+  afterwards, since physical/LAG enabled-state was assumed fully handled by
+  the earlier physical/LAG-stage tasks (see `tasks/main.yml` ordering:
+  physical/LAG interface config runs before L3 config). `routing` is now
+  immediately followed by a `no shutdown`/`shutdown` line reflecting the
+  interface's NetBox `enabled` state, deliberately duplicating what the
+  earlier stage already pushed; `aoscx_config` only actually sends it when
+  the device disagrees, so this is a no-op in the common case where
+  `routing` didn't reset anything. See
+  [docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md#l3-interface-ip-address-idempotency).
+
 ## [0.14.3] - 2026-08-31
 
 ### Fixed

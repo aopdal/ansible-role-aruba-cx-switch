@@ -403,6 +403,8 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
         - The interface has `if_ip_ospf_1_area` set AND it is not yet in the correct OSPF area (or `ospf_facts` is `None`)
         - `_ip_changes.dhcp_relay_change` is `True` (set by change detection when DHCP relay servers differ)
         - `_ip_changes.description_change` is `True` (set by change detection for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when the NetBox description differs from the device description)
+        - `_ip_changes.enabled_change` is `True` (set by change detection for VLAN SVIs and sub-interfaces — not loopbacks, which don't support shutdown/no shutdown — when the NetBox enabled state differs from the device admin state)
+        - `_ip_changes.mtu_change` is `True` (set by change detection for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when the NetBox MTU differs from the device MTU)
     - Returns: List of `{interface_name, interface, addresses}` dicts
 
 - **`build_l3_config_lines(item, interface_type, vrf_type, l3_counters_enable=True, ip_helper_addresses=None)`**
@@ -410,6 +412,8 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
     - `item` is a per-interface grouped dict from `group_interface_ips()` with an `addresses` list
     - Handles all IPs (IPv4 + IPv6, anycast gateways) in a single call — each per-interface command (vrf attach, ip mtu, l3-counters) emitted exactly once
     - For `interface_type` `vlan`, `loopback`, or `subinterface`, emits a `description <text>` line when `item.interface.description` is set. `physical` and `lag` are deliberately excluded — those are already pushed unconditionally by `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml` regardless of L2/L3 role, so emitting it here too would duplicate the command.
+    - For `interface_type` `vlan` or `subinterface`, emits a standalone `no shutdown`/`shutdown` line reflecting `item.interface.enabled` (default `True`). `loopback` is excluded — AOS-CX loopbacks don't support admin shutdown.
+    - For `interface_type` `physical` or `lag`, the same `no shutdown`/`shutdown` line is ALSO emitted, but immediately after `routing` rather than standalone — a deliberate duplicate of what `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml` already pushed earlier in the run, guarding against AOS-CX resetting admin state as a side effect of (re)applying `routing`. `aoscx_config` only actually sends it when the device disagrees, so it's a no-op in the common case.
     - OSPF interface config is handled separately in `tasks/configure_ospf.yml`
     - When `ip_helper_addresses` is provided and the interface has `custom_fields.if_ip_helper=True`, emits `ip helper-address <ip>` lines (one per server, ordered by string index key) after all IP/anycast lines and before `l3-counters`
     - Servers are looked up by the interface VRF name in `ip_helper_addresses` (a dict keyed by VRF, values are `{"0": "ip", "1": "ip", ...}`)
@@ -615,7 +619,8 @@ orchestration described below and calls into those helpers per interface.
     - Compare NetBox interface configuration with device state
     - Implements granular change detection for:
       - Physical properties (enabled/disabled, description, MTU) — physical, LAG, and MCLAG interfaces
-      - Description — virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces; NetBox `type.value == "virtual"`), which skip the admin-state/MTU checks above but are still compared on `description`
+      - Description and MTU — virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces; NetBox `type.value == "virtual"`), compared against the device the same way as physical/LAG interfaces
+      - Enabled/disabled state — VLAN SVIs and sub-interfaces only (not loopbacks, which don't support admin shutdown on AOS-CX)
       - Encapsulation VLAN — sub-interfaces only (NetBox `type.value == "virtual"` with `parent` set). Compares the device's `subintf_vlan` (REST API, requires `enhanced_facts`) against the first `tagged_vlans[].vid` on the NetBox interface, so a re-tagged sub-interface is detected as drift instead of silently passing when its IP/description are otherwise unchanged
       - LAG membership
       - L2 VLAN configuration
@@ -632,7 +637,7 @@ orchestration described below and calls into those helpers per interface.
       - `lag`: LAG interfaces needing changes
       - `mclag`: MCLAG interfaces needing changes
       - `l2`: L2 interfaces needing VLAN changes
-      - `l3`: L3 interfaces needing IP address or DHCP relay changes (also includes VLAN SVI / loopback / sub-interface entries that only need a description update)
+      - `l3`: L3 interfaces needing IP address or DHCP relay changes (also includes VLAN SVI / loopback / sub-interface entries that only need a description or MTU update, and VLAN SVI / sub-interface entries that only need an enabled (shutdown/no shutdown) state change — loopbacks don't support the latter)
       - `lag_members`: Physical interfaces needing LAG assignment changes
       - `no_changes`: Interfaces that don't need any changes
     - Adds `_ip_changes` dict to L3 interfaces containing:
@@ -642,6 +647,8 @@ orchestration described below and calls into those helpers per interface.
       - `dhcp_relay_to_remove`: Sorted list of relay server IPs present on the device but absent from NetBox (requires `dhcp_relay_facts`). Used by the "Remove stale ip helper-address entries" task.
       - `dhcp_relay_expected`/`dhcp_relay_actual`: Sorted lists of the desired (from `ip_helper_addresses`) and currently-configured (from `dhcp_relay_facts`) relay servers. Always populated for any interface with `if_ip_helper=True` when both `dhcp_relay_facts` and `ip_helper_addresses` are provided — including interfaces that land in `no_changes` because the servers already match — so verification/reporting tooling can display current ip helper state without re-deriving it.
       - `description_change`: `True` when a virtual interface's (VLAN SVI/loopback/sub-interface) description differs from the device, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` emits a `description` line. Physical/LAG/MCLAG description changes are handled separately by `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml`, which push description unconditionally whenever the interface has any pending change.
+      - `enabled_change`: `True` when a VLAN SVI's or sub-interface's NetBox `enabled` state differs from the device admin state, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` emits a `shutdown`/`no shutdown` line. Not set for loopbacks — AOS-CX loopbacks don't support admin shutdown. Physical/LAG/MCLAG enabled-state changes are handled separately (see `physical`/`lag` categories above and `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml`).
+      - `mtu_change`: `True` when a virtual interface's (VLAN SVI/loopback/sub-interface) NetBox MTU differs from the device MTU, so `group_interface_ips` includes the interface even when no IPs need adding — `build_l3_config_lines` already emits `ip mtu <mtu>` unconditionally whenever `interface.mtu` is set, for every interface type, so no additional handling is needed there. Physical/LAG/MCLAG MTU changes are handled by the same `physical`/`lag` MTU comparison used for their enabled-state check above.
       - `encapsulation_change`: `True` when a sub-interface's device-side `subintf_vlan` (REST API, requires `enhanced_facts`) differs from NetBox's `tagged_vlans[0].vid`, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` re-emits the `encapsulation dot1q <vid>` line. Without `enhanced_facts` this comparison is skipped (no false positives, but also no drift detection) since standard `aoscx_facts` does not expose `subintf_vlan`.
     - See "L3 Interface IP Address Idempotency" section for performance details
 

@@ -500,9 +500,9 @@ Compares NetBox interfaces with device facts to identify which interfaces need c
 #### Purpose
 
 Enables idempotent interface configuration by detecting:
-- Enabled/disabled state changes (physical, LAG, MCLAG)
+- Enabled/disabled state changes (physical, LAG, MCLAG, VLAN SVI, sub-interface — not loopback, which doesn't support admin shutdown on AOS-CX)
 - Description changes (all interface types, incl. virtual)
-- MTU changes
+- MTU changes (all interface types, incl. virtual — VLAN SVI, loopback, sub-interface)
 - LAG membership changes
 - L2 VLAN configuration changes
 - L3 IP address changes (IPv4 by specific address; IPv6 fully compared when `enhanced_facts` is supplied)
@@ -524,13 +524,13 @@ Enables idempotent interface configuration by detecting:
   - `lag` - LAG interfaces needing changes
   - `mclag` - MCLAG interfaces needing changes
   - `l2` - L2 interfaces needing VLAN changes
-  - `l3` - L3 interfaces needing IP address, description, encapsulation, or DHCP relay changes (also includes VLAN SVI/loopback/sub-interface entries that only need a description update)
+  - `l3` - L3 interfaces needing IP address, description, MTU, enabled-state, encapsulation, or DHCP relay changes (also includes VLAN SVI/loopback/sub-interface entries that only need a description or MTU update, and VLAN SVI/sub-interface entries that only need an enabled-state update)
   - `lag_members` - Physical interfaces needing LAG assignment
   - `no_changes` - Interfaces that don't need changes
 
   L3 entries additionally carry an `_ip_changes` dict (`ipv4_to_add`,
   `ipv6_addresses`, `dhcp_relay_change`, `dhcp_relay_to_remove`,
-  `description_change`, `encapsulation_change`, `vrf_change`, ...) —
+  `description_change`, `enabled_change`, `mtu_change`, `encapsulation_change`, `vrf_change`, ...) —
   consumed by `l3_config_helpers.group_interface_ips()` /
   `build_l3_config_lines()`. See
   [FILTER_PLUGINS.md "L3 Interface IP Address Idempotency"](../FILTER_PLUGINS.md#l3-interface-ip-address-idempotency)
@@ -539,9 +539,9 @@ Enables idempotent interface configuration by detecting:
 #### Checks Performed
 
 **Basic Interface Properties:**
-- Enabled/disabled state (`admin` state)
+- Enabled/disabled state (`admin` state) — physical, LAG, MCLAG, VLAN SVI, and sub-interface; not loopback (no admin shutdown on AOS-CX)
 - Description (with special handling for `AP_Aruba`)
-- MTU (if specified in NetBox)
+- MTU (if specified in NetBox) — all interface types, including virtual (VLAN SVI, loopback, sub-interface)
 
 **LAG Membership:**
 - Current LAG assignment vs. NetBox

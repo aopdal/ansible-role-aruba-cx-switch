@@ -216,6 +216,216 @@ class TestGetInterfacesNeedingConfigChanges:
         assert len(result["l3"]) == 1
         assert result["l3"][0]["_ip_changes"]["description_change"] is True
 
+    def test_vlan_svi_enabled_mismatch(self):
+        """VLAN SVI (virtual) with an enabled-state mismatch needs L3 changes
+        and is flagged with _ip_changes.enabled_change for group_interface_ips()."""
+        interfaces = [
+            {
+                "name": "vlan100",
+                "type": {"value": "virtual"},
+                "enabled": False,  # Should be shut down
+                "ip_addresses": [{"address": "10.1.100.1/24"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan100": {
+                        "admin": "up",  # Currently enabled on device
+                        "ip4_address": "10.1.100.1/24",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["name"] == "vlan100"
+        assert result["l3"][0]["_ip_changes"]["enabled_change"] is True
+
+    def test_vlan_svi_enabled_match_no_changes(self):
+        """VLAN SVI with matching enabled state and IP needs no changes."""
+        interfaces = [
+            {
+                "name": "vlan100",
+                "type": {"value": "virtual"},
+                "enabled": True,
+                "ip_addresses": [{"address": "10.1.100.1/24"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan100": {
+                        "admin": "up",
+                        "ip4_address": "10.1.100.1/24",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["no_changes"]) == 1
+        assert "_ip_changes" not in result["no_changes"][0]
+
+    def test_subinterface_enabled_mismatch(self):
+        """Sub-interface (virtual + parent) with an enabled-state mismatch
+        needs L3 changes and is flagged with _ip_changes.enabled_change."""
+        interfaces = [
+            {
+                "name": "1/1/3.2000",
+                "type": {"value": "virtual"},
+                "parent": {"name": "1/1/3"},
+                "enabled": False,
+                "ip_addresses": [{"address": "10.2.0.1/30"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/3.2000": {
+                        "admin": "up",
+                        "ip4_address": "10.2.0.1/30",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["_ip_changes"]["enabled_change"] is True
+
+    def test_loopback_enabled_mismatch_not_checked(self):
+        """Loopback interfaces don't support admin shutdown on AOS-CX, so an
+        enabled-state 'mismatch' must never be flagged for them."""
+        interfaces = [
+            {
+                "name": "loopback0",
+                "type": {"value": "virtual"},
+                "enabled": False,
+                "ip_addresses": [{"address": "10.255.0.1/32"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "loopback0": {
+                        "admin": "up",
+                        "ip4_address": "10.255.0.1/32",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["no_changes"]) == 1
+        assert "_ip_changes" not in result["no_changes"][0]
+
+    def test_vlan_svi_mtu_mismatch(self):
+        """VLAN SVI (virtual) with an MTU mismatch needs L3 changes and is
+        flagged with _ip_changes.mtu_change for group_interface_ips()."""
+        interfaces = [
+            {
+                "name": "vlan100",
+                "type": {"value": "virtual"},
+                "mtu": 9198,
+                "ip_addresses": [{"address": "10.1.100.1/24"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan100": {
+                        "mtu": 1500,
+                        "ip4_address": "10.1.100.1/24",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["name"] == "vlan100"
+        assert result["l3"][0]["_ip_changes"]["mtu_change"] is True
+
+    def test_vlan_svi_mtu_match_no_changes(self):
+        """VLAN SVI with matching MTU and IP needs no changes."""
+        interfaces = [
+            {
+                "name": "vlan100",
+                "type": {"value": "virtual"},
+                "mtu": 9198,
+                "ip_addresses": [{"address": "10.1.100.1/24"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan100": {
+                        "mtu": 9198,
+                        "ip4_address": "10.1.100.1/24",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["no_changes"]) == 1
+        assert "_ip_changes" not in result["no_changes"][0]
+
+    def test_subinterface_mtu_mismatch(self):
+        """Sub-interface (virtual + parent) with an MTU mismatch needs L3
+        changes and is flagged with _ip_changes.mtu_change."""
+        interfaces = [
+            {
+                "name": "1/1/3.2000",
+                "type": {"value": "virtual"},
+                "parent": {"name": "1/1/3"},
+                "mtu": 9198,
+                "ip_addresses": [{"address": "10.2.0.1/30"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/3.2000": {
+                        "mtu": 1500,
+                        "ip4_address": "10.2.0.1/30",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["_ip_changes"]["mtu_change"] is True
+
+    def test_loopback_mtu_mismatch(self):
+        """Loopback interfaces DO support 'ip mtu' on AOS-CX (unlike admin
+        shutdown), so an MTU mismatch must be flagged for them."""
+        interfaces = [
+            {
+                "name": "loopback0",
+                "type": {"value": "virtual"},
+                "mtu": 9198,
+                "ip_addresses": [{"address": "10.255.0.1/32"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "loopback0": {
+                        "mtu": 1500,
+                        "ip4_address": "10.255.0.1/32",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["_ip_changes"]["mtu_change"] is True
+
     def test_mtu_mismatch(self):
         """Test detection of MTU mismatch"""
         interfaces = [
