@@ -95,6 +95,13 @@ def group_interface_ips(
     - The interface has _ip_changes.description_change=True (set by change detection
       for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when the
       NetBox description differs from the device description).
+    - The interface has _ip_changes.enabled_change=True (set by change detection
+      for VLAN SVIs and sub-interfaces — not loopbacks, which don't support
+      shutdown/no shutdown — when the NetBox enabled state differs from the
+      device admin state).
+    - The interface has _ip_changes.mtu_change=True (set by change detection
+      for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when
+      the NetBox MTU differs from the device MTU).
 
     Args:
         interface_ip_list: List of per-IP items, each with keys:
@@ -251,12 +258,35 @@ def group_interface_ips(
             else False
         )
 
+        # Check whether an enabled-state (shutdown/no shutdown) change was
+        # flagged during change detection (VLAN SVIs and sub-interfaces only
+        # - see interface_change_detection.py). Covers interfaces where the
+        # NetBox enabled state differs from the device admin state but no
+        # IP/OSPF/DHCP/description change is otherwise needed.
+        has_enabled_change = bool(
+            ip_changes.get("enabled_change")
+            if isinstance(ip_changes, dict)
+            else False
+        )
+
+        # Check whether an MTU change was flagged during change detection
+        # (virtual interfaces only — see interface_change_detection.py).
+        # Covers interfaces where the NetBox MTU differs from the device MTU
+        # but no IP/OSPF/DHCP/description/enabled change is otherwise needed.
+        has_mtu_change = bool(
+            ip_changes.get("mtu_change")
+            if isinstance(ip_changes, dict)
+            else False
+        )
+
         if (
             item["addresses"]
             or has_ospf_change
             or has_dhcp_relay_change
             or has_description_change
             or has_encapsulation_change
+            or has_enabled_change
+            or has_mtu_change
         ):
             item["addresses"].sort(key=_addr_sort_key)
             result.append(item)
@@ -284,6 +314,19 @@ def build_l3_config_lines(
     configure_physical_interfaces.yml / configure_lag_interfaces.yml /
     configure_mclag_interfaces.yml regardless of L2/L3 role, so adding it here
     too would duplicate the command.
+
+    For 'vlan' and 'subinterface' types, also emits a 'shutdown' / 'no shutdown'
+    line reflecting the NetBox 'enabled' state. Loopback interfaces do not
+    support admin shutdown on AOS-CX, so they are excluded.
+
+    For 'physical' and 'lag' types, a 'shutdown' / 'no shutdown' line is
+    ALSO emitted, but only immediately after 'routing' (not standalone like
+    vlan/subinterface above) — deliberately duplicating what
+    configure_physical_interfaces.yml / configure_lag_interfaces.yml already
+    pushed earlier in the run, to guard against AOS-CX resetting admin state
+    as a side effect of (re)applying 'routing'. See the 'routing' comment
+    inline below for why. aoscx_config only actually sends it when the
+    device disagrees, so this is a no-op in the common case.
 
     Args:
         item: Per-interface dict produced by group_interface_ips(), with keys:
@@ -331,6 +374,14 @@ def build_l3_config_lines(
             lines.append(f"description {description}")
             _debug(f"  Adding description: {description}")
 
+    # Enabled state (shutdown / no shutdown) — VLAN SVI and sub-interface
+    # types only. Loopback interfaces do not support admin shutdown on
+    # AOS-CX, so they are intentionally excluded here.
+    if interface_type in ("vlan", "subinterface"):
+        enabled = interface_obj.get("enabled", True)
+        lines.append("no shutdown" if enabled else "shutdown")
+        _debug(f"  Adding admin state: {'no shutdown' if enabled else 'shutdown'}")
+
     # Encapsulation for sub-interfaces (must come first)
     if interface_type == "subinterface":
         tagged_vlans = interface_obj.get("tagged_vlans", [])
@@ -346,9 +397,29 @@ def build_l3_config_lines(
     # VLAN SVIs and loopbacks are always L3 by nature on every platform and
     # never need this; sub-interface parents are handled separately in
     # tasks/configure_physical_interfaces.yml.
+    #
+    # Immediately re-assert admin state (shutdown/no shutdown) after
+    # 'routing'. AOS-CX has been observed to reset a physical/LAG
+    # interface's admin-shutdown state as a side effect of (re)applying its
+    # L2<->L3 routing mode - if that happens, an interface disabled earlier
+    # in the run (configure_physical_interfaces.yml/configure_lag_interfaces.yml,
+    # which run before L3 config - see tasks/main.yml) silently comes back
+    # up the moment this L3 push re-adds 'routing', even though nothing
+    # about its NetBox 'enabled' state changed. Unlike the description line
+    # above, this duplicates - deliberately - what those earlier tasks
+    # already pushed: aoscx_config only actually sends it when the device
+    # disagrees, so it's a no-op in the common case where 'routing' didn't
+    # reset anything.
     if interface_type in ("physical", "lag"):
         lines.append("routing")
         _debug("  Adding routing (L3 mode)")
+
+        enabled = interface_obj.get("enabled", True)
+        lines.append("no shutdown" if enabled else "shutdown")
+        _debug(
+            f"  Re-asserting admin state after routing: "
+            f"{'no shutdown' if enabled else 'shutdown'}"
+        )
 
     # VRF attachment — once per interface, not once per IP
     # Two cases require "vrf attach":

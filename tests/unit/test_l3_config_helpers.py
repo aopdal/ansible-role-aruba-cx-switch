@@ -576,7 +576,7 @@ class TestBuildL3ConfigLines:
         assert "l3-counters" in lines
 
     def test_command_order_custom_vrf(self):
-        """Routing first, then VRF, then MTU, then IPs, then l3-counters"""
+        """Routing first, then admin state, then VRF, then MTU, then IPs, then l3-counters"""
         item = _make_item(
             {"vrf": {"name": "TEST"}, "mtu": 9000},
             [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
@@ -584,7 +584,8 @@ class TestBuildL3ConfigLines:
         lines = build_l3_config_lines(item, "physical", "custom", True)
 
         assert lines[0] == "routing"
-        assert lines[1] == "vrf attach TEST"
+        assert lines[1] == "no shutdown"
+        assert lines[2] == "vrf attach TEST"
         assert lines.index("ip mtu 9000") < lines.index(
             "ip address 10.0.0.1/24")
         assert lines[-1] == "l3-counters"
@@ -856,6 +857,134 @@ class TestBuildL3ConfigLinesDescription:
         assert not any(line.startswith("description") for line in lines)
 
 
+class TestBuildL3ConfigLinesEnabled:
+    """Tests for shutdown/no shutdown emission in build_l3_config_lines.
+
+    vlan/subinterface types always get a standalone enabled-state line.
+    loopback never does - AOS-CX loopback interfaces don't support admin
+    shutdown. physical/lag ALSO get one, but only tied to 'routing' (see
+    TestBuildL3ConfigLinesRoutingReassertsEnabled below) - deliberately
+    duplicating what configure_physical_interfaces.yml/
+    configure_lag_interfaces.yml already pushed, to guard against AOS-CX
+    resetting admin state as a side effect of (re)applying 'routing'.
+    """
+
+    def test_vlan_enabled_true_emits_no_shutdown(self):
+        """VLAN SVI with enabled=True emits 'no shutdown'"""
+        item = _make_item(
+            {"enabled": True},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", True)
+
+        assert "no shutdown" in lines
+        assert "shutdown" not in lines
+
+    def test_vlan_enabled_false_emits_shutdown(self):
+        """VLAN SVI with enabled=False emits 'shutdown'"""
+        item = _make_item(
+            {"enabled": False},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", True)
+
+        assert "shutdown" in lines
+        assert "no shutdown" not in lines
+
+    def test_vlan_enabled_defaults_to_true(self):
+        """VLAN SVI without an explicit 'enabled' key defaults to enabled (no shutdown)"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "vlan", "default", True)
+
+        assert "no shutdown" in lines
+
+    def test_subinterface_enabled_false_emits_shutdown(self):
+        """Sub-interface with enabled=False emits 'shutdown'"""
+        item = _make_item(
+            {"enabled": False, "tagged_vlans": [{"vid": 100}]},
+            [{"address": "10.0.0.1/30", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "subinterface", "default", True)
+
+        assert "shutdown" in lines
+        assert "no shutdown" not in lines
+
+    def test_loopback_never_emits_shutdown_line(self):
+        """Loopback interfaces never emit shutdown/no shutdown - AOS-CX
+        loopbacks don't support admin shutdown."""
+        item = _make_item(
+            {"enabled": False},
+            [{"address": "10.255.0.1/32", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "loopback", "default", True)
+
+        assert not any(line.endswith("shutdown") for line in lines)
+
+
+class TestBuildL3ConfigLinesRoutingReassertsEnabled:
+    """Tests for the admin-state reassertion tied to 'routing' for
+    physical/lag interfaces.
+
+    AOS-CX has been observed to reset a physical/LAG interface's
+    admin-shutdown state as a side effect of (re)applying its L2<->L3
+    routing mode. Since 'routing' is always emitted for physical/lag
+    interfaces reaching build_l3_config_lines (see
+    test_physical_emits_routing/test_lag_emits_routing above), a
+    'shutdown'/'no shutdown' line must immediately follow it so a
+    disabled-in-NetBox interface can't silently come back up whenever the
+    L3 push re-adds 'routing' - even though configure_physical_interfaces.yml/
+    configure_lag_interfaces.yml already pushed the correct admin state
+    earlier in the same run.
+    """
+
+    def test_physical_enabled_true_emits_no_shutdown_after_routing(self):
+        """Physical L3 interface with enabled=True: 'no shutdown' immediately follows 'routing'"""
+        item = _make_item(
+            {"enabled": True},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "physical", "default", True)
+
+        assert lines[0] == "routing"
+        assert lines[1] == "no shutdown"
+
+    def test_physical_enabled_false_emits_shutdown_after_routing(self):
+        """Physical L3 interface with enabled=False: 'shutdown' immediately follows 'routing'"""
+        item = _make_item(
+            {"enabled": False},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "physical", "default", True)
+
+        assert lines[0] == "routing"
+        assert lines[1] == "shutdown"
+
+    def test_physical_enabled_defaults_to_true(self):
+        """Physical L3 interface without an explicit 'enabled' key defaults to enabled (no shutdown)"""
+        item = _make_item(
+            {},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "physical", "default", True)
+
+        assert lines[0] == "routing"
+        assert lines[1] == "no shutdown"
+
+    def test_lag_enabled_false_emits_shutdown_after_routing(self):
+        """LAG L3 interface with enabled=False: 'shutdown' immediately follows 'routing'"""
+        item = _make_item(
+            {"enabled": False},
+            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
+        )
+        lines = build_l3_config_lines(item, "lag", "default", True)
+
+        assert lines[0] == "routing"
+        assert lines[1] == "shutdown"
+
+
 class TestBuildL3ConfigLinesIpHelper:
     """Tests for ip helper-address support in build_l3_config_lines"""
 
@@ -1120,6 +1249,118 @@ class TestGroupInterfaceIpsDescriptionChange:
         item = self._make_item({
             "name": "vlan101",
             "_ip_changes": {"description_change": True},
+            "custom_fields": {},
+        }, needs_add=True)
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert len(result[0]["addresses"]) == 1
+
+
+class TestGroupInterfaceIpsEnabledChange:
+    """Tests for group_interface_ips including interfaces with only an enabled-state change."""
+
+    def _make_item(self, interface_obj, needs_add=False):
+        """Build a minimal per-IP item with given interface dict."""
+        return {
+            "interface_name": interface_obj.get("name", "vlan101"),
+            "interface": interface_obj,
+            "address": "10.0.0.1/24",
+            "ip_role": None,
+            "anycast_mac": None,
+            "_needs_add": needs_add,
+        }
+
+    def test_includes_interface_with_enabled_change_flag(self):
+        """Interface flagged enabled_change=True is included even when no IPs need adding."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"enabled_change": True, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert result[0]["interface_name"] == "vlan101"
+        assert result[0]["addresses"] == []
+
+    def test_omits_interface_without_enabled_change_flag(self):
+        """Interface with no flag and _needs_add=False is still omitted."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_enabled_change_false_does_not_include(self):
+        """Explicit enabled_change=False does not cause inclusion."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"enabled_change": False, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_enabled_change_combined_with_ip_add(self):
+        """Interface with both an enabled change and an IP to add is included with the address."""
+        item = self._make_item({
+            "name": "vlan101",
+            "_ip_changes": {"enabled_change": True},
+            "custom_fields": {},
+        }, needs_add=True)
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert len(result[0]["addresses"]) == 1
+
+
+class TestGroupInterfaceIpsMtuChange:
+    """Tests for group_interface_ips including interfaces with only an MTU change."""
+
+    def _make_item(self, interface_obj, needs_add=False):
+        """Build a minimal per-IP item with given interface dict."""
+        return {
+            "interface_name": interface_obj.get("name", "vlan101"),
+            "interface": interface_obj,
+            "address": "10.0.0.1/24",
+            "ip_role": None,
+            "anycast_mac": None,
+            "_needs_add": needs_add,
+        }
+
+    def test_includes_interface_with_mtu_change_flag(self):
+        """Interface flagged mtu_change=True is included even when no IPs need adding."""
+        item = self._make_item({
+            "name": "loopback0",
+            "_ip_changes": {"mtu_change": True, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        result = group_interface_ips([item])
+        assert len(result) == 1
+        assert result[0]["interface_name"] == "loopback0"
+        assert result[0]["addresses"] == []
+
+    def test_omits_interface_without_mtu_change_flag(self):
+        """Interface with no flag and _needs_add=False is still omitted."""
+        item = self._make_item({
+            "name": "loopback0",
+            "_ip_changes": {"ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_mtu_change_false_does_not_include(self):
+        """Explicit mtu_change=False does not cause inclusion."""
+        item = self._make_item({
+            "name": "loopback0",
+            "_ip_changes": {"mtu_change": False, "ipv4_to_add": []},
+            "custom_fields": {},
+        })
+        assert group_interface_ips([item]) == []
+
+    def test_mtu_change_combined_with_ip_add(self):
+        """Interface with both an MTU change and an IP to add is included with the address."""
+        item = self._make_item({
+            "name": "loopback0",
+            "_ip_changes": {"mtu_change": True},
             "custom_fields": {},
         }, needs_add=True)
         result = group_interface_ips([item])
