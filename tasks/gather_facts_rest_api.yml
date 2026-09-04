@@ -104,19 +104,26 @@
 # so querying it unconditionally breaks fact gathering for every device on
 # such a platform, not just ones with sub-interfaces.
 #
-# user_config and forwarding_state are queried alongside admin because
-# 'admin' alone has been observed to come back null for interfaces that are
-# demonstrably up (including LAG members and VLAN SVIs) - the AOS-CX REST
-# API does not populate it reliably. user_config.admin (the configured/
-# intended state) and forwarding_state.enablement (an operational fallback,
-# notably for LAG members where admin_state can misreport) are what
-# interface_change_detection.py's _get_device_enabled_state() actually
-# prefers; without them it has nothing usable and every enabled-state
-# comparison silently no-ops. See CHANGELOG.md.
+# user_config is queried alongside admin because 'admin' alone has been
+# observed to come back null for interfaces that are demonstrably up
+# (including LAG members and VLAN SVIs) - the AOS-CX REST API does not
+# populate it reliably. user_config.admin (the configured/intended state)
+# is what interface_change_detection.py's _get_device_enabled_state()
+# actually prefers; without it, it has nothing usable and every
+# enabled-state comparison silently no-ops. See CHANGELOG.md.
+#
+# Deliberately NOT querying forwarding_state: it reports operational
+# forwarding readiness (does the interface currently have link and pass
+# traffic), not admin-configured intent, and using it as an enabled-state
+# signal produces false results in both directions - a disconnected port
+# NetBox wants explicitly shut down would already read as "not
+# forwarding" and never get the shutdown pushed, while an
+# administratively-enabled interface with nothing connected would be
+# wrongly reported as drift. See CHANGELOG.md.
 - name: Set interface attributes to query
   ansible.builtin.set_fact:
     _rest_interface_base_attrs: "{{
-      'name,admin,user_config,forwarding_state,description,mtu,type,' ~
+      'name,admin,user_config,description,mtu,type,' ~
       'interfaces,ip4_address,ip6_addresses,' ~
       'ip6_address_link_local,' ~
       'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,' ~

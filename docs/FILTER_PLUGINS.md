@@ -94,27 +94,49 @@ NetBox would be incorrectly flagged as needing L2 changes.
 
 **Problem**: AOS-CX devices expose multiple admin state fields with different meanings:
 
-- `admin_state`: May show "down" for ports without physical link
-- `forwarding_state.enablement`: Shows operational forwarding state
-- `user_config.admin`: Shows configured admin intent (most reliable)
+- `admin` / `admin_state`: The configured admin state. May be absent or
+  come back `null` from the REST API depending on query attributes and
+  interface type (see `docs/filter_plugins/rest_api_transforms.md`).
+- `user_config.admin`: Shows configured admin intent (most reliable when
+  present).
+- `forwarding_state.enablement`: Operational forwarding state — is the
+  interface actually able to pass traffic right now — **not** admin-config
+  intent, and **never** used for enabled-state detection, for any
+  interface type. It conflates two different questions in both
+  directions: a disconnected physical port that NetBox wants explicitly
+  shut down already reads `enablement: false` from having no link, so
+  comparing against it would never detect the missing `shutdown` and
+  silently leave the interface administratively up forever; conversely, a
+  VLAN SVI or routed sub-interface that's correctly "no shutdown"
+  (matching NetBox `enabled: true`) also reads `enablement: false`
+  whenever nothing is connected on the other end, which would be wrongly
+  reported as drift. Both failure modes were observed in practice on real
+  devices — one is a false negative that never self-corrects, the other a
+  false positive that never stops re-triggering.
 
-**Filter Behavior**:
+**Filter Behavior** (`_get_device_enabled_state()`):
 
 ```python
 # Priority order:
-# 1. user_config.admin (if exists)
-# 2. forwarding_state.enablement (fallback)
-# 3. admin_state (last resort)
+# 1. user_config.admin (if present)
+# 2. admin / admin_state (fallback)
+# forwarding_state.enablement is never consulted, for any interface type.
 ```
 
 **Impact**:
 
-- Correctly handles ports configured as "up" but without physical link
-- Prevents false positives where `admin_state: down` (no link) is compared against NetBox `enabled: true`
+- Enabled-state comparisons always reflect configured intent, never link
+  or traffic state
+- A disconnected port that NetBox wants shut down is still correctly
+  flagged and gets `shutdown` pushed
+- An administratively-enabled VLAN SVI/sub-interface with nothing
+  connected is never reported as drift
 
 **Best Practice**:
 
-- Trust that filter uses the most reliable state field
+- Trust that the filter compares against configured (admin) state only —
+  operational/link status is a separate concern the role does not use to
+  decide whether to push a `shutdown`/`no shutdown` change
 - Use `DEBUG_ANSIBLE=true` to see which state fields are being compared
 
 ### Recommendations
@@ -647,7 +669,7 @@ orchestration described below and calls into those helpers per interface.
       - `dhcp_relay_to_remove`: Sorted list of relay server IPs present on the device but absent from NetBox (requires `dhcp_relay_facts`). Used by the "Remove stale ip helper-address entries" task.
       - `dhcp_relay_expected`/`dhcp_relay_actual`: Sorted lists of the desired (from `ip_helper_addresses`) and currently-configured (from `dhcp_relay_facts`) relay servers. Always populated for any interface with `if_ip_helper=True` when both `dhcp_relay_facts` and `ip_helper_addresses` are provided — including interfaces that land in `no_changes` because the servers already match — so verification/reporting tooling can display current ip helper state without re-deriving it.
       - `description_change`: `True` when a virtual interface's (VLAN SVI/loopback/sub-interface) description differs from the device, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` emits a `description` line. Physical/LAG/MCLAG description changes are handled separately by `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml`, which push description unconditionally whenever the interface has any pending change.
-      - `enabled_change`: `True` when a VLAN SVI's or sub-interface's NetBox `enabled` state differs from the device admin state. Not set for loopbacks — AOS-CX loopbacks don't support admin shutdown. Unlike the other `_ip_changes` flags, `group_interface_ips`/`build_l3_config_lines` deliberately do NOT consume this one — a VLAN SVI with Active Gateway (anycast) configured prompts for interactive confirmation on `shutdown` via the AOS-CX CLI (`Continue (y/n)?`), which `aoscx_config` (`network_cli`) has no way to answer. `tasks/configure_l3_interfaces.yml` reads this flag directly and pushes the enabled state via `aoscx_interface` (REST, no CLI prompt) instead — the same approach physical/LAG interfaces already use for their own enabled-state changes (see `physical`/`lag` categories above and `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml`).
+      - `enabled_change`: `True` when a VLAN SVI's or sub-interface's NetBox `enabled` state differs from the device's *admin-configured* state — determined via `_get_device_enabled_state()` (see "Admin State Detection" above), which compares only `user_config.admin`/`admin`/`admin_state`, never `forwarding_state.enablement` — an administratively-enabled VLAN SVI/sub-interface with nothing connected on the other end must not be reported as drift just because it isn't forwarding traffic. Not set for loopbacks — AOS-CX loopbacks don't support admin shutdown. Unlike the other `_ip_changes` flags, `group_interface_ips`/`build_l3_config_lines` deliberately do NOT consume this one — a VLAN SVI with Active Gateway (anycast) configured prompts for interactive confirmation on `shutdown` via the AOS-CX CLI (`Continue (y/n)?`), which `aoscx_config` (`network_cli`) has no way to answer. `tasks/configure_l3_interfaces.yml` reads this flag directly and pushes the enabled state via `aoscx_interface` (REST, no CLI prompt) instead — the same approach physical/LAG interfaces already use for their own enabled-state changes (see `physical`/`lag` categories above and `configure_physical_interfaces.yml`/`configure_lag_interfaces.yml`/`configure_mclag_interfaces.yml`).
       - `mtu_change`: `True` when a virtual interface's (VLAN SVI/loopback/sub-interface) NetBox MTU differs from the device MTU, so `group_interface_ips` includes the interface even when no IPs need adding — `build_l3_config_lines` already emits `ip mtu <mtu>` unconditionally whenever `interface.mtu` is set, for every interface type, so no additional handling is needed there. Physical/LAG/MCLAG MTU changes are handled by the same `physical`/`lag` MTU comparison used for their enabled-state check above.
       - `encapsulation_change`: `True` when a sub-interface's device-side `subintf_vlan` (REST API, requires `enhanced_facts`) differs from NetBox's `tagged_vlans[0].vid`, so `group_interface_ips` includes the interface even when no IPs need adding and `build_l3_config_lines` re-emits the `encapsulation dot1q <vid>` line. Without `enhanced_facts` this comparison is skipped (no false positives, but also no drift detection) since standard `aoscx_facts` does not expose `subintf_vlan`.
     - See "L3 Interface IP Address Idempotency" section for performance details
