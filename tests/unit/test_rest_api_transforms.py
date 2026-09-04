@@ -135,6 +135,52 @@ class TestRestApiToAoscxInterfaces:
         assert "1/1/2" in result["lag10"]["interfaces"]
         assert result["1/1/1"]["interfaces"] == {}
 
+    def test_admin_null_falls_back_to_up(self):
+        """admin/admin_state present but null must still default to 'up'.
+
+        Regression test: dict.get(key, default) only applies its default
+        when the key is *missing*, not when its value is None - the AOS-CX
+        REST API has been observed to return 'admin': null for interfaces
+        that are demonstrably up (LAG members, VLAN SVIs), so a naive
+        `.get("admin", "up")` silently yields None instead of "up".
+        """
+        rest_data = {
+            "1/1/1": {"admin_state": None, "admin": None, "type": "system"},
+        }
+        result = rest_api_to_aoscx_interfaces(rest_data)
+        assert result["1/1/1"]["admin"] == "up"
+
+    def test_admin_and_admin_state_absent_defaults_to_up(self):
+        """Neither field present at all - still defaults to 'up'."""
+        rest_data = {"1/1/1": {"type": "system"}}
+        result = rest_api_to_aoscx_interfaces(rest_data)
+        assert result["1/1/1"]["admin"] == "up"
+
+    def test_user_config_and_forwarding_state_passed_through(self):
+        """user_config/forwarding_state are carried through unchanged.
+
+        These are what interface_change_detection.py's
+        _get_device_enabled_state() actually relies on when 'admin' itself
+        is null/unreliable - see the module docstring NOTE.
+        """
+        rest_data = {
+            "1/1/1": {
+                "admin": None,
+                "user_config": {"admin": "down"},
+                "forwarding_state": {"enablement": False},
+            }
+        }
+        result = rest_api_to_aoscx_interfaces(rest_data)
+        assert result["1/1/1"]["user_config"] == {"admin": "down"}
+        assert result["1/1/1"]["forwarding_state"] == {"enablement": False}
+
+    def test_user_config_and_forwarding_state_default_when_absent(self):
+        """When not queried/returned, default to an empty dict / None."""
+        rest_data = {"1/1/1": {"admin": "up"}}
+        result = rest_api_to_aoscx_interfaces(rest_data)
+        assert result["1/1/1"]["user_config"] == {}
+        assert result["1/1/1"]["forwarding_state"] is None
+
 
 class TestRestApiToAoscxVlans:
     """Tests for rest_api_to_aoscx_vlans function"""

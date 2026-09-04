@@ -91,17 +91,34 @@ inspects device facts itself for these three):
   helper-address` servers differ from the device).
 - `interface._ip_changes.description_change` is `True` (a VLAN SVI /
   loopback / sub-interface description differs from the device).
-- `interface._ip_changes.enabled_change` is `True` (a VLAN SVI or
-  sub-interface's `enabled` state differs from the device admin state — not
-  set for loopbacks, which don't support shutdown/no shutdown).
 - `interface._ip_changes.mtu_change` is `True` (a VLAN SVI / loopback /
   sub-interface's MTU differs from the device MTU).
 
-Without this, an interface that only needs its OSPF area, DHCP relay
-servers, description, MTU, or enabled state updated — with no IP address
+**`_ip_changes.enabled_change` is deliberately NOT one of these triggers.**
+A VLAN SVI with Active Gateway (anycast) configured prompts for interactive
+confirmation on `shutdown` via the AOS-CX CLI:
+
+```
+ao-01(config-if-vlan)# shut
+Warning: Disabling an interface used by Active Gateway can result in
+traffic loss on other interfaces.
+
+Continue (y/n)?
+```
+
+`aoscx_config` (`network_cli`) has no way to answer that prompt — the
+command would just silently never take effect, leaving the interface
+enabled regardless of what NetBox says. `tasks/configure_l3_interfaces.yml`
+reads `_ip_changes.enabled_change` directly instead (not via
+`group_interface_ips`/`build_l3_config_lines` at all) and pushes the
+enabled state with `aoscx_interface` (REST) — no CLI, no prompt. This is
+the same approach physical/LAG interfaces already use for their own
+enabled-state changes.
+
+Without the triggers that remain, an interface that only needs its OSPF
+area, DHCP relay servers, description, or MTU updated — with no IP address
 change at all — would never be handed to `build_l3_config_lines`, and that
-update
-would silently never get pushed.
+update would silently never get pushed.
 
 **Example**:
 ```yaml
@@ -257,22 +274,22 @@ build_l3_config_lines(
    change, regardless of L2/L3 role. Emitting it here too would duplicate
    the command.
 
-2. **Enabled state** (`interface_type` is `'vlan'` or `'subinterface'` only, standalone at this position)
-   ```
-   no shutdown   # interface.enabled is True (or unset, default True)
-   shutdown      # interface.enabled is False
-   ```
-   `loopback` is deliberately excluded — AOS-CX loopback interfaces don't
-   support admin shutdown. `physical` and `lag` do NOT get this line here —
-   see step 4 below, where they get the same line but tied to `routing`
-   instead of standalone.
+   **No standalone enabled-state line is emitted for `vlan` or
+   `subinterface`.** A VLAN SVI with Active Gateway (anycast) configured
+   prompts for interactive CLI confirmation on `shutdown` (`Continue
+   (y/n)?`), which `aoscx_config` (`network_cli`) has no way to answer.
+   Enabled state for these types is pushed via `aoscx_interface` (REST, no
+   CLI prompt) directly by `tasks/configure_l3_interfaces.yml` instead —
+   see the NOTE in `group_interface_ips`'s docstring above and step 3
+   below for the one place a `shutdown`/`no shutdown` line IS still
+   emitted by this function.
 
-3. **Encapsulation** (sub-interfaces only, from the first `tagged_vlans[].vid` on the NetBox interface)
+2. **Encapsulation** (sub-interfaces only, from the first `tagged_vlans[].vid` on the NetBox interface)
    ```
    encapsulation dot1q <vlan_id>
    ```
 
-4. **Routing mode, then enabled-state reassertion** (`interface_type` is `'physical'` or `'lag'` only)
+3. **Routing mode, then enabled-state reassertion** (`interface_type` is `'physical'` or `'lag'` only)
    ```
    routing
    no shutdown   # interface.enabled is True (or unset, default True)
@@ -293,11 +310,14 @@ build_l3_config_lines(
    interface's admin-shutdown state as a side effect of (re)applying its
    L2↔L3 routing mode, which would otherwise silently bring a
    NetBox-disabled interface back up the moment this function re-adds
-   `routing`. Since `aoscx_config` only actually pushes a line when the
-   device disagrees, this reassertion is a no-op in the common case where
-   `routing` didn't reset anything.
+   `routing`. This is safe from the CLI-confirmation-prompt risk described
+   in step 1 above — Active Gateway is an SVI-only AOS-CX feature and
+   cannot be configured on a physical or LAG interface. Since
+   `aoscx_config` only actually pushes a line when the device disagrees,
+   this reassertion is a no-op in the common case where `routing` didn't
+   reset anything.
 
-5. **VRF Attachment** — two cases:
+4. **VRF Attachment** — two cases:
    ```
    vrf attach <vrf_name>
    ```
@@ -307,7 +327,7 @@ build_l3_config_lines(
      `default`. AOS-CX requires `vrf attach default` explicitly to clear
      the old VRF — simply omitting the command does not revert it.
 
-6. **All IPv4 addresses** (regular first, then anycast)
+5. **All IPv4 addresses** (regular first, then anycast)
    ```
    ip address <address>                 # regular
    ip address <address> secondary       # additional regular IPs
@@ -315,7 +335,7 @@ build_l3_config_lines(
    active-gateway ip <address>          # anycast
    ```
 
-7. **All IPv6 addresses** (regular first, then anycast)
+6. **All IPv6 addresses** (regular first, then anycast)
    ```
    ipv6 address <address>                  # regular
    ipv6 address link-local <addr>/<prefix>  # if anycast addr is link-local (fe80::)
@@ -328,20 +348,20 @@ build_l3_config_lines(
    > `build_l3_config_lines` emits this automatically when the anycast address
    > starts with `fe80:`. Global-unicast anycast addresses are unaffected.
 
-8. **ip helper-address** (only when `ip_helper_addresses` is passed and the interface has `custom_fields.if_ip_helper: true`)
+7. **ip helper-address** (only when `ip_helper_addresses` is passed and the interface has `custom_fields.if_ip_helper: true`)
    ```
    ip helper-address <ip>   # one line per configured DHCP relay server
    ```
 
-9. **MTU** (if set on interface)
+8. **MTU** (if set on interface)
    ```
    ip mtu <mtu>
    ```
 
-10. **L3 Counters** (if enabled)
-    ```
-    l3-counters
-    ```
+9. **L3 Counters** (if enabled)
+   ```
+   l3-counters
+   ```
 
 **Example Usage**:
 

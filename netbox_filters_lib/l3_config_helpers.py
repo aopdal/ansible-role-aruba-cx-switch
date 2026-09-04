@@ -95,13 +95,19 @@ def group_interface_ips(
     - The interface has _ip_changes.description_change=True (set by change detection
       for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when the
       NetBox description differs from the device description).
-    - The interface has _ip_changes.enabled_change=True (set by change detection
-      for VLAN SVIs and sub-interfaces — not loopbacks, which don't support
-      shutdown/no shutdown — when the NetBox enabled state differs from the
-      device admin state).
     - The interface has _ip_changes.mtu_change=True (set by change detection
       for virtual interfaces — VLAN SVIs, loopbacks, sub-interfaces — when
       the NetBox MTU differs from the device MTU).
+
+    NOTE: _ip_changes.enabled_change (set by change detection for VLAN SVIs
+    and sub-interfaces — see interface_change_detection.py) is deliberately
+    NOT a trigger here. A VLAN SVI with Active Gateway (anycast) configured
+    prompts for interactive confirmation on 'shutdown' via the AOS-CX CLI
+    ("Continue (y/n)?"), which aoscx_config (network_cli) has no way to
+    answer — the command silently never takes effect. enabled_change is
+    instead consumed directly by tasks/configure_l3_interfaces.yml, which
+    pushes the enabled state via aoscx_interface (REST) — no CLI prompt
+    involved — the same way physical/LAG interfaces already do.
 
     Args:
         interface_ip_list: List of per-IP items, each with keys:
@@ -258,21 +264,14 @@ def group_interface_ips(
             else False
         )
 
-        # Check whether an enabled-state (shutdown/no shutdown) change was
-        # flagged during change detection (VLAN SVIs and sub-interfaces only
-        # - see interface_change_detection.py). Covers interfaces where the
-        # NetBox enabled state differs from the device admin state but no
-        # IP/OSPF/DHCP/description change is otherwise needed.
-        has_enabled_change = bool(
-            ip_changes.get("enabled_change")
-            if isinstance(ip_changes, dict)
-            else False
-        )
-
         # Check whether an MTU change was flagged during change detection
         # (virtual interfaces only — see interface_change_detection.py).
         # Covers interfaces where the NetBox MTU differs from the device MTU
-        # but no IP/OSPF/DHCP/description/enabled change is otherwise needed.
+        # but no IP/OSPF/DHCP/description change is otherwise needed.
+        #
+        # enabled_change is deliberately NOT checked here - see the NOTE in
+        # this function's docstring. It never reaches build_l3_config_lines();
+        # tasks/configure_l3_interfaces.yml consumes it directly instead.
         has_mtu_change = bool(
             ip_changes.get("mtu_change")
             if isinstance(ip_changes, dict)
@@ -285,7 +284,6 @@ def group_interface_ips(
             or has_dhcp_relay_change
             or has_description_change
             or has_encapsulation_change
-            or has_enabled_change
             or has_mtu_change
         ):
             item["addresses"].sort(key=_addr_sort_key)
@@ -315,18 +313,24 @@ def build_l3_config_lines(
     configure_mclag_interfaces.yml regardless of L2/L3 role, so adding it here
     too would duplicate the command.
 
-    For 'vlan' and 'subinterface' types, also emits a 'shutdown' / 'no shutdown'
-    line reflecting the NetBox 'enabled' state. Loopback interfaces do not
-    support admin shutdown on AOS-CX, so they are excluded.
+    NOT emitted here for any interface type: 'vlan'/'subinterface' enabled
+    state is pushed via aoscx_interface (REST) by
+    tasks/configure_l3_interfaces.yml instead of a CLI 'shutdown'/
+    'no shutdown' line — a VLAN SVI with Active Gateway (anycast) configured
+    prompts for interactive confirmation on 'shutdown' via the AOS-CX CLI,
+    which aoscx_config (network_cli) cannot answer. See the NOTE in
+    group_interface_ips()'s docstring for the full explanation.
 
-    For 'physical' and 'lag' types, a 'shutdown' / 'no shutdown' line is
-    ALSO emitted, but only immediately after 'routing' (not standalone like
-    vlan/subinterface above) — deliberately duplicating what
-    configure_physical_interfaces.yml / configure_lag_interfaces.yml already
-    pushed earlier in the run, to guard against AOS-CX resetting admin state
-    as a side effect of (re)applying 'routing'. See the 'routing' comment
-    inline below for why. aoscx_config only actually sends it when the
-    device disagrees, so this is a no-op in the common case.
+    For 'physical' and 'lag' types, a 'shutdown' / 'no shutdown' line IS
+    emitted, but only immediately after 'routing' — deliberately duplicating
+    what configure_physical_interfaces.yml / configure_lag_interfaces.yml
+    already pushed earlier in the run, to guard against AOS-CX resetting
+    admin state as a side effect of (re)applying 'routing'. This is safe
+    from the same CLI-prompt risk as vlan/subinterface above: Active Gateway
+    is an SVI-only AOS-CX feature and cannot be configured on a physical or
+    LAG interface. See the 'routing' comment inline below for why the
+    reassertion itself is needed. aoscx_config only actually sends the line
+    when the device disagrees, so this is a no-op in the common case.
 
     Args:
         item: Per-interface dict produced by group_interface_ips(), with keys:
@@ -374,13 +378,10 @@ def build_l3_config_lines(
             lines.append(f"description {description}")
             _debug(f"  Adding description: {description}")
 
-    # Enabled state (shutdown / no shutdown) — VLAN SVI and sub-interface
-    # types only. Loopback interfaces do not support admin shutdown on
-    # AOS-CX, so they are intentionally excluded here.
-    if interface_type in ("vlan", "subinterface"):
-        enabled = interface_obj.get("enabled", True)
-        lines.append("no shutdown" if enabled else "shutdown")
-        _debug(f"  Adding admin state: {'no shutdown' if enabled else 'shutdown'}")
+    # NOTE: No 'shutdown'/'no shutdown' line is emitted here for vlan/
+    # subinterface types. That's handled via REST (aoscx_interface) by
+    # tasks/configure_l3_interfaces.yml instead - see this function's
+    # docstring and the NOTE in group_interface_ips()'s docstring.
 
     # Encapsulation for sub-interfaces (must come first)
     if interface_type == "subinterface":
