@@ -130,6 +130,32 @@
     - vlan_interfaces | length > 0
     - item.name not in (ansible_facts.network_resources.interfaces.keys() | list if ansible_facts.network_resources.interfaces is defined else [])
 
+# Existing VLAN SVIs / sub-interfaces whose NetBox 'enabled' state differs
+# from the device (flagged as _ip_changes.enabled_change by
+# identify_interface_changes.yml). Pushed via REST (aoscx_interface), NOT
+# the CLI 'shutdown'/'no shutdown' line: a VLAN SVI with Active Gateway
+# (anycast) configured prompts for interactive confirmation on 'shutdown'
+# via the AOS-CX CLI -
+#   Warning: Disabling an interface used by Active Gateway can result in
+#   traffic loss on other interfaces.
+#   Continue (y/n)?
+# - which aoscx_config (network_cli) has no way to answer, so the command
+# silently never takes effect and the interface stays enabled. REST has no
+# such prompt - this is the same approach already used for physical/LAG
+# interfaces' own enabled-state changes (configure_physical_interfaces.yml /
+# configure_lag_interfaces.yml). See netbox_filters_lib/l3_config_helpers.py
+# (group_interface_ips docstring NOTE) for where this flag is set and why
+# build_l3_config_lines() deliberately does not consume it.
+- name: Update enabled state on VLAN SVIs / sub-interfaces that need it
+  arubanetworks.aoscx.aoscx_interface:
+    name: "{{ item.name }}"
+    enabled: "{{ item.enabled }}"
+  loop: "{{ interfaces_with_ips | selectattr('_ip_changes', 'defined')
+    | selectattr('_ip_changes.enabled_change', 'defined')
+    | selectattr('_ip_changes.enabled_change') | list }}"
+  loop_control:
+    label: "Interface: {{ item.name }} - Enabled: {{ item.enabled }}"
+
 - name: Categorize L3 interfaces
   ansible.builtin.set_fact:
     l3_interfaces: "{{ interface_ips | categorize_l3_interfaces }}"

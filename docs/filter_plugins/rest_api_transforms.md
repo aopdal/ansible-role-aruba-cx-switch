@@ -47,10 +47,11 @@ Converts REST API interface data into the format used by `aoscx_facts`.
 
 Takes the raw dict from a `GET /system/interfaces?depth=2` REST API call and normalizes each interface entry:
 
-1. **Admin state**: Checks both `admin_state` and `admin` fields (the field name varies by firmware version), and stores it as `admin`.
-2. **IPv6 addresses**: URL-decodes the address keys (the REST API URL-encodes colons and slashes in IPv6 addresses).
-3. **VLAN config**: Passes through `vlan_mode`, `vlan_tag`, and `vlan_trunks` as-is.
-4. **VSX/Anycast IPs**: Preserves `vsx_virtual_ip4/ip6` and gateway MAC fields for anycast gateway detection.
+1. **Admin state**: Checks both `admin_state` and `admin` fields (the field name varies by firmware version), and stores it as `admin`. `admin`/`admin_state` on their own are **not reliable** — the AOS-CX REST API has been observed to return `admin: null` for interfaces that are demonstrably up (LAG members, VLAN SVIs), so this defaults to `"up"` when both are missing or null.
+2. **Enabled-state passthrough**: Also passes through `user_config` and `forwarding_state` unchanged. These are what `netbox_filters_lib/interface_change_detection.py`'s `_get_device_enabled_state()` actually prefers — `user_config.admin` (the configured/intended state), then `forwarding_state.enablement` (an operational fallback, notably for LAG members) — falling back to `admin`/`admin_state` only as a last resort. Both require `user_config,forwarding_state` to be included in the REST query's requested attributes (see `tasks/gather_facts_rest_api.yml`'s `_rest_interface_base_attrs`) — without that they are simply absent here, and every enabled-state comparison downstream silently no-ops.
+3. **IPv6 addresses**: URL-decodes the address keys (the REST API URL-encodes colons and slashes in IPv6 addresses).
+4. **VLAN config**: Passes through `vlan_mode`, `vlan_tag`, and `vlan_trunks` as-is.
+5. **VSX/Anycast IPs**: Preserves `vsx_virtual_ip4/ip6` and gateway MAC fields for anycast gateway detection.
 
 #### Parameters
 
@@ -58,7 +59,7 @@ Takes the raw dict from a `GET /system/interfaces?depth=2` REST API call and nor
 
 #### Returns
 
-- **dict**: Normalized interface data with consistent field names. Keys are interface names, values contain: `name`, `admin`, `description`, `mtu`, `type`, `ip4_address`, `ip4_address_secondary`, `ip6_addresses`, `vsx_virtual_ip4`, `vsx_virtual_ip6`, `vsx_virtual_gw_mac_v4`, `vsx_virtual_gw_mac_v6`, `vlan_mode`, `vlan_tag`, `vlan_trunks`, `lacp_status`, `bond_status`, `routing`, `vrf`, `other_config`.
+- **dict**: Normalized interface data with consistent field names. Keys are interface names, values contain: `name`, `admin`, `user_config`, `forwarding_state`, `description`, `mtu`, `type`, `ip4_address`, `ip4_address_secondary`, `ip6_addresses`, `vsx_virtual_ip4`, `vsx_virtual_ip6`, `vsx_virtual_gw_mac_v4`, `vsx_virtual_gw_mac_v6`, `vlan_mode`, `vlan_tag`, `vlan_trunks`, `lacp_status`, `bond_status`, `routing`, `vrf`, `other_config`.
 
 #### Usage Example
 

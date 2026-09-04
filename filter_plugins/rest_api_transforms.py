@@ -8,6 +8,19 @@ The main differences between REST API and aoscx_facts formats:
 - REST API ip6_addresses is dict with actual addresses at depth=2
 - REST API includes vsx_virtual_* fields for anycast/active-gateway
 - VLAN IDs in REST API response may be strings or integers
+
+NOTE on admin/enabled state: the raw 'admin' attribute has been observed to
+come back null from the AOS-CX REST API for interfaces that are
+demonstrably up (LAG members, VLAN SVIs) - it is not a reliable indicator
+by itself. rest_api_to_aoscx_interfaces() therefore also passes through
+'user_config' and 'forwarding_state' unchanged, which is what
+netbox_filters_lib/interface_change_detection.py's
+_get_device_enabled_state() actually prefers (user_config.admin, then
+forwarding_state.enablement, falling back to admin/admin_state only as a
+last resort). Both require 'user_config,forwarding_state' to be included
+in the REST query's requested attributes (see
+tasks/gather_facts_rest_api.yml) - without that, both keys are simply
+absent from rest_data and the fallback chain has nothing to use.
 """
 
 from urllib.parse import unquote
@@ -37,8 +50,13 @@ def rest_api_to_aoscx_interfaces(rest_data):
             # Skip non-dict entries (shouldn't happen but be defensive)
             continue
 
-        # Normalize admin state (REST API may use 'admin' or 'admin_state')
-        admin_state = intf_data.get("admin_state") or intf_data.get("admin", "up")
+        # Normalize admin state (REST API may use 'admin' or 'admin_state').
+        # Chained with 'or' rather than a dict.get() default: both keys can
+        # be *present* with a null value (observed for 'admin' on live
+        # devices), and dict.get(key, default) only applies its default
+        # when the key is missing - not when its value is None - so a
+        # trailing default here would silently never fire.
+        admin_state = intf_data.get("admin_state") or intf_data.get("admin") or "up"
 
         # Extract IPv6 addresses from the dict format
         # REST API returns: {"2001%3Adb8%3A%3A1%2F64": {...}, ...}
@@ -62,6 +80,13 @@ def rest_api_to_aoscx_interfaces(rest_data):
         result[intf_name] = {
             "name": intf_name,
             "admin": admin_state,
+            # Passed through unchanged for _get_device_enabled_state() in
+            # interface_change_detection.py, which prefers these over
+            # 'admin' above - see the module docstring NOTE. Only present
+            # when the REST query requested them (they are absent, not
+            # null, if not queried - .get() then correctly yields {}/None).
+            "user_config": intf_data.get("user_config", {}),
+            "forwarding_state": intf_data.get("forwarding_state"),
             "description": intf_data.get("description", ""),
             "mtu": intf_data.get("mtu"),
             "type": intf_data.get("type"),

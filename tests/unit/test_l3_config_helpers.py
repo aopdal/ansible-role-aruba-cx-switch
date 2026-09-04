@@ -858,59 +858,51 @@ class TestBuildL3ConfigLinesDescription:
 
 
 class TestBuildL3ConfigLinesEnabled:
-    """Tests for shutdown/no shutdown emission in build_l3_config_lines.
+    """Tests for shutdown/no shutdown (non-)emission in build_l3_config_lines.
 
-    vlan/subinterface types always get a standalone enabled-state line.
-    loopback never does - AOS-CX loopback interfaces don't support admin
-    shutdown. physical/lag ALSO get one, but only tied to 'routing' (see
-    TestBuildL3ConfigLinesRoutingReassertsEnabled below) - deliberately
-    duplicating what configure_physical_interfaces.yml/
-    configure_lag_interfaces.yml already pushed, to guard against AOS-CX
-    resetting admin state as a side effect of (re)applying 'routing'.
+    vlan/subinterface/loopback types never get a standalone enabled-state
+    line here — a VLAN SVI with Active Gateway (anycast) configured prompts
+    for interactive confirmation on 'shutdown' via the AOS-CX CLI, which
+    aoscx_config (network_cli) has no way to answer. Enabled state for
+    vlan/subinterface is instead pushed via aoscx_interface (REST) by
+    tasks/configure_l3_interfaces.yml — see the NOTE in
+    group_interface_ips()'s docstring. physical/lag DO get a line, but only
+    tied to 'routing' (see TestBuildL3ConfigLinesRoutingReassertsEnabled
+    below), which is safe from the same prompt: Active Gateway is an
+    SVI-only AOS-CX feature.
     """
 
-    def test_vlan_enabled_true_emits_no_shutdown(self):
-        """VLAN SVI with enabled=True emits 'no shutdown'"""
+    def test_vlan_enabled_true_never_emits_shutdown_line(self):
+        """VLAN SVI with enabled=True: no standalone shutdown/no shutdown line"""
         item = _make_item(
             {"enabled": True},
             [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "vlan", "default", True)
 
-        assert "no shutdown" in lines
-        assert "shutdown" not in lines
+        assert not any(line.endswith("shutdown") for line in lines)
 
-    def test_vlan_enabled_false_emits_shutdown(self):
-        """VLAN SVI with enabled=False emits 'shutdown'"""
+    def test_vlan_enabled_false_never_emits_shutdown_line(self):
+        """VLAN SVI with enabled=False: no standalone shutdown/no shutdown line
+        (would otherwise risk hanging on the Active Gateway CLI confirmation
+        prompt - this is pushed via REST instead, not build_l3_config_lines)"""
         item = _make_item(
             {"enabled": False},
             [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "vlan", "default", True)
 
-        assert "shutdown" in lines
-        assert "no shutdown" not in lines
+        assert not any(line.endswith("shutdown") for line in lines)
 
-    def test_vlan_enabled_defaults_to_true(self):
-        """VLAN SVI without an explicit 'enabled' key defaults to enabled (no shutdown)"""
-        item = _make_item(
-            {},
-            [{"address": "10.0.0.1/24", "ip_role": None, "anycast_mac": None}],
-        )
-        lines = build_l3_config_lines(item, "vlan", "default", True)
-
-        assert "no shutdown" in lines
-
-    def test_subinterface_enabled_false_emits_shutdown(self):
-        """Sub-interface with enabled=False emits 'shutdown'"""
+    def test_subinterface_enabled_false_never_emits_shutdown_line(self):
+        """Sub-interface with enabled=False: no standalone shutdown/no shutdown line"""
         item = _make_item(
             {"enabled": False, "tagged_vlans": [{"vid": 100}]},
             [{"address": "10.0.0.1/30", "ip_role": None, "anycast_mac": None}],
         )
         lines = build_l3_config_lines(item, "subinterface", "default", True)
 
-        assert "shutdown" in lines
-        assert "no shutdown" not in lines
+        assert not any(line.endswith("shutdown") for line in lines)
 
     def test_loopback_never_emits_shutdown_line(self):
         """Loopback interfaces never emit shutdown/no shutdown - AOS-CX
@@ -1257,7 +1249,16 @@ class TestGroupInterfaceIpsDescriptionChange:
 
 
 class TestGroupInterfaceIpsEnabledChange:
-    """Tests for group_interface_ips including interfaces with only an enabled-state change."""
+    """Tests confirming group_interface_ips does NOT include an interface
+    for enabled_change alone.
+
+    enabled_change is deliberately excluded from group_interface_ips'
+    inclusion triggers (unlike description_change/mtu_change/etc.) — see the
+    NOTE in its docstring. tasks/configure_l3_interfaces.yml reads
+    _ip_changes.enabled_change directly and pushes it via aoscx_interface
+    (REST) instead, to avoid the AOS-CX CLI's interactive confirmation
+    prompt on 'shutdown' for a VLAN SVI with Active Gateway configured.
+    """
 
     def _make_item(self, interface_obj, needs_add=False):
         """Build a minimal per-IP item with given interface dict."""
@@ -1270,17 +1271,15 @@ class TestGroupInterfaceIpsEnabledChange:
             "_needs_add": needs_add,
         }
 
-    def test_includes_interface_with_enabled_change_flag(self):
-        """Interface flagged enabled_change=True is included even when no IPs need adding."""
+    def test_omits_interface_with_only_enabled_change_flag(self):
+        """Interface flagged enabled_change=True but with no IPs to add is
+        omitted here - it's handled entirely outside build_l3_config_lines."""
         item = self._make_item({
             "name": "vlan101",
             "_ip_changes": {"enabled_change": True, "ipv4_to_add": []},
             "custom_fields": {},
         })
-        result = group_interface_ips([item])
-        assert len(result) == 1
-        assert result[0]["interface_name"] == "vlan101"
-        assert result[0]["addresses"] == []
+        assert group_interface_ips([item]) == []
 
     def test_omits_interface_without_enabled_change_flag(self):
         """Interface with no flag and _needs_add=False is still omitted."""
@@ -1300,8 +1299,9 @@ class TestGroupInterfaceIpsEnabledChange:
         })
         assert group_interface_ips([item]) == []
 
-    def test_enabled_change_combined_with_ip_add(self):
-        """Interface with both an enabled change and an IP to add is included with the address."""
+    def test_enabled_change_combined_with_ip_add_still_included_for_the_ip(self):
+        """Interface with both an enabled change and an IP to add is still
+        included - but only because of the IP, not the enabled_change flag."""
         item = self._make_item({
             "name": "vlan101",
             "_ip_changes": {"enabled_change": True},
