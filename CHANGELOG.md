@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.6] - 2026-09-04
+
+### Fixed
+
+- The 0.14.5 fix above (`user_config`/`forwarding_state` now queried and
+  fed into `_get_device_enabled_state()`) made enabled-state comparisons
+  actually run for the first time, and that surfaced a pre-existing flaw
+  in `forwarding_state.enablement` as an admin-state fallback: it reflects
+  *operational* forwarding readiness (is the interface actually passing
+  traffic right now), not admin-configured intent, and the two diverge
+  exactly when it matters — a disconnected physical port that NetBox
+  wants explicitly shut down already reads `enablement: false` from
+  having no link, so comparing against it would never detect the missing
+  `shutdown` and silently leave the interface administratively up
+  forever; conversely, a VLAN SVI or routed sub-interface that's correctly
+  "no shutdown" (matching NetBox `enabled: true`) also reads
+  `enablement: false` whenever nothing is connected on the other end,
+  which was wrongly reported as drift. Both were observed in practice —
+  one a false negative that never self-corrects, the other a false
+  positive that never stops re-triggering. `_get_device_enabled_state()`
+  (`netbox_filters_lib/interface_change_detection.py`) no longer consults
+  `forwarding_state.enablement` at all, for any interface type — only
+  `user_config.admin`, falling back to `admin`/`admin_state`, both of
+  which reflect configured intent rather than link/traffic status.
+  `forwarding_state` is no longer requested from the REST API
+  (`tasks/gather_facts_rest_api.yml`) or passed through by
+  `rest_api_to_aoscx_interfaces()` (`filter_plugins/rest_api_transforms.py`)
+  either, since nothing consumes it any more. See
+  [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md#admin-state-detection).
+- The fix above introduced its own false positive: `rest_api_to_aoscx_interfaces()`
+  (`filter_plugins/rest_api_transforms.py`) defaulted the `admin` field to
+  `"up"` whenever both `admin_state` and `admin` were missing/null in the
+  raw REST response — which, on real devices, has been observed to happen
+  regardless of an interface's *actual* admin state, disabled interfaces
+  included. `_get_device_enabled_state()`
+  (`netbox_filters_lib/interface_change_detection.py`) relies on that
+  field being `None` specifically to mean "unknown, skip the comparison"
+  when neither it nor `user_config.admin` is usable; once it started
+  defaulting to `"up"` instead, every interface whose device state was
+  genuinely unknown was confidently reported as up — producing false
+  `enabled_change`/DRIFT for physical interfaces that were correctly
+  disabled in NetBox (surfaced by multiple consecutive disabled spare
+  ports on one lab host all flagging DRIFT in the same `autotest-aoscx`
+  verification run). The `"up"` default is removed; `admin` now stays
+  `None` when genuinely unavailable, restoring the "unknown state is
+  never reported as drift" behavior. See
+  [docs/filter_plugins/rest_api_transforms.md](docs/filter_plugins/rest_api_transforms.md).
+
 ## [0.14.5] - 2026-09-04
 
 ### Fixed
