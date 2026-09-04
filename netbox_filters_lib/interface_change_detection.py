@@ -60,14 +60,27 @@ def _get_device_enabled_state(device_intf):
     """
     Determine the device's actual admin-enabled state from aoscx facts.
 
-    Tries multiple fields in order of reliability, matching AOS-CX facts
-    quirks (particularly for LAG members, where "admin"/"admin_state" alone
-    can misreport):
-    - user_config.admin: most reliable for the configured (intended) state.
-    - forwarding_state.enablement: reliable operational fallback, especially
-      for LAG members where admin_state can show "up" even when the
-      interface is administratively down.
-    - admin / admin_state: last-resort fallback.
+    Tries fields in order of reliability:
+    - user_config.admin: the configured (intended) admin state - what
+      "shutdown"/"no shutdown" actually writes, per AOS-CX/pyaoscx (the
+      admin_state setter mirrors into user_config["admin"] for every
+      interface type except the LAG aggregate interface itself).
+    - admin / admin_state: fallback when user_config isn't present. Still a
+      configured-state field, not an operational one.
+
+    Deliberately does NOT fall back to forwarding_state.enablement, even
+    though that field is present in REST facts (see
+    tasks/gather_facts_rest_api.yml). forwarding_state.enablement answers
+    "is this interface actually forwarding traffic right now" - an
+    operational/link question - not "is it administratively shut down".
+    The two diverge exactly when they matter most: a disconnected port
+    that NetBox wants explicitly shut down would already read
+    enablement=False from having no link, so a comparison against it would
+    never detect the missing "shutdown" and silently leave the interface
+    administratively up; the mirror case (an administratively-enabled
+    VLAN SVI/sub-interface with nothing connected on the other end) would
+    be wrongly reported as drift. Both were observed in practice. Trust
+    only fields that reflect configuration intent.
 
     Args:
         device_intf: Device interface facts dict (one entry from
@@ -77,18 +90,11 @@ def _get_device_enabled_state(device_intf):
         True/False if a usable field was found, otherwise None (caller
         should skip the comparison when the device state is unknown).
     """
-    device_admin_state = device_intf.get("admin") or device_intf.get("admin_state")
-
     user_config = device_intf.get("user_config", {})
     if isinstance(user_config, dict) and "admin" in user_config:
         return user_config.get("admin") == "up"
 
-    forwarding_state = device_intf.get("forwarding_state")
-    if isinstance(forwarding_state, dict):
-        enablement = forwarding_state.get("enablement")
-        if enablement is not None:
-            return enablement
-
+    device_admin_state = device_intf.get("admin") or device_intf.get("admin_state")
     return device_admin_state == "up" if device_admin_state else None
 
 

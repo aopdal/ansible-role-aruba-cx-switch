@@ -115,6 +115,41 @@ class TestGetInterfacesNeedingConfigChanges:
             interfaces, device_facts)
         assert len(result["physical"]) == 1
 
+    def test_enabled_state_unknown_device_admin_no_false_drift(self):
+        """When the device's admin state genuinely cannot be determined
+        (no user_config, and both admin/admin_state are null - the
+        AOS-CX REST API has been observed to return 'admin': null
+        regardless of an interface's actual admin state, disabled
+        interfaces included), the enabled-state check must be skipped
+        entirely rather than guessing "up" - guessing would report false
+        drift for interfaces that are genuinely, correctly disabled.
+        rest_api_to_aoscx_interfaces() (filter_plugins/rest_api_transforms.py)
+        must leave 'admin' as None in this situation, not default it to
+        "up", for this to hold. See CHANGELOG.md.
+        """
+        interfaces = [
+            {
+                "name": "1/1/8",
+                "type": {"value": "1000base-t"},
+                "enabled": False,  # NetBox wants it disabled
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/8": {
+                        "admin": None,
+                        "admin_state": None,
+                        "user_config": {},
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["no_changes"]) == 1
+        assert "_ip_changes" not in result["no_changes"][0]
+
     def test_description_mismatch(self):
         """Test detection of description mismatch"""
         interfaces = [
@@ -294,6 +329,112 @@ class TestGetInterfacesNeedingConfigChanges:
             interfaces, device_facts)
         assert len(result["l3"]) == 1
         assert result["l3"][0]["_ip_changes"]["enabled_change"] is True
+
+    def test_subinterface_forwarding_state_down_no_false_drift(self):
+        """A sub-interface that is administratively enabled (matching
+        NetBox) but operationally down - e.g. nothing connected on the
+        other end - must NOT be flagged as an enabled-state mismatch.
+
+        forwarding_state.enablement is an operational-plane signal, not an
+        admin-config one, and is never consulted for enabled-state
+        detection (any interface type) - see
+        _get_device_enabled_state()'s docstring. user_config.admin is what
+        actually decides this.
+        """
+        interfaces = [
+            {
+                "name": "1/1/1.701",
+                "type": {"value": "virtual"},
+                "parent": {"name": "1/1/1"},
+                "enabled": True,  # NetBox wants it up
+                "ip_addresses": [{"address": "172.18.17.6/31"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1.701": {
+                        "user_config": {"admin": "up"},  # actually admin-up
+                        "forwarding_state": {
+                            "enablement": False
+                        },  # just no link partner - must be ignored
+                        "ip4_address": "172.18.17.6/31",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["no_changes"]) == 1
+        assert "_ip_changes" not in result["no_changes"][0]
+
+    def test_physical_disconnected_port_still_flagged_for_shutdown(self):
+        """A disconnected physical port that NetBox wants explicitly shut
+        down must still be flagged, even though it's already not
+        forwarding traffic (forwarding_state.enablement=False) simply
+        because nothing is connected.
+
+        Comparing against forwarding_state here would make this a silent
+        no-op forever: a disconnected port already reads as "not
+        forwarding" regardless of its actual admin config, so the missing
+        'shutdown' would never be detected/pushed. Only admin/
+        user_config.admin (configured intent) may decide this - see
+        _get_device_enabled_state()'s docstring.
+        """
+        interfaces = [
+            {
+                "name": "1/1/5",
+                "type": {"value": "1000base-t"},
+                "enabled": False,  # NetBox wants it explicitly shut down
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/5": {
+                        "admin": "up",  # never explicitly shut down yet
+                        "admin_state": "up",
+                        "forwarding_state": {
+                            "enablement": False
+                        },  # not forwarding - but only because disconnected
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["physical"]) == 1
+        assert result["physical"][0]["name"] == "1/1/5"
+
+    def test_lag_member_admin_up_forwarding_state_ignored(self):
+        """A LAG member interface's enabled-state comparison must rely on
+        admin/user_config.admin, not forwarding_state.enablement - matching
+        the physical-port case above, and regardless of any historical LAG
+        bonding quirk in admin/admin_state reporting."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,  # NetBox wants it up
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "admin_state": "up",
+                        "forwarding_state": {
+                            "enablement": False
+                        },  # e.g. LACP not yet synced - must be ignored
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["no_changes"]) == 1
+        assert "_ip_changes" not in result["no_changes"][0]
 
     def test_loopback_enabled_mismatch_not_checked(self):
         """Loopback interfaces don't support admin shutdown on AOS-CX, so an

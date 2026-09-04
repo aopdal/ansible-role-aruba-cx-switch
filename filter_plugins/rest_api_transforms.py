@@ -10,17 +10,28 @@ The main differences between REST API and aoscx_facts formats:
 - VLAN IDs in REST API response may be strings or integers
 
 NOTE on admin/enabled state: the raw 'admin' attribute has been observed to
-come back null from the AOS-CX REST API for interfaces that are
-demonstrably up (LAG members, VLAN SVIs) - it is not a reliable indicator
-by itself. rest_api_to_aoscx_interfaces() therefore also passes through
-'user_config' and 'forwarding_state' unchanged, which is what
+come back null from the AOS-CX REST API for interfaces regardless of their
+actual admin state (up or down) - it is not a reliable indicator by
+itself, and rest_api_to_aoscx_interfaces() leaves it as None rather than
+guessing "up" when unavailable (guessing "up" produces false drift
+reports for interfaces that are genuinely disabled - see CHANGELOG.md).
+rest_api_to_aoscx_interfaces() therefore also passes through 'user_config'
+unchanged, which is what
 netbox_filters_lib/interface_change_detection.py's
-_get_device_enabled_state() actually prefers (user_config.admin, then
-forwarding_state.enablement, falling back to admin/admin_state only as a
-last resort). Both require 'user_config,forwarding_state' to be included
-in the REST query's requested attributes (see
-tasks/gather_facts_rest_api.yml) - without that, both keys are simply
-absent from rest_data and the fallback chain has nothing to use.
+_get_device_enabled_state() actually prefers (user_config.admin, falling
+back to admin/admin_state, staying None/unknown - and skipping the
+comparison - only when neither is available). Requires 'user_config' to
+be included in the REST query's requested attributes (see
+tasks/gather_facts_rest_api.yml) - without that, the key is simply absent
+from rest_data and the fallback chain has nothing to use.
+
+Deliberately does NOT pass through 'forwarding_state': it reflects
+operational forwarding readiness (link/traffic), not admin-configured
+intent, and using it as an enabled-state signal produces false results in
+both directions (a disconnected port administratively "no shutdown"
+reads as not-forwarding; a port NetBox wants explicitly shut down that's
+merely disconnected already reads as matching, and the shutdown never
+gets pushed). See CHANGELOG.md.
 """
 
 from urllib.parse import unquote
@@ -51,12 +62,19 @@ def rest_api_to_aoscx_interfaces(rest_data):
             continue
 
         # Normalize admin state (REST API may use 'admin' or 'admin_state').
-        # Chained with 'or' rather than a dict.get() default: both keys can
-        # be *present* with a null value (observed for 'admin' on live
-        # devices), and dict.get(key, default) only applies its default
-        # when the key is missing - not when its value is None - so a
-        # trailing default here would silently never fire.
-        admin_state = intf_data.get("admin_state") or intf_data.get("admin") or "up"
+        # Deliberately left as None - not defaulted to "up" - when both are
+        # missing/null: 'admin' has been observed to come back null from
+        # the AOS-CX REST API even for interfaces that ARE administratively
+        # down, not just ones that are up, so treating "we don't know" as
+        # "up" produces false drift reports downstream wherever an
+        # interface's actual admin state matters (see
+        # _get_device_enabled_state() in interface_change_detection.py,
+        # which explicitly relies on None meaning "unknown, don't compare"
+        # to avoid exactly that - see CHANGELOG.md). Every current consumer
+        # of this "admin" field already tolerates None safely (treats it as
+        # "not confirmed up", at worst causing a redundant idempotent
+        # re-push rather than masking a real state).
+        admin_state = intf_data.get("admin_state") or intf_data.get("admin")
 
         # Extract IPv6 addresses from the dict format
         # REST API returns: {"2001%3Adb8%3A%3A1%2F64": {...}, ...}
@@ -81,12 +99,11 @@ def rest_api_to_aoscx_interfaces(rest_data):
             "name": intf_name,
             "admin": admin_state,
             # Passed through unchanged for _get_device_enabled_state() in
-            # interface_change_detection.py, which prefers these over
+            # interface_change_detection.py, which prefers this over
             # 'admin' above - see the module docstring NOTE. Only present
-            # when the REST query requested them (they are absent, not
-            # null, if not queried - .get() then correctly yields {}/None).
+            # when the REST query requested it (absent, not null, if not
+            # queried - .get() then correctly yields {}).
             "user_config": intf_data.get("user_config", {}),
-            "forwarding_state": intf_data.get("forwarding_state"),
             "description": intf_data.get("description", ""),
             "mtu": intf_data.get("mtu"),
             "type": intf_data.get("type"),

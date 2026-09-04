@@ -135,31 +135,35 @@ class TestRestApiToAoscxInterfaces:
         assert "1/1/2" in result["lag10"]["interfaces"]
         assert result["1/1/1"]["interfaces"] == {}
 
-    def test_admin_null_falls_back_to_up(self):
-        """admin/admin_state present but null must still default to 'up'.
+    def test_admin_null_stays_none_not_up(self):
+        """admin/admin_state present but null must stay None, NOT default
+        to 'up'.
 
-        Regression test: dict.get(key, default) only applies its default
-        when the key is *missing*, not when its value is None - the AOS-CX
-        REST API has been observed to return 'admin': null for interfaces
-        that are demonstrably up (LAG members, VLAN SVIs), so a naive
-        `.get("admin", "up")` silently yields None instead of "up".
+        Regression test: the AOS-CX REST API has been observed to return
+        'admin': null for interfaces regardless of their actual admin
+        state - including ones that are genuinely disabled. Guessing "up"
+        whenever both fields are null/missing caused
+        _get_device_enabled_state() (interface_change_detection.py) to
+        report false drift for interfaces that were correctly shut down,
+        because it relies on None specifically to mean "unknown, don't
+        compare" - see the module docstring NOTE and CHANGELOG.md.
         """
         rest_data = {
             "1/1/1": {"admin_state": None, "admin": None, "type": "system"},
         }
         result = rest_api_to_aoscx_interfaces(rest_data)
-        assert result["1/1/1"]["admin"] == "up"
+        assert result["1/1/1"]["admin"] is None
 
-    def test_admin_and_admin_state_absent_defaults_to_up(self):
-        """Neither field present at all - still defaults to 'up'."""
+    def test_admin_and_admin_state_absent_stays_none(self):
+        """Neither field present at all - stays None, not guessed as 'up'."""
         rest_data = {"1/1/1": {"type": "system"}}
         result = rest_api_to_aoscx_interfaces(rest_data)
-        assert result["1/1/1"]["admin"] == "up"
+        assert result["1/1/1"]["admin"] is None
 
-    def test_user_config_and_forwarding_state_passed_through(self):
-        """user_config/forwarding_state are carried through unchanged.
+    def test_user_config_passed_through(self):
+        """user_config is carried through unchanged.
 
-        These are what interface_change_detection.py's
+        This is what interface_change_detection.py's
         _get_device_enabled_state() actually relies on when 'admin' itself
         is null/unreliable - see the module docstring NOTE.
         """
@@ -167,19 +171,31 @@ class TestRestApiToAoscxInterfaces:
             "1/1/1": {
                 "admin": None,
                 "user_config": {"admin": "down"},
-                "forwarding_state": {"enablement": False},
             }
         }
         result = rest_api_to_aoscx_interfaces(rest_data)
         assert result["1/1/1"]["user_config"] == {"admin": "down"}
-        assert result["1/1/1"]["forwarding_state"] == {"enablement": False}
 
-    def test_user_config_and_forwarding_state_default_when_absent(self):
-        """When not queried/returned, default to an empty dict / None."""
+    def test_user_config_defaults_when_absent(self):
+        """When not queried/returned, default to an empty dict."""
         rest_data = {"1/1/1": {"admin": "up"}}
         result = rest_api_to_aoscx_interfaces(rest_data)
         assert result["1/1/1"]["user_config"] == {}
-        assert result["1/1/1"]["forwarding_state"] is None
+
+    def test_forwarding_state_not_passed_through(self):
+        """forwarding_state must NOT appear in the result even if present
+        on the raw REST data.
+
+        It reflects operational forwarding readiness (link/traffic), not
+        admin-configured intent, and using it as an enabled-state signal
+        produces false results in both directions - see the module
+        docstring NOTE and CHANGELOG.md.
+        """
+        rest_data = {
+            "1/1/1": {"admin": "up", "forwarding_state": {"enablement": False}}
+        }
+        result = rest_api_to_aoscx_interfaces(rest_data)
+        assert "forwarding_state" not in result["1/1/1"]
 
 
 class TestRestApiToAoscxVlans:
