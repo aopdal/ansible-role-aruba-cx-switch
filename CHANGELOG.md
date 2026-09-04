@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.5] - 2026-09-04
+
+### Fixed
+
+- Disabling a VLAN SVI with Active Gateway (anycast) configured, via the
+  0.14.4 fix above, still didn't shut the interface down. The CLI
+  `shutdown` command triggers an interactive confirmation prompt on
+  AOS-CX for such interfaces:
+  ```
+  ao-01(config-if-vlan)# shut
+  Warning: Disabling an interface used by Active Gateway can result in
+  traffic loss on other interfaces.
+
+  Continue (y/n)?
+  ```
+  `aoscx_config` (`network_cli`) has no way to answer that prompt, so the
+  command silently never took effect and the interface stayed enabled
+  regardless of NetBox. VLAN SVI/sub-interface enabled-state changes are
+  now pushed via `aoscx_interface` (REST) directly from
+  `tasks/configure_l3_interfaces.yml` instead of a `shutdown`/
+  `no shutdown` line in `build_l3_config_lines()`
+  (`netbox_filters_lib/l3_config_helpers.py`) — REST has no interactive
+  prompt, and this is the same approach physical/LAG interfaces already
+  use for their own enabled-state changes. The physical/LAG `routing`
+  reassertion added in 0.14.4 is unaffected — Active Gateway is an
+  SVI-only AOS-CX feature and cannot be configured on a physical or LAG
+  interface. See
+  [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md#l3-interface-ip-address-idempotency).
+- The VLAN SVI/sub-interface enabled-state fix above never actually fired
+  when `aoscx_gather_facts_rest_api: true`: the REST API interface query
+  only requested `admin`, and that field has been observed to come back
+  `null` for interfaces that are demonstrably up (LAG members, VLAN SVIs)
+  — it is not a reliable indicator by itself on AOS-CX. With no other
+  field to fall back to, `_get_device_enabled_state()`
+  (`netbox_filters_lib/interface_change_detection.py`) always returned
+  `None` (device state unknown), so `enabled_change` was never flagged for
+  *any* interface — physical/LAG included, not just VLAN SVIs — and every
+  enabled-state comparison silently no-opped. `user_config` and
+  `forwarding_state` are now requested alongside `admin`
+  (`tasks/gather_facts_rest_api.yml`) and passed through unchanged by
+  `rest_api_to_aoscx_interfaces()`
+  (`filter_plugins/rest_api_transforms.py`), which is what
+  `_get_device_enabled_state()` actually prefers
+  (`user_config.admin`, then `forwarding_state.enablement`, falling back
+  to `admin`/`admin_state` only as a last resort). Also fixed a related
+  fallback bug in the same function: `intf_data.get("admin", "up")` never
+  applied its `"up"` default when `admin` was present-but-`null`, since
+  `dict.get(key, default)` only falls back when the key is missing, not
+  when its value is `None`.
+
 ## [0.14.4] - 2026-09-02
 
 ### Fixed
