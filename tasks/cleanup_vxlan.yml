@@ -1,43 +1,84 @@
 ---
 # tasks/cleanup_vxlan.yml
 # ========================
-# Remove VXLAN VNI and VLAN-to-VNI mapping for VLANs that are being deleted
-# Two-step removal process (reverse of configuration):
-#   1. Remove VLAN from VNI (no vlan X under vni Y)
-#   2. Remove VNI from VXLAN interface (no vni Y)
+# Remove VXLAN VNI and VLAN-to-VNI mapping for VLANs that are being deleted,
+# plus any VNI that has already lost its VLAN mapping entirely ("bare" VNI).
+# Three-step removal process:
+#   1. Remove VLAN from VNI (no vlan X under vni Y) - for VNIs still mapped
+#      to a VLAN that is being deleted
+#   2. Remove VNI from VXLAN interface (no vni Y) - for those same VNIs
+#   3. Remove any bare VNI (no vlan mapped under it at all) outright
 # This must happen AFTER EVPN cleanup and BEFORE VLAN deletion
 # Order: identify_vlan_changes.yml → cleanup_evpn.yml → cleanup_vxlan.yml → cleanup_vlans.yml
 #
 # Prerequisites: identify_vlan_changes.yml must run first to set:
 # - vlan_changes.vlans_to_delete: VLANs that should be removed
-# - vlans: VLANs available from NetBox (to look up L2VPN termination info)
+#
+# Note: the VNI/VLAN pairs to clean up in Steps 1-2 are read from the
+# device itself ('show evpn evi', parsed by parse_evpn_evi_output) rather
+# than from NetBox's vlan.l2vpn_termination. A VLAN in
+# vlan_changes.vlans_to_delete may already be an "orphaned" VLAN - on the
+# device but no longer present in NetBox at all (see
+# get_vlans_needing_changes in netbox_filters_lib/vlan_filters.py) - so
+# NetBox can no longer tell us which VNI it was mapped to. The device
+# still knows.
+#
+# Step 3 covers a further case Steps 1-2 cannot see: AOS-CX auto-detaches
+# a VLAN from its VNI mapping when that VLAN is deleted from global
+# config, leaving a bare 'vni Y' shell with no VLAN under it. Once the
+# VLAN is gone, the VNI no longer shows up in 'show evpn evi' either (no
+# VLAN left to associate an EVI with), so it's invisible to Steps 1-2 and
+# read instead from 'show running-config' via get_stale_vxlan_vnis.
 
 - name: Verify VLAN analysis has been performed
   ansible.builtin.assert:
     that:
       - vlan_changes is defined
       - vlan_changes.vlans_to_delete is defined
-      - vlans is defined
     fail_msg: "ERROR: identify_vlan_changes.yml must run before cleanup_vxlan.yml"
     success_msg: "VLAN analysis completed - proceeding with VXLAN cleanup"
+
+- name: Gather current VXLAN VNI configuration from device
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show evpn evi
+  register: vxlan_cleanup_config_output
+  vars:
+    ansible_connection: network_cli
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vlan_changes.vlans_to_delete | length > 0
+  changed_when: false
+  failed_when: false
+
+- name: Parse VXLAN configuration from device output
+  ansible.builtin.set_fact:
+    vxlan_cleanup_parsed: >-
+      {{
+        vxlan_cleanup_config_output.stdout[0] | parse_evpn_evi_output
+        if vxlan_cleanup_config_output.stdout is defined and vxlan_cleanup_config_output.stdout | length > 0
+        else {'vxlan_mappings': [], 'vxlan_vnis': [], 'vxlan_vlans': [], 'evpn_vlans': []}
+      }}
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vlan_changes.vlans_to_delete | length > 0
+    - vxlan_cleanup_config_output is defined
 
 - name: Determine VLANs to remove from VXLAN
   ansible.builtin.set_fact:
     vlans_to_remove_from_vxlan: >-
       {{
-        vlans | default([])
-        | selectattr('vid', 'in', vlan_changes.vlans_to_delete)
-        | selectattr('l2vpn_termination.id', 'defined')
-        | list
+        vxlan_cleanup_parsed.vxlan_mappings
+        | get_evpn_vxlan_cleanup_items(vlan_changes.vlans_to_delete)
       }}
   when:
-    - vlan_changes is defined
-    - vlan_changes.vlans_to_delete is defined
+    - custom_fields.device_vxlan | default(false) | bool
     - vlan_changes.vlans_to_delete | length > 0
+    - vxlan_cleanup_parsed is defined
 
 - name: Display VLANs to remove from VXLAN
   ansible.builtin.debug:
-    msg: "Removing VXLAN mapping for VLAN {{ item.vid }} (VNI {{ item.l2vpn_termination.l2vpn.identifier }})"
+    msg: "Removing VXLAN mapping for VLAN {{ item.vid }} (VNI {{ item.vni }})"
   loop: "{{ vlans_to_remove_from_vxlan }}"
   loop_control:
     label: "VLAN {{ item.vid }}"
@@ -54,10 +95,10 @@
       - "no vlan {{ item.vid }}"
     parents:
       - "interface vxlan 1"
-      - "vni {{ item.l2vpn_termination.l2vpn.identifier }}"
+      - "vni {{ item.vni }}"
   loop: "{{ vlans_to_remove_from_vxlan }}"
   loop_control:
-    label: "VLAN {{ item.vid }} from VNI {{ item.l2vpn_termination.l2vpn.identifier }}"
+    label: "VLAN {{ item.vid }} from VNI {{ item.vni }}"
   when:
     - vlans_to_remove_from_vxlan is defined
     - vlans_to_remove_from_vxlan | length > 0
@@ -71,12 +112,12 @@
 - name: Remove VNI from VXLAN interface (Step 2)
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - "no vni {{ item.l2vpn_termination.l2vpn.identifier }}"
+      - "no vni {{ item.vni }}"
     parents:
       - "interface vxlan 1"
   loop: "{{ vlans_to_remove_from_vxlan }}"
   loop_control:
-    label: "VNI {{ item.l2vpn_termination.l2vpn.identifier }}"
+    label: "VNI {{ item.vni }}"
   when:
     - vlans_to_remove_from_vxlan is defined
     - vlans_to_remove_from_vxlan | length > 0
@@ -84,12 +125,66 @@
     ansible_connection: network_cli
   register: vxlan_vni_removal_result
 
+# Step 3: Remove bare VNIs (no VLAN mapped under them at all)
+# See the "Step 3" note at the top of this file for why these need a
+# separate device-truth source from Steps 1-2.
+- name: Get current running-config for bare VXLAN VNI cleanup
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show running-config
+  register: vxlan_running_config_output
+  vars:
+    ansible_connection: network_cli
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+  changed_when: false
+  failed_when: false
+
+- name: Determine bare VNIs (no VLAN mapped) to remove
+  ansible.builtin.set_fact:
+    vxlan_bare_vnis_to_remove: >-
+      {{
+        vxlan_running_config_output.stdout[0] | get_stale_vxlan_vnis
+        if vxlan_running_config_output.stdout is defined and vxlan_running_config_output.stdout | length > 0
+        else []
+      }}
+  when:
+    - custom_fields.device_vxlan | default(false) | bool
+    - vxlan_running_config_output is defined
+
+- name: Display bare VNIs to remove
+  ansible.builtin.debug:
+    msg: "Removing bare VNI {{ item }} (no VLAN mapped - orphaned)"
+  loop: "{{ vxlan_bare_vnis_to_remove }}"
+  when:
+    - vxlan_bare_vnis_to_remove is defined
+    - vxlan_bare_vnis_to_remove | length > 0
+    - custom_fields.device_vxlan | default(false) | bool
+
+- name: Remove bare VNIs with no VLAN mapping (Step 3)
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "no vni {{ item }}"
+    parents:
+      - "interface vxlan 1"
+  loop: "{{ vxlan_bare_vnis_to_remove }}"
+  loop_control:
+    label: "VNI {{ item }} (bare)"
+  when:
+    - vxlan_bare_vnis_to_remove is defined
+    - vxlan_bare_vnis_to_remove | length > 0
+    - custom_fields.device_vxlan | default(false) | bool
+  vars:
+    ansible_connection: network_cli
+  register: vxlan_bare_vni_removal_result
+
 - name: Display VXLAN cleanup results
   ansible.builtin.debug:
     msg: >-
       VXLAN cleanup completed:
       {{ vxlan_vlan_removal_result.results | default([]) | selectattr('changed', 'equalto', true) | list | length }} VLAN-to-VNI mappings removed,
-      {{ vxlan_vni_removal_result.results | default([]) | selectattr('changed', 'equalto', true) | list | length }} VNIs removed
+      {{ vxlan_vni_removal_result.results | default([]) | selectattr('changed', 'equalto', true) | list | length }} VNIs removed,
+      {{ vxlan_bare_vni_removal_result.results | default([]) | selectattr('changed', 'equalto', true) | list | length }} bare VNIs removed
   when:
     - vxlan_vlan_removal_result is defined
     - vxlan_vni_removal_result is defined

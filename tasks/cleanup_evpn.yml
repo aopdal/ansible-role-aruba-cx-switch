@@ -7,34 +7,64 @@
 #
 # Prerequisites: identify_vlan_changes.yml must run first to set:
 # - vlan_changes.vlans_to_delete: VLANs that should be removed
-# - vlans: VLANs available from NetBox (to look up L2VPN termination info)
+#
+# Note: the VNI/VLAN pairs to clean up are read from the device itself
+# ('show evpn evi', parsed by parse_evpn_evi_output) rather than from
+# NetBox's vlan.l2vpn_termination. A VLAN in vlan_changes.vlans_to_delete
+# may already be an "orphaned" VLAN - on the device but no longer present
+# in NetBox at all (see get_vlans_needing_changes in
+# netbox_filters_lib/vlan_filters.py) - so NetBox can no longer tell us
+# which VNI it was mapped to. The device still knows.
 
 - name: Verify VLAN analysis has been performed
   ansible.builtin.assert:
     that:
       - vlan_changes is defined
       - vlan_changes.vlans_to_delete is defined
-      - vlans is defined
     fail_msg: "ERROR: identify_vlan_changes.yml must run before cleanup_evpn.yml"
     success_msg: "VLAN analysis completed - proceeding with EVPN cleanup"
+
+- name: Gather current EVPN/VXLAN VNI configuration from device
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show evpn evi
+  register: evpn_cleanup_config_output
+  vars:
+    ansible_connection: network_cli
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+    - vlan_changes.vlans_to_delete | length > 0
+  changed_when: false
+  failed_when: false
+
+- name: Parse EVPN/VXLAN configuration from device output
+  ansible.builtin.set_fact:
+    evpn_cleanup_parsed: >-
+      {{
+        evpn_cleanup_config_output.stdout[0] | parse_evpn_evi_output
+        if evpn_cleanup_config_output.stdout is defined and evpn_cleanup_config_output.stdout | length > 0
+        else {'vxlan_mappings': [], 'vxlan_vnis': [], 'vxlan_vlans': [], 'evpn_vlans': []}
+      }}
+  when:
+    - custom_fields.device_evpn | default(false) | bool
+    - vlan_changes.vlans_to_delete | length > 0
+    - evpn_cleanup_config_output is defined
 
 - name: Determine VLANs to remove from EVPN
   ansible.builtin.set_fact:
     vlans_to_remove_from_evpn: >-
       {{
-        vlans | default([])
-        | selectattr('vid', 'in', vlan_changes.vlans_to_delete)
-        | selectattr('l2vpn_termination.id', 'defined')
-        | list
+        evpn_cleanup_parsed.vxlan_mappings
+        | get_evpn_vxlan_cleanup_items(vlan_changes.vlans_to_delete)
       }}
   when:
-    - vlan_changes is defined
-    - vlan_changes.vlans_to_delete is defined
+    - custom_fields.device_evpn | default(false) | bool
     - vlan_changes.vlans_to_delete | length > 0
+    - evpn_cleanup_parsed is defined
 
 - name: Display VLANs to remove from EVPN
   ansible.builtin.debug:
-    msg: "Removing EVPN configuration for VLAN {{ item.vid }} (VNI {{ item.l2vpn_termination.l2vpn.identifier }})"
+    msg: "Removing EVPN configuration for VLAN {{ item.vid }} (VNI {{ item.vni }})"
   loop: "{{ vlans_to_remove_from_evpn }}"
   loop_control:
     label: "VLAN {{ item.vid }}"

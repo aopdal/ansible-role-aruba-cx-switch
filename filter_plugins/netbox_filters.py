@@ -37,6 +37,8 @@ from netbox_filters_lib.vlan_filters import (
     get_vlans_needing_name_update,
     get_vlan_interfaces,
     parse_evpn_evi_output,
+    get_evpn_vxlan_cleanup_items,
+    get_stale_vxlan_vnis,
     parse_vlan_id_spec,
 )
 from netbox_filters_lib.vrf_filters import (
@@ -128,6 +130,8 @@ class FilterModule:
             "get_vlans_needing_name_update": get_vlans_needing_name_update,
             "get_vlan_interfaces": get_vlan_interfaces,
             "parse_evpn_evi_output": parse_evpn_evi_output,
+            "get_evpn_vxlan_cleanup_items": get_evpn_vxlan_cleanup_items,
+            "get_stale_vxlan_vnis": get_stale_vxlan_vnis,
             "extract_interface_vrfs": extract_interface_vrfs,
             "filter_vrfs_in_use": filter_vrfs_in_use,
             "get_vrfs_in_use": get_vrfs_in_use,

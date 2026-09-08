@@ -10,6 +10,8 @@ from netbox_filters_lib.vlan_filters import (
     extract_vxlan_mappings,
     get_vlans_in_use,
     get_vlans_needing_changes,
+    get_evpn_vxlan_cleanup_items,
+    get_stale_vxlan_vnis,
     get_vlans_needing_igmp_update,
     get_vlans_needing_voice_update,
     get_vlans_needing_name_update,
@@ -406,6 +408,123 @@ that doesn't contain L2VNI data"""
         result = parse_evpn_evi_output(output)
         assert result["vxlan_vnis"] == [16777200]
         assert result["vxlan_vlans"] == [4094]
+
+
+class TestGetEvpnVxlanCleanupItems:
+    """Tests for get_evpn_vxlan_cleanup_items function"""
+
+    def test_matches_mapping_for_vlan_being_deleted(self):
+        """VNI/VLAN pair on the device is returned when its VLAN is being deleted"""
+        mappings = [[10100, 100], [10200, 200]]
+        result = get_evpn_vxlan_cleanup_items(mappings, [100])
+        assert result == [{"vid": 100, "vni": 10100}]
+
+    def test_orphaned_vlan_not_in_netbox_still_resolves_vni(self):
+        """
+        Regression test: a VLAN can be scheduled for deletion because it is
+        "orphaned" (on the device but no longer present in NetBox at all -
+        see get_vlans_needing_changes), so NetBox has no l2vpn_termination
+        to look up. The device-reported mapping must still resolve the VNI.
+        """
+        mappings = [[10300, 300]]
+        result = get_evpn_vxlan_cleanup_items(mappings, [300])
+        assert result == [{"vid": 300, "vni": 10300}]
+
+    def test_ignores_mappings_not_scheduled_for_deletion(self):
+        """VNI/VLAN pairs whose VLAN is not being deleted are left alone"""
+        mappings = [[10100, 100], [10200, 200]]
+        result = get_evpn_vxlan_cleanup_items(mappings, [999])
+        assert result == []
+
+    def test_multiple_matches_sorted_by_vid(self):
+        """Multiple matches are returned sorted by VLAN ID"""
+        mappings = [[10300, 300], [10100, 100], [10200, 200]]
+        result = get_evpn_vxlan_cleanup_items(mappings, [100, 200, 300])
+        assert result == [
+            {"vid": 100, "vni": 10100},
+            {"vid": 200, "vni": 10200},
+            {"vid": 300, "vni": 10300},
+        ]
+
+    def test_empty_mappings_returns_empty_list(self):
+        """No device mappings means nothing to clean up"""
+        assert get_evpn_vxlan_cleanup_items([], [100]) == []
+
+    def test_empty_vlans_to_delete_returns_empty_list(self):
+        """No VLANs scheduled for deletion means nothing to clean up"""
+        assert get_evpn_vxlan_cleanup_items([[10100, 100]], []) == []
+
+    def test_malformed_mapping_entries_are_skipped(self):
+        """Malformed entries (wrong length, empty) don't raise and are skipped"""
+        mappings = [[10100, 100], [10200], None, []]
+        result = get_evpn_vxlan_cleanup_items(mappings, [100, 200])
+        assert result == [{"vid": 100, "vni": 10100}]
+
+
+class TestGetStaleVxlanVnis:
+    """Tests for get_stale_vxlan_vnis function"""
+
+    def test_bare_vni_with_no_vlan_is_stale(self):
+        """
+        Regression test: matches the reported field case - VNIs left
+        behind under 'interface vxlan 1' after their VLAN was deleted
+        elsewhere in config, with no 'vlan' line under them anymore.
+        """
+        running_config = """interface vxlan 1
+    source ip 172.27.252.128
+    no shutdown
+    vni 1000101
+        vlan 101
+    vni 1000104
+    vni 1000105
+"""
+        result = get_stale_vxlan_vnis(running_config)
+        assert result == [1000104, 1000105]
+
+    def test_mapped_vni_is_not_stale(self):
+        """A VNI with a VLAN still mapped underneath it is left alone"""
+        running_config = """interface vxlan 1
+    source ip 172.27.252.128
+    no shutdown
+    vni 1000101
+        vlan 101
+    vni 1000102
+        vlan 102
+"""
+        assert get_stale_vxlan_vnis(running_config) == []
+
+    def test_only_scoped_to_vxlan_interface_block(self):
+        """VNI-looking lines outside 'interface vxlan 1' are ignored"""
+        running_config = """interface 1/1/1
+    no shutdown
+interface vxlan 1
+    vni 1000101
+        vlan 101
+    vni 1000104
+router bgp 65000
+    vni 999
+"""
+        assert get_stale_vxlan_vnis(running_config) == [1000104]
+
+    def test_no_vxlan_interface_block_returns_empty(self):
+        """No 'interface vxlan 1' block at all means nothing to report"""
+        running_config = "interface 1/1/1\n    no shutdown\n"
+        assert get_stale_vxlan_vnis(running_config) == []
+
+    def test_empty_and_none_input(self):
+        """Empty or missing running-config text returns an empty list"""
+        assert get_stale_vxlan_vnis("") == []
+        assert get_stale_vxlan_vnis(None) == []
+
+    def test_all_bare_vnis(self):
+        """All VNIs bare - e.g. every mapped VLAN under them was deleted"""
+        running_config = """interface vxlan 1
+    vni 1000104
+    vni 1000105
+    vni 1000106
+"""
+        assert get_stale_vxlan_vnis(
+            running_config) == [1000104, 1000105, 1000106]
 
 
 class TestGetVlansNeedingIgmpUpdate:
