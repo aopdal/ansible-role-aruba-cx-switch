@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.7] - 2026-09-08
+
+### Fixed
+
+- `cleanup_evpn.yml` / `cleanup_vxlan.yml` failed to remove the VNI and its
+  VLAN-to-VNI mapping when a VLAN scheduled for deletion had already been
+  deleted from NetBox outright (rather than just unassigned from the
+  device). Both tasks looked up the VNI via
+  `vlan.l2vpn_termination.l2vpn.identifier` on NetBox's `vlans` list, but a
+  fully-deleted NetBox VLAN is also absent from that list, so the lookup
+  silently found nothing and no `no vlan` / `no vni` commands were ever
+  generated — `cleanup_vlans.yml` would still delete the VLAN itself,
+  leaving the VNI orphaned under `interface vxlan 1` and EVPN indefinitely.
+  Both tasks now run `show evpn evi` themselves and match the
+  device-reported VNI-to-VLAN mappings (via the new
+  `get_evpn_vxlan_cleanup_items` filter) against
+  `vlan_changes.vlans_to_delete`, so cleanup no longer depends on NetBox
+  still remembering the L2VPN termination for a VLAN it has already
+  forgotten. See
+  [docs/EVPN_VXLAN_CONFIGURATION.md](docs/EVPN_VXLAN_CONFIGURATION.md#cleanup-filter-logic).
+- `cleanup_vxlan.yml` still left a "bare" VNI (a `vni X` shell with no
+  `vlan` mapped under it at all) behind indefinitely, even after the fix
+  above: AOS-CX auto-detaches a VLAN from its VNI mapping the moment that
+  VLAN is deleted from global config, and once the VLAN is gone the VNI no
+  longer appears in `show evpn evi` either (there's no VLAN left to form
+  an EVI), so it was invisible to the device-truth lookup added above.
+  `cleanup_vxlan.yml` now also runs `show running-config` and removes any
+  VNI under `interface vxlan 1` with no VLAN mapped (via the new
+  `get_stale_vxlan_vnis` filter), unconditionally — `configure_vxlan.yml`
+  always runs first in the same play, so any VNI still bare by the time
+  cleanup runs cannot be a legitimate in-progress mapping. See
+  [docs/EVPN_VXLAN_CONFIGURATION.md](docs/EVPN_VXLAN_CONFIGURATION.md#cleanup-filter-logic).
+
 ## [0.14.6] - 2026-09-04
 
 ### Fixed

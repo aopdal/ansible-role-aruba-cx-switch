@@ -171,6 +171,44 @@ ansible-playbook site.yml --tags "timezone"
 ansible-playbook site.yml --skip-tags "base_config"
 ```
 
+## Troubleshooting
+
+### Banner push fails with `internal_vlan_range_base` out-of-bounds error
+
+Symptom, seen on a physical AOS-CX 6200-series switch/VSF stack:
+
+```
+GENERIC OPERATION ERROR: value out of bounds: internal_vlan_range_base must be
+between 2 and 4094 value is 0
+: Code: 400: on Module: UPDATE SYSTEM BANNER
+```
+
+This is **not** a bug in `configure_banner.yml` or in this role. The
+`arubanetworks.aoscx.aoscx_banner` module's underlying pyaoscx call
+(`Device.update_banner()`) does a read-modify-write of the switch's *entire*
+`/system` object: it `GET`s the full writable system config, changes only the
+banner field, then `PUT`s the whole object back. AOS-CX 6200-series switches
+ship with `system internal-vlan-range start 0 end 0` by default — i.e. no
+internal VLAN pool configured at all. That `0` round-trips fine on `GET`, but
+fails the device's own write-side validation (2-4094) the moment *anything*
+triggers a full-object `PUT` of system config — banner just happens to be the
+earliest such call in the task order, so it surfaces here first even though
+the range isn't what you're trying to change.
+
+Fix on the switch, not in the role:
+
+```
+show running-config | include internal-vlan-range
+system internal-vlan-range start <start> end <end>
+```
+
+e.g. `system internal-vlan-range start 4093 end 4094`. This is a one-time,
+platform-specific prerequisite for 6200-series devices, not something this
+role currently manages (it isn't NetBox-driven — it's a platform trait, not
+a per-device business fact — and changing an in-use range can renumber
+internal VLANs, so it's deliberately left as an operator step rather than
+pushed automatically on every run).
+
 ## Implementation Notes
 
 1. **aoscx_config Module**: NTP and timezone use `aoscx_config` with `network_cli` connection as these are not idempotent but provide broader compatibility

@@ -507,6 +507,33 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
     - Compares NetBox with current device state
     - Returns: Dict with `vlans_to_create` and `vlans_to_delete` lists
 
+- **`parse_evpn_evi_output(output)`**
+    - Parse `show evpn evi` CLI output into the VNI/VLAN state actually
+      configured on the device
+    - Returns: Dict with `evpn_vlans`, `vxlan_vnis`, `vxlan_vlans`, and
+      `vxlan_mappings` (list of `[vni, vlan]` pairs)
+
+- **`get_evpn_vxlan_cleanup_items(vxlan_mappings, vlans_to_delete)`**
+    - Used by `cleanup_evpn.yml` / `cleanup_vxlan.yml` to find which VNIs to
+      remove. Matches device-reported `vxlan_mappings` (from
+      `parse_evpn_evi_output`) against `vlan_changes.vlans_to_delete`,
+      rather than looking up the VNI via NetBox's `l2vpn_termination` — a
+      VLAN scheduled for deletion may already be gone from NetBox entirely
+      ("orphaned" VLAN cleanup), so the device is the only remaining source
+      for its VNI.
+    - Returns: List of `{vid, vni}` dicts, sorted by `vid`
+
+- **`get_stale_vxlan_vnis(running_config)`**
+    - Used by `cleanup_vxlan.yml` to find "bare" VNIs — configured under
+      `interface vxlan 1` with no VLAN mapped underneath. AOS-CX
+      auto-detaches a VLAN from its VNI when that VLAN is deleted from
+      global config, so a bare VNI can never appear in `show evpn evi`
+      (there's no VLAN left to form an EVI) and is invisible to
+      `get_evpn_vxlan_cleanup_items`; this scans `show running-config`
+      directly instead.
+    - Returns: Sorted list of VNI numbers (ints) with no `vlan` line
+      beneath them
+
 - **`get_vlans_needing_igmp_update(device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None)`**
     - Determine which VLANs need IGMP snooping configuration updates
     - Filters to VLANs in use with `vlan_ip_igmp_snooping` custom field defined

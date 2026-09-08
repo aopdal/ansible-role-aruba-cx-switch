@@ -640,6 +640,115 @@ def parse_evpn_evi_output(output):
     return result
 
 
+def get_evpn_vxlan_cleanup_items(vxlan_mappings, vlans_to_delete):
+    """
+    Match device-reported VNI-to-VLAN mappings against VLANs scheduled for
+    deletion, to drive cleanup_evpn.yml / cleanup_vxlan.yml.
+
+    This intentionally sources the VNI number from device state (the
+    'vxlan_mappings' produced by parse_evpn_evi_output from 'show evpn
+    evi') rather than from NetBox's vlan.l2vpn_termination. By the time
+    cleanup runs, a VLAN in vlans_to_delete may already be an "orphaned"
+    VLAN - on the device but no longer present in NetBox at all (see
+    get_vlans_needing_changes) - in which case NetBox can no longer tell
+    us which VNI it was mapped to. The device still knows, so cleanup
+    must ask the device instead of NetBox.
+
+    Args:
+        vxlan_mappings: List of [vni, vlan] pairs from parse_evpn_evi_output
+        vlans_to_delete: List of VLAN IDs scheduled for deletion (from
+            vlan_changes.vlans_to_delete)
+
+    Returns:
+        List of dicts with 'vid' and 'vni' keys, one per device mapping
+        whose VLAN is in vlans_to_delete, sorted by vid
+    """
+    if not vxlan_mappings or not vlans_to_delete:
+        return []
+
+    vlans_to_delete_set = set(vlans_to_delete)
+    items = []
+    for mapping in vxlan_mappings:
+        if not mapping or len(mapping) != 2:
+            continue
+        vni, vid = mapping
+        if vid in vlans_to_delete_set:
+            items.append({"vid": vid, "vni": vni})
+            _debug(f"VNI {vni} / VLAN {vid} scheduled for EVPN/VXLAN cleanup")
+
+    return sorted(items, key=lambda item: item["vid"])
+
+
+def get_stale_vxlan_vnis(running_config):
+    """
+    Find VNIs configured under 'interface vxlan 1' with no VLAN mapped to
+    them ("bare" VNIs) - a distinct staleness case from
+    get_evpn_vxlan_cleanup_items, which can only find a VNI to remove via
+    its mapped VLAN.
+
+    configure_vxlan.yml always creates a VNI and maps a VLAN to it in the
+    same task run (Step 2 then Step 3, immediately back to back) - it
+    never intentionally leaves a VNI without a VLAN. cleanup_vxlan.yml
+    always runs after configure_vxlan.yml within the same play, so
+    configure_vxlan.yml already had its chance to complete any legitimate
+    mapping earlier in this same run. A bare VNI still present at cleanup
+    time is therefore always stale, in practice because AOS-CX
+    auto-detaches a VLAN from its VNI mapping when that VLAN is deleted
+    from global config ('no vlan X'), leaving the empty 'vni Y' shell
+    behind with no corresponding 'no vni Y' ever having been issued. Once
+    the VLAN is gone, it can no longer appear in 'show evpn evi' either
+    (there is no VLAN left to associate the L2VNI/EVI with), so this VNI
+    is invisible to get_evpn_vxlan_cleanup_items and must be read
+    directly from 'interface vxlan 1' in the running-config instead.
+
+    Args:
+        running_config: Full 'show running-config' text from the device.
+
+    Returns:
+        Sorted list of VNI numbers (ints) configured under
+        'interface vxlan 1' with no 'vlan' line beneath them.
+    """
+    if not running_config:
+        return []
+
+    vni_re = re.compile(r"^vni (\d+)$")
+    vlan_re = re.compile(r"^vlan (\d+)$")
+
+    in_vxlan = False
+    current_vni = None
+    vni_has_vlan = {}
+
+    for raw_line in running_config.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        # A non-indented line is a new top-level statement: enter or leave
+        # the 'interface vxlan 1' block.
+        if not raw_line[0].isspace():
+            in_vxlan = line == "interface vxlan 1"
+            current_vni = None
+            continue
+
+        if not in_vxlan:
+            continue
+
+        vni_match = vni_re.match(line)
+        if vni_match:
+            current_vni = int(vni_match.group(1))
+            vni_has_vlan.setdefault(current_vni, False)
+            continue
+
+        vlan_match = vlan_re.match(line)
+        if vlan_match and current_vni is not None:
+            vni_has_vlan[current_vni] = True
+
+    stale = sorted(vni for vni, has_vlan in vni_has_vlan.items() if not has_vlan)
+    if stale:
+        _debug(f"get_stale_vxlan_vnis: {len(stale)} bare VNI(s) found: {stale}")
+    return stale
+
+
 def get_vlans_needing_igmp_update(
     device_vlans, vlans_in_use_dict, enhanced_vlan_facts=None
 ):

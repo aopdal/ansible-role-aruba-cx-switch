@@ -31,6 +31,8 @@ EXPECTED_FILTER_NAMES = {
     "get_vlans_needing_name_update",
     "get_vlan_interfaces",
     "parse_evpn_evi_output",
+    "get_evpn_vxlan_cleanup_items",
+    "get_stale_vxlan_vnis",
     "extract_interface_vrfs",
     "filter_vrfs_in_use",
     "get_vrfs_in_use",

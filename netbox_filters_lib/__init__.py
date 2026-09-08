@@ -22,6 +22,8 @@ from .vlan_filters import (
     get_vlans_needing_changes,
     get_vlan_interfaces,
     parse_evpn_evi_output,
+    get_evpn_vxlan_cleanup_items,
+    get_stale_vxlan_vnis,
     parse_vlan_id_spec,
 )
 from .vrf_filters import (
@@ -86,6 +88,8 @@ __all__ = [
     "get_vlans_needing_changes",
     "get_vlan_interfaces",
     "parse_evpn_evi_output",
+    "get_evpn_vxlan_cleanup_items",
+    "get_stale_vxlan_vnis",
     "parse_vlan_id_spec",
     # VRF filters
     "extract_interface_vrfs",

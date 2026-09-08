@@ -230,7 +230,7 @@ This order matters: EVPN config must be removed before VXLAN, and both before th
 
 ### cleanup_evpn.yml
 
-Identifies VLANs in `vlan_changes.vlans_to_delete` that have an L2VPN termination and removes them from the EVPN context:
+Identifies VLANs in `vlan_changes.vlans_to_delete` that have a VNI mapping on the device and removes them from the EVPN context:
 
 ```
 evpn
@@ -242,28 +242,38 @@ Only runs when `custom_fields.device_evpn` is true.
 
 ### cleanup_vxlan.yml
 
-Two-step removal (reverse of configuration) for VLANs in `vlan_changes.vlans_to_delete` with L2VPN terminations:
+Three-step removal for VLANs in `vlan_changes.vlans_to_delete` with a VNI mapping on the device, plus any VNI that has already lost its VLAN mapping entirely:
 
 ```
 interface vxlan 1
   vni 10100
     no vlan 100        # Step 1: Remove VLAN from VNI
   no vni 10100         # Step 2: Remove VNI
+  no vni 10400         # Step 3: Remove a bare VNI (no VLAN mapped at all)
 ```
 
 Step 1 only runs when `custom_fields.device_vxlan` is true.
 
 ### Cleanup Filter Logic
 
+**Steps 1-2** (`cleanup_evpn.yml` and `cleanup_vxlan.yml`): both run `show evpn evi` themselves and parse it with `parse_evpn_evi_output` to get the VNI-to-VLAN mappings **actually configured on the device**, then match those against `vlan_changes.vlans_to_delete` with `get_evpn_vxlan_cleanup_items`:
+
 ```yaml
-vlans_to_remove_from_evpn: >-
-  {{ vlans
-    | selectattr('vid', 'in', vlan_changes.vlans_to_delete)
-    | selectattr('l2vpn_termination.id', 'defined')
-    | list }}
+vlans_to_remove_from_vxlan: >-
+  {{ vxlan_cleanup_parsed.vxlan_mappings
+     | get_evpn_vxlan_cleanup_items(vlan_changes.vlans_to_delete) }}
 ```
 
-Only VLANs that are both scheduled for deletion **and** have an L2VPN termination (VNI mapping) are cleaned up.
+This intentionally does **not** look up the VNI via NetBox's `vlan.l2vpn_termination`, unlike `configure_evpn.yml`/`configure_vxlan.yml`. A VLAN in `vlan_changes.vlans_to_delete` can be an "orphaned" VLAN — still configured on the device but no longer present in NetBox at all (see `get_vlans_needing_changes` in [netbox_filters_lib/vlan_filters.py](../netbox_filters_lib/vlan_filters.py)) — in which case NetBox can no longer tell the role which VNI it was mapped to. The device still knows, via `show evpn evi`, so cleanup asks the device instead. This also means cleanup works whether the VLAN was removed from NetBox outright or just unassigned from the device.
+
+**Step 3** (`cleanup_vxlan.yml` only): AOS-CX auto-detaches a VLAN from its VNI mapping the moment that VLAN is deleted from global config (`no vlan X`), leaving a bare `vni Y` shell behind with no VLAN under it and no `no vni Y` ever having been issued. Once the VLAN is gone, the VNI no longer appears in `show evpn evi` either — there's no VLAN left to associate an EVI with — so Steps 1-2 can never see it. Step 3 instead runs `show running-config` and scans the `interface vxlan 1` block directly with `get_stale_vxlan_vnis`, which returns every VNI with no `vlan` line under it:
+
+```yaml
+vxlan_bare_vnis_to_remove: >-
+  {{ vxlan_running_config_output.stdout[0] | get_stale_vxlan_vnis }}
+```
+
+This check is unconditional (it doesn't consult `vlan_changes.vlans_to_delete` at all): `cleanup_vxlan.yml` always runs after `configure_vxlan.yml` within the same play, so `configure_vxlan.yml` already had its chance to complete any legitimate VNI-to-VLAN mapping earlier in that same run. Any VNI still bare by the time cleanup runs is stale.
 
 ## Role Variables
 
@@ -358,7 +368,9 @@ The VXLAN task runs in three steps. If the task was interrupted between Step 2 (
 
 1. Confirm `aoscx_idempotent_mode: true`
 2. Confirm VLAN is no longer assigned to any interface in NetBox (it must not be in `vlans_in_use`)
-3. Confirm the VLAN still exists in NetBox with its L2VPN termination (needed to look up the VNI for cleanup)
+3. Confirm `show evpn evi` on the device actually shows a VNI mapped to the VLAN — cleanup reads the VNI from the device, not from NetBox, so if the VNI/VLAN mapping was never pushed (or was removed by hand) there's nothing for cleanup to find
+
+Note: cleanup no longer requires the VLAN to still exist in NetBox with an L2VPN termination — it works from the device's own `show evpn evi` output, so it also cleans up VLANs that were deleted from NetBox outright rather than just unassigned from the device.
 
 ## Best Practices
 
