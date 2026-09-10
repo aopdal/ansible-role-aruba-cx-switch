@@ -34,7 +34,7 @@
       {%- set out = [] -%}
       {%- if pa_role.description is defined -%}
       {%-   set _ = out.append('description ' ~ pa_role.description) -%}
-      {%- elif _pa_role_current.description -%}
+      {%- elif _pa_role_current.get('description') -%}
       {%-   set _ = out.append('no description') -%}
       {%- endif -%}
       {%- if pa_role.poe_priority is defined -%}
