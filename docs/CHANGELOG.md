@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.8] - 2026-09-10
+
+### Fixed
+
+- Removing a port-access role's `description` from NetBox left the stale
+  `description ...` line on the device forever. `port_access_diff`
+  correctly detected the mismatch and re-pushed the role, but
+  `configure_port_access_role.yml` only ever emitted a `description` line
+  when `pa_role.description` was defined — with it removed, no line (add
+  or remove) was generated at all, and `aoscx_config`'s `match: line`
+  never deletes a device line that isn't in the desired list on its own.
+  The role task now compares against `aoscx_port_access_facts` and emits
+  `no description` when the device still has one but NetBox no longer
+  does. Requires `aoscx_gather_facts_rest_api: true` for the device-side
+  comparison; see
+  [docs/PORT_ACCESS_CONFIGURATION.md](PORT_ACCESS_CONFIGURATION.md#removing-a-role-attribute-eg-description).
+  The same gap still exists for `poe_priority`/`trust_mode`/the VLAN
+  attributes (documented as a known limitation, not yet fixed — see that
+  same doc section).
+
 ## [0.14.7] - 2026-09-08
 
 ### Fixed
