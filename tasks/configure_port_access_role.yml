@@ -10,10 +10,32 @@
     match: line
   vars:
     ansible_connection: network_cli
+    # Device-reported state for this role, when REST API facts are
+    # available (see tasks/gather_facts_rest_api.yml). Used below to emit
+    # a 'no description' removal line when a description was pushed
+    # previously but has since been removed from NetBox - 'match: line'
+    # only adds lines that are missing, it never removes a device line
+    # that isn't in the desired list, so without this a removed
+    # description would otherwise stick around on the device forever.
+    #
+    # NOTE: the same gap exists for poe_priority/trust_mode/vlan_* (no
+    # 'no <keyword>' is emitted when one of those is removed from NetBox
+    # on an already-configured role), but those attributes have
+    # device-side operational defaults (e.g. a role always reports SOME
+    # poe-priority/trust-mode) rather than description's "null when
+    # unset" semantics. Without confirming what an unconfigured role
+    # actually reports for those fields, adding the same 'no <keyword>'
+    # logic risks the opposite bug: pushing a spurious negation - and
+    # `changed: true` - on every run for roles that simply never set
+    # them. Left for a follow-up once that's verified against real
+    # device facts.
+    _pa_role_current: "{{ ((aoscx_port_access_facts | default({})).roles | default({})).get(pa_role.name, {}) }}"
     _pa_role_cli_lines: >-
       {%- set out = [] -%}
       {%- if pa_role.description is defined -%}
       {%-   set _ = out.append('description ' ~ pa_role.description) -%}
+      {%- elif _pa_role_current.description -%}
+      {%-   set _ = out.append('no description') -%}
       {%- endif -%}
       {%- if pa_role.poe_priority is defined -%}
       {%-   set _ = out.append('poe-priority ' ~ pa_role.poe_priority) -%}
