@@ -140,6 +140,32 @@ the objects that actually differ:
 - **Device-profiles**: `enable`, `associate_role`, `associate_lldp_group`
   are compared.
 
+### Removing a role attribute (e.g. `description`)
+
+Deleting an attribute from a role in NetBox (e.g. removing `description`
+from a role that previously had one) is detected the same way as any other
+change — `port_access_diff` sees the desired and device-reported
+`description` no longer match and re-pushes the role. For `description`
+specifically, [`tasks/configure_port_access_role.yml`](../tasks/configure_port_access_role.yml)
+compares against `aoscx_port_access_facts` and emits `no description` when
+the role currently has one on the device but NetBox no longer specifies
+one; once removed, the role stops needing a push on subsequent runs (fully
+idempotent). This requires REST API facts to be available — without them
+`port_access_diff` falls back to "push everything", but no removal line is
+generated (there's no device state to compare against), so the description
+would be re-pushed with no value change each run without actually clearing
+it. Set `aoscx_gather_facts_rest_api: true` to get this behaviour.
+
+`poe_priority`, `trust_mode`, and the VLAN attributes (`vlan_access`,
+`vlan_trunk_native`, `vlan_trunk_allowed`) do **not** have the same
+removal handling yet — removing one of those from NetBox on an
+already-configured role currently leaves the stale value on the device.
+Unlike `description` (null when unset), these attributes have device-side
+operational defaults, so a naive port of the same fix risks pushing a
+spurious `no <keyword>` (and `changed: true`) on every run for roles that
+simply never set them; this needs verifying against real device facts
+before implementing.
+
 ## Cleanup
 
 Objects present on the device but removed from NetBox are only deleted
