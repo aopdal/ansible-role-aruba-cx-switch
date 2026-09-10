@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.9] - 2026-09-10
+
+### Fixed
+
+- `configure_port_access_role.yml` failed on any run where a port-access
+  role's device-side state wasn't already known — a brand new role being
+  pushed for the first time, or `aoscx_gather_facts_rest_api` disabled —
+  with `Finalization of task args for 'arubanetworks.aoscx.aoscx_config'
+  failed: ... object of type 'dict' has no attribute 'description'`. The
+  0.14.8 `no description` removal fix compared against
+  `_pa_role_current.description` using dot-attribute access; when the role
+  wasn't found in `aoscx_port_access_facts` (or the facts were unset),
+  `_pa_role_current` fell back to a literal `{}`, and ansible-core 2.19's
+  stricter argument-finalization step raises `AttributeError` on that bare
+  dict instead of the classic Jinja `Undefined`-on-missing-attribute
+  fallback. Switched to `_pa_role_current.get('description')` (the
+  dict-method form already used everywhere else in this codebase for the
+  same reason), which works identically whether the dict is empty or
+  populated.
+
 ## [0.14.8] - 2026-09-10
 
 ### Fixed
