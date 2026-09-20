@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.10] - 2026-09-20
+
+### Added
+
+- BGP: default-VRF sessions on a device without VXLAN (`device_vxlan` false
+  or unset) are now configured as address-family-based eBGP/iBGP neighbors —
+  same handling as VRF BGP sessions (`next-hop-self` for iBGP, import/export
+  route-maps for eBGP, address family derived from the IP address) but
+  without the `vrf <name>` / `exit-vrf` wrapper. Previously, default-VRF
+  sessions were only ever configured as EVPN/L2VPN overlay neighbors,
+  regardless of whether the device ran VXLAN. See
+  [docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md#vrf-bgp-sessions-and-routing-policies).
+
+### Fixed
+
+- Adding/changing `mtu` in NetBox for an interface that had never had an
+  explicit `ip mtu`/`mtu` pushed to the device before was silently ignored.
+  `get_interfaces_needing_config_changes()`
+  (`netbox_filters_lib/interface_change_detection.py`) guarded the MTU
+  comparison with `if device_mtu and ...` for both physical/LAG and virtual
+  (VLAN SVI/loopback/sub-interface) interfaces; when the device had never
+  had an MTU explicitly configured, facts report `mtu` as `None`, which
+  made the guard short-circuit to `False` and skip the comparison entirely
+  - `_ip_changes.mtu_change` was never set, and the interface was never
+  pulled into the L3 config push. A missing/falsy device MTU is now treated
+  as `0` for comparison purposes, so it correctly compares as a mismatch
+  against any NetBox-specified MTU. See
+  [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md#l3-interface-ip-address-idempotency).
+
+- Removing a physical interface's LAG assignment in NetBox was never
+  propagated to the device — the interface stayed a LAG member forever,
+  and `assign_interfaces_to_lag.yml` only ever pushed `lag <n>` to add a
+  member, never `no lag <n>` to remove one. Root cause was in
+  `get_interfaces_needing_config_changes()`
+  (`netbox_filters_lib/interface_change_detection.py`): the LAG-membership
+  comparison (including an existing "should not be in LAG but is" branch)
+  was nested entirely inside `if nb_lag and isinstance(nb_lag, dict)`, but
+  clearing an interface's `lag` field in NetBox makes it `None`, not an
+  empty dict — so the whole comparison block, and that branch with it,
+  never ran for the one case it needed to handle. The comparison against
+  device state now runs unconditionally, and a new `_lag_removal` flag /
+  `lag_removals` category (parallel to `lag_members`, but deliberately not
+  treated as an active member for `l2`/`l3` categorization purposes, since
+  a departing interface still needs its own standalone config) is
+  consumed by a new task in `assign_interfaces_to_lag.yml` that pushes
+  `no lag <n>`. `tasks/main.yml`'s gate on running
+  `assign_interfaces_to_lag.yml` at all is also updated — it previously
+  only fired when at least one NetBox interface still had a `lag`
+  assignment defined, which excluded a run where every remaining LAG
+  member is being removed. See
+  [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md#interface_change_detectionpy---change-detection).
+
 ## [0.14.9] - 2026-09-10
 
 ### Fixed
