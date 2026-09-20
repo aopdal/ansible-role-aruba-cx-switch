@@ -525,7 +525,8 @@ Enables idempotent interface configuration by detecting:
   - `mclag` - MCLAG interfaces needing changes
   - `l2` - L2 interfaces needing VLAN changes
   - `l3` - L3 interfaces needing IP address, description, MTU, enabled-state, encapsulation, or DHCP relay changes (also includes VLAN SVI/loopback/sub-interface entries that only need a description or MTU update, and VLAN SVI/sub-interface entries that only need an enabled-state update)
-  - `lag_members` - Physical interfaces needing LAG assignment
+  - `lag_members` - Physical interfaces needing LAG assignment (`lag <n>`)
+  - `lag_removals` - Physical interfaces that are a LAG member on the device but no longer assigned to any LAG in NetBox, needing removal (`no lag <n>`, via `_lag_removal`). Not counted as a LAG member for `l2`/`l3` categorization.
   - `no_changes` - Interfaces that don't need changes
 
   L3 entries additionally carry an `_ip_changes` dict (`ipv4_to_add`,
@@ -545,6 +546,7 @@ Enables idempotent interface configuration by detecting:
 
 **LAG Membership:**
 - Current LAG assignment vs. NetBox
+- Interface is a LAG member on the device but NetBox no longer assigns it to any LAG (removal)
 
 **L2 Configuration (for non-SVI interfaces):**
 - VLAN mode (access/trunk)

@@ -139,6 +139,13 @@ def get_interfaces_needing_config_changes(
           enabled (shutdown/no shutdown) state change - loopbacks don't
           support the latter)
         - lag_members: Physical interfaces needing LAG assignment changes
+        - lag_removals: Physical interfaces that need to be removed from a LAG
+          they are currently a member of on the device but no longer have a
+          `lag` assignment in NetBox (`_lag_removal` set to the device-side
+          LAG name to remove). Kept separate from `lag_members` - which is
+          consumed only to push an "add to LAG" line - since a departing
+          interface still needs its own standalone L2/L3 config categorized
+          normally, unlike an active member.
         - no_changes: Interfaces that don't need any changes
     """
     result = {
@@ -148,6 +155,7 @@ def get_interfaces_needing_config_changes(
         "l2": [],
         "l3": [],
         "lag_members": [],
+        "lag_removals": [],
         "no_changes": [],
     }
 
@@ -345,7 +353,12 @@ def get_interfaces_needing_config_changes(
             nb_mtu = nb_intf.get("mtu")
             if nb_mtu and nb_mtu != "" and nb_mtu is not None:
                 device_mtu = device_intf.get("mtu")
-                if device_mtu and int(nb_mtu) != int(device_mtu):
+                # device_mtu is None/falsy when the device has never had an
+                # explicit MTU pushed (e.g. no ip/mtu command sent since
+                # interface creation) - treat that as 0 rather than skipping
+                # the comparison, otherwise a NetBox MTU added after the
+                # fact is never detected as drift. See CHANGELOG.md.
+                if int(nb_mtu) != int(device_mtu or 0):
                     needs_change = True
                     change_reasons.append(
                         f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
@@ -400,7 +413,11 @@ def get_interfaces_needing_config_changes(
             nb_mtu = nb_intf.get("mtu")
             if nb_mtu and nb_mtu != "" and nb_mtu is not None:
                 device_mtu = device_intf.get("mtu")
-                if device_mtu and int(nb_mtu) != int(device_mtu):
+                # See the matching comment in the physical/LAG MTU check
+                # above - device_mtu is None/falsy whenever the SVI/
+                # loopback/sub-interface has never had an explicit
+                # 'ip mtu' pushed, and must still compare as a mismatch.
+                if int(nb_mtu) != int(device_mtu or 0):
                     needs_change = True
                     change_reasons.append(
                         f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
@@ -412,24 +429,37 @@ def get_interfaces_needing_config_changes(
         # Check LAG membership
         # AOS-CX stores LAG membership in the LAG interface's "interfaces" dict,
         # not on the physical interface itself. Use the reverse mapping we built earlier.
+        #
+        # nb_lag_name/device_lag_name are computed unconditionally (not
+        # nested inside "if nb_lag is a dict") so the removal case below is
+        # actually reachable: an interface with its LAG assignment cleared
+        # in NetBox has nb_lag=None, not an empty dict, so a check gated on
+        # "nb_lag and isinstance(nb_lag, dict)" would never see it and the
+        # removal branch would be permanently dead code.
         nb_lag = nb_intf.get("lag")
-        if nb_lag and isinstance(nb_lag, dict):
-            nb_lag_name = nb_lag.get("name", "")
-            # Look up current LAG membership from our reverse mapping
-            device_lag_name = intf_to_lag_map.get(intf_name, "")
+        nb_lag_name = nb_lag.get("name", "") if isinstance(nb_lag, dict) else ""
+        # Look up current LAG membership from our reverse mapping
+        device_lag_name = intf_to_lag_map.get(intf_name, "")
 
-            if nb_lag_name and nb_lag_name != device_lag_name:
-                needs_change = True
-                change_reasons.append(
-                    f"LAG membership mismatch (NB: {nb_lag_name}, "
-                    f"device: {device_lag_name})"
-                )
-            elif not nb_lag_name and device_lag_name:
-                # Interface should not be in LAG but is
-                needs_change = True
-                change_reasons.append(
-                    f"Interface should not be in LAG (device has: {device_lag_name})"
-                )
+        if nb_lag_name and nb_lag_name != device_lag_name:
+            needs_change = True
+            change_reasons.append(
+                f"LAG membership mismatch (NB: {nb_lag_name}, "
+                f"device: {device_lag_name})"
+            )
+        elif not nb_lag_name and device_lag_name:
+            # Interface should not be in LAG but is - flag it for removal.
+            # assign_interfaces_to_lag.yml pushes "no lag <n>" for anything
+            # in result["lag_removals"] (see _categorize_interface_for_changes
+            # below). Deliberately NOT added to result["lag_members"] - that
+            # category is consumed only to ADD a "lag <n>" line, and (unlike
+            # an active member) a departing interface must still get its own
+            # standalone L2/L3 config categorized normally afterward.
+            needs_change = True
+            change_reasons.append(
+                f"Interface should not be in LAG (device has: {device_lag_name})"
+            )
+            nb_intf["_lag_removal"] = device_lag_name
 
         # Check L2 configuration (VLANs)
         # Skip L2 VLAN checks for ALL virtual interfaces (VLAN SVIs, loopbacks,
@@ -722,6 +752,7 @@ def get_interfaces_needing_config_changes(
     _debug(f"  L2 interfaces needing changes: {len(result['l2'])}")
     _debug(f"  L3 interfaces needing changes: {len(result['l3'])}")
     _debug(f"  LAG member changes: {len(result['lag_members'])}")
+    _debug(f"  LAG member removals: {len(result['lag_removals'])}")
     _debug(f"  Interfaces not needing changes: {len(result['no_changes'])}")
 
     return result
@@ -740,6 +771,11 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
 
     Categories:
     - lag_members: Physical interfaces that are members of a LAG (for LAG assignment)
+    - lag_removals: Physical interfaces leaving a LAG they're currently a
+      member of on the device (NetBox cleared their `lag` assignment) - see
+      `_lag_removal` in get_interfaces_needing_config_changes(). NOT treated
+      as a LAG member for L2/L3 categorization purposes below (unlike an
+      active member, a departing interface needs its own standalone config).
     - physical: Physical interfaces including LAG members (for MTU, speed, admin state)
     - lag: LAG interfaces (for LAG creation and basic config)
     - mclag: MCLAG interfaces (for MCLAG-specific config)
@@ -769,6 +805,13 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
         result_dict["lag_members"].append(intf)
         is_lag_member = True
         # Don't return - continue to add to physical category too
+    elif intf.get("_lag_removal"):
+        # Interface is currently a LAG member on the device but NetBox no
+        # longer assigns it to any LAG - needs "no lag <n>", not "lag <n>".
+        # Deliberately does NOT set is_lag_member: once removed, this
+        # interface is standalone again and should still be categorized
+        # into l2/l3 below like any other physical interface.
+        result_dict["lag_removals"].append(intf)
 
     # Categorize by interface type (LAG, MCLAG, physical)
     if type_value == "lag":

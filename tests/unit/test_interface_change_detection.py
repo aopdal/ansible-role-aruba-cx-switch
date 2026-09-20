@@ -489,6 +489,35 @@ class TestGetInterfacesNeedingConfigChanges:
         assert result["l3"][0]["name"] == "vlan100"
         assert result["l3"][0]["_ip_changes"]["mtu_change"] is True
 
+    def test_vlan_svi_mtu_set_when_device_mtu_never_configured(self):
+        """VLAN SVI where the device has never had an explicit 'ip mtu'
+        pushed reports mtu=None in facts. Adding an MTU in NetBox for such
+        an interface must still be flagged as a mismatch and pushed -
+        regression test for a bug where a falsy device_mtu (None/0/missing)
+        short-circuited the comparison and silently skipped the change."""
+        interfaces = [
+            {
+                "name": "vlan100",
+                "type": {"value": "virtual"},
+                "mtu": 9198,
+                "ip_addresses": [{"address": "10.1.100.1/24"}],
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "vlan100": {
+                        "mtu": None,
+                        "ip4_address": "10.1.100.1/24",
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["l3"]) == 1
+        assert result["l3"][0]["_ip_changes"]["mtu_change"] is True
+
     def test_vlan_svi_mtu_match_no_changes(self):
         """VLAN SVI with matching MTU and IP needs no changes."""
         interfaces = [
@@ -591,6 +620,32 @@ class TestGetInterfacesNeedingConfigChanges:
             interfaces, device_facts)
         assert len(result["physical"]) == 1
 
+    def test_physical_mtu_set_when_device_mtu_never_configured(self):
+        """Same regression as test_vlan_svi_mtu_set_when_device_mtu_never_configured
+        but for a physical/LAG-style interface: a falsy device_mtu
+        (None/0/missing) must not short-circuit the mismatch comparison."""
+        interfaces = [
+            {
+                "name": "1/1/1",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mtu": 9198,
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/1": {
+                        "admin": "up",
+                        "mtu": None,
+                    }
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["physical"]) == 1
+
     def test_vlan_interface_not_on_device(self):
         """Test VLAN interface (SVI) not on device needs L3 changes"""
         interfaces = [
@@ -657,6 +712,98 @@ class TestGetInterfacesNeedingConfigChanges:
         # Should be in both lag_members and physical
         assert len(result["lag_members"]) == 1
         assert len(result["physical"]) == 1
+
+    def test_lag_member_removed_in_netbox_needs_removal(self):
+        """Regression test: an interface that is a LAG member on the device
+        but has had its 'lag' assignment cleared in NetBox (nb_intf.get('lag')
+        is None, not an empty dict) must be flagged for removal.
+
+        Previously the LAG-membership comparison was nested entirely inside
+        `if nb_lag and isinstance(nb_lag, dict)`, so when NetBox had no `lag`
+        key at all (the normal way to represent "no longer a LAG member"),
+        the comparison block - including the existing but unreachable
+        "should not be in LAG but is" branch - never ran at all, and the
+        interface was silently left as a LAG member on the device forever.
+        """
+        interfaces = [
+            {
+                "name": "1/1/10",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                # No 'lag' key - interface removed from LAG in NetBox
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/10": {"admin": "up"},
+                    "lag1": {
+                        "type": "lag",
+                        "interfaces": {"1/1/10": {}},  # still a member on device
+                    },
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["lag_removals"]) == 1
+        assert result["lag_removals"][0]["name"] == "1/1/10"
+        assert result["lag_removals"][0]["_lag_removal"] == "lag1"
+        # Not treated as an active LAG member
+        assert len(result["lag_members"]) == 0
+        # Still categorized as physical for its own admin-state/MTU/description
+        assert len(result["physical"]) == 1
+
+    def test_lag_member_removed_in_netbox_gets_standalone_l2_config(self):
+        """A departing LAG member with its own access-VLAN config in NetBox
+        must still be categorized into 'l2' - unlike an active LAG member,
+        which is excluded from l2/l3 because the LAG carries that config."""
+        interfaces = [
+            {
+                "name": "1/1/10",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+                "mode": {"value": "access"},
+                "untagged_vlan": {"vid": 20},
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/10": {"admin": "up"},
+                    "lag1": {
+                        "type": "lag",
+                        "interfaces": {"1/1/10": {}},
+                    },
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["lag_removals"]) == 1
+        assert len(result["l2"]) == 1
+
+    def test_interface_never_in_lag_no_removal_flagged(self):
+        """An interface with no NetBox 'lag' assignment and no device-side
+        LAG membership must not be spuriously flagged for removal."""
+        interfaces = [
+            {
+                "name": "1/1/11",
+                "type": {"value": "1000base-t"},
+                "enabled": True,
+            },
+        ]
+        device_facts = {
+            "network_resources": {
+                "interfaces": {
+                    "1/1/11": {"admin": "up"},
+                }
+            }
+        }
+        result = get_interfaces_needing_config_changes(
+            interfaces, device_facts)
+        assert len(result["lag_removals"]) == 0
+        assert len(result["no_changes"]) == 1
 
     def test_access_vlan_mismatch(self):
         """Test detection of access VLAN mismatch"""

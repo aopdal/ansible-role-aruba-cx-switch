@@ -314,7 +314,11 @@
     - interfaces
     - mclag_interfaces
 
-# Assign physical interfaces to LAG (after LAG/MCLAG creation)
+# Assign physical interfaces to LAG (after LAG/MCLAG creation), and remove
+# physical interfaces from a LAG they're no longer assigned to in NetBox.
+# The removal side needs its own length check: an interface being fully
+# removed from a LAG has lag=None in NetBox by definition, so it never
+# satisfies the "lag is defined" check used for the assignment side.
 - name: Assign physical interfaces to LAG
   ansible.builtin.include_tasks:
     file: assign_interfaces_to_lag.yml
@@ -327,8 +331,9 @@
   when:
     - aoscx_configure_lag_interfaces | bool or aoscx_configure_mclag_interfaces
       | bool
-    - interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none)
-      | list | length > 0
+    - (interfaces | selectattr('lag', 'defined') | selectattr('lag', '!=', none)
+      | list | length > 0) or
+      (interface_changes.lag_removals | default([]) | length > 0)
   tags:
     - interfaces
     - lag_interfaces

@@ -21,6 +21,7 @@
 #   - l2: L2 interfaces needing VLAN changes
 #   - l3: L3 interfaces needing IP address changes
 #   - lag_members: Physical interfaces needing LAG assignment changes
+#   - lag_removals: Physical interfaces needing removal from a LAG
 #   - no_changes: Interfaces that don't need any changes
 
 - name: Debug - Show sample device interface facts
@@ -173,6 +174,8 @@
       - "L3 interfaces needing changes: {{ interface_changes.l3 | default([]) |
         length }}"
       - "LAG member changes: {{ interface_changes.lag_members | default([]) |
+        length }}"
+      - "LAG member removals: {{ interface_changes.lag_removals | default([]) |
         length }}"
       - "Interfaces not needing changes: {{ interface_changes.no_changes |
         default([]) | length }}"
