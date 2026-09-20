@@ -1,5 +1,6 @@
 ---
-# Assign physical interfaces to LAG interfaces
+# Assign physical interfaces to LAG interfaces, and remove physical
+# interfaces from a LAG they're no longer assigned to in NetBox.
 # This must run AFTER LAG and MCLAG interfaces have been created
 
 # Verify that interface analysis has been performed
@@ -8,10 +9,32 @@
     that:
       - interface_changes is defined
       - interface_changes.lag_members is defined
+      - interface_changes.lag_removals is defined
     fail_msg: "ERROR: identify_interface_changes.yml must run before assign_interfaces_to_lag.yml"
     success_msg: "Interface analysis completed - proceeding with LAG member assignment"
   tags:
     - always
+
+# Remove physical interfaces from LAG (NetBox no longer assigns them to any
+# LAG, but the device still has them as a member - see _lag_removal, set by
+# get_interfaces_needing_config_changes() in
+# netbox_filters_lib/interface_change_detection.py). Runs before the "add"
+# task below so an interface moving directly from one LAG to another in the
+# same run leaves the old LAG first - though that specific move is normally
+# handled by the "LAG membership mismatch" branch pushing "lag <new>"
+# directly, which AOS-CX applies as an implicit reassignment.
+- name: assign_interfaces_to_lag | Remove physical interfaces from LAG (no longer assigned in NetBox)
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - interface {{ item.name }}
+    lines:
+      - "no {{ item._lag_removal | replace('lag', 'lag ') }}"
+    match: line
+  loop: "{{ interface_changes.lag_removals | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.name }} -/-> LAG: {{ item._lag_removal }}"
+  vars:
+    ansible_connection: network_cli
 
 - name: assign_interfaces_to_lag | Debug physical interfaces to assign to LAGs (only those needing changes)
   ansible.builtin.debug:
@@ -22,6 +45,8 @@
         | selectattr('lag', '!=', none) | list | length }}
       - "Physical interfaces needing LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
       - "Assignments: {{ interface_changes.lag_members | default([]) | map(attribute='name') | list | join(', ') }}"
+      - "Physical interfaces needing LAG removal: {{ interface_changes.lag_removals | default([]) | length }}"
+      - "Removals: {{ interface_changes.lag_removals | default([]) | map(attribute='name') | list | join(', ') }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 # Assign physical interfaces to LAG (only those needing changes)
@@ -47,4 +72,5 @@
         {{ interfaces | selectattr('lag', 'defined')
         | selectattr('lag', '!=', none) | list | length }}
       - "Physical interfaces that received LAG assignment changes: {{ interface_changes.lag_members | default([]) | length }}"
+      - "Physical interfaces removed from LAG: {{ interface_changes.lag_removals | default([]) | length }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1

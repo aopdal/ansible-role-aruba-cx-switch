@@ -688,6 +688,7 @@ orchestration described below and calls into those helpers per interface.
       - `l2`: L2 interfaces needing VLAN changes
       - `l3`: L3 interfaces needing IP address or DHCP relay changes (also includes VLAN SVI / loopback / sub-interface entries that only need a description or MTU update, and VLAN SVI / sub-interface entries that only need an enabled (shutdown/no shutdown) state change — loopbacks don't support the latter)
       - `lag_members`: Physical interfaces needing LAG assignment changes
+      - `lag_removals`: Physical interfaces that are a LAG member on the device but no longer have a `lag` assignment in NetBox — pushed as `no lag <n>` by `assign_interfaces_to_lag.yml`, distinct from `lag_members` (which only ever pushes `lag <n>`). Each entry has `_lag_removal` set to the device-side LAG name to remove. Not treated as a LAG member for `l2`/`l3` categorization — once removed, the interface needs its own standalone config, unlike an active member (which is excluded from `l2`/`l3` on the assumption the LAG carries that config instead).
       - `no_changes`: Interfaces that don't need any changes
     - Adds `_ip_changes` dict to L3 interfaces containing:
       - `ipv4_to_add`: List of specific IPv4 addresses needing configuration

@@ -2,12 +2,14 @@
 
 ## Overview
 
-This document covers all aspects of BGP configuration for EVPN/VXLAN fabrics using this role,
-including:
+This document covers all aspects of BGP configuration using this role, for both EVPN/VXLAN
+fabrics and plain eBGP/iBGP (no EVPN) in the default VRF, including:
 
 - BGP router process with Router ID
-- EVPN neighbors for overlay
+- EVPN neighbors for overlay (devices with `device_vxlan: true`)
 - Optional IPv4 unicast neighbors for underlay
+- Address-family-based eBGP/iBGP peering in the default VRF (devices without VXLAN) — see
+  [VRF BGP Sessions and Routing Policies](#vrf-bgp-sessions-and-routing-policies)
 - VRF instances with route distinguishers
 - Route reflector configuration
 - NetBox BGP plugin integration for structured data models
@@ -411,8 +413,21 @@ automatically placed in VRF context on the device. The role uses the
 | `_vrf` | `"lab-blue"` | Interface VRF name (or `"default"`) |
 | `_af` | `"ipv4"` / `"ipv6"` | Address family derived from local IP syntax |
 
-Sessions in `_vrf == "default"` are configured as EVPN/underlay neighbors.
-Sessions in any other VRF are configured under the matching `vrf` context inside `router bgp`.
+`tasks/configure_bgp.yml` then splits the enriched sessions into two groups, gated by the
+device's `device_vxlan` custom field:
+
+| Group | Sessions included | Configured as |
+|-------|--------------------|---------------|
+| `bgp_evpn_sessions` | `_vrf == "default"`, **only when `device_vxlan` is true** | EVPN/L2VPN overlay neighbors (`address-family l2vpn evpn`) |
+| `bgp_vrf_sessions` | Every non-default-VRF session, **plus** `_vrf == "default"` sessions when `device_vxlan` is **not** true | Address-family (`ipv4`/`ipv6` unicast) neighbors with full eBGP/iBGP handling — see below |
+
+In other words: a device running EVPN/VXLAN peers its default-VRF sessions as the EVPN
+overlay, same as before. A device **not** running VXLAN (`device_vxlan` false or unset) gets
+its default-VRF sessions configured exactly like a VRF session — `next-hop-self` for iBGP,
+import/export route-maps for eBGP, address family chosen from the IP address — just without
+the `vrf <name>` / `exit-vrf` wrapper, since the default VRF is the `router bgp` context
+itself and AOS-CX has no `vrf default` sub-mode to enter. This is the supported way to run
+plain eBGP/iBGP in the default VRF without EVPN.
 
 ### iBGP vs eBGP Detection
 
