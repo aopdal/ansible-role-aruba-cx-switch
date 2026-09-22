@@ -65,7 +65,7 @@
         keepalive_src_ip: "{{ vsx_keepalive_src | default('mgmt') }}"
         keepalive_peer_ip: "{{ vsx_keepalive_peer | default('not set') }}"
         device_role: "{{ vsx_role | default('not set') }}"
-        split_recovery_disable: true
+        split_recovery_disable: false
         isl_port: "{{ vsx_isl_lag | default('lag256') }}"
         config_sync_disable: false
         config_sync_features:
