@@ -5,7 +5,8 @@ on:
   push:
     branches:
       - main
-      - develop
+  # Disable the develop branch for push events
+  #      - develop
   pull_request:
     branches:
       - main

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.11] - 2026-09-22
+
+### Fixed
+
+- VSX for EVPN VXLAN, recomended setting for split recovery is enabled
+
 ## [0.14.10] - 2026-09-20
 
 ### Added
