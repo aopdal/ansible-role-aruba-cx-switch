@@ -384,18 +384,57 @@ NetBox (`device_roles` list):
 
 | Role value | Behaviour |
 |------------|-----------|
-| `spine` | All BGP neighbors → RR clients |
-| `route-reflector` | All BGP neighbors → RR clients |
-| `rr` | All BGP neighbors → RR clients |
+| `spine` | All iBGP neighbors → RR clients |
+| `route-reflector` | All iBGP neighbors → RR clients |
+| `rr` | All iBGP neighbors → RR clients |
 
-No manual `bgp_rr_clients` entries required. Example result on spine-1:
+No manual `bgp_rr_clients` entries required. Only **iBGP** sessions
+(`local_as.asn == remote_as.asn`) are made RR clients — `route-reflector-client` has no
+meaning for eBGP.
+
+Route reflection is applied per address family, generically, not only when the device is part
+of an EVPN/VXLAN fabric:
+
+| Session group | Where RR client is applied |
+|----------------|-----------------------------|
+| `bgp_evpn_sessions` (default VRF, `device_vxlan: true`) | `address-family l2vpn evpn` (global, not per-VRF on AOS-CX) |
+| `bgp_vrf_sessions` (every non-default-VRF session, plus default-VRF sessions when `device_vxlan` is **not** true) | `address-family ipv4 unicast` / `address-family ipv6 unicast`, inside the matching `vrf <name>` context when `_vrf != "default"` |
+
+This means a spine running plain iBGP in the default VRF — no EVPN, no VXLAN — gets its
+iBGP neighbors configured as RR clients under `address-family ipv4/ipv6 unicast` just like a
+VXLAN fabric spine gets them under `address-family l2vpn evpn`. See
+[VRF BGP Sessions and Routing Policies](#vrf-bgp-sessions-and-routing-policies) for how
+sessions are split into these two groups.
+
+Example result on spine-1 running EVPN/VXLAN:
 
 ```
 router bgp 65000
-  neighbor 10.255.255.11 route-reflector-client
-  neighbor 10.255.255.12 route-reflector-client
-  neighbor 10.255.255.13 route-reflector-client
-  neighbor 10.255.255.14 route-reflector-client
+  address-family l2vpn evpn
+    neighbor 10.255.255.11 route-reflector-client
+    neighbor 10.255.255.12 route-reflector-client
+    neighbor 10.255.255.13 route-reflector-client
+    neighbor 10.255.255.14 route-reflector-client
+```
+
+Example result on spine-1 running plain iBGP in the default VRF (no EVPN/VXLAN):
+
+```
+router bgp 65000
+  address-family ipv4 unicast
+    neighbor 10.255.255.11 route-reflector-client
+    neighbor 10.255.255.12 route-reflector-client
+```
+
+Example result on a leaf acting as RR for a non-default VRF iBGP session:
+
+```
+router bgp 65000
+  vrf lab-blue
+    address-family ipv4 unicast
+      neighbor 10.10.10.2 route-reflector-client
+    exit-address-family
+  exit-vrf
 ```
 
 ---
@@ -433,8 +472,16 @@ plain eBGP/iBGP in the default VRF without EVPN.
 
 | Condition | Type | Extra Config |
 |-----------|------|--------------|
-| `local_as.asn == remote_as.asn` | iBGP | `next-hop-self` added |
+| `local_as.asn == remote_as.asn` | iBGP | `next-hop-self` and `update-source <local_address>` added |
 | `local_as.asn != remote_as.asn` | eBGP | Import/export route-maps applied |
+
+iBGP VRF sessions also get `neighbor <remote_address> update-source <local_address>`, where
+`<local_address>` is the session's own `local_address` IP (typically a loopback used for
+peering) — this ensures the session sources from the intended peering address rather than
+whatever interface the device's route to the neighbor happens to egress through, matching the
+`update-source` already applied to EVPN/underlay neighbors
+(`address-family l2vpn evpn` / `ipv4 unicast` sessions above). eBGP VRF sessions are directly
+connected by convention and do not get `update-source`.
 
 ### Routing Policy Rule Fields (API)
 
