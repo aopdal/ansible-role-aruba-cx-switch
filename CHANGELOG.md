@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.12] - 2026-09-25
+
+### Fixed
+
+- BGP router id taken from custom field - device_bgp_routerid
+- BGP: iBGP VRF sessions (`bgp_vrf_sessions` — every non-default-VRF session,
+  plus default-VRF sessions when `device_vxlan` is not true) now get
+  `neighbor <remote_address> update-source <local_address>`, sourcing the
+  session from the session's own peering address (typically loopback0)
+  instead of whatever interface the device's route to the neighbor happens
+  to egress through. Previously only EVPN/underlay neighbors got
+  `update-source`; plain iBGP VRF/default-VRF sessions did not. eBGP VRF
+  sessions are unaffected (directly connected by convention). See
+  [docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md#ibgp-vs-ebgp-detection).
+- BGP: route reflector configuration for a `spine`/`route-reflector`/`rr`
+  device role is now generic across address families and VRFs, instead of
+  only covering IPv4 sessions in the default VRF. Previously the
+  address-family route-reflector-client task looped over the raw,
+  unenriched session list — it never entered `vrf <name>` context for
+  non-default-VRF sessions (pushing `route-reflector-client` into the wrong
+  context) and never handled IPv6 or non-default VRFs at all. It now loops
+  over the same `bgp_vrf_sessions` group used for VRF/address-family
+  neighbor configuration (every non-default-VRF session, plus default-VRF
+  sessions when `device_vxlan` is not true), applies
+  `route-reflector-client` under the correct `address-family
+  ipv4/ipv6 unicast` and `vrf <name>` context, and is restricted to iBGP
+  sessions only (`route-reflector-client` has no meaning for eBGP). This
+  makes route reflection work for plain iBGP in the default VRF without
+  EVPN/VXLAN, not just spines that are part of an EVPN/VXLAN fabric. See
+  [docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md#route-reflector-configuration).
+
 ## [0.14.11] - 2026-09-22
 
 ### Fixed
