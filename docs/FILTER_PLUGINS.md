@@ -950,6 +950,23 @@ recreates the route's next-hop).
     - Returns: `{"routes_to_apply": [...], "routes_to_delete": [...]}`
       — see [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)
 
+### `snmp_filters.py` - SNMP Settings
+
+- **`resolve_snmp_vrf(snmp_vrf, interfaces, primary_ip4)`** - `auto` →
+  `mgmt` when `primary_ip4` is on a `mgmt_only` interface, else `default`;
+  any other value is returned unchanged
+- **`build_snmp_system_location(snmp_system_location, sites, locations)`**
+  - explicit value, else `<site>/<location>` from NetBox
+- **`validate_snmpv3_users(snmpv3_users, snmpv3_user_keys)`** - returns
+  `{"valid", "warnings", "errors"}`; messages never contain secrets
+- **`build_snmpv3_user_line(user, snmpv3_user_keys)`** - `snmpv3 user`
+  CLI line rendered as AOS-CX shows it in the running-config
+- **`get_snmp_changes(snmp_facts, snmp_vrf, snmp_system_location, snmp_system_contact, snmpv3_users, snmpv3_user_keys)`**
+  - compares desired state with `aoscx_snmp_facts`; returns
+  `{"lines_to_push", "users_to_push", "lines_to_remove"}`. Plaintext
+  passphrases are never compared; `None` facts push everything and remove
+  nothing — see [SNMP_CONFIGURATION.md](SNMP_CONFIGURATION.md)
+
 ## Usage in Playbooks
 
 All filters are available through the standard Ansible filter syntax:
@@ -1266,6 +1283,7 @@ All filters are available through the standard Ansible filter syntax:
     - Port-access (device-profile) operations → `port_access.py` / `port_access_orphans.py`
     - VSX operations → `vsx.py`
     - Static route operations → `static_route_filters.py`
+    - SNMP operations → `snmp_filters.py`
     - Virtual interface (SVI/loopback/sub-interface) cleanup → `interface_orphans.py`
 
 2. **Write your function** with proper docstring:
@@ -1376,6 +1394,7 @@ netbox_filters.py (main entry point, 62 filters)
     ├── ospf_filters.py → utils
     ├── port_access.py (no dependencies)
     ├── port_access_orphans.py (no dependencies)
+    ├── snmp_filters.py → utils
     ├── static_route_filters.py (no dependencies)
     ├── stp.py (no dependencies)
     └── vsx.py (no dependencies)
@@ -1392,9 +1411,9 @@ rest_api_transforms.py (separate entry point, 5 filters — no dependency on net
 
 ## Statistics
 
-- **Total Filters**: 67 (62 in `netbox_filters.py` + 5 in `rest_api_transforms.py`)
+- **Total Filters**: 72 (67 in `netbox_filters.py` + 5 in `rest_api_transforms.py`)
 - **Total Lines**: ~6,500 in `netbox_filters_lib/` (including docstrings and comments), plus ~460 across the two plugin entry-point files
-- **Modules**: 17 in `netbox_filters_lib/`, across 2 plugin files
+- **Modules**: 18 in `netbox_filters_lib/`, across 2 plugin files
 - **Test Coverage**: Unit-tested per module under `tests/unit/`; used in production for 100+ switches
 - **Code Quality**: Pylint-checked via pre-commit
 
@@ -1414,6 +1433,7 @@ rest_api_transforms.py (separate entry point, 5 filters — no dependency on net
 | `ospf_filters.py` | 8 | 438 | OSPF configuration and change detection |
 | `utils.py` | 4 | 246 | Helper functions (incl. IP version detection, data-shape normalisation) |
 | `static_route_filters.py` | 1 | 136 | Static route change detection |
+| `snmp_filters.py` | 5 | 320 | SNMP VRF/location resolution, SNMPv3 validation, CLI lines, change detection |
 | `stp.py` | 2 | 134 | Global + per-interface STP change detection |
 | `interface_ip_processing.py` | 1 | 103 | IP address matching |
 | `vsx.py` | 1 | 80 | VSX config change detection |

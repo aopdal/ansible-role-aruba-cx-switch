@@ -92,6 +92,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **DHCP relay IPv4** - Configuration pr VRF
 - ✅ **Static routing** - Forward, blackhole, and reject routes per VRF
 - ✅ **BFD** - For BGP
+- ✅ **SNMP** - Agent VRF, system location (from NetBox site/location), SNMPv3 users
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
 - ❌ **DHCP Snooping** - on Roadmap
@@ -99,7 +100,6 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ❌ **Loop protection** - on roadmap
 - ❌ **ACL** - on roadmap
 - ❌ **Logging** - on roadmap
-- ❌ **SNMP** - on roadmap
 - ❌ **L3 VNI** - on roadmap
 - ❌ **Multicast routing** - not on roadmap
 - ❌ **QoS** - not on roadmap
@@ -259,6 +259,7 @@ index. Highlights:
 - **[docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)** - BGP/EVPN configuration guide
 - **[docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md)** - OSPF configuration reference
 - **[docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)** - Static routes configuration
+- **[docs/SNMP_CONFIGURATION.md](docs/SNMP_CONFIGURATION.md)** - SNMP configuration
 - **[docs/STP_CONFIGURATION.md](docs/STP_CONFIGURATION.md)** - Spanning tree configuration
 - **[docs/PORT_ACCESS_CONFIGURATION.md](docs/PORT_ACCESS_CONFIGURATION.md)** - Port-access configuration
 - **[docs/VSX_CONFIGURATION.md](docs/VSX_CONFIGURATION.md)** - VSX configuration
@@ -333,6 +334,14 @@ aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true  # includes loopback interfaces
 aoscx_configure_ospf: true
 aoscx_configure_static_routes: true
+aoscx_configure_snmp: true  # skipped unless snmp_* vars set; idempotent mode removes SNMP when none are set
+
+# SNMP (see docs/SNMP_CONFIGURATION.md) - typically set in group_vars
+snmp_vrf: auto              # auto = mgmt if managed via mgmt port, else default
+snmp_system_location: ""    # empty = '<site>/<location>' from NetBox
+snmp_system_contact: ""
+snmpv3_users: []            # [{name, auth_protocol, priv_protocol, access_level}]
+snmpv3_user_keys: {}        # vaulted secrets per user name
 
 # Idempotent mode - removes configs not in NetBox
 aoscx_idempotent_mode: false

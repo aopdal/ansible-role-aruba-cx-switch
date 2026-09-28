@@ -302,6 +302,25 @@ class TestGetVlansNeedingChanges:
         result = get_vlans_needing_changes(vlans, vlans_in_use, ansible_facts)
         assert 1 not in result["vlans_to_delete"]
 
+    def test_vlans_needing_changes_skip_internal_vlans(self):
+        """Test that switch-owned internal VLANs are never marked for deletion"""
+        vlans = get_sample_vlans()
+        vlans_in_use = {"vids": [10]}
+        ansible_facts = {
+            "network_resources": {
+                "vlans": {
+                    "10": {"id": 10, "type": "static"},
+                    "99": {"id": 99, "type": "static"},
+                    # Internal VLAN inside `system internal-vlan-range` (6200)
+                    "4094": {"id": 4094, "type": "internal"},
+                    # Internal VLAN above 4094 (8360)
+                    "7167": {"id": 7167, "type": "internal"},
+                }
+            }
+        }
+        result = get_vlans_needing_changes(vlans, vlans_in_use, ansible_facts)
+        assert result["vlans_to_delete"] == [99]
+
 
 class TestGetVlanInterfaces:
     """Tests for get_vlan_interfaces function"""

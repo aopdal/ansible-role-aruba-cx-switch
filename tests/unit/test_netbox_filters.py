@@ -79,6 +79,11 @@ EXPECTED_FILTER_NAMES = {
     "stp_interface_changes",
     "vsx_config_diff",
     "get_static_route_changes",
+    "resolve_snmp_vrf",
+    "build_snmp_system_location",
+    "validate_snmpv3_users",
+    "build_snmpv3_user_line",
+    "get_snmp_changes",
 }
 
 
@@ -128,6 +133,7 @@ class TestFilterModule:
             "stp_global_config_diff",  # stp
             "vsx_config_diff",  # vsx
             "get_static_route_changes",  # static_route_filters
+            "resolve_snmp_vrf",  # snmp_filters
         ],
     )
     def test_filter_resolves_to_a_real_function(self, name):

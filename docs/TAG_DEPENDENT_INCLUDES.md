@@ -152,7 +152,7 @@ narrowing.
 Must run alongside VLAN changes; the overlay depends on the underlay
 VLANs staying in sync. Not high-risk enough to require narrowing.
 
-### L2 / L3 interfaces, VLANs, LAGs, base config, NTP / DNS
+### L2 / L3 interfaces, VLANs, LAGs, base config, NTP / DNS / SNMP
 
 Regular day-to-day operations. Carry their normal feature + layer tags.
 
@@ -193,7 +193,7 @@ ansible-playbook configure_aoscx.yml -t interfaces
 # Modify base config (hostname, banner, timezone).
 ansible-playbook configure_aoscx.yml -t base_config
 
-# Configure NTP / DNS (may depend on VRFs).
+# Configure NTP / DNS / SNMP (may depend on VRFs). Use -t snmp for SNMP only.
 ansible-playbook configure_aoscx.yml -t services
 
 # Push L3 interface config only, without touching routing protocols.

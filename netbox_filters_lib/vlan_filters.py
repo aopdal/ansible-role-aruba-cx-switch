@@ -437,7 +437,17 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
             vlans_dict = network_resources.get("vlans", {})
             if vlans_dict and isinstance(vlans_dict, dict):
                 # AOS-CX stores VLANs as dict keyed by VID
-                for vid_str in vlans_dict.keys():
+                for vid_str, vlan_data in vlans_dict.items():
+                    # Skip switch-owned internal VLANs (type "internal").
+                    # They are created by the platform itself (e.g. 7167 on
+                    # 8360, or inside `system internal-vlan-range` on 6200)
+                    # and must never be created or deleted by the role.
+                    if (
+                        isinstance(vlan_data, dict)
+                        and vlan_data.get("type") == "internal"
+                    ):
+                        _debug(f"Skipping internal VLAN {vid_str} from device facts")
+                        continue
                     try:
                         vid = int(vid_str)
                         # Validate VLAN ID is in valid range (1-4094)

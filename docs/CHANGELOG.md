@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-28
+
+### Added
+
+- SNMP: new `snmp` feature (tags `snmp` + `services`, runs after VRFs)
+  configuring `snmp-server vrf`, `system-location`, `system-contact` and
+  SNMPv3 users from group_vars (`snmp_vrf`, `snmp_system_location`,
+  `snmp_system_contact`, `snmpv3_users`, `snmpv3_user_keys`). The agent VRF
+  is auto-detected (`mgmt` when the device is managed via the dedicated mgmt
+  port, `default` for in-band management), and the system location defaults
+  to `<site>/<location>` from NetBox. SNMPv3 secrets follow the OSPF MD5 key
+  pattern: vaulted, with `encrypted: true` ciphertext being idempotent. Skipped
+  unless SNMP variables are set. With REST fact gathering, SNMP state is read
+  from the REST API (`aoscx_snmp_facts`) and only differences are pushed;
+  with `aoscx_idempotent_mode: true` SNMPv3 users, agent VRFs, location and
+  contact not in the variables are removed. See docs/SNMP_CONFIGURATION.md.
+  **Note for idempotent-mode users:** with no SNMP variables set, idempotent
+  mode now removes all SNMP config from the device. Set
+  `aoscx_configure_snmp: false` if SNMP is managed outside this role.
+
+### Fixed
+
+- REST API fact gathering (`aoscx_gather_facts_rest_api: true`) now works
+  under `--check`. The session login POST was skipped in check mode, so every
+  later REST query failed with `'dict object' has no attribute
+  'cookies_string'`. All REST calls in `gather_facts_rest_api.yml` are
+  read-only and now set `check_mode: false`.
+- VLANs: switch-owned internal VLANs (REST `type: internal`, e.g. VLAN 7167
+  on 8360 or VLANs inside `system internal-vlan-range` on 6200) are now
+  ignored by VLAN change identification, so idempotent cleanup never tries
+  to delete them. Previously only the 1-4094 range check protected them,
+  which did not cover internal VLANs allocated inside that range.
+
 ## [0.14.12] - 2026-09-25
 
 ### Fixed

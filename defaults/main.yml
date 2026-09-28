@@ -18,6 +18,12 @@ aoscx_configure_banner: true
 aoscx_configure_ntp: true
 aoscx_configure_timezone: true
 aoscx_configure_dns: true
+# Configure SNMP (agent VRF, system location/contact, SNMPv3 users).
+# Auto-skipped unless at least one snmp_* / snmpv3_* variable below is set,
+# except in aoscx_idempotent_mode: then it also runs with none set and
+# REMOVES all SNMP config from the device. Set false to leave SNMP untouched.
+# See docs/SNMP_CONFIGURATION.md.
+aoscx_configure_snmp: true
 # Configure anycast gateway prerequisite (no ip icmp redirect)
 aoscx_configure_icmp_redirect: true
 aoscx_generate_template_config: false
@@ -197,3 +203,24 @@ aoscx_builtin_vrfs:
   - mgmt
   - MGMT
   - "" # Empty string is also treated as default VRF
+
+# SNMP settings (see docs/SNMP_CONFIGURATION.md). Typically set in
+# group_vars. Setting snmpv3_users, snmp_system_location,
+# snmp_system_contact, or a non-'auto' snmp_vrf enables SNMP configuration.
+#
+# VRF the SNMP agent listens in. 'auto' = 'mgmt' when the device's
+# primary_ip4 is on a NetBox mgmt_only interface, otherwise 'default'
+# (in-band management over a VLAN SVI). Set a VRF name to override.
+snmp_vrf: auto
+# Empty = derived from NetBox as '<site>/<location>' (or '<site>').
+snmp_system_location: ""
+snmp_system_contact: ""
+# SNMPv3 users (no secrets). Each: name, auth_protocol
+# (md5|sha|sha224|sha256|sha384|sha512), priv_protocol
+# (aes|aes192|aes256|des), access_level (ro|rw, default ro).
+snmpv3_users: []
+# Secrets per user name, kept in a vault:
+#   <user>: {auth_pass: {secret, encrypted}, priv_pass: {secret, encrypted}}
+# encrypted: true = AOS-CX ciphertext (idempotent); false = plaintext
+# (reports changed on every run).
+snmpv3_user_keys: {}
