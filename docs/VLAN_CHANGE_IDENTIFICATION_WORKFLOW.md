@@ -399,6 +399,16 @@ vlan_changes:
   vlans_in_use: [10, 20]     # Protected from deletion
 ```
 
+VLANs that are never considered for deletion, even when not in use:
+
+- VLAN 1 (default VLAN).
+- Switch-owned internal VLANs, reported by the REST API as
+  `type: internal` (e.g. VLAN 7167 on 8360, or VLANs inside
+  `system internal-vlan-range` on 6200). They are still present in
+  `ansible_facts.network_resources.vlans`, so consumers of the facts
+  that compare against NetBox should filter on `type` themselves.
+- Any VLAN ID outside 1-4094.
+
 ### Common Patterns
 
 #### Pattern 1: Configure Feature for VLANs with L2VPN
