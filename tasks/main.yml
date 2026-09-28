@@ -187,6 +187,28 @@
     - dns
     - services
 
+# SNMP runs AFTER VRFs because the agent is bound to a VRF (snmp-server vrf).
+- name: Include SNMP configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_snmp.yml
+    apply:
+      tags:
+        - snmp
+        - services
+  when:
+    - aoscx_configure_snmp | bool
+    # Idempotent mode also runs with no SNMP variables set, to remove SNMP
+    # from the device.
+    - >-
+      (aoscx_idempotent_mode | bool) or
+      (snmpv3_users | length > 0) or
+      (snmp_system_location | length > 0) or
+      (snmp_system_contact | length > 0) or
+      (snmp_vrf not in ['', 'auto'])
+  tags:
+    - snmp
+    - services
+
 # ============================================================================
 # VLAN Analysis (must run BEFORE VLAN/EVPN/VXLAN configuration)
 # ============================================================================

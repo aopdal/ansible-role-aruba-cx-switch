@@ -109,6 +109,13 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
   forward/blackhole/reject route types, change detection and idempotency,
   cleanup behaviour, and known limitations (no ECMP).
 
+### SNMP
+
+- **[SNMP_CONFIGURATION.md](SNMP_CONFIGURATION.md)** - SNMP reference:
+  agent VRF auto-detection (mgmt port vs. in-band), system location from
+  NetBox site/location, SNMPv3 users with vaulted ciphertext secrets, and
+  idempotency behaviour.
+
 ### Spanning Tree (STP)
 
 - **[STP_CONFIGURATION.md](STP_CONFIGURATION.md)** - Global MSTP settings and

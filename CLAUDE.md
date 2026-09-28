@@ -68,8 +68,8 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
 3. Base system (no VRF dependency): banner → timezone → anycast gateway.
 4. **VRFs** — must precede anything that can reference a VRF (L3 interfaces,
    NTP, DNS, OSPF, BGP).
-5. VRF-dependent base services: NTP → DNS (both can be bound to a VRF, so
-   the VRF must exist first).
+5. VRF-dependent base services: NTP → DNS → SNMP (all can be bound to a
+   VRF, so the VRF must exist first).
 6. **VLAN change identification** (`identify_vlan_changes.yml`) — sets
    `vlans`, `vlans_in_use`, `vlan_changes`. Required by all VLAN/EVPN/VXLAN
    tasks.
@@ -113,7 +113,7 @@ Existing dependency chains to preserve:
 
 | Feature           | Depends on                                                  |
 | ----------------- | ----------------------------------------------------------- |
-| NTP, DNS          | VRFs                                                        |
+| NTP, DNS, SNMP    | VRFs                                                        |
 | L3 interfaces     | VRFs, physical/LAG interfaces                               |
 | SVIs / anycast    | VLANs                                                       |
 | LAG member assign | LAG / MCLAG creation, physical interfaces                   |
@@ -146,7 +146,10 @@ rejected by lint / review.
   undeclared variables via `default(...)` only — declare the default in
   `defaults/main.yml` so users can discover and override it.
 - Variable names are prefixed `aoscx_` (role-owned) or read from NetBox as
-  `custom_fields.device_*` / `interfaces` / `vlans` etc.
+  `custom_fields.device_*` / `interfaces` / `vlans` etc. Exception: feature
+  data an operator sets in group_vars is unprefixed and named after its
+  domain (`ospf_auth_keys`, `snmp_*`, `snmpv3_*`); feature toggles stay
+  `aoscx_configure_*`.
 - Booleans are filtered with `| bool` at the use site.
 - Do not rename or remove existing variables without a deprecation entry
   (see `aoscx_connection_type` and `aoscx_no_log` for the current pattern:
@@ -172,8 +175,8 @@ rejected by lint / review.
   only act on the diff — see `tasks/configure_l3_interface_common.yml` and
   the helpers in
   [netbox_filters_lib/l3_config_helpers.py](netbox_filters_lib/l3_config_helpers.py).
-  **Exception**: write-only/hashed secret fields (OSPF MD5 auth today;
-  AAA/SNMP/local-user passwords when implemented) cannot be idempotency-
+  **Exception**: write-only/hashed secret fields (OSPF MD5 auth and SNMPv3
+  users today; AAA/local-user passwords when implemented) cannot be idempotency-
   compared against device state at all — see
   [§4.7](#47-write-only--hashed-secret-fields-idempotency).
 - L3 interfaces use `aoscx_config` (not `aoscx_l3_interface`) so that
@@ -221,7 +224,8 @@ rejected by lint / review.
   username/password), `set_fact` blocks that resolve `ansible_password` /
   `aoscx_rest_password`, and OSPF MD5 key pushes via `aoscx_config`. Any
   future feature carrying a secret (AAA/RADIUS/TACACS+ shared secrets,
-  SNMPv3 auth/priv passphrases, local user passwords, BGP MD5 password,
+  SNMPv3 auth/priv passphrases (`configure_snmp.yml` today), local user
+  passwords, BGP MD5 password,
   etc.) MUST follow the same rule. Do NOT reintroduce the deprecated
   `aoscx_no_log` variable — it is retained in `defaults/main.yml` for
   backward compatibility only and has no runtime effect.
@@ -265,6 +269,7 @@ Update the relevant topic page when you touch its area:
 | STP                                           | [docs/STP_CONFIGURATION.md](docs/STP_CONFIGURATION.md)                                       |
 | Port-access (device-profile)                  | [docs/PORT_ACCESS_CONFIGURATION.md](docs/PORT_ACCESS_CONFIGURATION.md)                       |
 | VSX                                           | [docs/VSX_CONFIGURATION.md](docs/VSX_CONFIGURATION.md)                                       |
+| SNMP                                          | [docs/SNMP_CONFIGURATION.md](docs/SNMP_CONFIGURATION.md)                                     |
 | DNS / NTP / banner / timezone                 | [docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md), [docs/DNS_CONFIGURATION.md](docs/DNS_CONFIGURATION.md) |
 | Filter plugins                                | [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md), [docs/FILTER_PLUGINS_REUSE.md](docs/FILTER_PLUGINS_REUSE.md) |
 | NetBox custom fields / config context         | [docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md)                                     |
@@ -316,9 +321,11 @@ this and is deliberately built around it instead of fighting it — see
   `encrypted: true` using the device's own ciphertext, which *is*
   idempotent.
 
-This is a category, not an OSPF-specific quirk. Every **planned** feature
-that carries a secret — AAA/RADIUS/TACACS+ shared secrets, SNMPv3
-auth/priv passphrases, local user passwords — will hit the same wall when
+This is a category, not an OSPF-specific quirk. SNMPv3 users
+(`snmpv3_user_keys`, see [docs/SNMP_CONFIGURATION.md](docs/SNMP_CONFIGURATION.md#idempotency))
+follow the same pattern. Every **planned** feature that carries a
+secret — AAA/RADIUS/TACACS+ shared secrets, local user passwords — will
+hit the same wall when
 implemented, for the same reason: the device is the only place that can
 say whether a secret is "correct," and it will not hand that answer back
 over facts/REST in a form comparable to cleartext input. When building

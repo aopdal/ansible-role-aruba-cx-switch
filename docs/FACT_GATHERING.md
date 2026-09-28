@@ -67,7 +67,7 @@ A single authenticated REST API session gathers:
 - **VXLAN/VNI** - VNI mappings (when enabled)
 
 Several features — OSPF, VSX, static routes, VRFs/route-targets, STP,
-port-access, DHCP relay — also get their facts through this same
+port-access, DHCP relay, SNMP — also get their facts through this same
 REST API path; see "Selective fact gathering" below for when their
 queries run.
 
@@ -88,6 +88,14 @@ queries run.
 - Direct network access from the Ansible controller to the switch
   management interface
 
+### Check mode
+
+All REST calls (the read-only GETs and the session login/logout POSTs)
+set `check_mode: false`, so fact gathering also runs under `--check` and
+change detection previews real device state. Without it, Ansible skips
+the login POST in check mode and every later query fails for lack of a
+session cookie.
+
 ### Migration from `aoscx_facts`
 
 Enable the variable — the role handles the data transformation:
@@ -104,7 +112,7 @@ aoscx_rest_api_version: "10.15"
 ## Selective fact gathering with `aoscx_test_mode`
 
 Feature-specific REST queries (OSPF, VSX, static routes, VRFs, STP,
-EVPN/VXLAN, port-access, DHCP relay) only run when their data has a
+EVPN/VXLAN, port-access, DHCP relay, SNMP) only run when their data has a
 consumer: the matching `aoscx_configure_*` flag must also be true. In a
 regular run, if a feature is disabled (e.g. `aoscx_configure_vsx: false`),
 the role skips that feature's REST calls entirely, since nothing

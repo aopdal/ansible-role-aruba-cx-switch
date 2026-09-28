@@ -1,0 +1,116 @@
+# code: language=ansible
+---
+# SNMP configuration for Aruba CX switches
+#
+# Global settings come from group_vars (see defaults/main.yml and
+# docs/SNMP_CONFIGURATION.md):
+#   - snmp_vrf: 'auto' (mgmt if primary_ip4 is on a mgmt_only interface,
+#     otherwise default) or an explicit VRF name
+#   - snmp_system_location: empty = '<site>/<location>' from NetBox
+#   - snmp_system_contact
+#   - snmpv3_users + snmpv3_user_keys (secrets, vaulted)
+#
+# With REST facts (aoscx_gather_facts_rest_api: true -> aoscx_snmp_facts),
+# get_snmp_changes pushes only what differs and, in aoscx_idempotent_mode,
+# removes SNMPv3 users, agent VRFs, location and contact not in the
+# variables. Plaintext passphrases are never compared (only user presence,
+# protocols and access level), see CLAUDE.md section 4.7.
+#
+# Without REST facts every line is pushed with aoscx_config match: line
+# (compared against the running-config, which renders user lines exactly
+# as built here); plaintext keys then report changed on every run, and
+# nothing is removed.
+
+# SNMP is desired when any SNMP variable is set. Otherwise this file only
+# runs in aoscx_idempotent_mode, with an empty desired state, so everything
+# SNMP-related found on the device is removed.
+- name: Determine whether SNMP is desired
+  ansible.builtin.set_fact:
+    _snmp_desired: >-
+      {{ (snmpv3_users | length > 0) or
+         (snmp_system_location | length > 0) or
+         (snmp_system_contact | length > 0) or
+         (snmp_vrf not in ['', 'auto']) }}
+
+- name: Resolve SNMP settings
+  ansible.builtin.set_fact:
+    _snmp_vrf: >-
+      {{ (snmp_vrf | resolve_snmp_vrf(interfaces | default([]), primary_ip4 | default('')))
+         if _snmp_desired | bool else '' }}
+    _snmp_system_location: >-
+      {{ (snmp_system_location | build_snmp_system_location(
+            sites | default(site | default([])),
+            locations | default(location | default([]))))
+         if _snmp_desired | bool else '' }}
+    _snmpv3_validation: "{{ snmpv3_users | validate_snmpv3_users(snmpv3_user_keys) }}"
+
+- name: Validate SNMPv3 users
+  ansible.builtin.assert:
+    that: _snmpv3_validation.valid
+    fail_msg: "Invalid SNMPv3 configuration: {{ _snmpv3_validation.errors | join('; ') }}"
+    quiet: true
+
+- name: Warn about weak SNMPv3 protocols
+  ansible.builtin.debug:
+    msg: "SNMPv3 warning: {{ item }}"
+  loop: "{{ _snmpv3_validation.warnings }}"
+  when: _snmpv3_validation.warnings | length > 0
+
+- name: Display SNMP configuration debug info
+  ansible.builtin.debug:
+    msg:
+      - "Configuring SNMP on {{ inventory_hostname }}"
+      - "SNMP desired: {{ _snmp_desired }}"
+      - "SNMP VRF: {{ _snmp_vrf | default('None (remove)', true) }}"
+      - "System location: {{ _snmp_system_location | default('Not configured', true) }}"
+      - "System contact: {{ snmp_system_contact | default('Not configured', true) }}"
+      - "SNMPv3 users: {{ snmpv3_users | map(attribute='name') | join(', ') }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Identify SNMP changes
+  ansible.builtin.set_fact:
+    _snmp_changes: >-
+      {{ aoscx_snmp_facts | default(None) | get_snmp_changes(
+           _snmp_vrf, _snmp_system_location, snmp_system_contact,
+           snmpv3_users, snmpv3_user_keys) }}
+  no_log: true
+
+- name: Display SNMP changes
+  ansible.builtin.debug:
+    msg:
+      - "REST facts used: {{ aoscx_snmp_facts is defined }}"
+      - "Global lines to push: {{ _snmp_changes.lines_to_push }}"
+      - "Users to push: {{ _snmp_changes.users_to_push | map(attribute='name') | list }}"
+      - "Lines to remove (idempotent mode only): {{ _snmp_changes.lines_to_remove }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: Configure SNMP global settings
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ _snmp_changes.lines_to_push }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+  when: _snmp_changes.lines_to_push | length > 0
+
+- name: Configure SNMPv3 users
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "{{ item | build_snmpv3_user_line(snmpv3_user_keys) }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+  loop: "{{ _snmp_changes.users_to_push }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+# Runs after the pushes so a moved agent VRF is added before the old one is
+# removed. lines_to_remove is only non-empty when REST facts are available.
+- name: Remove SNMP settings not in the variables
+  arubanetworks.aoscx.aoscx_config:
+    lines: "{{ _snmp_changes.lines_to_remove }}"
+  vars:
+    ansible_connection: network_cli
+  when:
+    - aoscx_idempotent_mode | bool
+    - _snmp_changes.lines_to_remove | length > 0
