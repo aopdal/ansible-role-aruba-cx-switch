@@ -14,6 +14,7 @@ Without REST facts, lines are pushed with ``aoscx_config`` ``match: line``,
 where plaintext keys report ``changed`` on every run.
 """
 
+from .mgmt_vrf import interface_ips, is_oobm_interface, resolve_mgmt_vrf
 from .utils import _debug
 
 SNMPV3_AUTH_PROTOCOLS = ("md5", "sha", "sha224", "sha256", "sha384", "sha512")
@@ -23,7 +24,6 @@ SNMPV3_WEAK_PROTOCOLS = ("md5", "des")
 
 _AUTO_VRF_VALUES = (None, "", "auto")
 
-
 def _first(value):
     """Return the first element of a list, or the value itself if scalar."""
     if isinstance(value, (list, tuple)):
@@ -32,16 +32,6 @@ def _first(value):
                 return item
         return None
     return value or None
-
-
-def _intf_ips(intf):
-    """Return the bare IP addresses (no prefix length) on a NetBox interface."""
-    ips = []
-    for ip in intf.get("ip_addresses") or []:
-        address = ip.get("address") if isinstance(ip, dict) else ip
-        if address:
-            ips.append(str(address).split("/", 1)[0])
-    return ips
 
 
 def resolve_snmp_vrf(snmp_vrf, interfaces=None, primary_ip4=None):
@@ -54,28 +44,20 @@ def resolve_snmp_vrf(snmp_vrf, interfaces=None, primary_ip4=None):
         primary_ip4 (str): Device primary IPv4 address (no prefix length).
 
     Returns:
-        str: ``mgmt`` when management runs over the dedicated mgmt port
-        (the interface carrying ``primary_ip4`` is ``mgmt_only``),
-        otherwise ``default`` (in-band management over a VLAN SVI).
-        When ``primary_ip4`` is unknown, ``mgmt`` is chosen if any
-        ``mgmt_only`` interface has an IP address.
+        str: The management VRF (see ``resolve_mgmt_vrf``). When
+        ``primary_ip4`` is unknown, ``mgmt`` if the ``mgmt`` interface has
+        an IP, otherwise ``default``.
     """
     if snmp_vrf not in _AUTO_VRF_VALUES:
         return snmp_vrf
 
-    interfaces = interfaces or []
-    primary = str(primary_ip4).split("/", 1)[0] if primary_ip4 else ""
+    vrf = resolve_mgmt_vrf(interfaces, primary_ip4)
+    if vrf:
+        return vrf
 
-    if primary:
-        for intf in interfaces:
-            if primary in _intf_ips(intf):
-                vrf = "mgmt" if intf.get("mgmt_only") else "default"
-                _debug(f"SNMP VRF: primary_ip4 {primary} on {intf.get('name')} -> {vrf}")
-                return vrf
-
-    for intf in interfaces:
-        if intf.get("mgmt_only") and _intf_ips(intf):
-            _debug(f"SNMP VRF: mgmt_only interface {intf.get('name')} has IP -> mgmt")
+    for intf in interfaces or []:
+        if is_oobm_interface(intf) and interface_ips(intf):
+            _debug("SNMP VRF: mgmt interface has IP -> mgmt")
             return "mgmt"
 
     return "default"

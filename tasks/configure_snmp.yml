@@ -4,7 +4,7 @@
 #
 # Global settings come from group_vars (see defaults/main.yml and
 # docs/SNMP_CONFIGURATION.md):
-#   - snmp_vrf: 'auto' (mgmt if primary_ip4 is on a mgmt_only interface,
+#   - snmp_vrf: 'auto' (mgmt if primary_ip4 is on the OOBM 'mgmt' interface,
 #     otherwise default) or an explicit VRF name
 #   - snmp_system_location: empty = '<site>/<location>' from NetBox
 #   - snmp_system_contact

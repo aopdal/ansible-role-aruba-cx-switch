@@ -47,10 +47,11 @@ aoscx_configure_vsx: false
 # limitation. See docs/STATIC_ROUTES_CONFIGURATION.md.
 aoscx_configure_static_routes: true
 
-# Configure ssh server vrf default and https-server vrf default on access-switch
-# devices. These services are always enabled on the mgmt VRF; this adds the
-# default VRF so that in-band management and REST API calls work for devices
-# whose device_roles contains 'access-switch'.
+# Configure ssh server vrf <vrf> and https-server vrf <vrf> in addition to
+# the mgmt VRF: 'default' on devices whose first device_role is
+# 'access-switch', plus the in-band management VRF (VRF of the interface
+# carrying primary_ip4, when that is not the OOBM 'mgmt' port). See
+# docs/BASE_CONFIGURATION.md.
 aoscx_configure_access_switch_server_vrfs: true
 
 # Configure ip route 0.0.0.0/0 (default gateway) on access-switch devices.
@@ -208,9 +209,10 @@ aoscx_builtin_vrfs:
 # group_vars. Setting snmpv3_users, snmp_system_location,
 # snmp_system_contact, or a non-'auto' snmp_vrf enables SNMP configuration.
 #
-# VRF the SNMP agent listens in. 'auto' = 'mgmt' when the device's
-# primary_ip4 is on a NetBox mgmt_only interface, otherwise 'default'
-# (in-band management over a VLAN SVI). Set a VRF name to override.
+# VRF the SNMP agent listens in. 'auto' = the management VRF: 'mgmt' when
+# the device's primary_ip4 is on the OOBM port (interface named 'mgmt'),
+# otherwise that interface's NetBox VRF or 'default' (in-band, e.g. a VLAN
+# SVI - also when flagged mgmt_only in NetBox). Set a VRF name to override.
 snmp_vrf: auto
 # Empty = derived from NetBox as '<site>/<location>' (or '<site>').
 snmp_system_location: ""

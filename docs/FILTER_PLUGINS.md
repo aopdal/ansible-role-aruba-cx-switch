@@ -950,11 +950,21 @@ recreates the route's next-hop).
     - Returns: `{"routes_to_apply": [...], "routes_to_delete": [...]}`
       — see [STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)
 
+### `mgmt_vrf.py` - Management VRF
+
+- **`resolve_mgmt_vrf(interfaces, primary_ip4)`** - VRF of the interface
+  carrying `primary_ip4`: `mgmt` for the OOBM `mgmt` port, else the
+  interface's NetBox VRF or `default`; `None` when not found. `mgmt_only`
+  is deliberately ignored (also set on in-band SVIs)
+- **`get_server_vrfs(interfaces, primary_ip4, device_roles)`** - extra
+  ssh/https-server VRFs besides `mgmt`: `default` for `access-switch`, plus
+  the in-band management VRF — see [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md)
+
 ### `snmp_filters.py` - SNMP Settings
 
 - **`resolve_snmp_vrf(snmp_vrf, interfaces, primary_ip4)`** - `auto` →
-  `mgmt` when `primary_ip4` is on a `mgmt_only` interface, else `default`;
-  any other value is returned unchanged
+  `resolve_mgmt_vrf` (fallback `mgmt` if the `mgmt` port has an IP, else
+  `default`); any other value is returned unchanged
 - **`build_snmp_system_location(snmp_system_location, sites, locations)`**
   - explicit value, else `<site>/<location>` from NetBox
 - **`validate_snmpv3_users(snmpv3_users, snmpv3_user_keys)`** - returns
@@ -1284,6 +1294,7 @@ All filters are available through the standard Ansible filter syntax:
     - VSX operations → `vsx.py`
     - Static route operations → `static_route_filters.py`
     - SNMP operations → `snmp_filters.py`
+    - Management VRF / ssh-https server VRFs → `mgmt_vrf.py`
     - Virtual interface (SVI/loopback/sub-interface) cleanup → `interface_orphans.py`
 
 2. **Write your function** with proper docstring:
@@ -1394,7 +1405,8 @@ netbox_filters.py (main entry point, 62 filters)
     ├── ospf_filters.py → utils
     ├── port_access.py (no dependencies)
     ├── port_access_orphans.py (no dependencies)
-    ├── snmp_filters.py → utils
+    ├── mgmt_vrf.py → utils
+    ├── snmp_filters.py → mgmt_vrf, utils
     ├── static_route_filters.py (no dependencies)
     ├── stp.py (no dependencies)
     └── vsx.py (no dependencies)
@@ -1411,9 +1423,9 @@ rest_api_transforms.py (separate entry point, 5 filters — no dependency on net
 
 ## Statistics
 
-- **Total Filters**: 72 (67 in `netbox_filters.py` + 5 in `rest_api_transforms.py`)
+- **Total Filters**: 74 (69 in `netbox_filters.py` + 5 in `rest_api_transforms.py`)
 - **Total Lines**: ~6,500 in `netbox_filters_lib/` (including docstrings and comments), plus ~460 across the two plugin entry-point files
-- **Modules**: 18 in `netbox_filters_lib/`, across 2 plugin files
+- **Modules**: 19 in `netbox_filters_lib/`, across 2 plugin files
 - **Test Coverage**: Unit-tested per module under `tests/unit/`; used in production for 100+ switches
 - **Code Quality**: Pylint-checked via pre-commit
 
@@ -1433,6 +1445,7 @@ rest_api_transforms.py (separate entry point, 5 filters — no dependency on net
 | `ospf_filters.py` | 8 | 438 | OSPF configuration and change detection |
 | `utils.py` | 4 | 246 | Helper functions (incl. IP version detection, data-shape normalisation) |
 | `static_route_filters.py` | 1 | 136 | Static route change detection |
+| `mgmt_vrf.py` | 2 | 100 | Management VRF (OOBM vs. in-band), ssh/https-server VRFs |
 | `snmp_filters.py` | 5 | 320 | SNMP VRF/location resolution, SNMPv3 validation, CLI lines, change detection |
 | `stp.py` | 2 | 134 | Global + per-interface STP change detection |
 | `interface_ip_processing.py` | 1 | 103 | IP address matching |

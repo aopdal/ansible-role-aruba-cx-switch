@@ -70,9 +70,12 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 4. VRF configuration (`vrfs`, `layer3`, `routing`)
 5. **NTP configuration** ← Services (`ntp`, `services`)
 6. **DNS configuration** ← Services (`dns`, `services`)
-7. VLAN configuration
-8. Physical interfaces
-9. ... (rest of configuration)
+7. **ssh/https-server VRFs** ← (`server_vrfs`, `base_config`, `system`)
+8. **SNMP configuration** ← Services (`snmp`, `services`), see
+   [SNMP_CONFIGURATION.md](SNMP_CONFIGURATION.md)
+9. VLAN configuration
+10. Physical interfaces
+11. ... (rest of configuration)
 
 ## Features
 
@@ -89,6 +92,36 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 - **Simple Setup**: Sets timezone using `clock timezone` command
 - **Validation**: Only runs if timezone is defined and non-empty
 - **Standard Format**: Supports standard timezone strings (e.g., "europe/oslo")
+
+### Management VRF and ssh/https-server VRFs (`tasks/configure_access_switch_server_vrfs.yml`)
+
+The **management VRF** is the VRF of the interface carrying the device's
+`primary_ip4` (filter `resolve_mgmt_vrf`):
+
+| `primary_ip4` is on                             | Management VRF       |
+|-------------------------------------------------|----------------------|
+| the interface named `mgmt` (out-of-band port)    | `mgmt`               |
+| another interface with a NetBox VRF              | that VRF             |
+| another interface without a VRF (e.g. `vlan1`)   | `default` (in-band)  |
+| not found / `primary_ip4` unset                  | undetermined         |
+
+NetBox's `mgmt_only` flag is not used for this: it is also set on in-band
+management interfaces, e.g. `vlan1` on a CX 6000, which has no out-of-band
+port and no `mgmt` VRF.
+
+`ssh server vrf mgmt` and `https-server vrf mgmt` are always part of the
+starting config (`system.j2` / `https.j2`). This task, controlled by
+`aoscx_configure_access_switch_server_vrfs` (default `true`), adds
+`ssh server vrf <vrf>` and `https-server vrf <vrf>` for (filter
+`get_server_vrfs`):
+
+- `default` on devices whose first device role is `access-switch`
+- the in-band management VRF, when the device is not managed through the
+  `mgmt` port. Nothing is added when it is undetermined.
+
+It runs after VRF configuration, because the in-band VRF can be a user
+VRF. The same rules are used in the ZTP starting config templates, and
+for SNMP `snmp_vrf: auto`.
 
 ### NTP Configuration (`tasks/configure_ntp.yml`)
 

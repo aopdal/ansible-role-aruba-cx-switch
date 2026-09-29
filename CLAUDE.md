@@ -68,8 +68,8 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
 3. Base system (no VRF dependency): banner → timezone → anycast gateway.
 4. **VRFs** — must precede anything that can reference a VRF (L3 interfaces,
    NTP, DNS, OSPF, BGP).
-5. VRF-dependent base services: NTP → DNS → SNMP (all can be bound to a
-   VRF, so the VRF must exist first).
+5. VRF-dependent base services: NTP → DNS → ssh/https-server VRFs → SNMP
+   (all can be bound to a VRF, so the VRF must exist first).
 6. **VLAN change identification** (`identify_vlan_changes.yml`) — sets
    `vlans`, `vlans_in_use`, `vlan_changes`. Required by all VLAN/EVPN/VXLAN
    tasks.
@@ -113,7 +113,7 @@ Existing dependency chains to preserve:
 
 | Feature           | Depends on                                                  |
 | ----------------- | ----------------------------------------------------------- |
-| NTP, DNS, SNMP    | VRFs                                                        |
+| NTP, DNS, SNMP, ssh/https-server VRFs | VRFs                                    |
 | L3 interfaces     | VRFs, physical/LAG interfaces                               |
 | SVIs / anycast    | VLANs                                                       |
 | LAG member assign | LAG / MCLAG creation, physical interfaces                   |
@@ -128,6 +128,13 @@ Existing dependency chains to preserve:
 If a new feature has no dependencies, place it in the base-system block.
 Otherwise document the dependency in a comment above the include and
 update the table above in the same change.
+
+The **management VRF** (OOBM `mgmt` port vs. in-band) is derived from the
+interface carrying `primary_ip4` by `resolve_mgmt_vrf`
+([netbox_filters_lib/mgmt_vrf.py](netbox_filters_lib/mgmt_vrf.py)). Reuse it
+for any feature that must follow the management path; never infer it from
+NetBox `mgmt_only`, which is also set on in-band SVIs (e.g. `vlan1` on a CX
+6000, which has no `mgmt` VRF).
 
 Many tasks also gate on **NetBox custom fields** on the device:
 `device_ospf`, `device_bgp`, `device_vsx`, `device_evpn`, `device_vxlan`,

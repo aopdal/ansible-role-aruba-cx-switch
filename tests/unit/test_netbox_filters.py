@@ -80,6 +80,8 @@ EXPECTED_FILTER_NAMES = {
     "vsx_config_diff",
     "get_static_route_changes",
     "resolve_snmp_vrf",
+    "resolve_mgmt_vrf",
+    "get_server_vrfs",
     "build_snmp_system_location",
     "validate_snmpv3_users",
     "build_snmpv3_user_line",

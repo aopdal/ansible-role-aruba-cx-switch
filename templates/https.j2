@@ -1,6 +1,6 @@
 
 https-server vrf mgmt
-{% if (device_roles | default([]) | first | lower) == 'access-switch' %}
-https-server vrf default
-{% endif %}
+{% for vrf in interfaces | default([]) | get_server_vrfs(primary_ip4 | default(''), device_roles | default([])) %}
+https-server vrf {{ vrf }}
+{% endfor %}
 https-server rest access-mode read-write

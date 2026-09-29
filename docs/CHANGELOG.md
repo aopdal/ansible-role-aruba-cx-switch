@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-09-29
+
+### Changed
+
+- ssh/https-server VRFs (`aoscx_configure_access_switch_server_vrfs`, and
+  the `system.j2` / `https.j2` starting-config templates): besides `mgmt`,
+  and `default` on `access-switch` devices, `ssh server vrf` /
+  `https-server vrf` are now also configured for the in-band management VRF
+  (the VRF of the interface carrying `primary_ip4`, when that is not the
+  `mgmt` port), so in-band managed devices of any role stay reachable. The
+  task now runs after VRF configuration, as the in-band VRF can be a user
+  VRF. New filters `resolve_mgmt_vrf` and `get_server_vrfs`
+  (`netbox_filters_lib/mgmt_vrf.py`). See docs/BASE_CONFIGURATION.md.
+
+### Fixed
+
+- SNMP: `snmp_vrf: auto` picked the `mgmt` VRF on switches without an
+  out-of-band port (e.g. CX 6000) when the in-band management SVI (`vlan1`)
+  is flagged `mgmt_only` in NetBox, pushing `snmp-server vrf mgmt` for a VRF
+  that does not exist. The management VRF is now the VRF of the interface
+  carrying `primary_ip4`: `mgmt` only for the interface named `mgmt`,
+  otherwise the interface's NetBox VRF or `default`.
+
 ## [0.15.0] - 2026-09-28
 
 ### Added

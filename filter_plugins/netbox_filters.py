@@ -104,6 +104,7 @@ from netbox_filters_lib.interface_orphans import get_virtual_interfaces_to_delet
 from netbox_filters_lib.stp import stp_global_config_diff, stp_interface_changes
 from netbox_filters_lib.vsx import vsx_config_diff
 from netbox_filters_lib.static_route_filters import get_static_route_changes
+from netbox_filters_lib.mgmt_vrf import resolve_mgmt_vrf, get_server_vrfs
 from netbox_filters_lib.snmp_filters import (
     resolve_snmp_vrf,
     build_snmp_system_location,
@@ -191,7 +192,9 @@ class FilterModule:
             "vsx_config_diff": vsx_config_diff,
             # Static routes
             "get_static_route_changes": get_static_route_changes,
-            # SNMP
+            # Management VRF / SNMP
+            "resolve_mgmt_vrf": resolve_mgmt_vrf,
+            "get_server_vrfs": get_server_vrfs,
             "resolve_snmp_vrf": resolve_snmp_vrf,
             "build_snmp_system_location": build_snmp_system_location,
             "validate_snmpv3_users": validate_snmpv3_users,
