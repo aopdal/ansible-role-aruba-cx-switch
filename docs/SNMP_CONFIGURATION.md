@@ -54,12 +54,20 @@ is bound to a VRF), alongside NTP and DNS.
 
 With `snmp_vrf: auto`:
 
-- `mgmt` when the interface carrying the device's `primary_ip4` is a
-  NetBox `mgmt_only` interface (dedicated management port)
-- `default` when `primary_ip4` is on any other interface (in-band
-  management over a VLAN interface)
-- when `primary_ip4` is not known: `mgmt` if any `mgmt_only` interface
-  has an IP address, otherwise `default`
+the management VRF, i.e. the VRF of the interface carrying the device's
+`primary_ip4` (same rule as the ssh/https-server VRFs, see
+[BASE_CONFIGURATION.md](BASE_CONFIGURATION.md#management-vrf-and-sshhttps-server-vrfs-tasksconfigure_access_switch_server_vrfsyml)):
+
+- `mgmt` when `primary_ip4` is on the interface named `mgmt` (the AOS-CX
+  out-of-band management port)
+- the interface's NetBox VRF when it has one, otherwise `default`
+  (in-band management, e.g. a VLAN interface)
+- when `primary_ip4` is not known: `mgmt` if the `mgmt` interface has an IP
+  address, otherwise `default`
+
+The NetBox `mgmt_only` flag is deliberately not used: it is also set on
+in-band management interfaces, e.g. `vlan1` on a CX 6000, which has no
+out-of-band port (and no `mgmt` VRF).
 
 ## System location from NetBox
 

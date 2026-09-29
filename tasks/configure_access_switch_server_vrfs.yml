@@ -1,32 +1,32 @@
 # code: language=ansible
 ---
-# Configure ssh server vrf default and https-server vrf default on
-# access-switch devices.
+# Configure ssh server vrf <vrf> and https-server vrf <vrf> for the VRFs a
+# device is managed through, in addition to the mgmt VRF.
 #
 # These services are always present on the mgmt VRF (system.j2 / https.j2
-# generate those lines). This task adds the default-VRF binding so that
-# in-band management and REST API calls work on access-switches.
+# generate those lines). This task adds (get_server_vrfs):
+#   - 'default' on access-switch devices (device_roles first element,
+#     case-insensitive == 'access-switch')
+#   - the in-band management VRF: the VRF of the interface carrying
+#     primary_ip4, when that is not the out-of-band 'mgmt' port (e.g. vlan1
+#     on a CX 6000, also when flagged mgmt_only in NetBox)
+# Nothing is added for the in-band part when primary_ip4 is unset or not
+# found on a NetBox interface.
 #
-# Gate: device_roles first element (case-insensitive) == 'access-switch'
+# Runs after VRF configuration: the in-band VRF can be a user VRF.
 
-- name: configure_access_switch_server_vrfs | Configure ssh server vrf default
+- name: configure_access_switch_server_vrfs | Resolve server VRFs
+  ansible.builtin.set_fact:
+    _server_vrfs: >-
+      {{ interfaces | default([]) | get_server_vrfs(
+           primary_ip4 | default(''), device_roles | default([])) }}
+
+- name: configure_access_switch_server_vrfs | Configure ssh and https-server VRFs
   arubanetworks.aoscx.aoscx_config:
     lines:
-      - ssh server vrf default
+      - ssh server vrf {{ item }}
+      - https-server vrf {{ item }}
     match: line
   vars:
     ansible_connection: network_cli
-  when:
-    - device_roles | default([]) | length > 0
-    - (device_roles | default([]) | first | lower) == 'access-switch'
-
-- name: configure_access_switch_server_vrfs | Configure https-server vrf default
-  arubanetworks.aoscx.aoscx_config:
-    lines:
-      - https-server vrf default
-    match: line
-  vars:
-    ansible_connection: network_cli
-  when:
-    - device_roles | default([]) | length > 0
-    - (device_roles | default([]) | first | lower) == 'access-switch'
+  loop: "{{ _server_vrfs }}"

@@ -100,20 +100,6 @@
     - base_config
     - system
 
-- name: Include access-switch server VRF configuration tasks
-  ansible.builtin.include_tasks:
-    file: configure_access_switch_server_vrfs.yml
-    apply:
-      tags:
-        - server_vrfs
-        - base_config
-        - system
-  when: aoscx_configure_access_switch_server_vrfs | bool
-  tags:
-    - server_vrfs
-    - base_config
-    - system
-
 # Default gateway for access-switches: ip route 0.0.0.0/0 derived from primary_ip4.
 # No VRF dependency (default VRF only); placed in base-system block.
 - name: Include access-switch default gateway configuration tasks
@@ -186,6 +172,22 @@
   tags:
     - dns
     - services
+
+# ssh/https-server VRFs run AFTER VRFs: the in-band management VRF (VRF of the
+# interface carrying primary_ip4) can be a user VRF.
+- name: Include ssh/https-server VRF configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_access_switch_server_vrfs.yml
+    apply:
+      tags:
+        - server_vrfs
+        - base_config
+        - system
+  when: aoscx_configure_access_switch_server_vrfs | bool
+  tags:
+    - server_vrfs
+    - base_config
+    - system
 
 # SNMP runs AFTER VRFs because the agent is bound to a VRF (snmp-server vrf).
 - name: Include SNMP configuration tasks

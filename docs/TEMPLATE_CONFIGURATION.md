@@ -22,7 +22,7 @@ Template generation can run in two scenarios:
 
 The `aoscx.j2` master template includes:
 
-1. **system.j2** - Hostname, banner (MOTD), user credentials
+1. **system.j2** - Hostname, banner (MOTD), user credentials, `ssh server vrf` (mgmt plus the in-band/access-switch VRFs from `get_server_vrfs`, see [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md))
 2. **time.j2** - Timezone, NTP configuration
 3. **anycast_no_icmp_redirect.j2** - ICMP redirect disable (Anycast Gateway support)
 4. **vrf.j2** - VRF definitions with RD and route targets
@@ -39,7 +39,7 @@ The `aoscx.j2` master template includes:
 15. **vsx.j2** - Virtual Switching Extension (VSX) configuration
 16. **ospf.j2** - OSPF router instance and area configuration (`router ospf`/`area`; authentication is interface-level, see `int_phys.j2`/`int_lag.j2`/`int_vlan.j2`)
 17. **gateway.j2** - Default gateway (access-switch) and static routes (`ip route`/`ipv6 route`, from the `static_routes` config_context)
-18. **https.j2** - HTTPS/REST API configuration
+18. **https.j2** - HTTPS/REST API configuration, `https-server vrf` (same VRFs as `ssh server vrf`)
 
 ## Not Included
 

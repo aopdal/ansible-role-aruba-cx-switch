@@ -20,6 +20,12 @@ SVI_INTF = {
     "ip_addresses": [{"address": "10.10.0.5/24"}],
 }
 MGMT_NO_IP = {"name": "mgmt", "mgmt_only": True, "ip_addresses": []}
+# CX 6000 without an OOBM port: in-band SVI flagged mgmt_only in NetBox
+INBAND_MGMT_SVI = {
+    "name": "vlan1",
+    "mgmt_only": True,
+    "ip_addresses": [{"address": "172.16.3.48/24"}],
+}
 
 KEYS = {
     "snmplab": {
@@ -62,6 +68,17 @@ class TestResolveSnmpVrf:
 
     def test_empty_setting_treated_as_auto(self):
         assert resolve_snmp_vrf("", [MGMT_INTF], "10.4.23.1") == "mgmt"
+
+    def test_mgmt_only_svi_is_default(self):
+        """mgmt_only in NetBox does not mean OOBM port (CX 6000, vlan1)"""
+        assert resolve_snmp_vrf("auto", [INBAND_MGMT_SVI], "172.16.3.48") == "default"
+
+    def test_no_primary_ip_mgmt_only_svi_is_default(self):
+        assert resolve_snmp_vrf("auto", [INBAND_MGMT_SVI], None) == "default"
+
+    def test_inband_user_vrf(self):
+        svi = {"name": "vlan99", "vrf": {"name": "OOB"}, "ip_addresses": [{"address": "10.99.0.5/24"}]}
+        assert resolve_snmp_vrf("auto", [svi], "10.99.0.5") == "OOB"
 
     def test_no_interfaces(self):
         assert resolve_snmp_vrf("auto", None, None) == "default"

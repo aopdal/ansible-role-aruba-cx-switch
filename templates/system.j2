@@ -10,7 +10,7 @@ user {{ ansible_user }} group administrators password plaintext {{ stage_passwor
 hpe-anw-central
     disable
 ssh server vrf mgmt
-{% if (device_roles | default([]) | first | lower) == 'access-switch' %}
-ssh server vrf default
-{% endif %}
+{% for vrf in interfaces | default([]) | get_server_vrfs(primary_ip4 | default(''), device_roles | default([])) %}
+ssh server vrf {{ vrf }}
+{% endfor %}
 !
