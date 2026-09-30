@@ -3,7 +3,7 @@ VRF-related filters for NetBox data transformation
 """
 
 import os
-from .utils import _debug, _to_dict
+from .utils import _debug, _to_dict, nb_choice_value
 
 
 def extract_interface_vrfs(interfaces):
@@ -225,8 +225,9 @@ def build_vrf_rt_config(vrf_details):
                 rt_name = rt.get("name")
                 if not rt_name:
                     continue
-                af = _to_dict(rt.get("custom_fields") or {}).get(
-                    "address_family", "ipv4"
+                af = nb_choice_value(
+                    _to_dict(rt.get("custom_fields") or {}).get("address_family"),
+                    "ipv4",
                 )
                 if af not in valid_afs:
                     af = "ipv4"

@@ -16,6 +16,7 @@ from netbox_filters import FilterModule
 # sync when adding/removing/renaming a filter there.
 EXPECTED_FILTER_NAMES = {
     "collapse_vlan_list",
+    "nb_choice_value",
     "select_interfaces_to_configure",
     "extract_vlan_ids",
     "extract_port_access_vlan_ids",

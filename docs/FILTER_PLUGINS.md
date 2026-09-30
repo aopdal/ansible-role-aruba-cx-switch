@@ -376,7 +376,7 @@ filter_plugins/
 
 ### `utils.py` - Helper Functions
 
-Core utilities used across all modules (5 functions, 2 exposed as filters, 176 lines):
+Core utilities used across all modules (exposed filters: `collapse_vlan_list`, `select_interfaces_to_configure`, `nb_choice_value`):
 
 - **`_debug(message)`**
     - Print debug messages when `DEBUG_ANSIBLE=true` environment variable is set
@@ -384,6 +384,15 @@ Core utilities used across all modules (5 functions, 2 exposed as filters, 176 l
 - **`collapse_vlan_list(vlan_list)`**
     - Format VLAN IDs as compact ranges
     - Example: `[10, 11, 12, 20, 21]` → `"10-12,20-21"`
+
+- **`nb_choice_value(raw, default=None)`**
+    - Return the plain value of a NetBox choice field. NetBox <= 4.6 returns
+      select-type custom fields as a bare string (`"broadcast"`); NetBox 4.7+
+      returns `{"value": "broadcast", "label": "Broadcast"}`. Accepts both,
+      returns `default` for `None`/empty.
+    - Use it for every select custom field read (`if_ip_ospf_network`,
+      `if_persona`, route-target `address_family`):
+      `{{ intf.custom_fields.if_ip_ospf_network | nb_choice_value('') }}`
 
 - **`select_interfaces_to_configure(interfaces, idempotent_mode, changes)`**
     - Select which interfaces to configure based on idempotent mode

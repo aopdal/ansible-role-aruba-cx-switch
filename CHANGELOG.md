@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-30
+
+### Added
+
+- New filter `nb_choice_value` (`netbox_filters_lib/utils.py`): returns the
+  plain value of a NetBox choice field whether NetBox serialises it as a bare
+  string (<= 4.6) or as a `{value, label}` dict (4.7+).
+
+### Fixed
+
+- NetBox 4.7 compatibility: NetBox 4.7 returns select-type custom fields as
+  `{"value": ..., "label": ...}` instead of a bare string. The role read
+  `if_ip_ospf_network` (interface), `if_persona` (interface) and
+  `address_family` (route target) as strings, so on 4.7 OSPF network-type
+  change detection broke (`group_interface_ips` raised on `.replace()` of a
+  dict, and `configure_ospf.yml` would build `ip ospf network {'value': ...}`),
+  route targets all fell back to `ipv4` in `build_vrf_rt_config`, and the
+  `vrf.j2` / `int_phys.j2` / `_macros_interface.j2` starting-config templates
+  dropped or mis-rendered these fields. All read sites now go through
+  `nb_choice_value`, so NetBox 4.6 and 4.7 are both supported. netbox-bgp
+  0.20.x needed no change (its choice fields were already dicts).
+
 ## [0.15.1] - 2026-09-29
 
 ### Changed
