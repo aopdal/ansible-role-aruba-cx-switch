@@ -8,8 +8,19 @@ vrf {{ vrf_name }}
 {%     set export_targets = template_vrfs_details[vrf_name].export_targets | default([]) %}
 {%     set import_targets = template_vrfs_details[vrf_name].import_targets | default([]) %}
 {%     if export_targets | length > 0 or import_targets | length > 0 %}
-{%       set ipv4_exports = export_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv4') | map(attribute='name') | list %}
-{%       set ipv4_imports = import_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv4') | map(attribute='name') | list %}
+{#       address_family is a select custom field: bare string on NetBox <= 4.6,
+          {value, label} dict on 4.7+; nb_choice_value accepts both. #}
+{%       set rt_by_af = {'ipv4': {'export': [], 'import': []}, 'ipv6': {'export': [], 'import': []}} %}
+{%       for rt_dir in ['export', 'import'] %}
+{%         for rt in (export_targets if rt_dir == 'export' else import_targets) %}
+{%           set rt_af = (rt.custom_fields | default({})).address_family | default(none) | nb_choice_value %}
+{%           if rt_af in rt_by_af %}
+{%             set _ = rt_by_af[rt_af][rt_dir].append(rt.name) %}
+{%           endif %}
+{%         endfor %}
+{%       endfor %}
+{%       set ipv4_exports = rt_by_af['ipv4']['export'] %}
+{%       set ipv4_imports = rt_by_af['ipv4']['import'] %}
 {%       if ipv4_exports | length > 0 or ipv4_imports | length > 0 %}
     address-family ipv4 unicast
 {%         for rt in ipv4_exports %}
@@ -20,8 +31,8 @@ vrf {{ vrf_name }}
 {%         endfor %}
     exit-address-family
 {%       endif %}
-{%       set ipv6_exports = export_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv6') | map(attribute='name') | list %}
-{%       set ipv6_imports = import_targets | selectattr('custom_fields.address_family', 'defined') | selectattr('custom_fields.address_family', 'equalto', 'ipv6') | map(attribute='name') | list %}
+{%       set ipv6_exports = rt_by_af['ipv6']['export'] %}
+{%       set ipv6_imports = rt_by_af['ipv6']['import'] %}
 {%       if ipv6_exports | length > 0 or ipv6_imports | length > 0 %}
     address-family ipv6 unicast
 {%         for rt in ipv6_exports %}

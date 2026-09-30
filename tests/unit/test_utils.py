@@ -8,6 +8,7 @@ from netbox_filters_lib.utils import (
     get_interface_type_value,
     is_ipv4_address,
     is_ipv6_address,
+    nb_choice_value,
     normalize_ipv6,
     populate_ip_changes,
     select_interfaces_to_configure,
@@ -50,6 +51,29 @@ class TestIsIpv6Address:
     def test_ipv4_and_ipv6_are_inverses(self):
         for addr in ["192.168.1.1", "10.0.0.1/8", "2001:db8::1", "fe80::1/64"]:
             assert is_ipv4_address(addr) != is_ipv6_address(addr)
+
+
+class TestNbChoiceValue:
+    """Select custom fields: bare string on NetBox <= 4.6, dict on 4.7+."""
+
+    def test_netbox_46_bare_string(self):
+        assert nb_choice_value("broadcast") == "broadcast"
+
+    def test_netbox_47_value_label_dict(self):
+        assert nb_choice_value({"value": "broadcast", "label": "Broadcast"}) == "broadcast"
+
+    def test_none_returns_default(self):
+        assert nb_choice_value(None) is None
+        assert nb_choice_value(None, "ipv4") == "ipv4"
+
+    def test_empty_string_returns_default(self):
+        assert nb_choice_value("", "ipv4") == "ipv4"
+
+    def test_dict_without_value_returns_default(self):
+        assert nb_choice_value({"label": "x"}, "ipv4") == "ipv4"
+
+    def test_non_string_value_passthrough(self):
+        assert nb_choice_value({"value": 4, "label": "IPv4"}) == 4
 
 
 class TestGetInterfaceTypeValue:

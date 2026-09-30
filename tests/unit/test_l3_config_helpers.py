@@ -301,6 +301,38 @@ class TestGroupInterfaceIps:
         result = group_interface_ips(items, ospf_facts=ospf_facts)
         assert result == []  # P2P matches → skip
 
+    def test_skips_ospf_interface_when_network_type_matches_p2p_netbox_47_dict(self):
+        """NetBox 4.7+ returns if_ip_ospf_network as {value, label}"""
+        items = [{"interface_name": "1/1/18",
+                  "interface": {"custom_fields": {
+                      "if_ip_ospf_1_area": "0.0.0.0",
+                      "if_ip_ospf_network": {"value": "point-to-point",
+                                             "label": "Point-to-Point"},
+                  }},
+                  "address": "10.0.0.1/31", "ip_role": None, "anycast_mac": None,
+                  "_needs_add": False}]
+        ospf_facts = {"default": {"1": {"0.0.0.0": {
+            "1/1/18": {"ospf_if_type": "ospf_iftype_pointopoint"},
+        }}}}
+        result = group_interface_ips(items, ospf_facts=ospf_facts)
+        assert result == []  # P2P matches → skip
+
+    def test_includes_ospf_interface_when_network_type_changes_netbox_47_dict(self):
+        """NetBox 4.7+ dict form still detects a network-type mismatch"""
+        items = [{"interface_name": "1/1/18",
+                  "interface": {"custom_fields": {
+                      "if_ip_ospf_1_area": "0.0.0.0",
+                      "if_ip_ospf_network": {"value": "point-to-point",
+                                             "label": "Point-to-Point"},
+                  }},
+                  "address": "10.0.0.1/31", "ip_role": None, "anycast_mac": None,
+                  "_needs_add": False}]
+        ospf_facts = {"default": {"1": {"0.0.0.0": {
+            "1/1/18": {"ospf_if_type": None},
+        }}}}
+        result = group_interface_ips(items, ospf_facts=ospf_facts)
+        assert len(result) == 1
+
     def test_includes_ospf_interface_when_network_type_changes_to_p2p(self):
         """Include interface when device is broadcast but NetBox wants point-to-point"""
         items = [{"interface_name": "1/1/18",

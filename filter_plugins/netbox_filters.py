@@ -22,7 +22,11 @@ if _role_root not in sys.path:
 # flake8: noqa: E402
 # ruff: noqa
 # fmt: off  # Tell Black to not reformat this section
-from netbox_filters_lib.utils import collapse_vlan_list, select_interfaces_to_configure
+from netbox_filters_lib.utils import (
+    collapse_vlan_list,
+    nb_choice_value,
+    select_interfaces_to_configure,
+)
 from netbox_filters_lib.vlan_filters import (
     extract_vlan_ids,
     extract_port_access_vlan_ids,
@@ -123,6 +127,7 @@ class FilterModule:
         """Return dict of all available filters"""
         return {
             "collapse_vlan_list": collapse_vlan_list,
+            "nb_choice_value": nb_choice_value,
             "select_interfaces_to_configure": select_interfaces_to_configure,
             "extract_vlan_ids": extract_vlan_ids,
             "extract_port_access_vlan_ids": extract_port_access_vlan_ids,

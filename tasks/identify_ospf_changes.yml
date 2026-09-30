@@ -109,7 +109,7 @@
         {%- set vrf_name = ((intf.vrf.name | default('default'))
           if intf.vrf is mapping else 'default') | replace('Global', 'default') -%}
         {%- set area = intf.custom_fields.if_ip_ospf_1_area -%}
-        {%- set network = intf.custom_fields.if_ip_ospf_network | default('', true) -%}
+        {%- set network = intf.custom_fields.if_ip_ospf_network | nb_choice_value('') -%}
         {%- set passive = intf.custom_fields.if_ip_ospf_passive | default(false) -%}
         {%- set auth_enabled = intf.custom_fields.if_ip_ospf_auth | default(true) -%}
         {%- set key_obj = (ospf_auth_keys.get(vrf_name)

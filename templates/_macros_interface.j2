@@ -12,8 +12,9 @@
 {% macro ospf_interface(intf) %}
 {% if intf.custom_fields.if_ip_ospf_1_area != none %}
    ip ospf {{ ospf_process_id | default(1) }} area {{ intf.custom_fields.if_ip_ospf_1_area }}
-{%   if intf.custom_fields.if_ip_ospf_network != none %}
-   ip ospf network {{ intf.custom_fields.if_ip_ospf_network }}
+{%   set _ospf_network = intf.custom_fields.if_ip_ospf_network | nb_choice_value %}
+{%   if _ospf_network != none %}
+   ip ospf network {{ _ospf_network }}
 {%   endif %}
 {%   if intf.custom_fields.if_ip_ospf_passive %}
    ip ospf passive

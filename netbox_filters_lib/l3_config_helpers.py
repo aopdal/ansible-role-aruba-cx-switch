@@ -5,7 +5,7 @@ This module provides helper functions for building L3 interface configuration
 to reduce code duplication across physical, LAG, and VLAN interface types.
 """
 
-from .utils import _debug, is_ipv4_address, is_ipv6_address
+from .utils import _debug, is_ipv4_address, is_ipv6_address, nb_choice_value
 
 __all__ = [
     "build_l3_config_lines",
@@ -201,7 +201,9 @@ def group_interface_ips(
                 else:
                     # Interface is in the area — also check network type
                     current_type = area_data[intf_name].get("ospf_if_type")
-                    desired_network = custom_fields.get("if_ip_ospf_network")
+                    desired_network = nb_choice_value(
+                        custom_fields.get("if_ip_ospf_network")
+                    )
                     if desired_network:
                         # AOS-CX REST OSPF interface-type enum does not
                         # mirror NetBox's hyphenated values 1:1 (e.g.

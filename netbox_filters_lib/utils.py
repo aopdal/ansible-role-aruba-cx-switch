@@ -44,6 +44,22 @@ def get_interface_type_value(interface):
     return None
 
 
+def nb_choice_value(raw, default=None):
+    """Return the plain value of a NetBox choice field.
+
+    NetBox 4.7+ serialises select-type custom fields as
+    ``{"value": "broadcast", "label": "Broadcast"}``; NetBox <= 4.6 returns
+    the bare string ``"broadcast"``. Built-in choice fields (``type``,
+    ``mode``, ...) have always used the dict form. Accepts either shape and
+    returns the value, or ``default`` when ``raw`` is None/empty.
+    """
+    if isinstance(raw, dict):
+        raw = raw.get("value")
+    if raw is None or raw == "":
+        return default
+    return raw
+
+
 def normalize_ipv6(addr):
     """Normalize an IPv6 address (with or without prefix) to canonical form.
 

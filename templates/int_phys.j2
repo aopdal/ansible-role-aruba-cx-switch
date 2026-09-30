@@ -24,11 +24,12 @@ interface {{ intf.name }}
 {%     else %}
    shutdown
 {%     endif %}
-{%     if intf.custom_fields.if_persona != none %}
-{%       if intf.custom_fields.if_persona == "none" %}
+{%     set _persona = intf.custom_fields.if_persona | nb_choice_value %}
+{%     if _persona != none %}
+{%       if _persona == "none" %}
    no persona
 {%       else %}
-   persona {{ intf.custom_fields.if_persona }}
+   persona {{ _persona }}
 {%       endif %}
 {%     endif %}
 {%     if intf.lag != none %}

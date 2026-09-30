@@ -259,6 +259,35 @@ class TestBuildVrfRtConfig:
         assert result["lab-blue"]["ipv6"]["export"] == ["65015:11"]
         assert result["lab-blue"]["ipv6"]["import"] == ["65015:11"]
 
+    def test_groups_by_address_family_netbox_47_dict(self):
+        """NetBox 4.7+ returns the select custom field as {value, label}."""
+        vrf_details = {
+            "lab-blue": {
+                "export_targets": [
+                    {"name": "65015:10", "custom_fields": {"address_family": {"value": "ipv4", "label": "ipv4"}}},
+                    {"name": "65015:11", "custom_fields": {"address_family": {"value": "ipv6", "label": "ipv6"}}},
+                ],
+                "import_targets": [
+                    {"name": "65015:11", "custom_fields": {"address_family": {"value": "ipv6", "label": "ipv6"}}},
+                ],
+            }
+        }
+        result = build_vrf_rt_config(vrf_details)
+        assert result["lab-blue"]["ipv4"]["export"] == ["65015:10"]
+        assert result["lab-blue"]["ipv6"]["export"] == ["65015:11"]
+        assert result["lab-blue"]["ipv6"]["import"] == ["65015:11"]
+        assert result["lab-blue"]["ipv4"]["import"] == []
+
+    def test_defaults_to_ipv4_when_custom_field_null(self):
+        vrf_details = {
+            "vrf-a": {
+                "export_targets": [{"name": "65015:10", "custom_fields": {"address_family": None}}],
+                "import_targets": [],
+            }
+        }
+        result = build_vrf_rt_config(vrf_details)
+        assert result["vrf-a"]["ipv4"]["export"] == ["65015:10"]
+
     def test_defaults_to_ipv4_when_no_custom_field(self):
         vrf_details = {
             "vrf-a": {

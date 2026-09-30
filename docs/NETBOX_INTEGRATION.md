@@ -37,6 +37,22 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | `if_stp_root_guard` | Boolean | Interface | No | Enable/disable Root Guard on an L2 interface | `configure_stp.yml` |
 | `if_ip_helper` | Boolean | Interface | No | Enable DHCP relay (`ip helper-address`) on an L3 interface | `configure_l3_interfaces.yml` |
 
+### Select custom fields and NetBox versions
+
+The role also reads three **select**-type custom fields: `if_ip_ospf_network`
+and `if_persona` (Interface) and `address_family` (Route Target). Their API
+serialisation changed in NetBox 4.7:
+
+| NetBox | `custom_fields.if_ip_ospf_network` |
+| ------ | ---------------------------------- |
+| <= 4.6 | `"broadcast"` |
+| 4.7+   | `{"value": "broadcast", "label": "Broadcast"}` |
+
+The role supports both. Every read of a select custom field goes through the
+`nb_choice_value` filter (see [FILTER_PLUGINS.md](FILTER_PLUGINS.md)); new
+code that reads a select custom field must do the same. External consumers of
+the same inventory (reports, verification playbooks) need the same treatment.
+
 ### Creating Custom Fields in NetBox
 
 #### 1. device_anycast_gateway (Boolean)
