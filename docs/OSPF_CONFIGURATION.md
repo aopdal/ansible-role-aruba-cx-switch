@@ -356,6 +356,11 @@ ospf_auth_key_id: 1
 
 A ready-to-copy skeleton ships in `examples/ospf-authentication/`.
 
+A whole-file vault is shown in cleartext by `ansible-inventory` when
+the vault password is available; encrypting the individual `secret`
+values with `ansible-vault encrypt_string` avoids that, see
+[Keeping secrets out of inventory dumps](SNMP_CONFIGURATION.md#keeping-secrets-out-of-inventory-dumps).
+
 ### Cleartext now → ciphertext later
 
 AOS-CX accepts both `md5 <plaintext>` and `md5 ciphertext <hash>`. The

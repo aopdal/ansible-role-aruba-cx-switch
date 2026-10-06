@@ -10,7 +10,8 @@ covers:
 5. [SNMPv3 users and secrets](#snmpv3-users-and-secrets)
 6. [Change detection and idempotency](#change-detection-and-idempotency)
 7. [Cleanup](#cleanup)
-8. [Known limitations](#known-limitations)
+8. [Template config](#template-config)
+9. [Known limitations](#known-limitations)
 
 ## What is configured
 
@@ -135,6 +136,41 @@ show running-config | include snmpv3
 The ciphertext depends on the switch's export password; devices sharing
 the same (default) export password accept the same ciphertext.
 
+### Keeping secrets out of inventory dumps
+
+A vault file encrypted as a whole (`ansible-vault encrypt vault.yml`) is
+decrypted when the inventory loads, so with the vault password available
+`ansible-inventory --host <switch>` / `--list` prints every secret in it
+in cleartext. A value encrypted on its own (`ansible-vault
+encrypt_string`, `!vault |`) stays encrypted in that output, as
+`{"__ansible_vault": "$ANSIBLE_VAULT;1.1;AES256..."}`, and is only
+decrypted when a play uses it (tested with ansible-core 2.19).
+
+For production inventories, keep the `vault.yml` file but encrypt only
+the leaf values:
+
+```yaml
+# group_vars/aoscx/vault.yml (plain YAML, values encrypted)
+vault_snmpv3_user_keys:
+  snmplab:
+    auth_pass:
+      secret: !vault |
+        $ANSIBLE_VAULT;1.1;AES256
+        3135316439613934...
+      encrypted: true
+    priv_pass:
+      secret: !vault |
+        $ANSIBLE_VAULT;1.1;AES256
+        6638643965396665...
+      encrypted: true
+```
+
+Also avoid exporting `ANSIBLE_VAULT_PASSWORD_FILE` in a shell profile or
+`.env` file. Pass `--vault-password-file` only to `ansible-playbook`, or
+set it in the Semaphore UI template, so `ansible-inventory` can't decrypt
+anything by accident. The same applies to `ospf_auth_keys`, the device
+login password and any other secret in the inventory.
+
 ## Change detection and idempotency
 
 With REST API fact gathering (`aoscx_gather_facts_rest_api: true`), the
@@ -199,6 +235,28 @@ skipped and the device is left as is.
 
 To keep SNMP that is managed outside this role while running in
 idempotent mode, set `aoscx_configure_snmp: false`.
+
+## Template config
+
+With `aoscx_generate_template_config: true`, `templates/snmp.j2` renders
+the same lines into the generated starting-point config, after
+`interface vxlan 1` and before `vsx`:
+
+```text
+snmp-server vrf mgmt
+snmp-server system-location bgp-isp-2/bgp-location
+snmp-server system-contact noc@example.net
+snmpv3 user snmplab auth sha auth-pass ciphertext AQB... priv aes priv-pass ciphertext AQB...
+!
+```
+
+It uses the same rule as the task: nothing is rendered unless
+`aoscx_configure_snmp` is `true` and at least one SNMP variable is set.
+The SNMPv3 passphrases from `snmpv3_user_keys` are written into the
+generated file as given, like the local user password in `system.j2`.
+With `encrypted: true` that is the AOS-CX ciphertext; plaintext keys end
+up in cleartext, and the template task prints a warning naming the
+affected users.
 
 ## Known limitations
 

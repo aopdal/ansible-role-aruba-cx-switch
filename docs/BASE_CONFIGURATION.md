@@ -10,8 +10,9 @@ The role includes base system configuration tasks that are executed early in the
 2. **Timezone Configuration** (`configure_timezone.yml`) — tags: `timezone`, `base_config`, `system`
 3. **NTP Configuration** (`configure_ntp.yml`) — tags: `ntp`, `services`
 4. **DNS Configuration** (`configure_dns.yml`) — tags: `dns`, `services`
+5. **SNMP Configuration** (`configure_snmp.yml`) — tags: `snmp`, `services`, see [SNMP_CONFIGURATION.md](SNMP_CONFIGURATION.md)
 
-Banner and timezone have no VRF dependency and are tagged `base_config`/`system`. NTP and DNS may reference a VRF (e.g., `mgmt`) and are tagged `services` instead, so that running `-t base_config` does not attempt VRF-dependent configuration.
+Banner and timezone have no VRF dependency and are tagged `base_config`/`system`. NTP, DNS and SNMP may reference a VRF (e.g., `mgmt`) and are tagged `services` instead, so that running `-t base_config` does not attempt VRF-dependent configuration.
 
 These tasks are controlled by flags in `defaults/main.yml` and execute before interface configurations.
 

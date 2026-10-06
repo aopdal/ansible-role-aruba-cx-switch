@@ -154,7 +154,8 @@ VLANs staying in sync. Not high-risk enough to require narrowing.
 
 ### L2 / L3 interfaces, VLANs, LAGs, base config, NTP / DNS / SNMP
 
-Regular day-to-day operations. Carry their normal feature + layer tags.
+Regular day-to-day operations. Carry their normal feature + layer tags
+(NTP, DNS and SNMP: `ntp` / `dns` / `snmp` + `services`).
 
 ## Testing
 
@@ -323,6 +324,11 @@ chmod +x test-tag-dependencies.sh
 
 ## Notes
 
+- Tags are case-sensitive and the role's tags are all lowercase. `-t snmp`
+  runs SNMP; `-t SNMP` matches no task, so the play runs only the
+  `always`-tagged tasks (fact gathering, save) and reports success
+  without configuring anything. The same applies to tags set in a
+  Semaphore UI task template.
 - The role deliberately does not read `ansible_run_tags` itself. Prior
   versions used `"'ospf' in ansible_run_tags or 'routing' in
   ansible_run_tags or 'all' in ansible_run_tags"` inside `when:` clauses;

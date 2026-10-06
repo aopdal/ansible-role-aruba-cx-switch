@@ -1,7 +1,7 @@
 ---
 # Generate device configuration from Jinja2 templates
 # This is a starting point for template-based configuration generation
-# Currently includes: system, time, ICMP redirect, VRF, VLAN, EVPN, STP, interfaces, VSX, OSPF
+# Currently includes: system, time, ICMP redirect, VRF, VLAN, EVPN, STP, interfaces, SNMP, VSX, OSPF
 # Note: BGP template not included (requires BGP plugin integration)
 
 - name: Render aoscx configuration template
@@ -11,6 +11,23 @@
   register: template_config
   when:
     - aoscx_generate_template_config | bool
+  tags:
+    - template_config
+    - base_config
+
+- name: Warn about plaintext SNMPv3 passphrases in the generated config
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: SNMPv3 user(s) {{ _snmp_plaintext_users | join(', ') }} have
+      plaintext passphrases (snmpv3_user_keys encrypted: false), which are
+      written in cleartext to {{ template_config.dest }}. Use the AOS-CX
+      ciphertext (encrypted: true) to keep them out of the file.
+  vars:
+    _snmp_plaintext_users: "{{ snmpv3_users | get_snmpv3_plaintext_users(snmpv3_user_keys) }}"
+  when:
+    - aoscx_generate_template_config | bool
+    - aoscx_configure_snmp | bool
+    - _snmp_plaintext_users | length > 0
   tags:
     - template_config
     - base_config
