@@ -5,6 +5,7 @@ from netbox_filters_lib.snmp_filters import (
     build_snmp_system_location,
     build_snmpv3_user_line,
     get_snmp_changes,
+    get_snmpv3_plaintext_users,
     resolve_snmp_vrf,
     validate_snmpv3_users,
 )
@@ -203,6 +204,33 @@ def _changes(facts, users=None, keys=None, vrf="mgmt", location=LOCATION, contac
         [USER] if users is None else users,
         KEYS if keys is None else keys,
     )
+
+
+class TestGetSnmpv3PlaintextUsers:
+    """Tests for get_snmpv3_plaintext_users"""
+
+    def test_all_ciphertext(self):
+        assert get_snmpv3_plaintext_users([USER], KEYS) == []
+
+    def test_plain_string_key(self):
+        keys = {"snmplab": {"auth_pass": "lab-auth", "priv_pass": {"secret": "x", "encrypted": True}}}
+        assert get_snmpv3_plaintext_users([USER], keys) == ["snmplab"]
+
+    def test_encrypted_false_priv(self):
+        keys = {"snmplab": {"auth_pass": {"secret": "x", "encrypted": True},
+                            "priv_pass": {"secret": "y", "encrypted": False}}}
+        assert get_snmpv3_plaintext_users([USER], keys) == ["snmplab"]
+
+    def test_priv_key_ignored_without_priv_protocol(self):
+        user = {"name": "snmplab", "auth_protocol": "sha"}
+        keys = {"snmplab": {"auth_pass": {"secret": "x", "encrypted": True}, "priv_pass": "plain"}}
+        assert get_snmpv3_plaintext_users([user], keys) == []
+
+    def test_no_auth_no_secrets(self):
+        assert get_snmpv3_plaintext_users([{"name": "u"}], {}) == []
+
+    def test_empty(self):
+        assert get_snmpv3_plaintext_users(None, None) == []
 
 
 class TestGetSnmpChanges:

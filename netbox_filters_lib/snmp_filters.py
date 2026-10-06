@@ -189,6 +189,26 @@ def build_snmpv3_user_line(user, snmpv3_user_keys=None):
     return line
 
 
+def get_snmpv3_plaintext_users(snmpv3_users, snmpv3_user_keys=None):
+    """Return the names of SNMPv3 users with a plaintext passphrase.
+
+    Used to warn that those passphrases end up in cleartext in the
+    generated template config. Never returns secrets.
+
+    Returns:
+        list: User names with an ``auth_pass``/``priv_pass`` in use that is
+        not ``encrypted: true``, in input order.
+    """
+    names = []
+    for user in snmpv3_users or []:
+        auth = user.get("auth_protocol")
+        priv = user.get("priv_protocol") if auth else None
+        fields = [f for f, enabled in (("auth_pass", auth), ("priv_pass", priv)) if enabled]
+        if any(not _key_obj(snmpv3_user_keys, user["name"], f)[1] for f in fields):
+            names.append(user["name"])
+    return names
+
+
 def _user_needs_push(user, actual, snmpv3_user_keys):
     """Return True when a desired SNMPv3 user differs from device state.
 

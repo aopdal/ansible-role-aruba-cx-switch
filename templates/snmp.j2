@@ -1,0 +1,23 @@
+{# Same desired-state rule and filters as tasks/configure_snmp.yml #}
+{% set _snmp_users = snmpv3_users | default([]) %}
+{% set _snmp_desired = (_snmp_users | length > 0)
+     or (snmp_system_location | default('') | length > 0)
+     or (snmp_system_contact | default('') | length > 0)
+     or (snmp_vrf | default('auto') not in ['', 'auto']) %}
+{% if aoscx_configure_snmp | default(true) | bool and _snmp_desired %}
+{%   set _snmp_vrf = snmp_vrf | default('auto') | resolve_snmp_vrf(interfaces | default([]), primary_ip4 | default('')) %}
+{%   set _snmp_location = snmp_system_location | default('') | build_snmp_system_location(sites | default(site | default([])), locations | default(location | default([]))) %}
+{%   if _snmp_vrf %}
+snmp-server vrf {{ _snmp_vrf }}
+{%   endif %}
+{%   if _snmp_location %}
+snmp-server system-location {{ _snmp_location }}
+{%   endif %}
+{%   if snmp_system_contact | default('') %}
+snmp-server system-contact {{ snmp_system_contact }}
+{%   endif %}
+{%   for user in _snmp_users %}
+{{ user | build_snmpv3_user_line(snmpv3_user_keys | default({})) }}
+{%   endfor %}
+!
+{% endif %}

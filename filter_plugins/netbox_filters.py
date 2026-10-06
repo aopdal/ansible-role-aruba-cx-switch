@@ -114,6 +114,7 @@ from netbox_filters_lib.snmp_filters import (
     build_snmp_system_location,
     validate_snmpv3_users,
     build_snmpv3_user_line,
+    get_snmpv3_plaintext_users,
     get_snmp_changes,
 )
 
@@ -204,5 +205,6 @@ class FilterModule:
             "build_snmp_system_location": build_snmp_system_location,
             "validate_snmpv3_users": validate_snmpv3_users,
             "build_snmpv3_user_line": build_snmpv3_user_line,
+            "get_snmpv3_plaintext_users": get_snmpv3_plaintext_users,
             "get_snmp_changes": get_snmp_changes,
         }
