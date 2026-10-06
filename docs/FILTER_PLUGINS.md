@@ -980,6 +980,9 @@ recreates the route's next-hop).
   `{"valid", "warnings", "errors"}`; messages never contain secrets
 - **`build_snmpv3_user_line(user, snmpv3_user_keys)`** - `snmpv3 user`
   CLI line rendered as AOS-CX shows it in the running-config
+- **`get_snmpv3_plaintext_users(snmpv3_users, snmpv3_user_keys)`** - names
+  of users with a passphrase that is not `encrypted: true` (no secrets);
+  used to warn that they are written in cleartext to the template config
 - **`get_snmp_changes(snmp_facts, snmp_vrf, snmp_system_location, snmp_system_contact, snmpv3_users, snmpv3_user_keys)`**
   - compares desired state with `aoscx_snmp_facts`; returns
   `{"lines_to_push", "users_to_push", "lines_to_remove"}`. Plaintext

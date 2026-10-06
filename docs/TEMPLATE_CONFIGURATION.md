@@ -36,10 +36,11 @@ The `aoscx.j2` master template includes:
 12. **int_loopback.j2** - Loopback interface configuration
 13. **int_vlan.j2** - VLAN SVI interface configuration, including per-interface OSPF area/network type/authentication
 14. **int_vxlan.j2** - VXLAN interface configuration
-15. **vsx.j2** - Virtual Switching Extension (VSX) configuration
-16. **ospf.j2** - OSPF router instance and area configuration (`router ospf`/`area`; authentication is interface-level, see `int_phys.j2`/`int_lag.j2`/`int_vlan.j2`)
-17. **gateway.j2** - Default gateway (access-switch) and static routes (`ip route`/`ipv6 route`, from the `static_routes` config_context)
-18. **https.j2** - HTTPS/REST API configuration, `https-server vrf` (same VRFs as `ssh server vrf`)
+15. **snmp.j2** - SNMP agent VRF, system location/contact and SNMPv3 users, rendered after `interface vxlan 1` and before `vsx` (running-config order). Uses the same variables and filters as `configure_snmp.yml`, see [SNMP_CONFIGURATION.md](SNMP_CONFIGURATION.md#template-config)
+16. **vsx.j2** - Virtual Switching Extension (VSX) configuration
+17. **ospf.j2** - OSPF router instance and area configuration (`router ospf`/`area`; authentication is interface-level, see `int_phys.j2`/`int_lag.j2`/`int_vlan.j2`)
+18. **gateway.j2** - Default gateway (access-switch) and static routes (`ip route`/`ipv6 route`, from the `static_routes` config_context)
+19. **https.j2** - HTTPS/REST API configuration, `https-server vrf` (same VRFs as `ssh server vrf`)
 
 ## Not Included
 

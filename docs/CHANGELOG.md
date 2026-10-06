@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SNMP in the generated template config (`templates/snmp.j2`, included in
+  `aoscx.j2` after `interface vxlan 1` and before `vsx`): agent VRF,
+  system location/contact and SNMPv3 users, using the same variables and
+  filters as `configure_snmp.yml`. A warning is shown when SNMPv3 users with
+  plaintext passphrases are written to the generated file.
+- New filter `get_snmpv3_plaintext_users`: names of SNMPv3 users whose
+  passphrases are not `encrypted: true`.
+
+### Changed
+
+- Documentation: the `snmp` tag is now listed in the README tag reference
+  and `docs/BASE_CONFIGURATION.md`, and the docs note that tags are
+  case-sensitive (`--tags SNMP` silently matches nothing).
+- Documentation: `docs/SNMP_CONFIGURATION.md` explains that a whole-file
+  vault is printed in cleartext by `ansible-inventory` and recommends
+  `encrypt_string` per secret instead (linked from the OSPF docs).
+
 ## [0.16.0] - 2026-09-30
 
 ### Added
