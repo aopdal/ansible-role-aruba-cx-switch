@@ -19,6 +19,7 @@ from urllib.parse import unquote
 from .utils import (
     _debug,
     extract_ip_addresses,
+    get_interface_type_value,
     is_ipv6_address,
     normalize_ipv6 as _normalize_ipv6,
 )
@@ -211,7 +212,13 @@ def compute_l3_ip_changes(nb_intf, device_intf, enhanced_intf, intf_name):
     # virtual-interface cleanup task: if NetBox re-tags the interface
     # to a different VLAN without renaming it, the device keeps
     # forwarding on the stale VLAN unless this is corrected.
-    if enhanced_intf and nb_intf.get("parent") is not None:
+    # Split (breakout) children like 1/1/18:1 also have a parent, but they
+    # are physical ports, not dot1q sub-interfaces.
+    if (
+        enhanced_intf
+        and nb_intf.get("parent") is not None
+        and get_interface_type_value(nb_intf) in (None, "virtual")
+    ):
         nb_tagged_vlans = nb_intf.get("tagged_vlans")
         nb_encap_vlan = None
         if (

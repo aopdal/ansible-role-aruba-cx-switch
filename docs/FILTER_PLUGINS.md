@@ -843,6 +843,27 @@ lines):
     - Returns: Sorted list of virtual interface names to delete. Physical
       and LAG/MCLAG interfaces are never included (they can't be deleted)
 
+### `interface_split.py` - Interface Split (Breakout)
+
+Decides which ports need `split <N>` from the NetBox 4.7 `channels` field
+(1 public filter; `parse_interface_splits` / `parse_rest_interface_splits`
+are internal helpers). See [INTERFACE_SPLIT.md](INTERFACE_SPLIT.md).
+
+- **`get_interfaces_to_split(interfaces, running_config, split_facts)`**
+    - Desired: physical interfaces with `channels` > 1. A missing key
+      (NetBox 4.6) or `null` means no split. Virtual and LAG interfaces are
+      ignored
+    - Device state: REST `split_facts` (`aoscx_interface_split_facts`)
+      when they carry `split_children`; the split count is the number of
+      `active` children of an `inactive` port. Otherwise `split <N>` lines
+      under each `interface` block in `show running-config`. A split with
+      unknown count (bare `split`) is treated as already split
+    - Only adds or changes splits, never removes one
+    - Returns: Sorted list of `{name, channels, current, supported}`;
+      `current` is the device split count, or `None` when the port is not
+      split. `supported` is `False` when the REST facts show the port
+      cannot be split (always `True` without REST facts)
+
 ### `stp.py` - Global and Per-Interface STP Change Detection
 
 STP configuration change detection (2 filters, 134 lines):

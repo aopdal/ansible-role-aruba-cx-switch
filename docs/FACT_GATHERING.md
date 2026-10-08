@@ -67,9 +67,16 @@ A single authenticated REST API session gathers:
 - **VXLAN/VNI** - VNI mappings (when enabled)
 
 Several features — OSPF, VSX, static routes, VRFs/route-targets, STP,
-port-access, DHCP relay, SNMP — also get their facts through this same
-REST API path; see "Selective fact gathering" below for when their
-queries run.
+port-access, DHCP relay, SNMP, interface split — also get their facts
+through this same REST API path; see "Selective fact gathering" below for
+when their queries run.
+
+Interface split state (`split_admin_status`, `split_children`,
+`split_parent`) is a separate `/system/interfaces` request, made only when
+a NetBox 4.7+ interface has a `channels` value. Hardware or firmware
+without split support may reject these attributes; a non-200 answer only
+means no `aoscx_interface_split_facts`, and the split task then reads the
+running-config instead. See [INTERFACE_SPLIT.md](INTERFACE_SPLIT.md).
 
 ### How it works
 
@@ -112,7 +119,7 @@ aoscx_rest_api_version: "10.15"
 ## Selective fact gathering with `aoscx_test_mode`
 
 Feature-specific REST queries (OSPF, VSX, static routes, VRFs, STP,
-EVPN/VXLAN, port-access, DHCP relay, SNMP) only run when their data has a
+EVPN/VXLAN, port-access, DHCP relay, SNMP, interface split) only run when their data has a
 consumer: the matching `aoscx_configure_*` flag must also be true. In a
 regular run, if a feature is disabled (e.g. `aoscx_configure_vsx: false`),
 the role skips that feature's REST calls entirely, since nothing

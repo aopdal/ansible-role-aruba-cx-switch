@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-08
+
+### Added
+
+- Interface split (breakout) from the NetBox 4.7 interface `channels`
+  field: a port with `channels: 4` gets `split 4`, and its children
+  (`1/1/18:1` ...) are configured as normal physical interfaces. The split
+  runs first in the physical interface step, is compared against the
+  device (no change on rerun), and never removes a split. With REST fact
+  gathering the split state comes from a separate, failure-tolerant
+  `/system/interfaces` query (`split_admin_status`, `split_children`,
+  `split_parent`, stored as `aoscx_interface_split_facts`), which also
+  skips ports that cannot be split with a warning; otherwise from the
+  running-config. NetBox
+  4.6 (no `channels` field) is unaffected. New variable
+  `aoscx_configure_interface_split` (default `true`), new filter
+  `get_interfaces_to_split`, template support in `int_phys.j2`. See
+  `docs/INTERFACE_SPLIT.md`.
+
+### Fixed
+
+- Split children (physical interfaces with a NetBox `parent`, e.g.
+  `1/1/18:1`) were treated as dot1q sub-interfaces: `int_phys.j2` rendered
+  `encapsulation dot1q` and dropped their MTU, and L3 change detection ran
+  the sub-interface encapsulation check on them. Only `virtual`
+  interfaces with a parent are now treated as sub-interfaces.
+
 ## [0.16.1] - 2026-10-06
 
 ### Added

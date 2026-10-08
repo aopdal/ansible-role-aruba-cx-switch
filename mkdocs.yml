@@ -98,6 +98,7 @@ nav:
                   - VLAN Management:
                             - Workflow Overview: VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md
                             - L2 Interface Modes: L2_INTERFACE_MODES.md
+                            - Interface Split (Breakout): INTERFACE_SPLIT.md
                             - Anycast Gateway: ANYCAST_GATEWAY.md
                             - Virtual Interface Cleanup: VIRTUAL_INTERFACE_CLEANUP.md
                   - EVPN & VXLAN:

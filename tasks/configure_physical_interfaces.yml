@@ -19,6 +19,26 @@
   tags:
     - always
 
+# Split (breakout) ports first: the child interfaces (e.g. 1/1/18:1) only
+# exist on the device after 'split', and splitting clears the port config,
+# so it must happen before the port and its children are configured below.
+# Skipped without a NetBox 4.7+ 'channels' value (no extra CLI call).
+- name: Include interface split configuration
+  ansible.builtin.include_tasks:
+    file: configure_interface_split.yml
+    apply:
+      tags:
+        - interfaces
+        - physical_interfaces
+        - layer1
+  when:
+    - aoscx_configure_interface_split | bool
+    - >-
+      interfaces | default([])
+      | selectattr('channels', 'defined')
+      | selectattr('channels')
+      | list | length > 0
+
 # Identify parent interfaces of sub-interfaces that need to be enabled
 # Parent interfaces exist in NetBox (enabled=true) but may not be in the change list
 # They need "no shutdown" for sub-interfaces to work
@@ -123,6 +143,8 @@
 
 # Combine interfaces from change list with parent interfaces needing enable
 # Only include interfaces where enabled state needs to change OR parent interfaces
+# Ports split in this run are included too: split clears the port config, so
+# the pre-split facts (admin up, MTU) no longer hold.
 - name: Build list of physical interfaces needing enable (state change needed)
   ansible.builtin.set_fact:
     physical_interfaces_to_enable: >-
@@ -134,6 +156,11 @@
             | list
           )
           + (parents_needing_enable | default([]))
+          + (interfaces
+            | selectattr('name', 'in', interface_split_pushed | default([]))
+            | selectattr('enabled', 'equalto', true)
+            | list
+          )
         )
         | unique(attribute='name')
         | list
@@ -149,6 +176,7 @@
         interface_changes.physical | default([])
         | selectattr('enabled', 'equalto', true)
         | selectattr('name', 'in', already_enabled_interfaces | default([]))
+        | rejectattr('name', 'in', interface_split_pushed | default([]))
         | list
       }}
 

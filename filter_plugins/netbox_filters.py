@@ -105,6 +105,7 @@ from netbox_filters_lib.port_access import (
 )
 from netbox_filters_lib.port_access_orphans import port_access_orphans
 from netbox_filters_lib.interface_orphans import get_virtual_interfaces_to_delete
+from netbox_filters_lib.interface_split import get_interfaces_to_split
 from netbox_filters_lib.stp import stp_global_config_diff, stp_interface_changes
 from netbox_filters_lib.vsx import vsx_config_diff
 from netbox_filters_lib.static_route_filters import get_static_route_changes
@@ -161,6 +162,7 @@ class FilterModule:
             "compare_interface_vlans": compare_interface_vlans,
             "get_interfaces_needing_changes": get_interfaces_needing_changes,
             "get_virtual_interfaces_to_delete": get_virtual_interfaces_to_delete,
+            "get_interfaces_to_split": get_interfaces_to_split,
             "select_ospf_interfaces": select_ospf_interfaces,
             "extract_ospf_areas": extract_ospf_areas,
             "get_ospf_interfaces_by_area": get_ospf_interfaces_by_area,

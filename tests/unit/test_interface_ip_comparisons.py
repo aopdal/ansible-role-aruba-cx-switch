@@ -222,6 +222,21 @@ class TestComputeL3IpChangesEncapsulation:
         )
         assert "encapsulation_change" not in ip_changes
 
+    def test_split_child_not_treated_as_subinterface(self):
+        """Breakout children (1/1/18:1) have a parent but are physical."""
+        nb_intf = {
+            "type": {"value": "100gbase-sr4"},
+            "parent": {"name": "1/1/18"},
+            "tagged_vlans": [{"vid": 701}],
+            "ip_addresses": [{"address": "10.0.0.1/31"}],
+        }
+        device_intf = {"ip4_address": "10.0.0.1/31"}
+        enhanced_intf = {"subintf_vlan": None}
+        needs_change, reasons, ip_changes = compute_l3_ip_changes(
+            nb_intf, device_intf, enhanced_intf, "1/1/18:1"
+        )
+        assert "encapsulation_change" not in ip_changes
+
     def test_no_enhanced_facts_skips_encapsulation_check(self):
         nb_intf = {
             "parent": {"name": "1/1/1"},

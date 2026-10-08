@@ -49,6 +49,7 @@ EXPECTED_FILTER_NAMES = {
     "compare_interface_vlans",
     "get_interfaces_needing_changes",
     "get_virtual_interfaces_to_delete",
+    "get_interfaces_to_split",
     "select_ospf_interfaces",
     "extract_ospf_areas",
     "get_ospf_interfaces_by_area",
@@ -134,6 +135,7 @@ class TestFilterModule:
             "port_access_diff",  # port_access
             "port_access_orphans",  # port_access_orphans
             "get_virtual_interfaces_to_delete",  # interface_orphans
+            "get_interfaces_to_split",  # interface_split
             "stp_global_config_diff",  # stp
             "vsx_config_diff",  # vsx
             "get_static_route_changes",  # static_route_filters

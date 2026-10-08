@@ -11,6 +11,9 @@
   | unique | list %}
 {% for intf in interfaces %}
 {%   if 'mgmt' not in intf.name and 'lag' not in intf.name and 'loopback' not in intf.name and 'vlan' not in intf.name %}
+{#     Split (breakout) children like 1/1/18:1 have a parent too, but are #}
+{#     physical ports - only virtual interfaces with a parent are dot1q.  #}
+{%     set _is_subif = intf.parent is not none and intf.type.value | default('') == 'virtual' %}
 interface {{ intf.name }}
 {%     if intf.description != '' %}
 {%       if intf.description == 'AP_Aruba' %}
@@ -24,6 +27,10 @@ interface {{ intf.name }}
 {%     else %}
    shutdown
 {%     endif %}
+{%     if intf.channels | default(none) is not none and intf.channels | int > 1 %}
+{# NetBox 4.7+ breakout port (channels field absent on older NetBox) #}
+   split {{ intf.channels | int }}
+{%     endif %}
 {%     set _persona = intf.custom_fields.if_persona | nb_choice_value %}
 {%     if _persona != none %}
 {%       if _persona == "none" %}
@@ -35,7 +42,7 @@ interface {{ intf.name }}
 {%     if intf.lag != none %}
    {{ intf.lag.name | replace("lag", "lag ") }}
 {%     endif %}
-{%     if intf.mtu != none and intf.parent is none %}
+{%     if intf.mtu != none and not _is_subif %}
    mtu {{ intf.mtu }}
 {%     endif %}
 {%     if intf.custom_fields.if_ip_unnumbered %}\
@@ -45,12 +52,12 @@ interface {{ intf.name }}
 {%       endif %}
    l3-counters
 {%     endif %}
-{%     if intf.parent is none and intf.name in subinterface_parent_names %}
+{%     if not _is_subif and intf.name in subinterface_parent_names %}
 {# Parent of a sub-interface - must be in routed mode so dot1q sub-interfaces #}
 {# can attach. Some hardware/firmware defaults physical ports to L2 mode. #}
    routing
 {%     endif %}
-{%     if intf.parent is not none %}
+{%     if _is_subif %}
 {# Subinterface - L3 routed configuration #}
 {%       set subint_vid = intf.name.split('.')[-1] %}
    encapsulation dot1q {{ subint_vid }}
@@ -105,7 +112,7 @@ interface {{ intf.name }}
 {{ m.ospf_interface(intf) }}
 
 {%     endif %}
-{%     if intf.parent is none and intf.ip_addresses | length == 0 and intf.name not in subinterface_parent_names %}
+{%     if not _is_subif and intf.ip_addresses | length == 0 and intf.name not in subinterface_parent_names %}
 {# Physical interface without IP - L2 settings #}
 {%       if intf.mode %}
    no routing
