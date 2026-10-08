@@ -859,6 +859,14 @@ The role uses standard NetBox objects for configuration.
 
 - `lag` - Parent LAG interface
 
+**Key fields for port split (NetBox 4.7+, optional):**
+
+- `channels` - On the port: number of breakout channels (pushes `split <N>`)
+- `parent` / `channel_id` - On each child (`1/1/18:1` ...)
+
+The `channels` field does not exist before NetBox 4.7; without it no port is
+split. See [INTERFACE_SPLIT.md](INTERFACE_SPLIT.md).
+
 ### L2VPNs and L2VPN Terminations
 
 **Source:** NetBox → IPAM → L2VPNs

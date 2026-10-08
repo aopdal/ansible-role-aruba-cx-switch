@@ -74,6 +74,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
 - ✅ **VRF Configuration** - Creates VRFs with RD and route-targets
 - ✅ **VLAN Management** - Idempotent VLAN creation and cleanup
 - ✅ **Physical Interface Configuration** - Enable/disable and description
+- ✅ **Split Interface** - Split 100GE into 4 * 25 og 40GE to 4 * 10
 - ✅ **L2 Interface Configuration** - Access and trunk ports with LACP support
 - ✅ **L3 Interface Configuration** - IPv4/IPv6 with VRF support, ip mtu, and l3-counters
 - ✅ **VLAN Interfaces (SVIs)** - Automatic creation and IP configuration, and active gateway
@@ -330,6 +331,7 @@ aoscx_gather_facts_rest_api: false
 aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
 aoscx_configure_physical_interfaces: true
+aoscx_configure_interface_split: true  # 'split N' from NetBox 4.7 interface channels (docs/INTERFACE_SPLIT.md)
 aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true  # includes loopback interfaces
 aoscx_configure_ospf: true

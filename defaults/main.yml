@@ -30,6 +30,12 @@ aoscx_generate_template_config: false
 aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
 aoscx_configure_physical_interfaces: true
+# Push 'split <N>' on physical ports whose NetBox interface has channels: N
+# (N > 1). Requires NetBox 4.7+ (older NetBox has no 'channels' field and
+# nothing is split). Only adds/changes a split, never removes one. Splitting
+# clears the port's config on the device. Runs as part of physical
+# interfaces. See docs/INTERFACE_SPLIT.md.
+aoscx_configure_interface_split: true
 aoscx_configure_lag_interfaces: true
 aoscx_configure_mclag_interfaces: true
 aoscx_configure_l2_interfaces: true

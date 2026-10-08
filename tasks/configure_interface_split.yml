@@ -1,0 +1,84 @@
+---
+# Split (breakout) physical ports, e.g. a 100G QSFP28 port into 4x 25G.
+#
+# NetBox 4.7+ models this as `channels: N` on the port; the children
+# (<port>:1 .. <port>:N) are separate interfaces with `parent` set to the
+# port. Only the parent needs `split N` - the children are then configured
+# like any other physical interface by the rest of the role.
+#
+# Change detection uses the REST split facts (aoscx_interface_split_facts,
+# from gather_facts_rest_api.yml) when available, otherwise `split` lines in
+# the running-config, so a port that is already split is left alone. Split
+# is never removed (see get_interfaces_to_split).
+#
+# Sets `interface_split_pushed` (list of port names) so the caller can
+# re-apply the parent's settings: AOS-CX clears the port config on split.
+
+# Fallback when REST split facts are unavailable (aoscx_facts mode, or
+# firmware that rejects the split attributes).
+- name: Get running-config for interface split detection
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show running-config
+  register: interface_split_running_config
+  changed_when: false
+  when: aoscx_interface_split_facts | default({}) | length == 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Determine ports needing split
+  ansible.builtin.set_fact:
+    _interface_split_changes: >-
+      {{
+        interfaces
+        | get_interfaces_to_split(
+            interface_split_running_config.stdout[0] | default(''),
+            aoscx_interface_split_facts | default({}))
+      }}
+
+- name: Separate ports the device cannot split
+  ansible.builtin.set_fact:
+    interfaces_to_split: "{{ _interface_split_changes | selectattr('supported') | list }}"
+    _interfaces_split_unsupported: "{{ _interface_split_changes | rejectattr('supported') | list }}"
+
+# Only known with REST split facts. Warn and skip rather than fail: the rest
+# of the port config can still be applied.
+- name: Warn about ports that cannot be split
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: {{ item.name }} has channels={{ item.channels }} in NetBox,
+      but the device reports it cannot be split - skipping split
+  loop: "{{ _interfaces_split_unsupported }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Display ports to split
+  ansible.builtin.debug:
+    msg: >-
+      Splitting {{ item.name }} into {{ item.channels }} channels
+      (current: {{ item.current if item.current is not none else 'not split' }})
+  loop: "{{ interfaces_to_split }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# cli_command (not aoscx_config) because AOS-CX asks for confirmation before
+# splitting a port, and aoscx_config cannot answer prompts. cli_command does
+# not support check mode for config commands.
+- name: Split ports
+  ansible.builtin.include_tasks:
+    file: configure_interface_split_port.yml
+    apply:
+      tags:
+        - interfaces
+        - physical_interfaces
+        - layer1
+  loop: "{{ interfaces_to_split }}"
+  loop_control:
+    loop_var: split_item
+    label: "{{ split_item.name }}"
+  when: not ansible_check_mode
+
+- name: Record ports that were split in this run
+  ansible.builtin.set_fact:
+    interface_split_pushed: >-
+      {{ interfaces_to_split | map(attribute='name') | list if not ansible_check_mode else [] }}

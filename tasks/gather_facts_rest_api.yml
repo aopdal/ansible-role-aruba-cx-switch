@@ -35,6 +35,9 @@
 # - aoscx_vsx_facts (when device_vsx enabled)
 # - aoscx_stp_global_facts (when aoscx_configure_stp enabled)
 # - aoscx_snmp_facts (when SNMP variables are set)
+# - aoscx_interface_split_facts (when a NetBox interface has `channels`
+#   and the device answers the split attributes; see
+#   docs/INTERFACE_SPLIT.md)
 # - aoscx_port_access_facts (when port_access is defined in the device's
 #   NetBox config_context). Built from a single REST call to
 #   /system/device_profiles?depth=5, then flattened by the
@@ -234,6 +237,38 @@
   register: _rest_interfaces
   delegate_to: localhost
   check_mode: false
+  tags:
+    - always
+
+# Query port split (breakout) state. A separate request, not part of the
+# interface attributes above: hardware/firmware without split support may
+# reject the attributes, and that must not break the main interface query.
+# Non-200 just means no REST split facts - configure_interface_split.yml
+# then falls back to the running-config. Only runs when a NetBox 4.7+
+# interface has a `channels` value.
+- name: Query interface split state via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/interfaces?depth=2&attributes=\
+      split_admin_status,split_children,split_parent"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 400, 404]
+    return_content: true
+  register: _rest_interface_split
+  delegate_to: localhost
+  check_mode: false
+  when:
+    - >-
+      (aoscx_configure_physical_interfaces | bool
+      and aoscx_configure_interface_split | bool)
+      or aoscx_test_mode | bool
+    - >-
+      interfaces | default([])
+      | selectattr('channels', 'defined')
+      | selectattr('channels')
+      | list | length > 0
   tags:
     - always
 
@@ -967,6 +1002,16 @@
     - custom_fields.device_vsx | default(false) | bool
     - _rest_vsx is defined
     - _rest_vsx.status | default(0) == 200
+  tags:
+    - always
+
+- name: Set interface split facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_interface_split_facts: "{{ _rest_interface_split.json }}"
+  when:
+    - _rest_interface_split is defined
+    - _rest_interface_split.status | default(0) == 200
+    - _rest_interface_split.json is mapping
   tags:
     - always
 

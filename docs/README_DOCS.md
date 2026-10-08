@@ -74,6 +74,10 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
     - access / tagged / tagged-all categorization rules
     - How NetBox `mode` + `tagged_vlans`/`untagged_vlan` map to AOS-CX `vlan_mode`
 
+- **[INTERFACE_SPLIT.md](INTERFACE_SPLIT.md)** - Port split (breakout) from the NetBox 4.7 `channels` field
+    - `split <N>` on the parent, children configured as normal physical ports
+    - NetBox 4.6 compatibility, never removes a split
+
 - **[ANYCAST_GATEWAY.md](ANYCAST_GATEWAY.md)** - Anycast gateway (active-gateway) configuration
     - IPv4/IPv6 anycast IP + MAC modelling in NetBox
     - EVPN/VXLAN active-gateway interaction

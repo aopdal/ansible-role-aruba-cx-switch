@@ -32,7 +32,7 @@ The `aoscx.j2` master template includes:
 8. **int_mgmt.j2** - Management interface configuration
 9. **system_interface_group.j2** - System interface groups
 10. **int_lag.j2** - LAG (Link Aggregation) interface configuration, including per-interface OSPF area/network type/authentication. LAG interfaces with an IP address are automatically put into routed mode (`routing`), since some platforms default LAGs to L2 (switching) mode.
-11. **int_phys.j2** - Physical interface settings, including per-interface OSPF area/network type/authentication. Physical interfaces that are the parent of a dot1q sub-interface are automatically put into routed mode (`routing`), since some hardware/firmware defaults physical ports to L2 (switching) mode and sub-interfaces require the parent to be routed.
+11. **int_phys.j2** - Physical interface settings, including per-interface OSPF area/network type/authentication. Physical interfaces that are the parent of a dot1q sub-interface are automatically put into routed mode (`routing`), since some hardware/firmware defaults physical ports to L2 (switching) mode and sub-interfaces require the parent to be routed. Ports with a NetBox 4.7 `channels` value get `split <N>`; their children (`1/1/18:1` ...) are rendered as normal physical ports, not sub-interfaces (see [INTERFACE_SPLIT.md](INTERFACE_SPLIT.md)).
 12. **int_loopback.j2** - Loopback interface configuration
 13. **int_vlan.j2** - VLAN SVI interface configuration, including per-interface OSPF area/network type/authentication
 14. **int_vxlan.j2** - VXLAN interface configuration

@@ -1,0 +1,41 @@
+---
+# Push 'split <N>' on one port. Called in a loop from
+# configure_interface_split.yml with `split_item` = {name, channels}.
+# The commands run in one persistent CLI session, so config mode carries
+# over between tasks.
+
+- name: Split port {{ split_item.name }}
+  vars:
+    ansible_connection: network_cli
+  block:
+    - name: Enter configuration mode
+      ansible.netcommon.cli_command:
+        command: configure terminal
+      changed_when: false
+
+    - name: Enter interface context {{ split_item.name }}
+      ansible.netcommon.cli_command:
+        command: "interface {{ split_item.name }}"
+      changed_when: false
+
+    - name: Configure split {{ split_item.channels }} on {{ split_item.name }}
+      ansible.netcommon.cli_command:
+        command: "split {{ split_item.channels }}"
+        prompt:
+          - '\(y/n\)\??'
+        answer:
+          - "y"
+      register: interface_split_result
+      changed_when: true
+      # The AOS-CX terminal plugin has no error regex, so CLI errors come
+      # back as normal output.
+      failed_when: >-
+        interface_split_result.failed | default(false)
+        or (interface_split_result.stdout | default('')
+            is search('Invalid input|not supported|error', ignorecase=true))
+
+  always:
+    - name: Leave configuration mode
+      ansible.netcommon.cli_command:
+        command: end
+      changed_when: false
