@@ -7,12 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
-
-- `docs/CODE_AUDIT.md`. Its one open finding (F6, a second `FilterModule`
-  in `filter_plugins/rest_api_transforms.py`) is a known, harmless layout
-  choice; references to its findings in code comments, tests and docs were
-  replaced with self-contained explanations.
+## [0.17.1] - 2026-10-16
 
 ### Added
 
@@ -41,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `vlans_to_remove`) are now sorted, so `-v` output and pushed `no ...`
   lines come out in the same order on every run. Which interfaces and
   addresses are flagged is unchanged.
+
+### Removed
+
+- `docs/CODE_AUDIT.md`. Its one open finding (F6, a second `FilterModule`
+  in `filter_plugins/rest_api_transforms.py`) is a known, harmless layout
+  choice; references to its findings in code comments, tests and docs were
+  replaced with self-contained explanations.
 
 ### Fixed
 
