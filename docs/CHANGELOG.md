@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Idempotent mode (`aoscx_idempotent_mode: true`) dropped some L2 trunk
+  changes it had detected. The most visible case was switching a trunk from
+  native-untagged to native-tagged (NetBox `tagged` or `tagged-all` with no
+  untagged VLAN): the change was found but the interface was never
+  reconfigured. `tasks/configure_l2_interfaces.yml` narrowed
+  `interface_changes.l2` a second time with `get_interfaces_needing_changes`,
+  which has narrower rules. Interfaces to configure now come from
+  `interface_changes.l2` in idempotent mode too, the same as standard mode,
+  and `get_interfaces_needing_changes` only builds the VLAN-removal cleanup
+  list. No filter was changed. `aoscx_force_l2_config` is no longer needed
+  as a workaround for this case. See `docs/L2_INTERFACE_MODES.md`.
+
 ## [0.17.0] - 2026-10-08
 
 ### Added

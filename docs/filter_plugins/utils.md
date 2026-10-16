@@ -266,6 +266,14 @@ Selects which interfaces should be configured based on the operating mode (stand
 
 Enables idempotent playbook execution by filtering interfaces to only those that need changes. In standard mode, all interfaces are configured; in idempotent mode, only interfaces with detected changes are configured.
 
+!!! note "No longer used by the role's L2 tasks"
+    `tasks/configure_l2_interfaces.yml` now selects interfaces directly from
+    `interface_changes.l2` in both standard and idempotent mode. When fed from
+    `get_interfaces_needing_changes()`, this filter could drop changes that
+    `get_interfaces_needing_config_changes` detected (see the note on
+    [get_interfaces_needing_changes](comparison.md)). The filter is kept,
+    unchanged, for external playbooks.
+
 #### Parameters
 
 - **interfaces** (list): List of all interface objects from NetBox

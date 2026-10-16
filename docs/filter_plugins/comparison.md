@@ -247,6 +247,14 @@ Analyzes all interfaces to identify which need configuration changes.
 
 Processes all interfaces at once, returning categorized lists of interfaces that need VLAN cleanup or configuration changes.
 
+!!! note "Role usage: cleanup list only"
+    The role uses only the `cleanup` list from this filter (in idempotent mode,
+    `tasks/configure_l2_interfaces.yml`). Its rules are narrower than
+    `get_interfaces_needing_config_changes`: no native-tagged handling, and a
+    native VLAN listed in `vlan_trunks` isn't recognized. Its `configure` list can
+    therefore miss changes (for example native-untagged to native-tagged), so the
+    role selects interfaces to configure from `interface_changes.l2` instead.
+
 #### Parameters
 
 - **interfaces** (list): List of interface objects from NetBox
