@@ -34,10 +34,8 @@ Interface processing functionality is split into five focused modules that handl
 `interface_change_detection.py` additionally depends on
 `interface_ip_comparisons.py` for the per-interface IP comparison logic
 (`compute_l3_ip_changes()`, `compute_dhcp_relay_changes()` — internal
-helpers, not separately registered as Ansible filters; split out per
-[docs/CODE_AUDIT.md](../CODE_AUDIT.md) finding F4, which also fixed finding
-F5 by making both functions pure instead of mutating the interface dict
-passed in).
+helpers, not separately registered as Ansible filters; both are pure and
+return their changes instead of mutating the interface dict passed in).
 
 ---
 

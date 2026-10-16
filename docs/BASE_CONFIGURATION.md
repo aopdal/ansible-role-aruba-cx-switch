@@ -21,10 +21,17 @@ These tasks are controlled by flags in `defaults/main.yml` and execute before in
 ### Defaults (can be overridden)
 ```yaml
 # Base configuration flags
+aoscx_configure_hostname: true
 aoscx_configure_banner: true
 aoscx_configure_ntp: true
 aoscx_configure_timezone: true
 aoscx_configure_dns: true
+# 'no ip icmp redirect' (anycast gateway prerequisite); only on devices
+# with the device_anycast_gateway custom field set
+aoscx_configure_icmp_redirect: true
+# Write the running config to startup config at the end of the run,
+# only when something changed (aoscx_config save_when: modified)
+aoscx_save_config: true
 ```
 
 ### Required NetBox config_context Variables

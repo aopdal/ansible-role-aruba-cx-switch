@@ -135,6 +135,12 @@ def rest_api_to_aoscx_interfaces(rest_data):
             # STP per-interface configuration (admin_edge_port_enable, bpdu_filter_enable, etc.)
             "stp_config": intf_data.get("stp_config") or {},
         }
+        # Configured 'ip mtu' on L3 interfaces. Only passed through when the
+        # REST query requested it, so change detection can tell "not
+        # gathered" (key absent) from a value - see _get_device_mtu() in
+        # interface_change_detection.py.
+        if "ip_mtu" in intf_data:
+            result[intf_name]["ip_mtu"] = intf_data["ip_mtu"]
 
     return result
 

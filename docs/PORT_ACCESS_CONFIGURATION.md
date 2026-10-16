@@ -29,10 +29,10 @@ Configuration is gated by `aoscx_configure_port_access` (default `true`)
 **and** the device's `port_access` config_context key being defined and
 non-empty — so leaving the variable at its default is safe for devices
 that don't use port-access at all. Task files:
-[`tasks/configure_port_access.yml`](../tasks/configure_port_access.yml),
-[`tasks/configure_port_access_lldp_group.yml`](../tasks/configure_port_access_lldp_group.yml),
-[`tasks/configure_port_access_role.yml`](../tasks/configure_port_access_role.yml),
-[`tasks/configure_port_access_device_profile.yml`](../tasks/configure_port_access_device_profile.yml).
+`tasks/configure_port_access.yml`,
+`tasks/configure_port_access_lldp_group.yml`,
+`tasks/configure_port_access_role.yml`,
+`tasks/configure_port_access_device_profile.yml`.
 
 Configuration order matters — device-profiles reference roles and LLDP
 groups, so they're always pushed in the order **lldp-group → role →
@@ -146,7 +146,7 @@ Deleting an attribute from a role in NetBox (e.g. removing `description`
 from a role that previously had one) is detected the same way as any other
 change — `port_access_diff` sees the desired and device-reported
 `description` no longer match and re-pushes the role. For `description`
-specifically, [`tasks/configure_port_access_role.yml`](../tasks/configure_port_access_role.yml)
+specifically, `tasks/configure_port_access_role.yml`
 compares against `aoscx_port_access_facts` and emits `no description` when
 the role currently has one on the device but NetBox no longer specifies
 one; once removed, the role stops needing a push on subsequent runs (fully
@@ -175,7 +175,7 @@ when **both** are true:
 - REST API facts are available (`aoscx_port_access_facts` is defined)
 
 [`port_access_orphans`](filter_plugins/port_access.md#3-port_access_orphansdesired-current)
-computes the orphan list; [`tasks/cleanup_port_access.yml`](../tasks/cleanup_port_access.yml)
+computes the orphan list; `tasks/cleanup_port_access.yml`
 removes them in the reverse of configuration order —
 device-profiles first (they reference roles/groups), then roles, then
 LLDP groups.
@@ -184,7 +184,7 @@ LLDP groups.
 
 Tags: `port_access`, `device_profile`, `layer2` for configuration;
 `port_access`, `cleanup`, `idempotent` for cleanup (see
-[README.md](../README.md#configuration-tags)). Not tag-protected under
+[README.md](index.md#configuration-tags)). Not tag-protected under
 [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md) — treated as
 routine L2 configuration.
 
@@ -209,7 +209,7 @@ is completed.
 - **Module-based configuration**: uses `aoscx_config` (CLI, `network_cli`
   connection) with `match: line`.
 - **ZTP/template generation**: when `aoscx_generate_template_config: true`,
-  [`templates/port_access.j2`](../templates/port_access.j2) renders the
+  `templates/port_access.j2` renders the
   same `port_access` config_context as plain CLI, for use in generated
   starting-point configs. This path has no idempotency or cleanup logic —
   it just emits text. See [TEMPLATE_CONFIGURATION.md](TEMPLATE_CONFIGURATION.md).

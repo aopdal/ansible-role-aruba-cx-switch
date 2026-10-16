@@ -24,13 +24,13 @@ The `utils.py` module provides core utility functions used across all filter mod
 
 **Dependencies**: None (base module)
 
-**Function Count**: 10 (4 exposed as Ansible filters — `collapse_vlan_list`, `select_interfaces_to_configure`, `is_ipv4_address`, `is_ipv6_address` — 6 internal helpers used by other modules)
+**Function Count**: 11 (5 exposed as Ansible filters — `collapse_vlan_list`, `nb_choice_value`, `select_interfaces_to_configure`, `is_ipv4_address`, `is_ipv6_address` — and 6 internal helpers used by other modules, marked *internal* below; internal helpers are not available in playbooks and can change without notice)
 
 **Note on `is_ipv4_address` / `is_ipv6_address`**: these two functions live here, but the Ansible filter names are registered via `netbox_filters_lib/l3_config_helpers.py` (which imports them from this module and re-exports them). If you're looking for their filter-facing documentation (parameters, return value, playbook examples), see [L3 Config Helpers](l3_config_helpers.md#3-is_ipv4_address) — they're covered here only because this is where the code actually lives.
 
 ## Functions
 
-### `_debug(message)`
+### `_debug(message)` — internal
 
 Internal debugging function that prints messages when the `DEBUG_ANSIBLE` environment variable is set.
 
@@ -258,6 +258,23 @@ def collapse_vlan_list(vlan_list):
 
 ---
 
+### `nb_choice_value(raw, default=None)`
+
+Returns the plain value of a NetBox choice field.
+
+NetBox 4.7+ serialises select-type custom fields as
+`{"value": "broadcast", "label": "Broadcast"}`; NetBox 4.6 and older
+return the bare string `"broadcast"`. Built-in choice fields (`type`,
+`mode`, ...) have always used the dict form. The filter accepts either
+shape and returns the value, or `default` when the field is `None` or
+empty.
+
+```yaml
+- name: Read the OSPF network type from a custom field
+  ansible.builtin.set_fact:
+    ospf_network: "{{ item.custom_fields.if_ip_ospf_network | nb_choice_value('broadcast') }}"
+```
+
 ### `select_interfaces_to_configure(interfaces, idempotent_mode, interfaces_needing_changes=None)`
 
 Selects which interfaces should be configured based on the operating mode (standard vs. idempotent).
@@ -265,6 +282,14 @@ Selects which interfaces should be configured based on the operating mode (stand
 #### Purpose
 
 Enables idempotent playbook execution by filtering interfaces to only those that need changes. In standard mode, all interfaces are configured; in idempotent mode, only interfaces with detected changes are configured.
+
+!!! note "No longer used by the role's L2 tasks"
+    `tasks/configure_l2_interfaces.yml` now selects interfaces directly from
+    `interface_changes.l2` in both standard and idempotent mode. When fed from
+    `get_interfaces_needing_changes()`, this filter could drop changes that
+    `get_interfaces_needing_config_changes` detected (see the note on
+    [get_interfaces_needing_changes](comparison.md)). The filter is kept,
+    unchanged, for external playbooks.
 
 #### Parameters
 
@@ -417,7 +442,7 @@ DEBUG: Idempotent mode: selecting 3 interfaces that need configuration changes
 
 ---
 
-### `extract_ip_addresses(nb_intf, exclude_anycast=False)`
+### `extract_ip_addresses(nb_intf, exclude_anycast=False)` — internal
 
 Extracts and categorizes IPv4 and IPv6 addresses from a single NetBox interface object.
 
@@ -454,7 +479,7 @@ ipv4, ipv6 = extract_ip_addresses(interface, exclude_anycast=True)
 
 ---
 
-### `populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6)`
+### `populate_ip_changes(nb_intf, nb_ipv4, nb_ipv6)` — internal
 
 Tags a NetBox interface object with IP addresses that need to be configured on the device.
 
@@ -501,7 +526,7 @@ populate_ip_changes(nb_interface, ipv4_to_add, ipv6_to_add)
 
 ---
 
-### `get_interface_type_value(interface)`
+### `get_interface_type_value(interface)` — internal
 
 Internal helper that reads a NetBox interface's `type` value regardless of how it was serialized.
 
@@ -529,7 +554,7 @@ if get_interface_type_value(nb_intf) == "virtual":
 
 ---
 
-### `normalize_ipv6(addr)`
+### `normalize_ipv6(addr)` — internal
 
 Internal helper that normalizes an IPv6 address to its canonical (fully-reduced) form, so two different textual spellings of the same address compare as equal.
 
@@ -556,7 +581,7 @@ normalized, original = normalize_ipv6("2001:db8:0:0::1/64")
 
 ---
 
-### `_to_dict(obj)`
+### `_to_dict(obj)` — internal
 
 Internal helper that coerces a value into a `dict`, tolerating the case where Ansible handed back a JSON-encoded string instead of an already-parsed object.
 
@@ -604,7 +629,7 @@ rd = vrf_obj.get("rd")
 ### Manual Testing
 
 The real unit tests for this module live in
-[tests/unit/test_utils.py](../../tests/unit/test_utils.py) and run via
+`tests/unit/test_utils.py` and run via
 `make test-unit`. `netbox_filters_lib` sits at the role root (a sibling of
 `filter_plugins/`, not inside it — see [FILTER_PLUGINS.md](../FILTER_PLUGINS.md)
 "Structure"), so it's imported directly, not through `filter_plugins`:

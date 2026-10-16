@@ -121,11 +121,11 @@ To avoid this, the role pre-compares desired routes (from
 distance, next-hop IP, or next-hop interface differ from what's already
 configured. This mirrors the pattern used for non-idempotent L3 interface
 configuration (see
-[netbox_filters_lib/l3_config_helpers.py](../netbox_filters_lib/l3_config_helpers.py)).
+`netbox_filters_lib/l3_config_helpers.py`).
 
 The comparison logic lives in
-[`get_static_route_changes`](../netbox_filters_lib/static_route_filters.py),
-used by [`tasks/configure_static_routes.yml`](../tasks/configure_static_routes.yml).
+`get_static_route_changes`,
+used by `tasks/configure_static_routes.yml`.
 
 !!! note "REST API facts are required for accurate change detection"
     When `aoscx_gather_facts_rest_api: false` (or the REST query fails),
@@ -157,7 +157,7 @@ prefix replaces the first rather than adding a second path.
 ### Overlap with the access-switch default gateway feature
 
 `aoscx_configure_access_switch_default_gateway` (see
-[README.md](../README.md)) independently pushes a default route
+[README.md](index.md)) independently pushes a default route
 (`0.0.0.0/0`) derived from `primary_ip4` for devices whose
 `device_roles` contains `access-switch`, using `aoscx_config` +
 `match: line`. If a device both has that role **and** defines a
@@ -177,7 +177,7 @@ default route on a given device.
 - **Filter reference**: see
   [FILTER_PLUGINS.md](FILTER_PLUGINS.md) for `get_static_route_changes`.
 - **ZTP/template generation**: when `aoscx_generate_template_config: true`,
-  [`templates/gateway.j2`](../templates/gateway.j2) also renders the same
+  `templates/gateway.j2` also renders the same
   `static_routes` config_context as plain `ip route` / `ipv6 route` CLI
   lines (IPv4 vs IPv6 selected automatically from `prefix`), for use in
   generated starting-point configs. `nullroute` is used for `blackhole`,

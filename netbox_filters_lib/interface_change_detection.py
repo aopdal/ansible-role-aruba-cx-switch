@@ -39,7 +39,7 @@ Provides functions to compare NetBox interface configuration with device facts
 and identify which interfaces need configuration changes.
 
 The IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison logic lives in
-interface_ip_comparisons.py (split out per docs/CODE_AUDIT.md finding F4);
+interface_ip_comparisons.py;
 this module handles orchestration - existence checks, physical/L2 property
 checks, and categorization.
 """
@@ -96,6 +96,62 @@ def _get_device_enabled_state(device_intf):
 
     device_admin_state = device_intf.get("admin") or device_intf.get("admin_state")
     return device_admin_state == "up" if device_admin_state else None
+
+
+def _get_device_mtu(device_intf, type_value):
+    """
+    Return (compare, device_mtu, is_ip_mtu) for an interface's MTU check,
+    reading the field the role actually configures.
+
+    Observed via REST on firmware 10.16: a physical port with ``mtu 9198``
+    reports user_config.mtu = 9198 but top-level mtu = 9500, and L3
+    interfaces with ``ip mtu 9198`` report ip_mtu = 9198 with mtu null.
+
+    - Physical: the role pushes ``mtu`` via aoscx_interface, stored in
+      user_config.mtu - prefer that.
+    - Virtual (SVI/loopback/sub-interface) and routed LAG: the role pushes
+      ``ip mtu`` (build_l3_config_lines) - prefer ip_mtu.
+    - L2 LAG (routing: false): the role never pushes an MTU (members carry
+      it), so don't compare at all.
+
+    Falls back to top-level ``mtu`` - the previous behaviour - whenever the
+    preferred field wasn't gathered (key absent, e.g. aoscx_facts module) or
+    ``routing`` isn't explicitly reported for a LAG.
+    """
+    routing = device_intf.get("routing")
+    if type_value == "lag" and routing is False:
+        return False, None, False
+    if type_value == "virtual" or (type_value == "lag" and routing is True):
+        if "ip_mtu" in device_intf:
+            return True, device_intf.get("ip_mtu"), True
+    elif type_value != "lag":
+        user_config = device_intf.get("user_config")
+        if isinstance(user_config, dict) and "mtu" in user_config:
+            return True, user_config.get("mtu"), False
+    return True, device_intf.get("mtu"), False
+
+
+def _is_implicit_access_vlan1(device_intf):
+    """
+    Return True when the device reports an L2 interface in its default
+    VLAN state, i.e. ``vlan access 1``.
+
+    AOS-CX does not store the default: an L2 interface with ``vlan access
+    1`` in the running-config comes back from REST with vlan_mode,
+    vlan_tag and applied_* all null and vlan_trunks empty (observed on a
+    6200 VSF stack, lag1, firmware 10.16). The interface is only known to
+    be L2 from ``routing: false``, so require that explicitly - a missing
+    ``routing`` key (other fact sources) or ``routing: true`` keeps the
+    previous behaviour of treating the VLAN state as unknown.
+    """
+    return (
+        device_intf.get("routing") is False
+        and not (device_intf.get("vlan_mode") or device_intf.get("applied_vlan_mode"))
+        and not (device_intf.get("vlan_tag") or device_intf.get("applied_vlan_tag"))
+        and not (
+            device_intf.get("vlan_trunks") or device_intf.get("applied_vlan_trunks")
+        )
+    )
 
 
 def get_interfaces_needing_config_changes(
@@ -227,8 +283,7 @@ def get_interfaces_needing_config_changes(
             continue
 
         # Shallow-copy so this function never mutates the caller's input
-        # objects (docs/CODE_AUDIT.md finding F5 / CLAUDE.md 4.3 "filters
-        # are pure"). Every `_ip_changes` write below (directly or via
+        # objects (CLAUDE.md 4.3 "filters are pure"). Every `_ip_changes` write below (directly or via
         # populate_ip_changes()/compute_l3_ip_changes()/
         # compute_dhcp_relay_changes()) only ever adds a fresh top-level
         # `_ip_changes` dict, never mutates nested structures shared with
@@ -351,8 +406,10 @@ def get_interfaces_needing_config_changes(
 
             # Check MTU (if specified in NetBox)
             nb_mtu = nb_intf.get("mtu")
-            if nb_mtu and nb_mtu != "" and nb_mtu is not None:
-                device_mtu = device_intf.get("mtu")
+            compare_mtu, device_mtu, is_ip_mtu = _get_device_mtu(
+                device_intf, type_value
+            )
+            if nb_mtu and compare_mtu:
                 # device_mtu is None/falsy when the device has never had an
                 # explicit MTU pushed (e.g. no ip/mtu command sent since
                 # interface creation) - treat that as 0 rather than skipping
@@ -363,6 +420,11 @@ def get_interfaces_needing_config_changes(
                     change_reasons.append(
                         f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
                     )
+                    if is_ip_mtu:
+                        # Routed LAG: 'ip mtu' is pushed by the L3 step,
+                        # which only picks up an MTU-only change via this
+                        # flag (group_interface_ips()).
+                        nb_intf.setdefault("_ip_changes", {})["mtu_change"] = True
         else:
             # Virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces) get
             # their own description/enabled/MTU checks below (mirroring, not
@@ -378,9 +440,7 @@ def get_interfaces_needing_config_changes(
                     f"description mismatch (NB: {nb_description}, "
                     f"device: {device_description})"
                 )
-                if "_ip_changes" not in nb_intf:
-                    nb_intf["_ip_changes"] = {}
-                nb_intf["_ip_changes"]["description_change"] = True
+                nb_intf.setdefault("_ip_changes", {})["description_change"] = True
 
             # Check enabled state (shutdown/no shutdown) for VLAN SVIs and
             # sub-interfaces. Loopback interfaces do NOT support admin
@@ -396,9 +456,7 @@ def get_interfaces_needing_config_changes(
                         f"enabled mismatch (NB: {nb_enabled}, "
                         f"device: {device_enabled})"
                     )
-                    if "_ip_changes" not in nb_intf:
-                        nb_intf["_ip_changes"] = {}
-                    nb_intf["_ip_changes"]["enabled_change"] = True
+                    nb_intf.setdefault("_ip_changes", {})["enabled_change"] = True
 
                 _debug(
                     f"Interface {intf_name}: NB enabled={nb_enabled}, "
@@ -411,8 +469,8 @@ def get_interfaces_needing_config_changes(
             # every interface type (unlike admin shutdown, which loopbacks
             # don't support).
             nb_mtu = nb_intf.get("mtu")
-            if nb_mtu and nb_mtu != "" and nb_mtu is not None:
-                device_mtu = device_intf.get("mtu")
+            if nb_mtu:
+                _, device_mtu, _ = _get_device_mtu(device_intf, "virtual")
                 # See the matching comment in the physical/LAG MTU check
                 # above - device_mtu is None/falsy whenever the SVI/
                 # loopback/sub-interface has never had an explicit
@@ -422,9 +480,7 @@ def get_interfaces_needing_config_changes(
                     change_reasons.append(
                         f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
                     )
-                    if "_ip_changes" not in nb_intf:
-                        nb_intf["_ip_changes"] = {}
-                    nb_intf["_ip_changes"]["mtu_change"] = True
+                    nb_intf.setdefault("_ip_changes", {})["mtu_change"] = True
 
         # Check LAG membership
         # AOS-CX stores LAG membership in the LAG interface's "interfaces" dict,
@@ -481,6 +537,11 @@ def get_interfaces_needing_config_changes(
             device_mode = device_intf.get("vlan_mode") or device_intf.get(
                 "applied_vlan_mode"
             )
+            # Default L2 state (vlan access 1) is not reported by AOS-CX -
+            # see _is_implicit_access_vlan1().
+            implicit_access_vlan1 = _is_implicit_access_vlan1(device_intf)
+            if implicit_access_vlan1:
+                device_mode = "access"
 
             # Only check if NetBox has a mode configured
             if nb_mode:
@@ -567,6 +628,8 @@ def get_interfaces_needing_config_changes(
                                 break
                             except (ValueError, TypeError):
                                 pass
+                    elif implicit_access_vlan1:
+                        device_native = 1
 
                     device_trunks = set()
                     vlan_trunks = device_intf.get("vlan_trunks") or device_intf.get(
@@ -704,8 +767,7 @@ def get_interfaces_needing_config_changes(
         # Check L3 configuration (IP addresses)
         # Compare IP addresses defined in NetBox with those on the device.
         # IPv4/IPv6/VRF/encapsulation/anycast/link-local comparison is
-        # delegated to compute_l3_ip_changes() (interface_ip_comparisons.py)
-        # - see docs/CODE_AUDIT.md F4/F5 for why this was split out.
+        # delegated to compute_l3_ip_changes() (interface_ip_comparisons.py).
         if nb_intf.get("ip_addresses"):
             enhanced_intf = None
             if enhanced_facts and isinstance(enhanced_facts, dict):
@@ -718,9 +780,7 @@ def get_interfaces_needing_config_changes(
                 needs_change = True
                 change_reasons.extend(l3_reasons)
             if l3_ip_changes:
-                if "_ip_changes" not in nb_intf:
-                    nb_intf["_ip_changes"] = {}
-                nb_intf["_ip_changes"].update(l3_ip_changes)
+                nb_intf.setdefault("_ip_changes", {}).update(l3_ip_changes)
 
         # Check DHCP relay / ip helper-address configuration
         # Delegated to compute_dhcp_relay_changes() (interface_ip_comparisons.py).
@@ -731,9 +791,7 @@ def get_interfaces_needing_config_changes(
             needs_change = True
             change_reasons.extend(dhcp_reasons)
         if dhcp_ip_changes:
-            if "_ip_changes" not in nb_intf:
-                nb_intf["_ip_changes"] = {}
-            nb_intf["_ip_changes"].update(dhcp_ip_changes)
+            nb_intf.setdefault("_ip_changes", {}).update(dhcp_ip_changes)
 
         if needs_change:
             _debug(
@@ -829,7 +887,7 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
         return
 
     # Categorize by interface type (physical interfaces, including LAG members)
-    elif type_value not in ["lag", "virtual"]:
+    else:
         # This is a physical interface (may or may not be a LAG member)
         result_dict["physical"].append(intf)
         # Don't return - continue to categorize by L2/L3

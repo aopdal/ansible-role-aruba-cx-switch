@@ -57,6 +57,11 @@ aoscx_rest_password: "{{ vault_switch_password }}"  # REST API password
 aoscx_rest_validate_certs: false        # SSL certificate validation
 ```
 
+`aoscx_rest_api_version` is only for these direct REST calls. The
+pyaoscx-backed modules (`aoscx_facts`, `aoscx_vlan`, `aoscx_interface`, ...)
+use `ansible_aoscx_rest_version` (default `10.09`, the highest pyaoscx
+supports); leave that one unchanged.
+
 ### What it provides
 
 A single authenticated REST API session gathers:
@@ -77,6 +82,22 @@ a NetBox 4.7+ interface has a `channels` value. Hardware or firmware
 without split support may reject these attributes; a non-200 answer only
 means no `aoscx_interface_split_facts`, and the split task then reads the
 running-config instead. See [INTERFACE_SPLIT.md](INTERFACE_SPLIT.md).
+
+#### Interface MTU fields
+
+The REST API reports MTU in different fields depending on what was
+configured, and change detection compares the one the role pushes:
+
+| Interface | Role pushes | Compared field | Notes |
+| --- | --- | --- | --- |
+| Physical | `mtu` (`aoscx_interface`) | `user_config.mtu` | Top-level `mtu` isn't the configured value (seen as 9500 with `mtu 9198` configured) |
+| VLAN SVI, loopback, sub-interface, routed LAG | `ip mtu` | `ip_mtu` | `ip_mtu` is 1500 when nothing is configured |
+| L2 LAG (`routing: false`) | nothing | not compared | Member ports carry the MTU |
+
+When the preferred field wasn't gathered (for example with the
+`aoscx_facts` module), or a LAG doesn't report `routing`, the comparison
+falls back to the top-level `mtu`, as before. `ip_mtu` was accepted by the
+8360, 6200 and 6000 lab switches on firmware 10.16.
 
 ### How it works
 

@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-10-16
+
+### Added
+
+- `docs/VRF_CONFIGURATION.md`: which VRFs are configured, how RD and route
+  targets map from NetBox (including the route target `address_family`
+  custom field), change detection, route target cleanup, and known
+  limitations. Linked from the docs index, the mkdocs nav, and the NetBox
+  custom field reference.
+
+### Changed
+
+- `aoscx_rest_host`, `aoscx_rest_user` and `aoscx_rest_password` are now
+  declared in `defaults/main.yml` (defaulting to `ansible_host`,
+  `ansible_user`, `ansible_password`, as before) instead of only in a
+  comment. No behaviour change.
+- Documentation: README "Role Variables" now lists every declared variable;
+  CLAUDE.md's task-order section and dependency table match
+  `tasks/main.yml` (hostname, access-switch default gateway, VRF change
+  identification, STP, port-access, virtual-interface cleanup, interface
+  split); `nb_choice_value` is documented and internal helpers are marked
+  as such in `docs/filter_plugins/utils.md`; links from `docs/` to source
+  files were turned into code spans (README links now go to `index.md`),
+  so `mkdocs build --strict` passes.
+- Interface change lists (`_ip_changes.ipv4_to_add`, `ipv6_to_add`,
+  `ipv6_to_remove`, anycast and link-local lists, L2 `vlans_to_add` /
+  `vlans_to_remove`) are now sorted, so `-v` output and pushed `no ...`
+  lines come out in the same order on every run. Which interfaces and
+  addresses are flagged is unchanged.
+
+### Removed
+
+- `docs/CODE_AUDIT.md`. Its one open finding (F6, a second `FilterModule`
+  in `filter_plugins/rest_api_transforms.py`) is a known, harmless layout
+  choice; references to its findings in code comments, tests and docs were
+  replaced with self-contained explanations.
+
+### Fixed
+
+- Idempotent mode (`aoscx_idempotent_mode: true`) dropped some L2 trunk
+  changes it had detected. The most visible case was switching a trunk from
+  native-untagged to native-tagged (NetBox `tagged` or `tagged-all` with no
+  untagged VLAN): the change was found but the interface was never
+  reconfigured. `tasks/configure_l2_interfaces.yml` narrowed
+  `interface_changes.l2` a second time with `get_interfaces_needing_changes`,
+  which has narrower rules. Interfaces to configure now come from
+  `interface_changes.l2` in idempotent mode too, the same as standard mode,
+  and `get_interfaces_needing_changes` only builds the VLAN-removal cleanup
+  list. No filter was changed. `aoscx_force_l2_config` is no longer needed
+  as a workaround for this case. See `docs/L2_INTERFACE_MODES.md`.
+- L2 interfaces (physical, LAG, MCLAG) set to access VLAN 1 in NetBox were
+  flagged for configuration on every run, which the previous fix made visible
+  as a LAG with nothing to change. AOS-CX doesn't report the default
+  `vlan access 1`: REST returns `vlan_mode`/`vlan_tag` as null. Change
+  detection now treats an interface with no VLAN mode, tag or trunks and
+  `routing: false` as access VLAN 1. If `routing` is missing or true, the
+  previous behaviour is kept. See `docs/L2_INTERFACE_MODES.md`.
+- MTU change detection compared the wrong device field, so interfaces with
+  an MTU set in NetBox were flagged on every run. Seen on an 8360 as LAGs
+  re-pushed with `no shutdown` / `lacp mode active`. Physical ports are now
+  compared against `user_config.mtu`, where `mtu` is stored; the top-level
+  `mtu` reported 9500 with `mtu 9198` configured. VLAN SVIs, loopbacks,
+  sub-interfaces and routed LAGs are compared against `ip_mtu`, which is now
+  part of the REST interface query. L2 LAGs aren't compared, since the role
+  never pushes an MTU on them. A routed LAG with a real `ip mtu` mismatch now
+  also gets the change pushed by the L3 step, which previously ignored
+  MTU-only changes on LAGs. If a field wasn't gathered, the top-level `mtu`
+  is compared as before. See `docs/FACT_GATHERING.md`.
+
 ## [0.17.0] - 2026-10-08
 
 ### Added
@@ -940,7 +1009,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `aoscx_test_mode` variable (default `false`, `defaults/main.yml`). REST API fact gathering (`tasks/gather_facts_rest_api.yml`) now skips a feature's queries (OSPF, VSX, static routes, VRFs/VRF route-targets, STP, EVPN, VXLAN, port-access, DHCP relay) in regular runs when that feature's `aoscx_configure_*` flag is `false`, since nothing downstream would consume the facts. Set `aoscx_test_mode: true` in test/report-only playbooks (e.g. `aruba-role-testing`) to force these queries regardless of the `aoscx_configure_*` flags, so device state can still be verified against NetBox intent without the role pushing configuration. See [docs/PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md#selective-fact-gathering-with-aoscx_test_mode).
+- New `aoscx_test_mode` variable (default `false`, `defaults/main.yml`). REST API fact gathering (`tasks/gather_facts_rest_api.yml`) now skips a feature's queries (OSPF, VSX, static routes, VRFs/VRF route-targets, STP, EVPN, VXLAN, port-access, DHCP relay) in regular runs when that feature's `aoscx_configure_*` flag is `false`, since nothing downstream would consume the facts. Set `aoscx_test_mode: true` in test/report-only playbooks (e.g. `aruba-role-testing`) to force these queries regardless of the `aoscx_configure_*` flags, so device state can still be verified against NetBox intent without the role pushing configuration. See [docs/FACT_GATHERING.md](FACT_GATHERING.md#selective-fact-gathering-with-aoscx_test_mode).
 
 ### Changed
 

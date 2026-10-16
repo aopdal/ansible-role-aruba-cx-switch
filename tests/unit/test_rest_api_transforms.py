@@ -198,6 +198,23 @@ class TestRestApiToAoscxInterfaces:
         assert "forwarding_state" not in result["1/1/1"]
 
 
+class TestRestApiToAoscxInterfacesIpMtu:
+    """ip_mtu is passed through only when the REST query requested it."""
+
+    def test_ip_mtu_passed_through_when_present(self):
+        result = rest_api_to_aoscx_interfaces({"vlan5": {"ip_mtu": 9198}})
+        assert result["vlan5"]["ip_mtu"] == 9198
+
+    def test_ip_mtu_null_kept_as_none(self):
+        result = rest_api_to_aoscx_interfaces({"1/1/1": {"ip_mtu": None}})
+        assert "ip_mtu" in result["1/1/1"]
+        assert result["1/1/1"]["ip_mtu"] is None
+
+    def test_ip_mtu_absent_when_not_queried(self):
+        result = rest_api_to_aoscx_interfaces({"vlan5": {"mtu": 1500}})
+        assert "ip_mtu" not in result["vlan5"]
+
+
 class TestRestApiToAoscxVlans:
     """Tests for rest_api_to_aoscx_vlans function"""
 

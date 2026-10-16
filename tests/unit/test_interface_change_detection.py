@@ -2322,7 +2322,7 @@ class TestSubinterfaceEncapsulationChangeDetection:
 
 
 class TestGetInterfacesNeedingConfigChangesDoesNotMutateInputs:
-    """docs/CODE_AUDIT.md F5: the function must not mutate its `interfaces`
+    """The function must not mutate its `interfaces`
     argument. Every `_ip_changes` write must land on a copy returned via
     `result`, never on the caller's original interface objects."""
 

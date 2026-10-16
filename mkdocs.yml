@@ -103,6 +103,7 @@ nav:
                             - Virtual Interface Cleanup: VIRTUAL_INTERFACE_CLEANUP.md
                   - EVPN & VXLAN:
                             - Configuration Guide: EVPN_VXLAN_CONFIGURATION.md
+                  - VRFs: VRF_CONFIGURATION.md
                   - BGP: BGP_CONFIGURATION.md
                   - OSPF: OSPF_CONFIGURATION.md
                   - Static Routes: STATIC_ROUTES_CONFIGURATION.md
@@ -128,7 +129,6 @@ nav:
                   - Changelog: CHANGELOG.md
                   - Release Process:
                             - Guide: RELEASE_PROCESS.md
-                  - Code Audit: CODE_AUDIT.md
                   - Documentation Site: DOCUMENTATION_SITE.md # How to use MkDocs
                   - Documentation Sync: DOCS_SYNC_WORKFLOW.md # How README.md syncs to docs/
                   - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md

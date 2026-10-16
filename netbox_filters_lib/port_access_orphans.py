@@ -30,7 +30,3 @@ def port_access_orphans(desired, current):
         )
         out[kind] = sorted(current_names - desired_names)
     return out
-
-
-def filters():
-    return {"port_access_orphans": port_access_orphans}

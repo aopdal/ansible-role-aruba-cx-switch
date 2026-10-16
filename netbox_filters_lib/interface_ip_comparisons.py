@@ -1,14 +1,13 @@
 """
 L3 IP-related comparison helpers for interface change detection.
 
-Split out of interface_change_detection.py (docs/CODE_AUDIT.md finding F4)
-to keep get_interfaces_needing_config_changes() focused on orchestration
+Split out of interface_change_detection.py to keep get_interfaces_needing_config_changes() focused on orchestration
 (existence checks, physical/L2 property checks, categorization) while the
 IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison logic - the
 densest and most independently-testable part of that function - lives
 here as its own module.
 
-Both entry points are pure (docs/CODE_AUDIT.md finding F5): they read
+Both entry points are pure: they read
 `nb_intf` / `device_intf` / `enhanced_intf` but never mutate them, and
 return the change-reasons plus an `_ip_changes` fragment for the caller to
 merge onto its own (already-copied) interface object. See CLAUDE.md 4.3.
@@ -47,8 +46,9 @@ def _get_device_vrf_name(device_intf, enhanced_intf=None):
         VRF name string, or ``None`` when only standard facts are available and
         they carry no VRF data (caller should skip comparison).
     """
-    # Enhanced REST API facts: the 'vrf' key is always present in the
-    # normalised output from rest_api_transforms.rest_api_to_aoscx_interfaces().
+    # Enhanced REST API facts (aoscx_enhanced_interface_facts, the raw
+    # /system/interfaces response): 'vrf' is present whenever the REST query
+    # requested it, which gather_facts_rest_api.yml always does.
     # null  → default VRF (no VRF attachment on the device)
     # dict  → custom VRF, keyed by VRF name
     if isinstance(enhanced_intf, dict) and "vrf" in enhanced_intf:
@@ -332,7 +332,7 @@ def compute_l3_ip_changes(nb_intf, device_intf, enhanced_intf, intf_name):
 
         # Store IPv4 change details for task-level filtering
         if ipv4_to_add:
-            ip_changes["ipv4_to_add"] = list(ipv4_to_add)
+            ip_changes["ipv4_to_add"] = sorted(ipv4_to_add)
 
     # Anycast gateway comparison (active-gateway configuration)
     # Extract anycast IPs from NetBox (these were excluded from regular IP comparison)
@@ -479,9 +479,9 @@ def compute_l3_ip_changes(nb_intf, device_intf, enhanced_intf, intf_name):
     # Store stale anycast gateways to remove
     if anycast_ipv4_to_remove or anycast_ipv6_to_remove:
         if anycast_ipv4_to_remove:
-            ip_changes["anycast_ipv4_to_remove"] = list(anycast_ipv4_to_remove)
+            ip_changes["anycast_ipv4_to_remove"] = sorted(anycast_ipv4_to_remove)
         if anycast_ipv6_to_remove:
-            ip_changes["anycast_ipv6_to_remove"] = list(anycast_ipv6_to_remove)
+            ip_changes["anycast_ipv6_to_remove"] = sorted(anycast_ipv6_to_remove)
 
     # Store anycast IPs that need to be added
     # (restored to ip_addresses field with anycast info)
@@ -567,12 +567,12 @@ def compute_l3_ip_changes(nb_intf, device_intf, enhanced_intf, intf_name):
             )
 
     if link_local_ipv6_to_add:
-        ip_changes["link_local_ipv6_to_add"] = list(link_local_ipv6_to_add)
+        ip_changes["link_local_ipv6_to_add"] = sorted(link_local_ipv6_to_add)
 
     # Store IPv6 addresses to remove even when NetBox has no IPv6
     # (device has addresses but they were all removed from NetBox)
     if enhanced_intf and ipv6_to_remove and not nb_ipv6:
-        ip_changes["ipv6_to_remove"] = list(ipv6_to_remove)
+        ip_changes["ipv6_to_remove"] = sorted(ipv6_to_remove)
 
     # ALWAYS store IPv6 change info when enhanced facts available
     # This allows task-level filtering even when interface needs changes
@@ -585,14 +585,14 @@ def compute_l3_ip_changes(nb_intf, device_intf, enhanced_intf, intf_name):
             existing_ipv6_to_add = ip_changes.get("ipv6_to_add", [])
             new_ipv6_to_add = list(ipv6_to_add)
             # Combine and deduplicate
-            all_ipv6_to_add = list(set(existing_ipv6_to_add + new_ipv6_to_add))
+            all_ipv6_to_add = sorted(set(existing_ipv6_to_add + new_ipv6_to_add))
             ip_changes["ipv6_to_add"] = all_ipv6_to_add
-            ip_changes["ipv6_addresses"] = list(nb_ipv6)
+            ip_changes["ipv6_addresses"] = sorted(nb_ipv6)
             if ipv6_to_remove:
-                ip_changes["ipv6_to_remove"] = list(ipv6_to_remove)
+                ip_changes["ipv6_to_remove"] = sorted(ipv6_to_remove)
         else:
             # No enhanced facts - store all addresses for reference
-            ip_changes["ipv6_addresses"] = list(nb_ipv6)
+            ip_changes["ipv6_addresses"] = sorted(nb_ipv6)
 
     return needs_change, change_reasons, ip_changes
 

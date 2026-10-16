@@ -81,12 +81,8 @@
     - name: Debug - Show interfaces analysis
       ansible.builtin.debug:
         msg:
-          - "Interfaces needing cleanup: {{ interfaces_needing_changes.cleanup | length }}"
-          - "Interfaces needing configuration: {{ interfaces_needing_changes.configure | length }}"
-          - "Total L2 interfaces in NetBox: {{ interface_changes.l2 | default([]) | length }}"
-          - >-
-            Interfaces already correct (skipped):
-            {{ (interface_changes.l2 | default([]) | length) - (interfaces_needing_changes.configure | length) }}
+          - "Interfaces needing VLAN cleanup: {{ interfaces_needing_changes.cleanup | length }}"
+          - "L2 interfaces needing configuration: {{ interface_changes.l2 | default([]) | length }}"
       when:
         - interface_changes.l2 is defined
         - aoscx_debug | bool or ansible_verbosity >= 1
@@ -104,19 +100,24 @@
 
 # Determine which interfaces to configure based on mode:
 # - Force mode: ALL L2 interfaces from NetBox (bypasses change detection)
-# - Idempotent mode: Use filtered list from change analysis
-# - Standard mode: Only interfaces detected as needing changes
+# - Standard and idempotent mode: interfaces detected as needing changes
+#   (interface_changes.l2, from identify_interface_changes.yml)
+#
+# Idempotent mode deliberately does NOT narrow this list further with
+# interfaces_needing_changes.configure: get_interfaces_needing_changes()
+# (comparison.py) uses a narrower rule set than
+# get_interfaces_needing_config_changes() - no native-tagged handling, no
+# native VLAN found in vlan_trunks - and silently dropped changes detected
+# here (e.g. native-untagged -> native-tagged). It is used only for the
+# Phase 1 VLAN-removal cleanup list above. See
+# tests/unit/test_l2_selection_pipeline.py.
 - name: Set interfaces to configure based on mode
   ansible.builtin.set_fact:
     interfaces_to_configure: >-
       {{
         (interfaces | selectattr('mode', 'defined') | list)
         if (aoscx_force_l2_config | default(false) | bool)
-        else (
-          (interface_changes.l2 | default([]) | select_interfaces_to_configure(aoscx_idempotent_mode, interfaces_needing_changes))
-          if (aoscx_idempotent_mode | bool)
-          else (interface_changes.l2 | default([]))
-        )
+        else (interface_changes.l2 | default([]))
       }}
 
 - name: Categorize interfaces for L2 configuration

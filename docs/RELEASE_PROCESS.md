@@ -59,7 +59,7 @@ MAJOR.MINOR.PATCH
 | Minor | `0.5.1` → `0.6.0` | New feature |
 | Major | `0.6.0` → `1.0.0` | Breaking change |
 
-The current version is stored in [`VERSION`](../VERSION) as a single plain-text line.
+The current version is stored in `VERSION` as a single plain-text line.
 
 > **Note**: This is an Ansible **Role** (not a Collection). Roles use `meta/main.yml` for
 > Galaxy metadata; the `VERSION` file is the version source of truth, not `galaxy.yml`.

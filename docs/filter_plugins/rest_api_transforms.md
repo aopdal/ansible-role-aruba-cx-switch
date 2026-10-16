@@ -59,7 +59,7 @@ Takes the raw dict from a `GET /system/interfaces?depth=2` REST API call and nor
 
 #### Returns
 
-- **dict**: Normalized interface data with consistent field names. Keys are interface names, values contain: `name`, `admin`, `user_config`, `description`, `mtu`, `type`, `ip4_address`, `ip4_address_secondary`, `ip6_addresses`, `vsx_virtual_ip4`, `vsx_virtual_ip6`, `vsx_virtual_gw_mac_v4`, `vsx_virtual_gw_mac_v6`, `vlan_mode`, `vlan_tag`, `vlan_trunks`, `lacp_status`, `bond_status`, `routing`, `vrf`, `other_config`.
+- **dict**: Normalized interface data with consistent field names. Keys are interface names, values contain: `name`, `admin`, `user_config`, `description`, `mtu`, `type`, `ip4_address`, `ip4_address_secondary`, `ip6_addresses`, `vsx_virtual_ip4`, `vsx_virtual_ip6`, `vsx_virtual_gw_mac_v4`, `vsx_virtual_gw_mac_v6`, `vlan_mode`, `vlan_tag`, `vlan_trunks`, `lacp_status`, `bond_status`, `routing`, `vrf`, `other_config`, and `ip_mtu` when the query requested it (left out otherwise, so "not gathered" can be told apart from a value).
 
 #### Usage Example
 

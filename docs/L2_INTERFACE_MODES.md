@@ -53,6 +53,16 @@ aoscx_rest_validate_certs: false  # adjust for your environment
 REST API credentials default to `ansible_host` / `ansible_user` / `ansible_password`. Override
 with `aoscx_rest_host`, `aoscx_rest_user`, `aoscx_rest_password` if needed.
 
+### Default access VLAN 1 is not reported
+
+AOS-CX doesn't store an L2 interface's default VLAN state. A port or LAG with
+`vlan access 1` in the running-config is returned from REST with `vlan_mode`,
+`vlan_tag` and `applied_*` all null, and `vlan_trunks` empty. Change detection
+treats that state as access VLAN 1 when the interface also reports `routing: false`.
+A NetBox interface set to access VLAN 1 then compares as unchanged. Without
+`routing: false` (other fact sources, or a routed interface), the VLAN state is
+treated as unknown and the interface is flagged for configuration, as before.
+
 ---
 
 ## Configuration Modes
@@ -82,6 +92,7 @@ aoscx_idempotent_mode: true
 - **Phase 1**: Runs cleanup (`cleanup_l2_vlans.yml`) for interfaces identified as needing
   cleanup
 - **Phase 2**: Applies configurations for interfaces identified as needing changes
+  (`interface_changes.l2` - the same list standard mode uses)
 - Ensures the device matches NetBox exactly
 - Suitable for ongoing drift detection and compliance enforcement
 
@@ -102,8 +113,8 @@ aoscx_force_l2_config: true
 
 - Bypasses change detection entirely
 - Configures **all** L2 interfaces from NetBox regardless of current device state
-- Useful when mode changes (e.g. `native-untagged` ↔ `native-tagged`) confuse change
-  detection
+- Fallback for cases change detection doesn't model (for example when device facts are
+  incomplete)
 - Takes precedence over `aoscx_idempotent_mode`
 
 ---
@@ -124,9 +135,9 @@ flowchart TD
 
     CheckForce -->|false| CheckMode{aoscx_idempotent_mode?}
 
-    CheckMode -->|true| Analyze[get_interfaces_needing_changes\non interface_changes.l2]
+    CheckMode -->|true| Analyze[get_interfaces_needing_changes\non interface_changes.l2\ncleanup list only]
     Analyze --> Cleanup[Phase 1: cleanup_l2_vlans.yml\nfor interfaces needing cleanup]
-    Cleanup --> IdempotentSet[select_interfaces_to_configure\nfrom interface_changes.l2]
+    Cleanup --> IdempotentSet[Use interface_changes.l2\ndirectly]
 
     CheckMode -->|false| StandardSet[Use interface_changes.l2\ndirectly]
 
@@ -163,8 +174,7 @@ flowchart TD
 | Filter | Purpose | Used In |
 |--------|---------|---------|
 | `get_interfaces_needing_config_changes` | Cross-references NetBox interfaces with device facts to produce `interface_changes` | `identify_interface_changes.yml` (prerequisite) |
-| `get_interfaces_needing_changes` | Within idempotent mode, refines `interface_changes.l2` to `cleanup` and `configure` lists | Idempotent mode only |
-| `select_interfaces_to_configure` | Picks the final `configure` list from the refined analysis | Idempotent mode only |
+| `get_interfaces_needing_changes` | Within idempotent mode, builds the VLAN-removal `cleanup` list from `interface_changes.l2`. Its `configure` list is **not** used to select interfaces: its rules are narrower (no native-tagged handling) and it used to drop detected changes | Idempotent mode only (cleanup) |
 | `categorize_l2_interfaces` | Groups interfaces into access/tagged/tagged-all × physical/LAG/MCLAG | All modes |
 | `compare_interface_vlans` | Compares a single interface's NetBox vs device VLAN state | Called by `get_interfaces_needing_changes` |
 
@@ -178,6 +188,8 @@ flowchart TD
 | `aoscx_idempotent_mode` | `false` | Enable full sync with cleanup |
 | `aoscx_force_l2_config` | `false` | Bypass change detection, configure all interfaces |
 | `aoscx_configure_l2_interfaces` | `true` | Enable/disable L2 interface configuration |
+| `aoscx_configure_lag_interfaces` | `true` | Create and configure LAG interfaces (description, enable, LACP) and assign members |
+| `aoscx_configure_mclag_interfaces` | `true` | Same for MCLAG (multi-chassis) LAGs on VSX pairs |
 | `aoscx_gather_facts` | `true` | Enable fact gathering |
 | `aoscx_debug` | `false` | Enable verbose debug output |
 
@@ -240,8 +252,9 @@ aoscx_force_l2_config: true
 
 ### Change Detection Not Working (Mode Type Mismatch)
 
-If you switch an interface between `native-untagged` and `native-tagged`, the change
-detection may not catch it correctly. Use force mode for that run:
+Switching a trunk between `native-untagged` and `native-tagged` is detected by
+`get_interfaces_needing_config_changes` and pushed in both standard and idempotent mode.
+If an interface still isn't reconfigured, use force mode for that run:
 
 ```yaml
 aoscx_force_l2_config: true

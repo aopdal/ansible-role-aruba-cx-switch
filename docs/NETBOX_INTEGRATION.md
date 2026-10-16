@@ -36,6 +36,7 @@ Custom fields provide **per-device control** over which features are enabled. Th
 | `if_stp_edge_port` | Boolean | Interface | No | Set port-type admin-edge (PortFast equivalent) | `configure_stp.yml` |
 | `if_stp_root_guard` | Boolean | Interface | No | Enable/disable Root Guard on an L2 interface | `configure_stp.yml` |
 | `if_ip_helper` | Boolean | Interface | No | Enable DHCP relay (`ip helper-address`) on an L3 interface | `configure_l3_interfaces.yml` |
+| `address_family` | Selection (`ipv4`, `ipv6`) | Route target | No (defaults to `ipv4`) | Address-family block a VRF route target is configured under | `identify_vrf_changes.yml` (see [VRF_CONFIGURATION.md](VRF_CONFIGURATION.md)) |
 
 ### Select custom fields and NetBox versions
 
