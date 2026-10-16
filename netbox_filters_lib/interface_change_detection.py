@@ -425,9 +425,7 @@ def get_interfaces_needing_config_changes(
                         # Routed LAG: 'ip mtu' is pushed by the L3 step,
                         # which only picks up an MTU-only change via this
                         # flag (group_interface_ips()).
-                        if "_ip_changes" not in nb_intf:
-                            nb_intf["_ip_changes"] = {}
-                        nb_intf["_ip_changes"]["mtu_change"] = True
+                        nb_intf.setdefault("_ip_changes", {})["mtu_change"] = True
         else:
             # Virtual interfaces (VLAN SVIs, loopbacks, sub-interfaces) get
             # their own description/enabled/MTU checks below (mirroring, not
@@ -443,9 +441,7 @@ def get_interfaces_needing_config_changes(
                     f"description mismatch (NB: {nb_description}, "
                     f"device: {device_description})"
                 )
-                if "_ip_changes" not in nb_intf:
-                    nb_intf["_ip_changes"] = {}
-                nb_intf["_ip_changes"]["description_change"] = True
+                nb_intf.setdefault("_ip_changes", {})["description_change"] = True
 
             # Check enabled state (shutdown/no shutdown) for VLAN SVIs and
             # sub-interfaces. Loopback interfaces do NOT support admin
@@ -461,9 +457,7 @@ def get_interfaces_needing_config_changes(
                         f"enabled mismatch (NB: {nb_enabled}, "
                         f"device: {device_enabled})"
                     )
-                    if "_ip_changes" not in nb_intf:
-                        nb_intf["_ip_changes"] = {}
-                    nb_intf["_ip_changes"]["enabled_change"] = True
+                    nb_intf.setdefault("_ip_changes", {})["enabled_change"] = True
 
                 _debug(
                     f"Interface {intf_name}: NB enabled={nb_enabled}, "
@@ -487,9 +481,7 @@ def get_interfaces_needing_config_changes(
                     change_reasons.append(
                         f"MTU mismatch (NB: {nb_mtu}, device: {device_mtu})"
                     )
-                    if "_ip_changes" not in nb_intf:
-                        nb_intf["_ip_changes"] = {}
-                    nb_intf["_ip_changes"]["mtu_change"] = True
+                    nb_intf.setdefault("_ip_changes", {})["mtu_change"] = True
 
         # Check LAG membership
         # AOS-CX stores LAG membership in the LAG interface's "interfaces" dict,
@@ -790,9 +782,7 @@ def get_interfaces_needing_config_changes(
                 needs_change = True
                 change_reasons.extend(l3_reasons)
             if l3_ip_changes:
-                if "_ip_changes" not in nb_intf:
-                    nb_intf["_ip_changes"] = {}
-                nb_intf["_ip_changes"].update(l3_ip_changes)
+                nb_intf.setdefault("_ip_changes", {}).update(l3_ip_changes)
 
         # Check DHCP relay / ip helper-address configuration
         # Delegated to compute_dhcp_relay_changes() (interface_ip_comparisons.py).
@@ -803,9 +793,7 @@ def get_interfaces_needing_config_changes(
             needs_change = True
             change_reasons.extend(dhcp_reasons)
         if dhcp_ip_changes:
-            if "_ip_changes" not in nb_intf:
-                nb_intf["_ip_changes"] = {}
-            nb_intf["_ip_changes"].update(dhcp_ip_changes)
+            nb_intf.setdefault("_ip_changes", {}).update(dhcp_ip_changes)
 
         if needs_change:
             _debug(
@@ -901,7 +889,7 @@ def _categorize_interface_for_changes(intf, result_dict, needs_change=True):
         return
 
     # Categorize by interface type (physical interfaces, including LAG members)
-    elif type_value not in ["lag", "virtual"]:
+    else:
         # This is a physical interface (may or may not be a LAG member)
         result_dict["physical"].append(intf)
         # Don't return - continue to categorize by L2/L3

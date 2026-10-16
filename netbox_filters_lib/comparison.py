@@ -121,8 +121,8 @@ def compare_interface_vlans(netbox_interface, device_facts_interface):
             result["needs_change"] = True
 
         # Compare trunk VLANs
-        result["vlans_to_add"] = list(nb_all_vlans - device_trunks)
-        result["vlans_to_remove"] = list(device_trunks - nb_all_vlans)
+        result["vlans_to_add"] = sorted(nb_all_vlans - device_trunks)
+        result["vlans_to_remove"] = sorted(device_trunks - nb_all_vlans)
 
         if result["vlans_to_add"] or result["vlans_to_remove"]:
             result["needs_change"] = True

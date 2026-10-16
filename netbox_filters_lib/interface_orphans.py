@@ -50,7 +50,3 @@ def get_virtual_interfaces_to_delete(desired_interfaces, device_interfaces):
         for name in device_interfaces
         if _is_virtual_interface(name) and name not in desired_names
     )
-
-
-def filters():
-    return {"get_virtual_interfaces_to_delete": get_virtual_interfaces_to_delete}

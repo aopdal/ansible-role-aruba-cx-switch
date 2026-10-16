@@ -640,3 +640,20 @@ class TestGetInterfacesNeedingChangesCleanup:
         entry = result["cleanup"][0]
         assert entry["is_lag"] is False
         assert entry["is_mclag"] is False
+
+
+def test_vlan_change_lists_sorted():
+    nb = {
+        "name": "1/1/1",
+        "mode": {"value": "tagged"},
+        "untagged_vlan": {"vid": 10},
+        "tagged_vlans": [{"vid": 300}, {"vid": 20}, {"vid": 100}],
+    }
+    device = {
+        "vlan_mode": "native-untagged",
+        "vlan_tag": {"10": "x"},
+        "vlan_trunks": {"10": "x", "900": "x", "50": "x", "400": "x"},
+    }
+    result = compare_interface_vlans(nb, device)
+    assert result["vlans_to_add"] == [20, 100, 300]
+    assert result["vlans_to_remove"] == [50, 400, 900]

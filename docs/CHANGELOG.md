@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Interface change lists (`_ip_changes.ipv4_to_add`, `ipv6_to_add`,
+  `ipv6_to_remove`, anycast and link-local lists, L2 `vlans_to_add` /
+  `vlans_to_remove`) are now sorted, so `-v` output and pushed `no ...`
+  lines come out in the same order on every run. Which interfaces and
+  addresses are flagged is unchanged.
+
 ### Fixed
 
 - Idempotent mode (`aoscx_idempotent_mode: true`) dropped some L2 trunk

@@ -443,3 +443,30 @@ class TestComputeDhcpRelayChanges:
             ip_helper_addresses={"default": {"1": "10.0.0.53"}},
         )
         assert nb_intf == nb_before
+
+
+class TestIpChangeListsAreSorted:
+    """Set-derived change lists are sorted so output is stable between runs."""
+
+    def test_ipv4_and_ipv6_lists_sorted(self):
+        nb_intf = {
+            "name": "vlan10",
+            "type": {"value": "virtual"},
+            "vrf": None,
+            "ip_addresses": [
+                {"address": "10.0.2.1/24"},
+                {"address": "10.0.1.1/24"},
+                {"address": "2001:db8::30/64"},
+                {"address": "2001:db8::10/64"},
+                {"address": "2001:db8::20/64"},
+            ],
+        }
+        enhanced = {
+            "vrf": None,
+            "ip6_addresses": {"2001%3Adb8%3A%3A99%2F64": {}, "2001%3Adb8%3A%3A88%2F64": {}},
+        }
+        _, _, changes = compute_l3_ip_changes(nb_intf, {}, enhanced, "vlan10")
+        for key in ("ipv4_to_add", "ipv6_to_add", "ipv6_to_remove", "ipv6_addresses"):
+            assert changes[key] == sorted(changes[key]), key
+        assert changes["ipv4_to_add"] == ["10.0.1.1/24", "10.0.2.1/24"]
+        assert changes["ipv6_to_remove"] == ["2001:db8::88/64", "2001:db8::99/64"]
