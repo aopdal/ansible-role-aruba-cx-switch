@@ -128,7 +128,6 @@ nav:
                   - Changelog: CHANGELOG.md
                   - Release Process:
                             - Guide: RELEASE_PROCESS.md
-                  - Code Audit: CODE_AUDIT.md
                   - Documentation Site: DOCUMENTATION_SITE.md # How to use MkDocs
                   - Documentation Sync: DOCS_SYNC_WORKFLOW.md # How README.md syncs to docs/
                   - Documentation on own server: GITHUB_ACTIONS_DEPLOYMENT.md

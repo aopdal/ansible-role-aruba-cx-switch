@@ -2,11 +2,11 @@
 Unit tests for netbox_filters_lib.interface_ip_comparisons
 
 Covers the IPv4/IPv6/VRF/encapsulation/anycast/link-local/DHCP-relay
-comparison logic split out of interface_change_detection.py per
-docs/CODE_AUDIT.md finding F4. See test_interface_change_detection.py for
+comparison logic split out of interface_change_detection.py. See
+test_interface_change_detection.py for
 end-to-end coverage through get_interfaces_needing_config_changes(); these
 tests exercise compute_l3_ip_changes()/compute_dhcp_relay_changes()
-directly and confirm they are pure (finding F5).
+directly and confirm they are pure.
 """
 import copy
 

@@ -176,7 +176,6 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 - **[NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md)** - NetBox integration reference
 - **[AUTOMATION_ECOSYSTEM.md](AUTOMATION_ECOSYSTEM.md)** - Architecture overview, with diagrams inlined next to the sections they illustrate
 - **[EXAMPLES.md](EXAMPLES.md)** - Overview of the runnable examples under [examples/](../examples/)
-- **[CODE_AUDIT.md](CODE_AUDIT.md)** - Internal code-quality audit (mostly resolved; kept for the one open item and as a historical record)
 
 ### Release Process
 

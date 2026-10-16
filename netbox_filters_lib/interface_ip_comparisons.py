@@ -1,14 +1,13 @@
 """
 L3 IP-related comparison helpers for interface change detection.
 
-Split out of interface_change_detection.py (docs/CODE_AUDIT.md finding F4)
-to keep get_interfaces_needing_config_changes() focused on orchestration
+Split out of interface_change_detection.py to keep get_interfaces_needing_config_changes() focused on orchestration
 (existence checks, physical/L2 property checks, categorization) while the
 IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison logic - the
 densest and most independently-testable part of that function - lives
 here as its own module.
 
-Both entry points are pure (docs/CODE_AUDIT.md finding F5): they read
+Both entry points are pure: they read
 `nb_intf` / `device_intf` / `enhanced_intf` but never mutate them, and
 return the change-reasons plus an `_ip_changes` fragment for the caller to
 merge onto its own (already-copied) interface object. See CLAUDE.md 4.3.

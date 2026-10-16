@@ -39,7 +39,7 @@ Provides functions to compare NetBox interface configuration with device facts
 and identify which interfaces need configuration changes.
 
 The IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison logic lives in
-interface_ip_comparisons.py (split out per docs/CODE_AUDIT.md finding F4);
+interface_ip_comparisons.py;
 this module handles orchestration - existence checks, physical/L2 property
 checks, and categorization.
 """
@@ -283,8 +283,7 @@ def get_interfaces_needing_config_changes(
             continue
 
         # Shallow-copy so this function never mutates the caller's input
-        # objects (docs/CODE_AUDIT.md finding F5 / CLAUDE.md 4.3 "filters
-        # are pure"). Every `_ip_changes` write below (directly or via
+        # objects (CLAUDE.md 4.3 "filters are pure"). Every `_ip_changes` write below (directly or via
         # populate_ip_changes()/compute_l3_ip_changes()/
         # compute_dhcp_relay_changes()) only ever adds a fresh top-level
         # `_ip_changes` dict, never mutates nested structures shared with
@@ -768,8 +767,7 @@ def get_interfaces_needing_config_changes(
         # Check L3 configuration (IP addresses)
         # Compare IP addresses defined in NetBox with those on the device.
         # IPv4/IPv6/VRF/encapsulation/anycast/link-local comparison is
-        # delegated to compute_l3_ip_changes() (interface_ip_comparisons.py)
-        # - see docs/CODE_AUDIT.md F4/F5 for why this was split out.
+        # delegated to compute_l3_ip_changes() (interface_ip_comparisons.py).
         if nb_intf.get("ip_addresses"):
             enhanced_intf = None
             if enhanced_facts and isinstance(enhanced_facts, dict):

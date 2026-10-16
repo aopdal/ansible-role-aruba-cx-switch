@@ -364,7 +364,7 @@ filter_plugins/
   ip_changes)` instead of writing `_ip_changes` onto the interface dict —
   and `get_interfaces_needing_config_changes()` now shallow-copies each
   interface at the top of its loop so it no longer mutates the `interfaces`
-  list passed in by the caller (see docs/CODE_AUDIT.md findings F4/F5). No
+  list passed in by the caller. No
   behavior change; the public filter's signature and output are unchanged.
 
 **Note**: The `interface_filters.py` module was split into three focused modules in November 2025:

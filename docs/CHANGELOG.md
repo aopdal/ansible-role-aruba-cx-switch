@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- `docs/CODE_AUDIT.md`. Its one open finding (F6, a second `FilterModule`
+  in `filter_plugins/rest_api_transforms.py`) is a known, harmless layout
+  choice; references to its findings in code comments, tests and docs were
+  replaced with self-contained explanations.
+
 ### Changed
 
 - Interface change lists (`_ip_changes.ipv4_to_add`, `ipv6_to_add`,
@@ -980,7 +987,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New `aoscx_test_mode` variable (default `false`, `defaults/main.yml`). REST API fact gathering (`tasks/gather_facts_rest_api.yml`) now skips a feature's queries (OSPF, VSX, static routes, VRFs/VRF route-targets, STP, EVPN, VXLAN, port-access, DHCP relay) in regular runs when that feature's `aoscx_configure_*` flag is `false`, since nothing downstream would consume the facts. Set `aoscx_test_mode: true` in test/report-only playbooks (e.g. `aruba-role-testing`) to force these queries regardless of the `aoscx_configure_*` flags, so device state can still be verified against NetBox intent without the role pushing configuration. See [docs/PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md#selective-fact-gathering-with-aoscx_test_mode).
+- New `aoscx_test_mode` variable (default `false`, `defaults/main.yml`). REST API fact gathering (`tasks/gather_facts_rest_api.yml`) now skips a feature's queries (OSPF, VSX, static routes, VRFs/VRF route-targets, STP, EVPN, VXLAN, port-access, DHCP relay) in regular runs when that feature's `aoscx_configure_*` flag is `false`, since nothing downstream would consume the facts. Set `aoscx_test_mode: true` in test/report-only playbooks (e.g. `aruba-role-testing`) to force these queries regardless of the `aoscx_configure_*` flags, so device state can still be verified against NetBox intent without the role pushing configuration. See [docs/FACT_GATHERING.md](FACT_GATHERING.md#selective-fact-gathering-with-aoscx_test_mode).
 
 ### Changed
 
