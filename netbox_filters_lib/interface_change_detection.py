@@ -98,6 +98,29 @@ def _get_device_enabled_state(device_intf):
     return device_admin_state == "up" if device_admin_state else None
 
 
+def _is_implicit_access_vlan1(device_intf):
+    """
+    Return True when the device reports an L2 interface in its default
+    VLAN state, i.e. ``vlan access 1``.
+
+    AOS-CX does not store the default: an L2 interface with ``vlan access
+    1`` in the running-config comes back from REST with vlan_mode,
+    vlan_tag and applied_* all null and vlan_trunks empty (observed on a
+    6300 VSF stack, lag1, firmware 10.16). The interface is only known to
+    be L2 from ``routing: false``, so require that explicitly - a missing
+    ``routing`` key (other fact sources) or ``routing: true`` keeps the
+    previous behaviour of treating the VLAN state as unknown.
+    """
+    return (
+        device_intf.get("routing") is False
+        and not (device_intf.get("vlan_mode") or device_intf.get("applied_vlan_mode"))
+        and not (device_intf.get("vlan_tag") or device_intf.get("applied_vlan_tag"))
+        and not (
+            device_intf.get("vlan_trunks") or device_intf.get("applied_vlan_trunks")
+        )
+    )
+
+
 def get_interfaces_needing_config_changes(
     interfaces,
     device_facts,
@@ -481,6 +504,11 @@ def get_interfaces_needing_config_changes(
             device_mode = device_intf.get("vlan_mode") or device_intf.get(
                 "applied_vlan_mode"
             )
+            # Default L2 state (vlan access 1) is not reported by AOS-CX -
+            # see _is_implicit_access_vlan1().
+            implicit_access_vlan1 = _is_implicit_access_vlan1(device_intf)
+            if implicit_access_vlan1:
+                device_mode = "access"
 
             # Only check if NetBox has a mode configured
             if nb_mode:
@@ -567,6 +595,8 @@ def get_interfaces_needing_config_changes(
                                 break
                             except (ValueError, TypeError):
                                 pass
+                    elif implicit_access_vlan1:
+                        device_native = 1
 
                     device_trunks = set()
                     vlan_trunks = device_intf.get("vlan_trunks") or device_intf.get(

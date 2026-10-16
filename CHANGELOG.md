@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `get_interfaces_needing_changes` only builds the VLAN-removal cleanup
   list. No filter was changed. `aoscx_force_l2_config` is no longer needed
   as a workaround for this case. See `docs/L2_INTERFACE_MODES.md`.
+- L2 interfaces (physical, LAG, MCLAG) set to access VLAN 1 in NetBox were
+  flagged for configuration on every run, which the previous fix made visible
+  as a LAG with nothing to change. AOS-CX doesn't report the default
+  `vlan access 1`: REST returns `vlan_mode`/`vlan_tag` as null. Change
+  detection now treats an interface with no VLAN mode, tag or trunks and
+  `routing: false` as access VLAN 1. If `routing` is missing or true, the
+  previous behaviour is kept. See `docs/L2_INTERFACE_MODES.md`.
 
 ## [0.17.0] - 2026-10-08
 

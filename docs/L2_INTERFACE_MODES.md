@@ -53,6 +53,16 @@ aoscx_rest_validate_certs: false  # adjust for your environment
 REST API credentials default to `ansible_host` / `ansible_user` / `ansible_password`. Override
 with `aoscx_rest_host`, `aoscx_rest_user`, `aoscx_rest_password` if needed.
 
+### Default access VLAN 1 is not reported
+
+AOS-CX doesn't store an L2 interface's default VLAN state. A port or LAG with
+`vlan access 1` in the running-config is returned from REST with `vlan_mode`,
+`vlan_tag` and `applied_*` all null, and `vlan_trunks` empty. Change detection
+treats that state as access VLAN 1 when the interface also reports `routing: false`.
+A NetBox interface set to access VLAN 1 then compares as unchanged. Without
+`routing: false` (other fact sources, or a routed interface), the VLAN state is
+treated as unknown and the interface is flagged for configuration, as before.
+
 ---
 
 ## Configuration Modes
