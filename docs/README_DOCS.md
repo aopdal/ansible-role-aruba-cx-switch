@@ -106,6 +106,13 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
   with vault indirection, VRF-name matching rules, and
   cleartext-to-ciphertext migration.
 
+### VRFs
+
+- **[VRF_CONFIGURATION.md](VRF_CONFIGURATION.md)** - VRF reference: which
+  VRFs are configured, RD and route targets from NetBox (the route target
+  `address_family` custom field), change detection, route target cleanup,
+  and known limitations (VRFs and RDs are never removed).
+
 ### Static Routes
 
 - **[STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md)** - Static route

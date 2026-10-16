@@ -257,6 +257,7 @@ index. Highlights:
 - **[docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md)** - Base system configuration (banner, timezone, NTP, DNS)
 - **[docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md)** - VLAN change workflow
 - **[docs/EVPN_VXLAN_CONFIGURATION.md](docs/EVPN_VXLAN_CONFIGURATION.md)** - EVPN/VXLAN configuration
+- **[docs/VRF_CONFIGURATION.md](docs/VRF_CONFIGURATION.md)** - VRFs, route distinguishers and route targets
 - **[docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)** - BGP/EVPN configuration guide
 - **[docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md)** - OSPF configuration reference
 - **[docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)** - Static routes configuration

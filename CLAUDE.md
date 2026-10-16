@@ -286,6 +286,7 @@ Update the relevant topic page when you touch its area:
 | VLANs / VLAN cleanup                          | [docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md](docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md) (includes "For Developers" section) |
 | L2 interfaces                                 | [docs/L2_INTERFACE_MODES.md](docs/L2_INTERFACE_MODES.md)                                     |
 | L3 / anycast / loopback                       | [docs/ANYCAST_GATEWAY.md](docs/ANYCAST_GATEWAY.md)                                           |
+| VRFs / route targets                          | [docs/VRF_CONFIGURATION.md](docs/VRF_CONFIGURATION.md)                                       |
 | BGP                                           | [docs/BGP_CONFIGURATION.md](docs/BGP_CONFIGURATION.md)                                       |
 | OSPF                                          | [docs/OSPF_CONFIGURATION.md](docs/OSPF_CONFIGURATION.md)                                     |
 | Static routes                                 | [docs/STATIC_ROUTES_CONFIGURATION.md](docs/STATIC_ROUTES_CONFIGURATION.md)                   |

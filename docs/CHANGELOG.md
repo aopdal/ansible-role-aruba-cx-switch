@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   choice; references to its findings in code comments, tests and docs were
   replaced with self-contained explanations.
 
+### Added
+
+- `docs/VRF_CONFIGURATION.md`: which VRFs are configured, how RD and route
+  targets map from NetBox (including the route target `address_family`
+  custom field), change detection, route target cleanup, and known
+  limitations. Linked from the docs index, the mkdocs nav, and the NetBox
+  custom field reference.
+
 ### Changed
 
 - `aoscx_rest_host`, `aoscx_rest_user` and `aoscx_rest_password` are now
