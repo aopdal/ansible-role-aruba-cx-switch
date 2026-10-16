@@ -132,7 +132,7 @@
 - name: Set interface attributes to query
   ansible.builtin.set_fact:
     _rest_interface_base_attrs: "{{
-      'name,admin,user_config,description,mtu,type,' ~
+      'name,admin,user_config,description,mtu,ip_mtu,type,' ~
       'interfaces,ip4_address,ip6_addresses,' ~
       'ip6_address_link_local,' ~
       'vlan_mode,vlan_tag,vlan_trunks,lacp_status,bond_status,' ~

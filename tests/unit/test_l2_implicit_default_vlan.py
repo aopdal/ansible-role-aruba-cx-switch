@@ -3,7 +3,7 @@ AOS-CX does not report the default L2 state in REST facts.
 
 An L2 interface configured as `vlan access 1` (the platform default) is
 returned with vlan_mode/vlan_tag null and vlan_trunks empty, observed on a
-6300 VSF stack (lag1, firmware 10.16) while `show running-config interface
+6200 VSF stack (lag1, firmware 10.16) while `show running-config interface
 lag1` showed `vlan access 1`. `routing: false` is the only signal that the
 interface is L2. Change detection must treat that state as access VLAN 1,
 otherwise a NetBox access-VLAN-1 interface is flagged on every run.

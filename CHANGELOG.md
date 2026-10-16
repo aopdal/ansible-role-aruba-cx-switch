@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   detection now treats an interface with no VLAN mode, tag or trunks and
   `routing: false` as access VLAN 1. If `routing` is missing or true, the
   previous behaviour is kept. See `docs/L2_INTERFACE_MODES.md`.
+- MTU change detection compared the wrong device field, so interfaces with
+  an MTU set in NetBox were flagged on every run. Seen on an 8360 as LAGs
+  re-pushed with `no shutdown` / `lacp mode active`. Physical ports are now
+  compared against `user_config.mtu`, where `mtu` is stored; the top-level
+  `mtu` reported 9500 with `mtu 9198` configured. VLAN SVIs, loopbacks,
+  sub-interfaces and routed LAGs are compared against `ip_mtu`, which is now
+  part of the REST interface query. L2 LAGs aren't compared, since the role
+  never pushes an MTU on them. A routed LAG with a real `ip mtu` mismatch now
+  also gets the change pushed by the L3 step, which previously ignored
+  MTU-only changes on LAGs. If a field wasn't gathered, the top-level `mtu`
+  is compared as before. See `docs/FACT_GATHERING.md`.
 
 ## [0.17.0] - 2026-10-08
 
