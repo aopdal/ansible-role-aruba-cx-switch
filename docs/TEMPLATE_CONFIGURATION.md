@@ -164,6 +164,13 @@ ok: [device-1] => {
 }
 ```
 
+## Role variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `aoscx_generate_template_config` | `false` | Render the starting-point configs |
+| `aoscx_template_config_output_dir` | `/tmp` | Directory the rendered files are written to |
+
 ## Template Variables
 
 Before rendering templates, the role gathers VRF and VLAN data using `gather_template_data.yml`. This ensures all necessary NetBox data is available to templates.

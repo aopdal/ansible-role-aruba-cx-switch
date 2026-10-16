@@ -53,7 +53,7 @@ pip install -r requirements.txt
 - `arubanetworks.aoscx` >= 4.5.1 - Aruba AOS-CX modules
 - `netbox.netbox` >= 3.23.0 - NetBox inventory and modules
 - `ansible.utils` >= 6.0.0 - `ipaddr` and other filters used throughout tasks/templates
-- `ansible.netcommon` >= 8.0.0 - Provides the `network_cli` connection plugin used by `aoscx_config`/`aoscx_command` tasks (see [CLAUDE.md §4.2](../CLAUDE.md))
+- `ansible.netcommon` >= 8.0.0 - Provides the `network_cli` connection plugin used by `aoscx_config`/`aoscx_command` tasks (see CLAUDE.md §4.2)
 - `community.docker` >= 3.10.2 - Molecule Docker driver (development/testing only)
 - `ansible.posix` >= 1.4.0 - Development/testing only
 

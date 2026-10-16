@@ -26,7 +26,7 @@ Both the custom field and config_context must be set — VSX tasks are
 skipped entirely unless `custom_fields.device_vsx` is `true` **and**
 `aoscx_configure_vsx: true` (default `false` — this is an opt-in feature,
 unlike most others in this role). Task file:
-[`tasks/configure_vsx.yml`](../tasks/configure_vsx.yml).
+`tasks/configure_vsx.yml`.
 
 ## Config context fields
 
@@ -105,7 +105,7 @@ setting this role deliberately never removes automatically.
 
 ## Task ordering and tags
 
-Tags: `vsx`, `ha` (see [README.md](../README.md#configuration-tags)). VSX
+Tags: `vsx`, `ha` (see [README.md](index.md#configuration-tags)). VSX
 is tag-protected under
 [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md#1-vsx-virtual-switching-extension) —
 not tagged `layer3`/`interfaces`, so a broad `-t layer3` or `-t interfaces`
@@ -119,7 +119,7 @@ apply VSX changes.
   `config_sync_features: [vsx-global, mclag-interfaces]` are hardcoded by
   the task, not configurable via config_context.
 - **ZTP/template generation**: when `aoscx_generate_template_config: true`,
-  [`templates/vsx.j2`](../templates/vsx.j2) renders VSX as plain CLI for
+  `templates/vsx.j2` renders VSX as plain CLI for
   generated starting-point configs — see the ISL caveat above, and see
   [TEMPLATE_CONFIGURATION.md](TEMPLATE_CONFIGURATION.md) generally. This
   path has no idempotency logic of its own.

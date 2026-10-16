@@ -211,7 +211,7 @@ this, the role tracks interfaces flagged with `_ip_changes.vrf_change`
 their OSPF area/network-type/authentication (and passive, if desired)
 regardless of what the pre-run facts snapshot shows. This is why OSPF
 configuration runs *after* L3 interface configuration in `tasks/main.yml`
-(see [CLAUDE.md](../CLAUDE.md) task ordering) - the VRF-attach push (and
+(see `CLAUDE.md` task ordering) - the VRF-attach push (and
 the L3 addressing it clears and re-applies) must land first, and the
 tracked interface list it produces is what OSPF's forced reconfiguration
 reads.

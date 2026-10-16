@@ -24,7 +24,7 @@ two independent layers of MSTP settings, both optional:
 Both layers are gated by `aoscx_configure_stp` (default `true`). Neither
 requires the other — you can set only the global region name, only
 per-interface guards, or both. Task file:
-[`tasks/configure_stp.yml`](../tasks/configure_stp.yml).
+`tasks/configure_stp.yml`.
 
 ## Global MSTP settings
 
@@ -116,7 +116,7 @@ instead of `changed: 0` when nothing actually changed).
   interfaces (and only the specific commands) that changed.
 
 Both are populated by
-[`tasks/gather_facts_rest_api.yml`](../tasks/gather_facts_rest_api.yml),
+`tasks/gather_facts_rest_api.yml`,
 gated on `aoscx_gather_facts_rest_api: true` **and** `aoscx_configure_stp: true`.
 
 There is no cleanup step for STP — a custom field removed from NetBox
@@ -130,7 +130,7 @@ STP interface configuration runs **after L2 interface configuration**
 (`configure_l2_interfaces.yml`) — the interfaces must already exist with
 their VLAN mode set before STP settings can be layered on top.
 
-Tags: `stp`, `layer2` (see [README.md](../README.md#configuration-tags)).
+Tags: `stp`, `layer2` (see [README.md](index.md#configuration-tags)).
 Unlike OSPF/BGP/VSX/static-routes, STP is **not** tag-protected under
 [TAG_DEPENDENT_INCLUDES.md](TAG_DEPENDENT_INCLUDES.md) — it's treated as
 routine L2 configuration, so a broad `-t layer2` run includes it.
@@ -141,9 +141,9 @@ routine L2 configuration, so a broad `-t layer2` run includes it.
   connection) with `match: line` for idempotent pushes when facts are
   unavailable.
 - **ZTP/template generation**: when `aoscx_generate_template_config: true`,
-  [`templates/stp.j2`](../templates/stp.j2) renders the global MSTP config,
-  and [`templates/int_phys.j2`](../templates/int_phys.j2) /
-  [`templates/int_lag.j2`](../templates/int_lag.j2) render the
+  `templates/stp.j2` renders the global MSTP config,
+  and `templates/int_phys.j2` /
+  `templates/int_lag.j2` render the
   per-interface settings, into generated starting-point configs. This path
   emits plain CLI text and has no idempotency or comparison logic of its
   own — see [TEMPLATE_CONFIGURATION.md](TEMPLATE_CONFIGURATION.md).

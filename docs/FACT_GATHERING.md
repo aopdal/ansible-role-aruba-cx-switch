@@ -57,6 +57,11 @@ aoscx_rest_password: "{{ vault_switch_password }}"  # REST API password
 aoscx_rest_validate_certs: false        # SSL certificate validation
 ```
 
+`aoscx_rest_api_version` is only for these direct REST calls. The
+pyaoscx-backed modules (`aoscx_facts`, `aoscx_vlan`, `aoscx_interface`, ...)
+use `ansible_aoscx_rest_version` (default `10.09`, the highest pyaoscx
+supports); leave that one unchanged.
+
 ### What it provides
 
 A single authenticated REST API session gathers:

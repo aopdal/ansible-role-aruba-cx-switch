@@ -811,7 +811,7 @@ L2VNI : 10100020
 
 #### How It Works (Plain English)
 
-Some deployments use `aoscx_configure_vlans_all: true`, which treats *every* VLAN available to the device as "in use" (rather than only VLANs actually assigned to an interface — see [README.md](../../README.md) for that variable). That's convenient, but it also means VLANs from a region-scoped or purely organisational NetBox VLAN group (e.g. a shared "linknet" group used only for point-to-point routed links, never as a switch VLAN) get swept in and pushed to the device too. This filter removes VLANs that belong to one of the named NetBox VLAN groups (matched by group *slug*) from the list, while leaving alone any VLAN that isn't in one of those groups — including VLANs that are genuinely referenced by an interface, which this filter doesn't know or care about.
+Some deployments use `aoscx_configure_vlans_all: true`, which treats *every* VLAN available to the device as "in use" (rather than only VLANs actually assigned to an interface — see [README.md](../index.md) for that variable). That's convenient, but it also means VLANs from a region-scoped or purely organisational NetBox VLAN group (e.g. a shared "linknet" group used only for point-to-point routed links, never as a switch VLAN) get swept in and pushed to the device too. This filter removes VLANs that belong to one of the named NetBox VLAN groups (matched by group *slug*) from the list, while leaving alone any VLAN that isn't in one of those groups — including VLANs that are genuinely referenced by an interface, which this filter doesn't know or care about.
 
 #### Parameters
 

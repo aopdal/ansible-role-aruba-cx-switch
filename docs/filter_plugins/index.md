@@ -602,7 +602,7 @@ Converts raw Aruba AOS-CX REST API responses into the format expected by `aoscx_
 
 1. **Single Responsibility**: Each filter does one thing well
 2. **Composability**: Filters can be chained together
-3. **Idempotency**: Comparison/diff filters enable idempotent playbooks — see [§4.7 in CLAUDE.md](../../CLAUDE.md#47-write-only--hashed-secret-fields-idempotency) for the one category (write-only secrets) where true idempotency isn't possible
+3. **Idempotency**: Comparison/diff filters enable idempotent playbooks — see §4.7 in CLAUDE.md for the one category (write-only secrets) where true idempotency isn't possible
 4. **Debugging**: Built-in debug logging via `DEBUG_ANSIBLE` env var
 5. **Safety**: Automatic exclusion of built-in/system resources; "facts unavailable" always falls back to "push everything" rather than silently skipping work
 6. **Backward Compatibility**: Filter names and signatures are not renamed/removed without a deprecation cycle

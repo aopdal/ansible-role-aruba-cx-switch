@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `aoscx_rest_host`, `aoscx_rest_user` and `aoscx_rest_password` are now
+  declared in `defaults/main.yml` (defaulting to `ansible_host`,
+  `ansible_user`, `ansible_password`, as before) instead of only in a
+  comment. No behaviour change.
+- Documentation: README "Role Variables" now lists every declared variable;
+  CLAUDE.md's task-order section and dependency table match
+  `tasks/main.yml` (hostname, access-switch default gateway, VRF change
+  identification, STP, port-access, virtual-interface cleanup, interface
+  split); `nb_choice_value` is documented and internal helpers are marked
+  as such in `docs/filter_plugins/utils.md`; links from `docs/` to source
+  files were turned into code spans (README links now go to `index.md`),
+  so `mkdocs build --strict` passes.
 - Interface change lists (`_ip_changes.ipv4_to_add`, `ipv6_to_add`,
   `ipv6_to_remove`, anycast and link-local lists, L2 `vlans_to_add` /
   `vlans_to_remove`) are now sorted, so `-v` output and pushed `no ...`

@@ -65,9 +65,12 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
    when `aoscx_gather_facts_rest_api: true`).
 2. Optional template-based config generation
    (`aoscx_generate_template_config`).
-3. Base system (no VRF dependency): banner → timezone → anycast gateway.
-4. **VRFs** — must precede anything that can reference a VRF (L3 interfaces,
-   NTP, DNS, OSPF, BGP).
+3. Base system (no VRF dependency): hostname → banner → timezone →
+   anycast gateway prerequisite (`no ip icmp redirect`) → access-switch
+   default gateway (`ip route 0.0.0.0/0`, default VRF only).
+4. **VRFs** (`identify_vrf_changes.yml` → `configure_vrfs.yml`) — must
+   precede anything that can reference a VRF (L3 interfaces, NTP, DNS,
+   ssh/https-server VRFs, SNMP, OSPF, BGP, static routes).
 5. VRF-dependent base services: NTP → DNS → ssh/https-server VRFs → SNMP
    (all can be bound to a VRF, so the VRF must exist first).
 6. **VLAN change identification** (`identify_vlan_changes.yml`) — sets
@@ -76,9 +79,16 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
 7. VLAN configuration.
 8. **Interface change identification** (`identify_interface_changes.yml`) —
    sets `interface_changes` (categorised: physical / lag / mclag / l2 / l3 /
-   no_changes). Required by all interface tasks.
-9. Interfaces: physical → LAG → MCLAG → assign-to-LAG → L2 → L3.
-9a. **OSPF** (tag-dependent — see
+   lag_members / lag_removals / no_changes). Required by all interface tasks.
+9. Interfaces: physical (interface split runs first inside this step) →
+   LAG → MCLAG → assign-to-LAG (including LAG removals) → L2 → STP →
+   port-access → port-access cleanup (idempotent mode) → virtual-interface
+   cleanup (idempotent mode, `aoscx_cleanup_virtual_interfaces`) → L3.
+   Virtual-interface cleanup deliberately runs **before** L3: a stale SVI,
+   loopback or sub-interface can hold the IP its NetBox replacement needs,
+   and the L3 push would fail on the duplicate address.
+9a. **OSPF** (`identify_ospf_changes.yml` → `configure_ospf.yml`,
+    tag-dependent — see
     [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md)). Runs
     after L3 interfaces: per-interface OSPF config (area/network-type/auth)
     targets loopback/VLAN-SVI/physical interfaces that must already exist
@@ -87,10 +97,11 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
 10. **Static routes** (tag-dependent, like OSPF/BGP — see
     [docs/TAG_DEPENDENT_INCLUDES.md](docs/TAG_DEPENDENT_INCLUDES.md)).
 11. EVPN, VXLAN.
-12. **Idempotent cleanup** (only when `aoscx_idempotent_mode: true`):
-    re-gather facts → re-identify VLAN changes → cleanup EVPN → VXLAN →
-    VLANs. Static route cleanup (delete) is also gated by
-    `aoscx_idempotent_mode` (see `tasks/configure_static_routes.yml`).
+12. **Idempotent VLAN/overlay cleanup** (only when
+    `aoscx_idempotent_mode: true`): re-gather facts → re-identify VLAN
+    changes → cleanup EVPN → VXLAN → VLANs. Static route cleanup (delete) is
+    also gated by `aoscx_idempotent_mode` (see
+    `tasks/configure_static_routes.yml`).
 13. BGP, VSX.
 14. `aoscx_config: save_when: modified` if `aoscx_save_config`.
 
@@ -122,6 +133,12 @@ Existing dependency chains to preserve:
 | EVPN              | VLANs                                                       |
 | VXLAN             | VLANs, loopback (source-interface)                          |
 | VSX               | MCLAG, ISL/keepalive interfaces                             |
+| Interface split   | Runs first in the physical step; children exist only after `split` |
+| STP (per-interface) | L2 interfaces                                             |
+| Port-access       | VLANs, L2 interfaces                                        |
+| Port-access cleanup | Port-access configuration (idempotent mode)               |
+| Virtual-interface cleanup | Interface facts from the first gather; must precede L3 interfaces |
+| Access-switch default gateway | Default VRF only (base-system block)           |
 | Cleanup tasks     | Re-gathered facts AFTER all configuration tasks             |
 | `save_when`       | Last (after every change)                                   |
 

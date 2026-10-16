@@ -188,6 +188,11 @@ for session in response.json()["results"]:
 ```yaml
 # In your playbook or group_vars
 aoscx_configure_bgp: true
+# BGP sessions are read from the netbox-bgp plugin; false skips BGP
+# configuration entirely
+aoscx_use_netbox_bgp_plugin: true
+# Validate TLS certificates on the role's NetBox API calls
+aoscx_netbox_validate_certs: true
 ```
 
 ## Running BGP Configuration

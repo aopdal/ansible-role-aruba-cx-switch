@@ -129,7 +129,7 @@ aoscx_configure_stp: true
 # Force L2 interface configuration - bypasses change detection
 # When true: Configures ALL L2 interfaces from NetBox regardless of current state
 # Useful for:
-#   - Mode changes (native-untagged <-> native-tagged) that detection may miss
+#   - Cases change detection doesn't model (e.g. incomplete device facts)
 #   - Troubleshooting idempotency issues
 #   - Ensuring configuration matches NetBox exactly
 # Default: false (use change detection for efficiency)
@@ -171,11 +171,13 @@ aoscx_connection_type: network_cli
 #   - REST API credentials (defaults to ansible_user/ansible_password)
 aoscx_gather_facts_rest_api: false
 
-# REST API credentials for enhanced fact gathering (delegated to localhost)
-# These default to ansible_host/ansible_user/ansible_password if not set
-# aoscx_rest_host: "{{ ansible_host }}"        # Switch management IP/hostname
-# aoscx_rest_user: "{{ ansible_user }}"        # REST API username
-# aoscx_rest_password: "{{ ansible_password }}"  # REST API password
+# REST API connection for direct REST calls (REST fact gathering, BGP
+# REST queries; delegated to localhost). Default to the inventory
+# connection values; override when the REST API uses other credentials.
+# Keep aoscx_rest_password in a vault.
+aoscx_rest_host: "{{ ansible_host }}" # Switch management IP/hostname
+aoscx_rest_user: "{{ ansible_user }}" # REST API username
+aoscx_rest_password: "{{ ansible_password }}" # REST API password
 aoscx_rest_validate_certs: false # Validate SSL certificates for REST API
 
 # Test/report mode for REST API fact gathering (gather_facts_rest_api.yml).

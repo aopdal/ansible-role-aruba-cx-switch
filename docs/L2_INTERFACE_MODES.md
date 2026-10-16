@@ -188,6 +188,8 @@ flowchart TD
 | `aoscx_idempotent_mode` | `false` | Enable full sync with cleanup |
 | `aoscx_force_l2_config` | `false` | Bypass change detection, configure all interfaces |
 | `aoscx_configure_l2_interfaces` | `true` | Enable/disable L2 interface configuration |
+| `aoscx_configure_lag_interfaces` | `true` | Create and configure LAG interfaces (description, enable, LACP) and assign members |
+| `aoscx_configure_mclag_interfaces` | `true` | Same for MCLAG (multi-chassis) LAGs on VSX pairs |
 | `aoscx_gather_facts` | `true` | Enable fact gathering |
 | `aoscx_debug` | `false` | Enable verbose debug output |
 

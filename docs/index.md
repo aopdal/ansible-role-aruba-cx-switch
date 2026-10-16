@@ -327,16 +327,54 @@ aoscx_gather_facts: true
 #   - REST API credentials (defaults to ansible_user/ansible_password)
 aoscx_gather_facts_rest_api: false
 
-# Enable/disable features
+# REST API connection (default to the inventory connection values)
+aoscx_rest_host: "{{ ansible_host }}"
+aoscx_rest_user: "{{ ansible_user }}"
+aoscx_rest_password: "{{ ansible_password }}"  # keep in a vault
+aoscx_rest_validate_certs: false
+aoscx_rest_api_version: "10.15"     # direct REST calls; set to your firmware (10.15+)
+ansible_aoscx_rest_version: 10.09   # pyaoscx modules only - don't change
+aoscx_test_mode: false              # gather all REST facts regardless of aoscx_configure_* (report playbooks)
+
+# Base system
+aoscx_configure_hostname: true
+aoscx_configure_banner: true
+aoscx_configure_timezone: true
+aoscx_configure_icmp_redirect: true  # 'no ip icmp redirect' (anycast gateway prerequisite, device_anycast_gateway)
+aoscx_configure_access_switch_default_gateway: true  # access-switch: ip route 0.0.0.0/0 from primary_ip4
+aoscx_configure_access_switch_server_vrfs: true      # ssh/https-server VRFs (BASE_CONFIGURATION.md)
+
+# Services (run after VRFs)
+aoscx_configure_ntp: true
+aoscx_configure_dns: true
+aoscx_configure_snmp: true  # skipped unless snmp_* vars set; idempotent mode removes SNMP when none are set
+
+# VRFs, VLANs and interfaces
 aoscx_configure_vrfs: true
 aoscx_configure_vlans: true
 aoscx_configure_physical_interfaces: true
 aoscx_configure_interface_split: true  # 'split N' from NetBox 4.7 interface channels (INTERFACE_SPLIT.md)
+aoscx_configure_lag_interfaces: true
+aoscx_configure_mclag_interfaces: true
 aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true  # includes loopback interfaces
+aoscx_configure_stp: true            # docs/STP_CONFIGURATION.md
+aoscx_configure_port_access: true    # skipped without a port_access config_context
+aoscx_force_l2_config: false         # push all L2 interfaces, bypassing change detection
+
+# Routing and overlay (also gated by device_* custom fields in NetBox)
 aoscx_configure_ospf: true
 aoscx_configure_static_routes: true
-aoscx_configure_snmp: true  # skipped unless snmp_* vars set; idempotent mode removes SNMP when none are set
+aoscx_configure_bgp: false
+aoscx_use_netbox_bgp_plugin: true    # BGP sessions come from the netbox-bgp plugin; false skips BGP
+aoscx_configure_evpn: false
+aoscx_configure_vxlan: false
+aoscx_configure_vsx: false
+aoscx_builtin_vrfs: [default, Default, Global, global, mgmt, MGMT, ""]  # treated as the default VRF
+
+# Template-based starting-point config (TEMPLATE_CONFIGURATION.md)
+aoscx_generate_template_config: false
+aoscx_template_config_output_dir: "/tmp"
 
 # SNMP (see docs/SNMP_CONFIGURATION.md) - typically set in group_vars
 snmp_vrf: auto              # auto = mgmt if managed via mgmt port, else default
@@ -376,7 +414,12 @@ aoscx_l3_counters_enable: true  # Enable l3-counters on L3 interfaces
 ```yaml
 netbox_url: "{{ lookup('env', 'NETBOX_URL') }}"
 netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+aoscx_netbox_validate_certs: true  # role's own NetBox API calls (e.g. netbox-bgp plugin)
 ```
+
+Deprecated and without effect: `aoscx_no_log` (secret-touching tasks
+always use `no_log: true`) and `aoscx_connection_type` (CLI tasks always
+use `network_cli`).
 
 ### OSPF Configuration
 

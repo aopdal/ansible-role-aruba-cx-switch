@@ -65,7 +65,7 @@ by-name does not catch this, since the interface name is unchanged - only the
 
 This is detected separately, as ordinary configuration drift rather than an
 orphan: `get_interfaces_needing_config_changes()` (see
-[`interface_change_detection.py`](../netbox_filters_lib/interface_change_detection.py)
+`interface_change_detection.py`
 in [FILTER_PLUGINS.md](FILTER_PLUGINS.md)) compares the device's actual
 `subintf_vlan` against NetBox's `tagged_vlans[0].vid` and flags a mismatch via
 `_ip_changes.encapsulation_change`, causing `configure_l3_interfaces.yml` to
@@ -98,6 +98,6 @@ applies to sub-interfaces.
 
 ## Implementation
 
-- Filter: [`get_virtual_interfaces_to_delete()`](../netbox_filters_lib/interface_orphans.py) in `netbox_filters_lib/interface_orphans.py` - diffs NetBox `interfaces` names against `ansible_facts.network_resources.interfaces`, restricted to VLAN/loopback/sub-interface name patterns.
-- Task: [`tasks/cleanup_virtual_interfaces.yml`](../tasks/cleanup_virtual_interfaces.yml) - identifies orphans and issues `no interface <name>` via `aoscx_config`.
-- Wired into [`tasks/main.yml`](../tasks/main.yml) immediately before the "Include L3 interface configuration tasks" step.
+- Filter: `get_virtual_interfaces_to_delete()` in `netbox_filters_lib/interface_orphans.py` - diffs NetBox `interfaces` names against `ansible_facts.network_resources.interfaces`, restricted to VLAN/loopback/sub-interface name patterns.
+- Task: `tasks/cleanup_virtual_interfaces.yml` - identifies orphans and issues `no interface <name>` via `aoscx_config`.
+- Wired into `tasks/main.yml` immediately before the "Include L3 interface configuration tasks" step.

@@ -46,8 +46,9 @@ def _get_device_vrf_name(device_intf, enhanced_intf=None):
         VRF name string, or ``None`` when only standard facts are available and
         they carry no VRF data (caller should skip comparison).
     """
-    # Enhanced REST API facts: the 'vrf' key is always present in the
-    # normalised output from rest_api_transforms.rest_api_to_aoscx_interfaces().
+    # Enhanced REST API facts (aoscx_enhanced_interface_facts, the raw
+    # /system/interfaces response): 'vrf' is present whenever the REST query
+    # requested it, which gather_facts_rest_api.yml always does.
     # null  → default VRF (no VRF attachment on the device)
     # dict  → custom VRF, keyed by VRF name
     if isinstance(enhanced_intf, dict) and "vrf" in enhanced_intf:
