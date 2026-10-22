@@ -2,7 +2,7 @@
 
 ## Overview
 
-The project uses **`make docs-sync`** to maintain consistency between `README.md` (root) and `docs/index.md` (MkDocs).
+The project uses **`make docs-sync`** to maintain consistency between `README.md` (root) and `docs/index.md` (documentation site).
 
 ## How It Works
 
@@ -126,7 +126,7 @@ When we added VLAN documentation, we:
 
 4. **Also updated separately:**
    - `docs/README.md` - Added full VLAN section
-   - `mkdocs.yml` - Added VLAN navigation
+   - `zensical.toml` - Added VLAN navigation
 
 ## Makefile Target Details
 
@@ -213,7 +213,7 @@ docs-sync: ## Sync README.md to docs/index.md
 - `README.md` - Source file (edit this)
 - `docs/index.md` - Generated file (don't edit)
 - `docs/README.md` - Documentation index (safe to edit)
-- `mkdocs.yml` - MkDocs configuration
+- `zensical.toml` - Zensical site configuration
 
 ## Summary
 

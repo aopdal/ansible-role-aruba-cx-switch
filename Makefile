@@ -204,11 +204,11 @@ docs-sync: ## Sync README.md to docs/index.md and CHANGELOG.md to docs/CHANGELOG
 docs-serve: ## Serve documentation locally at http://127.0.0.1:8000
 	@echo "$(BLUE)Starting documentation server...$(NC)"
 	@echo "$(GREEN)Visit: http://127.0.0.1:8000$(NC)"
-	@mkdocs serve
+	@zensical serve
 
 docs-build: ## Build documentation static site
 	@echo "$(BLUE)Building documentation...$(NC)"
-	@mkdocs build
+	@zensical build --clean
 	@echo "$(GREEN)✅ Documentation built in site/ directory$(NC)"
 
 docs: docs-serve ## Alias for docs-serve

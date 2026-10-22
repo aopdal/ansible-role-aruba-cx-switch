@@ -1,0 +1,149 @@
+# Zensical configuration for the role documentation site.
+# Reference: https://zensical.org/docs/setup/basics/
+
+[project]
+site_name = "Aruba CX Switch Ansible Role"
+site_description = "Production-ready Ansible role for managing Aruba CX switches with NetBox integration"
+site_author = "aopdal"
+# Canonical URL: GitHub Pages. The same build is mirrored to the self-hosted
+# server by .github/workflows/deploy-docs.yml.
+site_url = "https://aopdal.github.io/ansible-role-aruba-cx-switch/"
+
+repo_name = "aopdal/ansible-role-aruba-cx-switch"
+repo_url = "https://github.com/aopdal/ansible-role-aruba-cx-switch"
+edit_uri = "edit/main/docs/"
+
+docs_dir = "docs"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Documentation Index" = "README_DOCS.md" },
+  { "Architecture" = [
+    { "Automation Ecosystem" = "AUTOMATION_ECOSYSTEM.md" },
+  ] },
+  { "NetBox Integration" = [
+    { "Integration Reference" = "NETBOX_INTEGRATION.md" },
+    { "Filter Plugins" = [
+      { "Overview" = "FILTER_PLUGINS.md" },
+      { "Reuse filters" = "FILTER_PLUGINS_REUSE.md" },
+      { "Detailed Reference" = "filter_plugins/index.md" },
+      { "Utils Module" = "filter_plugins/utils.md" },
+      { "VLAN Filters" = "filter_plugins/vlan_filters.md" },
+      { "VRF Filters" = "filter_plugins/vrf_filters.md" },
+      { "Interface Filters" = "filter_plugins/interface_filters.md" },
+      { "Comparison Module" = "filter_plugins/comparison.md" },
+      { "OSPF Filters" = "filter_plugins/ospf_filters.md" },
+      { "BGP Filters" = "filter_plugins/bgp_filters.md" },
+      { "L3 Config Helpers" = "filter_plugins/l3_config_helpers.md" },
+      { "REST API Transforms" = "filter_plugins/rest_api_transforms.md" },
+      { "Port Access" = "filter_plugins/port_access.md" },
+      { "Static routes" = "filter_plugins/static_route_filters.md" },
+      { "STP" = "filter_plugins/stp.md" },
+      { "VSX" = "filter_plugins/vsx.md" },
+    ] },
+  ] },
+  { "Configuration" = [
+    { "Base System" = [
+      { "Overview" = "BASE_CONFIGURATION.md" },
+      { "DNS" = "DNS_CONFIGURATION.md" },
+    ] },
+    { "VLAN Management" = [
+      { "Workflow Overview" = "VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md" },
+      { "L2 Interface Modes" = "L2_INTERFACE_MODES.md" },
+      { "Interface Split (Breakout)" = "INTERFACE_SPLIT.md" },
+      { "Anycast Gateway" = "ANYCAST_GATEWAY.md" },
+      { "Virtual Interface Cleanup" = "VIRTUAL_INTERFACE_CLEANUP.md" },
+    ] },
+    { "EVPN & VXLAN" = [
+      { "Configuration Guide" = "EVPN_VXLAN_CONFIGURATION.md" },
+    ] },
+    { "VRFs" = "VRF_CONFIGURATION.md" },
+    { "BGP" = "BGP_CONFIGURATION.md" },
+    { "OSPF" = "OSPF_CONFIGURATION.md" },
+    { "Static Routes" = "STATIC_ROUTES_CONFIGURATION.md" },
+    { "SNMP" = "SNMP_CONFIGURATION.md" },
+    { "Tag-Dependent Tasks" = "TAG_DEPENDENT_INCLUDES.md" },
+    { "VSX Configuration" = "VSX_CONFIGURATION.md" },
+    { "Port access configuration" = "PORT_ACCESS_CONFIGURATION.md" },
+    { "STP Configuration" = "STP_CONFIGURATION.md" },
+    { "Generate configs" = "TEMPLATE_CONFIGURATION.md" },
+  ] },
+  { "Development" = [
+    { "Quick Start" = "QUICKSTART.md" },
+    { "Requirements" = "REQUIREMENTS.md" },
+    { "Development" = "DEVELOPMENT.md" },
+    { "Contributing" = "CONTRIBUTING.md" },
+  ] },
+  { "Examples" = [
+    { "Overview" = "EXAMPLES.md" },
+    { "BGP EVPN Fabric" = "examples/bgp-evpn-fabric.md" },
+  ] },
+  { "Testing" = [
+    { "Testing Guide" = "TESTING.md" },
+  ] },
+  { "Reference" = [
+    { "Quick Reference" = "QUICK_REFERENCE.md" },
+    { "Fact Gathering" = "FACT_GATHERING.md" },
+    { "Changelog" = "CHANGELOG.md" },
+    { "Release Process" = [
+      { "Guide" = "RELEASE_PROCESS.md" },
+    ] },
+    { "Documentation Site" = "DOCUMENTATION_SITE.md" },
+    { "Documentation Sync" = "DOCS_SYNC_WORKFLOW.md" },
+    { "Documentation on own server" = "GITHUB_ACTIONS_DEPLOYMENT.md" },
+    { "Workspace Setup" = "WORKSPACE.md" },
+    { "DevContainer Setup" = "DEVCONTAINER_SETUP.md" },
+    { "DevContainer Mounts" = "DEVCONTAINER_MOUNTS.md" },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "navigation.tabs",
+  "navigation.sections",
+  "navigation.expand",
+  "navigation.top",
+  "search.suggest",
+  "search.highlight",
+  "content.code.copy",
+  "content.code.annotate",
+]
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "indigo"
+accent = "indigo"
+toggle.icon = "material/brightness-7"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "indigo"
+accent = "indigo"
+toggle.icon = "material/brightness-4"
+toggle.name = "Switch to light mode"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/aopdal"
+
+# Mermaid is rendered natively by Zensical through the custom fence below;
+# no extra JavaScript is needed.
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight.anchor_linenums = true
+pymdownx.inlinehilite = {}
+pymdownx.snippets = {}
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+pymdownx.tabbed.alternate_style = true

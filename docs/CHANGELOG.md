@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Documentation is published to GitHub Pages at
+  <https://aopdal.github.io/ansible-role-aruba-cx-switch/> by the
+  `deploy-docs` workflow, alongside the existing self-hosted server. The
+  site is built once and deployed by two independent jobs
+  (`deploy-pages`, `deploy-server`). `site_url` is set to the GitHub Pages
+  URL.
+
+### Changed
+
+- Documentation site migrated from MkDocs + Material to
+  [Zensical](https://zensical.org/). Configuration moved from `mkdocs.yml`
+  to `zensical.toml`; `make docs-serve` / `make docs-build` and the docs
+  deploy workflow now run `zensical`. `requirements-docs.txt` pins
+  `zensical==0.0.71`. Mermaid diagrams are rendered natively, so the
+  bundled Mermaid 10 script and `docs/javascripts/mermaid-init.js` were
+  removed. Pages no longer show git-based "last updated" dates (the
+  `git-revision-date-localized` plugin has no Zensical equivalent yet).
+
 ## [0.17.1] - 2026-10-16
 
 ### Added
@@ -289,7 +309,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only fired when at least one NetBox interface still had a `lag`
   assignment defined, which excluded a run where every remaining LAG
   member is being removed. See
-  [docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md#interface_change_detectionpy---change-detection).
+  [docs/FILTER_PLUGINS.md](FILTER_PLUGINS.md#interface_change_detectionpy-change-detection).
 
 ## [0.14.9] - 2026-09-10
 

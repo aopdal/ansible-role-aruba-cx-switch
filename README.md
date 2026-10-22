@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/aopdal/ansible-role-aruba-cx-switch/workflows/CI/badge.svg)](https://github.com/aopdal/ansible-role-aruba-cx-switch/actions)
 [![codecov](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch/branch/main/graph/badge.svg)](https://codecov.io/gh/aopdal/ansible-role-aruba-cx-switch)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://aopdal.github.io/ansible-role-aruba-cx-switch/)
 
 Comprehensive Ansible role for configuring Aruba AOS-CX switches with **NetBox as the source of truth**.
 
@@ -277,7 +278,10 @@ index. Highlights:
 
 ### Documentation Site
 
-View all documentation with beautiful formatting using MkDocs:
+The documentation site is published at
+<https://aopdal.github.io/ansible-role-aruba-cx-switch/>.
+
+To preview it locally with Zensical:
 
 ```bash
 pip install -r requirements-docs.txt

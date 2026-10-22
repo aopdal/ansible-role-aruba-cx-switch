@@ -158,7 +158,7 @@ ansible-role-aruba-cx-switch/
 │       └── deploy-docs.yml     # Documentation deployment
 ├── defaults/
 │   └── main.yml                # Default variables (30+ options)
-├── docs/                       # MkDocs documentation site
+├── docs/                       # Zensical documentation site
 │   ├── archive/                # Archived development notes
 │   ├── filter_plugins/         # Filter plugin reference docs
 │   └── *.md                    # Configuration and user guides
@@ -207,11 +207,11 @@ ansible-role-aruba-cx-switch/
 ├── .pre-commit-config.yaml     # Pre-commit hooks configuration
 ├── .yamllint                   # YAML linting rules
 ├── Makefile                    # Development tasks (lint, test, docs)
-├── mkdocs.yml                  # MkDocs site configuration
+├── zensical.toml               # Zensical site configuration
 ├── requirements.yml            # Ansible collection dependencies
 ├── requirements.txt            # Python dependencies
 ├── requirements-test.txt       # Python test dependencies
-├── requirements-docs.txt       # MkDocs dependencies
+├── requirements-docs.txt       # Zensical dependencies
 ├── setup-testing.sh            # Testing environment setup
 ├── README.md                   # Main documentation
 ├── CHANGELOG.md                # Version history

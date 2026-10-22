@@ -40,7 +40,7 @@ netbox_filters_lib/        # Implementation modules (vlan, vrf, bgp, ospf,
                            # plugin loader does not try to load them.
 tests/                     # Ansible test playbooks + tests/unit/ (pytest).
 molecule/default/          # Molecule scenario.
-docs/                      # User + developer docs (mkdocs source). Index in
+docs/                      # User + developer docs (Zensical source). Index in
                            # docs/index.md (synced from README.md by
                            # `make docs-sync`).
 examples/                  # Example playbooks / inventories.
@@ -274,7 +274,7 @@ rejected by lint / review.
 ### 4.5 Documentation
 
 When you change behaviour, **also update `docs/`**. The site is built with
-MkDocs from `mkdocs.yml`; `docs/index.md` is regenerated from `README.md` by
+Zensical from `zensical.toml`; `docs/index.md` is regenerated from `README.md` by
 `make docs-sync`, so README-level changes propagate automatically — but
 topic docs do not.
 
@@ -306,7 +306,7 @@ Update the relevant topic page when you touch its area:
 
 If a feature has no existing doc, add a new page under `docs/` and link it
 from [docs/README_DOCS.md](docs/README_DOCS.md) and (where appropriate)
-`mkdocs.yml` nav.
+the `nav` in `zensical.toml`.
 
 Documentation style: Markdown, sentence-case headings, ATX (`#`) syntax,
 relative links to other docs, fenced code blocks with language hints. Do not
@@ -426,7 +426,7 @@ the auto-generated list. Most targets depend on the venv created by
 
 | Target              | Purpose                                                              |
 | ------------------- | -------------------------------------------------------------------- |
-| `make docs-install` | Install `requirements-docs.txt` (mkdocs + plugins).                  |
+| `make docs-install` | Install `requirements-docs.txt` (Zensical).                          |
 | `make docs-sync`    | Copy `README.md` → `docs/index.md` and `CHANGELOG.md` → `docs/CHANGELOG.md`, rewriting internal links. Run this whenever README/CHANGELOG change. |
 | `make docs-serve`   | Live preview at <http://127.0.0.1:8000>.                             |
 | `make docs-build`   | Build static site into `site/`.                                      |
