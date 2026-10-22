@@ -44,10 +44,29 @@ and missing anchors; fix them before committing.
 
 ## Publishing
 
-The site is published to a self-hosted web server by
-`.github/workflows/deploy-docs.yml` on every push to `main` that touches the
-documentation. See [GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md)
-for the required secrets and server setup.
+`.github/workflows/deploy-docs.yml` runs on every push to `main` that touches
+the documentation (and on manual dispatch). It builds the site once and
+publishes the same output to two places:
+
+| Target | Job | Notes |
+| ------ | --- | ----- |
+| GitHub Pages | `deploy-pages` | <https://aopdal.github.io/ansible-role-aruba-cx-switch/>. Canonical URL (`site_url` in `zensical.toml`). |
+| Self-hosted server | `deploy-server` | rsync over SSH. See [GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md) for secrets and server setup. |
+
+The two deploy jobs are independent: if the server is unreachable or its
+secrets are missing, GitHub Pages is still updated, and vice versa.
+
+### One-time GitHub Pages setup
+
+In the repository, go to **Settings → Pages** and set **Source** to
+**GitHub Actions**. No `gh-pages` branch is used.
+
+### Canonical URL
+
+`site_url` points at GitHub Pages, so the copy on the self-hosted server
+carries canonical links and a sitemap that refer to the GitHub Pages URL.
+Search engines index the GitHub Pages copy; existing links to the server
+keep working.
 
 ## Configuration
 

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Documentation is published to GitHub Pages at
+  <https://aopdal.github.io/ansible-role-aruba-cx-switch/> by the
+  `deploy-docs` workflow, alongside the existing self-hosted server. The
+  site is built once and deployed by two independent jobs
+  (`deploy-pages`, `deploy-server`). `site_url` is set to the GitHub Pages
+  URL.
+
 ### Changed
 
 - Documentation site migrated from MkDocs + Material to

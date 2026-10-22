@@ -1,5 +1,8 @@
 ---
-# Deploy Zensical Documentation to Your Own Server
+# Build the Zensical documentation once and publish it to two places:
+#   - GitHub Pages (https://aopdal.github.io/ansible-role-aruba-cx-switch/)
+#   - the self-hosted web server via rsync
+# The two deploy jobs are independent: a failure in one does not block the other.
 name: Deploy Documentation
 
 on:
@@ -16,11 +19,19 @@ on:
       - ".github/workflows/deploy-docs.yml"
   workflow_dispatch: # Allow manual trigger
 
+permissions:
+  contents: read
+
+# Never cancel a Pages deployment that is already running.
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -40,6 +51,44 @@ jobs:
       - name: Build documentation
         run: |
           zensical build --clean
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Upload site artifact for server deployment
+        uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: site
+          retention-days: 1
+
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  deploy-server:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download site artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: site
+          path: site
 
       - name: Validate deployment secrets
         run: |

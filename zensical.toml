@@ -5,7 +5,9 @@
 site_name = "Aruba CX Switch Ansible Role"
 site_description = "Production-ready Ansible role for managing Aruba CX switches with NetBox integration"
 site_author = "aopdal"
-# site_url = "https://aopdal.github.io/ansible-role-aruba-cx-switch/"  # Set when publishing to GitHub Pages
+# Canonical URL: GitHub Pages. The same build is mirrored to the self-hosted
+# server by .github/workflows/deploy-docs.yml.
+site_url = "https://aopdal.github.io/ansible-role-aruba-cx-switch/"
 
 repo_name = "aopdal/ansible-role-aruba-cx-switch"
 repo_url = "https://github.com/aopdal/ansible-role-aruba-cx-switch"

@@ -16,6 +16,8 @@ pip install -r requirements-docs.txt
 make docs-serve
 ```
 
+The published site is at <https://aopdal.github.io/ansible-role-aruba-cx-switch/>
+(also mirrored to the self-hosted server).
 See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for how the site is built and published.
 
 ---

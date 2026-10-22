@@ -2,12 +2,17 @@
 
 This guide explains how to automatically deploy the Zensical documentation site to your own web server using GitHub Actions.
 
+The same workflow also publishes the site to GitHub Pages; see
+[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md#publishing). This page covers
+only the self-hosted server (`deploy-server` job).
+
 ## Overview
 
 The workflow automatically:
 
-- Builds the Zensical static site
-- Deploys it to your server via rsync over SSH
+- Builds the Zensical static site (`build` job)
+- Deploys it to your server via rsync over SSH (`deploy-server` job)
+- Deploys the same build to GitHub Pages (`deploy-pages` job)
 - Triggers on pushes to `main` branch when documentation files change
 - Can be manually triggered via GitHub Actions UI
 
