@@ -111,10 +111,8 @@ pip install -r requirements-test.txt
 
 **Contains:**
 
-- `mkdocs` - Static site generator
-- `mkdocs-material` - Material theme for MkDocs
-- `mkdocs-git-revision-date-localized-plugin` - Git-based date display
-- `pymdown-extensions` - Markdown extensions
+- `zensical` - Static site generator (bundles its theme and the PyMdown
+  Markdown extensions)
 
 **Install:**
 ```bash
@@ -123,15 +121,15 @@ pip install -r requirements-docs.txt
 
 **Required for:**
 
-- Building documentation site (`mkdocs build`)
-- Serving documentation locally (`mkdocs serve`)
+- Building documentation site (`zensical build`)
+- Serving documentation locally (`zensical serve`)
 - Documentation development
 
 **NOT required for:**
 
 - Using the role
 - Running tests
-- Reading documentation (Markdown files work without MkDocs)
+- Reading documentation (Markdown files work without Zensical)
 
 ---
 

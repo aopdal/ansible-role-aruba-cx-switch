@@ -277,7 +277,7 @@ index. Highlights:
 
 ### Documentation Site
 
-View all documentation with beautiful formatting using MkDocs:
+View all documentation with beautiful formatting using Zensical:
 
 ```bash
 pip install -r requirements-docs.txt

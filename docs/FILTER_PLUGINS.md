@@ -664,7 +664,7 @@ IP address to interface matching and anycast gateway processing (1 filter, 106 l
       - `anycast_mac`: MAC address for anycast gateway (e.g., "02:01:00:00:01:00")
     - Used for L3 configuration including anycast gateway setup
 
-### `interface_change_detection.py` - Change Detection
+### `interface_change_detection.py`: Change Detection
 
 NetBox vs device comparison and idempotency logic (1 filter, 761 lines).
 The IPv4/IPv6/VRF/encapsulation/anycast/DHCP-relay comparison itself lives

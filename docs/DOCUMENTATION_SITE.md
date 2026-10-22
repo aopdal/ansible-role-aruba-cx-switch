@@ -1,110 +1,91 @@
-# Documentation Site
+# Documentation site
 
-This role uses **MkDocs with Material theme** to generate a beautiful documentation site.
+This role's documentation site is built with [Zensical](https://zensical.org/),
+the static site generator from the team behind Material for MkDocs. The site
+is configured in `zensical.toml` at the repository root and built from the
+Markdown files in `docs/`.
 
-## Why MkDocs Instead of antsibull-docs?
+## Why a site generator instead of antsibull-docs?
 
-While `antsibull-docs` is excellent for Ansible Collections (modules, plugins), this role benefits more from MkDocs because:
+`antsibull-docs` targets Ansible collections and extracts module/plugin
+documentation from code. This role is a standalone role whose value is in
+narrative guides (EVPN/VXLAN, BGP, cleanup workflows), so a general-purpose
+Markdown site generator fits better:
 
-- ✅ **Rich narrative docs** - EVPN/VXLAN guides, BGP configuration guides
-- ✅ **Flexible organization** - Can structure docs to tell a story
-- ✅ **Beautiful presentation** - Material theme is stunning
-- ✅ **Easy maintenance** - All your existing `.md` files work directly
-- ✅ **Code examples** - Excellent syntax highlighting for YAML/Jinja2
+- All existing `.md` files work directly.
+- Pages can be organised to tell a story rather than mirror code layout.
+- Syntax highlighting for YAML/Jinja2, admonitions, tabs and Mermaid
+  diagrams are built in.
 
-## Local Development
+## Local development
 
 ### Install dependencies
 
 ```bash
-pip install -r requirements-docs.txt
+make docs-install   # pip install -r requirements-docs.txt
 ```
 
 ### Serve locally
 
 ```bash
-mkdocs serve
+make docs-serve     # zensical serve
 ```
 
-Visit http://127.0.0.1:8000 to see the live preview.
+Visit <http://127.0.0.1:8000> for a live preview that rebuilds on save.
 
-### Build static site
+### Build the static site
 
 ```bash
-mkdocs build
+make docs-build     # zensical build --clean
 ```
 
-Output will be in `site/` directory.
+Output is written to `site/` (git-ignored). The build reports broken links
+and missing anchors; fix them before committing.
 
 ## Publishing
 
-### For Private Repositories (Current Setup)
-
-**GitHub Pages is NOT available** for private repos on the free plan. Instead, use local documentation:
-
-```bash
-# Live preview during development
-make docs-serve
-# Visit http://127.0.0.1:8000
-
-# Build static site for local/internal hosting
-make docs-build
-# Output in site/ directory - can be hosted on internal web server
-```
-
-### For Public Repositories or Paid Plans
-
-When the repo becomes public or you upgrade to a paid GitHub plan, documentation can be **automatically published** to GitHub Pages:
-
-1. **Uncomment** the workflow in `.github/workflows/deploy-docs.yml`
-2. **Enable GitHub Pages** in repo settings:
-    - Go to Settings → Pages
-    - Source: Deploy from a branch
-    - Branch: `gh-pages` / (root)
-    - Save
-3. **Push changes** to trigger deployment
-4. Site will be at: `https://aopdal.github.io/ansible-role-aruba-cx-switch`
-
-The workflow will automatically deploy when you push changes to:
-
-- `docs/**`
-- `README.md`
-- `CONTRIBUTING.md`
-- `CHANGELOG.md`
-- `mkdocs.yml`
+The site is published to a self-hosted web server by
+`.github/workflows/deploy-docs.yml` on every push to `main` that touches the
+documentation. See [GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md)
+for the required secrets and server setup.
 
 ## Configuration
 
-### Site Structure
+Everything lives in `zensical.toml`:
 
-Configured in `mkdocs.yml`:
+- `[project]` - site metadata, repository links and the `nav` tree.
+- `[project.theme]` - theme features (navigation tabs/sections, search,
+  code copy) and the light/dark palette.
+- `[project.markdown_extensions]` - Python-Markdown and PyMdown extensions.
 
-```yaml
-nav:
-  - Home: README.md
-  - Getting Started:
-    - Quick Start: docs/QUICKSTART.md
-  - Configuration:
-    - EVPN & VXLAN:
-      - Configuration Guide: docs/EVPN_VXLAN_CONFIGURATION.md
-    - BGP:
-      - Configuration Guide: docs/BGP_CONFIGURATION.md
+### Site structure
+
+The navigation is an explicit list of inline tables:
+
+```toml
+nav = [
+  { "Home" = "index.md" },
+  { "Configuration" = [
+    { "VRFs" = "VRF_CONFIGURATION.md" },
+    { "BGP" = "BGP_CONFIGURATION.md" },
+  ] },
+]
 ```
 
-### Features Enabled
+### Features enabled
 
-- **Navigation tabs** - Top-level sections in tabs
-- **Search** - Full-text search with suggestions
-- **Dark mode** - Automatic theme switching
-- **Code copy** - Click to copy code blocks
-- **Git info** - Shows when pages were last updated
-- **Responsive** - Works great on mobile
+- **Navigation tabs** - top-level sections in tabs
+- **Search** - full-text search with suggestions and highlighting
+- **Dark mode** - light/dark palette toggle
+- **Code copy** - click to copy code blocks
+- **Mermaid** - diagrams rendered natively from ```` ```mermaid ```` fences
+- **Responsive** - works on mobile
 
-## Writing Documentation
+## Writing documentation
 
 ### Standard Markdown
 
-Just write normal Markdown! All your existing docs work.
+Write normal Markdown; all existing docs work unchanged.
 
 ### Admonitions
 
@@ -114,22 +95,7 @@ Just write normal Markdown! All your existing docs work.
 
 !!! warning "Important"
     Be careful with this setting
-
-!!! tip "Pro Tip"
-    Use idempotent mode for production
 ```
-
-### Code Blocks with Highlighting
-
-````markdown
-```yaml
-# Automatically highlighted
-- name: Configure EVPN
-  when:
-    - aoscx_configure_evpn | bool
-    - custom_fields.device_evpn | bool
-```
-````
 
 ### Tabs
 
@@ -145,52 +111,22 @@ Just write normal Markdown! All your existing docs work.
     ```
 ```
 
-### Tables
+### Heading anchors
 
-Standard Markdown tables work great and look beautiful with Material theme.
+Zensical's heading slugs can differ from GitHub's. For example, GitHub turns
+`` `foo.py` - Bar `` into `#foopy---bar` while Zensical produces
+`#foopy-bar`. When a heading is the target of a cross-page link, avoid
+` - ` separators (use `` `foo.py`: Bar `` instead) so the anchor is the same
+in both places.
 
-## Adding New Pages
+## Adding new pages
 
-1. Create `.md` file in `docs/` directory
-2. Add to `nav` section in `mkdocs.yml`
-3. Commit and push - automatically deployed!
-
-## Comparison: antsibull-docs vs MkDocs
-
-| Feature | antsibull-docs | MkDocs Material |
-|---------|----------------|-----------------|
-| **Target** | Collections (modules/plugins) | Any docs (perfect for roles) |
-| **Content** | Auto-extracted from code | Rich narrative docs |
-| **Flexibility** | Structured/rigid | Very flexible |
-| **Theme** | Ansible style | Material (beautiful!) |
-| **Setup** | Collection required | Works with standalone role |
-| **Your use case** | ❌ Overkill | ✅ Perfect fit |
-
-## Best Practices
-
-1. **Keep docs in `docs/`** - Clean separation
-2. **Use descriptive filenames** - `EVPN_VXLAN_CONFIGURATION.md` not `config.md`
-3. **Link between pages** - Use relative links: `[BGP Setup](BGP_CONFIGURATION.md)`
-4. **Add examples** - Your YAML examples are excellent
-5. **Update navigation** - Add new pages to `mkdocs.yml` nav section
-
-## Example Output
-
-Your docs will look like:
-
-- **ansible.com documentation** (same Material theme!)
-- **Beautiful navigation** with collapsible sections
-- **Search** that actually works
-- **Code examples** with syntax highlighting
-- **Dark/light mode** toggle
-- **Mobile responsive**
+1. Create the `.md` file in `docs/`.
+2. Add it to `nav` in `zensical.toml`.
+3. Link it from [README_DOCS.md](README_DOCS.md).
+4. Run `make docs-build` and fix any reported issues.
 
 ## Resources
 
-- [MkDocs Documentation](https://www.mkdocs.org/)
-- [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
+- [Zensical documentation](https://zensical.org/docs/)
 - [Markdown Guide](https://www.markdownguide.org/)
-
----
-
-**TL;DR:** MkDocs is the better choice for this role because you have excellent narrative documentation that tells the story of BGP configuration, EVPN/VXLAN configuration, and cleanup processes. antsibull-docs is designed for collections with lots of modules/plugins to document automatically.

@@ -1,5 +1,5 @@
 ---
-# Deploy MkDocs Documentation to Your Own Server
+# Deploy Zensical Documentation to Your Own Server
 name: Deploy Documentation
 
 on:
@@ -11,7 +11,7 @@ on:
       - "README.md"
       - "CONTRIBUTING.md"
       - "CHANGELOG.md"
-      - "mkdocs.yml"
+      - "zensical.toml"
       - "requirements-docs.txt"
       - ".github/workflows/deploy-docs.yml"
   workflow_dispatch: # Allow manual trigger
@@ -26,9 +26,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0 # Full history for git-revision-date-localized plugin
-          fetch-tags: true # Fetch all tags so MkDocs can resolve the latest release tag
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -42,7 +39,7 @@ jobs:
 
       - name: Build documentation
         run: |
-          mkdocs build --clean --verbose
+          zensical build --clean
 
       - name: Validate deployment secrets
         run: |

@@ -6,7 +6,7 @@ This directory contains all documentation for the `ansible-role-aruba-cx-switch`
 
 ### Local Documentation Site (Recommended)
 
-This role uses **MkDocs with Material theme** for beautiful, searchable documentation.
+This role uses **Zensical** for beautiful, searchable documentation.
 
 ```bash
 # Install dependencies (first time only)
@@ -16,8 +16,7 @@ pip install -r requirements-docs.txt
 make docs-serve
 ```
 
-**Note:** GitHub Pages is disabled while the repo is private (requires public repo or paid plan).
-See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
+See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for how the site is built and published.
 
 ---
 
@@ -190,6 +189,6 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for details.
 
 ### Documentation Management
 
-- **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** - How to use MkDocs
+- **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** - How the Zensical documentation site is built and configured
 - **[DOCS_SYNC_WORKFLOW.md](DOCS_SYNC_WORKFLOW.md)** - How README.md syncs to docs/
-- **[GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md)** - Deploying the built MkDocs site to your own server via GitHub Actions
+- **[GITHUB_ACTIONS_DEPLOYMENT.md](GITHUB_ACTIONS_DEPLOYMENT.md)** - Deploying the built documentation site to your own server via GitHub Actions

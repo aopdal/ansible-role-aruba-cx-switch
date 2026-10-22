@@ -1,12 +1,12 @@
-# GitHub Actions - Deploy MkDocs to Your Own Server
+# GitHub Actions - Deploy the documentation site to your own server
 
-This guide explains how to automatically deploy your MkDocs documentation to your own web server using GitHub Actions.
+This guide explains how to automatically deploy the Zensical documentation site to your own web server using GitHub Actions.
 
 ## Overview
 
 The workflow automatically:
 
-- Builds the MkDocs static site
+- Builds the Zensical static site
 - Deploys it to your server via rsync over SSH
 - Triggers on pushes to `main` branch when documentation files change
 - Can be manually triggered via GitHub Actions UI
@@ -235,7 +235,7 @@ The workflow runs when:
     - `README.md`
     - `CONTRIBUTING.md`
     - `CHANGELOG.md`
-    - `mkdocs.yml`
+    - `zensical.toml`
     - `requirements-docs.txt`
     - `.github/workflows/deploy-docs.yml`
 
@@ -308,11 +308,11 @@ chmod 755 /var/www/html/docs
 
 ### Build Failures
 
-**Error:** `mkdocs build` fails
+**Error:** `zensical build` fails
 
 ```bash
 # Test build locally
-mkdocs build --verbose
+zensical build --clean
 
 # Check requirements-docs.txt is up to date
 pip install -r requirements-docs.txt
@@ -464,5 +464,5 @@ If rsync isn't available, use SCP:
 ## Need Help?
 
 - Check [GitHub Actions documentation](https://docs.github.com/en/actions)
-- Review [MkDocs deployment docs](https://www.mkdocs.org/user-guide/deploying-your-docs/)
+- Review [Zensical publishing docs](https://zensical.org/docs/publish-your-site/)
 - See workflow runs in **Actions** tab for detailed logs
