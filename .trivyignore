@@ -1,0 +1,9 @@
+# Trivy suppressions. Each entry must carry a justification.
+
+# DS-0026: HEALTHCHECK is meaningless for .devcontainer/Dockerfile — it is an
+# interactive VS Code dev container, not a long-running service.
+DS-0026
+
+# DS-0031: false positive. ANSIBLE_HOST_KEY_CHECKING is a boolean toggle, not a
+# secret; the rule matches on the substring "KEY" in the variable name.
+DS-0031

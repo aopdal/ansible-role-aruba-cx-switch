@@ -45,7 +45,7 @@ feature — see that section before considering a feature done.
 ### Key Benefits
 
 - ✅ **Isolated Environment** - No conflicts with system packages
-- ✅ **Single-version Testing** - Pinned to `ansible-core>=2.19.10,<2.20.0`
+- ✅ **Single-version Testing** - Pinned to `ansible-core>=2.19.11,<2.20.0`
 - ✅ **Automated CI/CD** - Runs on every push/PR
 - ✅ **Pre-commit Hooks** - Catch issues before commit
 - ✅ **Easy Commands** - Simple Makefile interface
@@ -256,7 +256,7 @@ deactivate
 - Python venv module (usually included with Python)
 - Docker (for Molecule tests)
 - Git
-- Ansible-core 2.19 (`>=2.19.10,<2.20.0`, installed in venv)
+- Ansible-core 2.19 (`>=2.19.11,<2.20.0`, installed in venv)
 
 ## Local Testing
 
@@ -388,6 +388,15 @@ The CI pipeline runs automatically on:
 3. **Molecule** - Role testing in Docker containers
 4. **Integration** - Integration test playbooks
 5. **Release** - Automatic Galaxy release on main branch
+
+### Workflow: `.github/workflows/security.yml`
+
+Runs on pull requests, pushes to `main`, weekly, and on demand. It audits
+Python dependencies at their latest allowed and declared minimum versions
+(`pip-audit`), scans the repository for misconfigurations and secrets
+(`trivy fs`), and scans the devcontainer image (informational). Run the same
+checks locally with `make audit` and `make audit-repo`. See
+[Security and dependency checks](SECURITY.md).
 
 ### Viewing CI Results
 
@@ -1429,7 +1438,7 @@ docker-compose up -d
 ## Software stack
 os: "Ubuntu 22.04 LTS" or "Debian 12"
 python: "3.10+"
-ansible-core: ">=2.19.10,<2.20.0"
+ansible-core: ">=2.19.11,<2.20.0"
 
 ## Python packages
 packages:
