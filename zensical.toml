@@ -71,6 +71,7 @@ nav = [
   { "Development" = [
     { "Quick Start" = "QUICKSTART.md" },
     { "Requirements" = "REQUIREMENTS.md" },
+    { "Security" = "SECURITY.md" },
     { "Development" = "DEVELOPMENT.md" },
     { "Contributing" = "CONTRIBUTING.md" },
   ] },

@@ -1,7 +1,7 @@
 # Testing Requirements for ansible-role-aruba-cx-switch
 
 # Ansible and collections
-ansible-core>=2.19.10,<2.20.0
+ansible-core>=2.19.11,<2.20.0
 ansible-lint>=6.22.0
 
 # Molecule for role testing
@@ -12,15 +12,15 @@ molecule-plugins[docker]>=23.5.0
 yamllint>=1.33.0
 
 # Python dependencies
-jinja2>=3.1.0
-pynetbox>=7.3.0
+jinja2>=3.1.6
+pynetbox>=7.3.3
 netaddr>=0.10.0
 
 # Docker for molecule tests
 docker>=7.0.0
 
 # Testing utilities
-pytest>=7.4.0
+pytest>=9.0.3
 pytest-cov>=4.1.0
 pytest-mock>=3.11.0
 # pytest-ansible conflicts with pytest argument parser - not needed for filter plugin unit tests
@@ -30,7 +30,10 @@ coverage[toml]>=7.3.0
 
 # Code quality
 pylint>=3.0.0
-black>=23.0.0
+black>=26.10.1
+
+# Dependency vulnerability audit (make audit)
+pip-audit>=2.9.0
 
 # Pre-commit hooks
 pre-commit>=3.5.0

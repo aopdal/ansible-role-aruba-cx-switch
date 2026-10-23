@@ -15,8 +15,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   site is built once and deployed by two independent jobs
   (`deploy-pages`, `deploy-server`). `site_url` is set to the GitHub Pages
   URL.
+- `make audit` checks Python dependencies for known vulnerabilities with
+  `pip-audit`, both at the newest versions the requirements allow and at the
+  declared minimum versions (`testing-scripts/requirement_floors.py`).
+  `make audit-repo` runs a trivy misconfiguration and secret scan.
+- `Security` workflow running the same checks on pull requests, pushes to
+  `main` and weekly, plus an informational scan of the devcontainer image.
+- Dependabot for GitHub Actions and devcontainer features.
+- [Security and dependency checks](SECURITY.md) page describing what the
+  project checks and what users are responsible for.
 
 ### Changed
+
+- `ansible-lint` in `requirements.txt` now has the same `>=6.22.0` floor as
+  `requirements-test.txt`.
+- `pynetbox` floor in `requirements-test.txt` corrected from the never-released
+  `7.3.0` to `7.3.3`.
+- Molecule runs on Ubuntu 26.04 and 24.04 in CI (Ubuntu 22.04 dropped);
+  `ubuntu2604` is the new local default for `MOLECULE_DISTRO`.
+- `.devcontainer/Dockerfile` moves from Node.js 20 (end-of-life) to Node.js 24
+  LTS, installs it with `--no-install-recommends`
+  and now upgrades what the upstream base image ships: Debian packages
+  (`apt-get upgrade`), npm (to 11.x), pip, GitPython and the base image's
+  pipx tools. This clears 89 of 92 fixable HIGH/CRITICAL CVEs in the image;
+  the remaining three are copies bundled inside pip.
 
 - Documentation site migrated from MkDocs + Material to
   [Zensical](https://zensical.org/). Configuration moved from `mkdocs.yml`
@@ -26,6 +48,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundled Mermaid 10 script and `docs/javascripts/mermaid-init.js` were
   removed. Pages no longer show git-based "last updated" dates (the
   `git-revision-date-localized` plugin has no Zensical equivalent yet).
+
+### Security
+
+- Raised minimum Python dependency versions past known vulnerabilities:
+  `ansible-core>=2.19.11` (PYSEC-2026-3458), `requests>=2.33.0`,
+  `paramiko>=5.0.0` (versions up to 4.0.0 allow SHA-1 RSA signatures,
+  PYSEC-2026-2858), and in `requirements-test.txt` `jinja2>=3.1.6`,
+  `pytest>=9.0.3`, `black>=26.10.1`. Environments that already run current
+  versions are unaffected; older ones are upgraded by
+  `pip install -U -r requirements.txt`.
 
 ## [0.17.1] - 2026-10-16
 

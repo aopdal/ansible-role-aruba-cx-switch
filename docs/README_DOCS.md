@@ -27,6 +27,7 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for how the site is built
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide for development of the role
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference for testing/development commands
 - **[REQUIREMENTS.md](REQUIREMENTS.md)** - Which `requirements*` file to use and when
+- **[SECURITY.md](SECURITY.md)** - Dependency vulnerability checks and what users are responsible for
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute changes
 
 ## Examples (Recommended Starting Point)
