@@ -13,7 +13,7 @@ your responsibility.
 | Python dependencies, latest | The newest versions `requirements.txt` and `requirements-test.txt` allow have no known vulnerabilities (`pip-audit`, PyPI advisory database). This covers `ansible-core`. | `make audit`, Security workflow |
 | Python dependencies, minimum | Every declared `>=` minimum is a released version with no known vulnerabilities, so an older environment that still satisfies the requirements is not knowingly vulnerable. | `make audit`, Security workflow |
 | Repository | No misconfigurations or committed secrets (`trivy fs`). | `make audit-repo`, Security workflow |
-| Devcontainer | The image built from `.devcontainer/Dockerfile` is scanned for fixable HIGH/CRITICAL OS-package CVEs (informational). | Security workflow |
+| Devcontainer | The image built from `.devcontainer/Dockerfile` is scanned for fixable HIGH/CRITICAL CVEs (informational). The Dockerfile upgrades Debian packages, npm, pip and the base image's Python tools, so a rebuild picks up current fixes. | Security workflow |
 | GitHub Actions, devcontainer features | Kept up to date by Dependabot. | `.github/dependabot.yml` |
 
 The [Security workflow](https://github.com/aopdal/ansible-role-aruba-cx-switch/actions/workflows/security.yml)
