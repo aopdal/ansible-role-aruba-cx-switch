@@ -341,13 +341,14 @@ molecule destroy     # Clean up
 molecule --debug test
 
 # Test with specific distro
-MOLECULE_DISTRO=ubuntu2004 molecule test
+MOLECULE_DISTRO=ubuntu2404 molecule test
 ```
 
-Available distros:
-- `ubuntu2404` (default)
-- `ubuntu2204`
-- `ubuntu2004`
+Distros tested in CI:
+- `ubuntu2604` (default)
+- `ubuntu2404`
+
+Any other `geerlingguy/docker-<distro>-ansible` image can be used locally.
 
 Configuration: `molecule/default/molecule.yml`
 
@@ -1377,7 +1378,7 @@ docker-compose up -d
 
 **Option 2: Dedicated VM**
 
-- Ubuntu 22.04 LTS
+- Ubuntu 24.04 or 26.04 LTS
 - NetBox installed via official documentation
 - Persistent storage for test data
 
@@ -1436,8 +1437,8 @@ docker-compose up -d
 
 ```yaml
 ## Software stack
-os: "Ubuntu 22.04 LTS" or "Debian 12"
-python: "3.10+"
+os: "Ubuntu 24.04 or 26.04 LTS" or "Debian 13"
+python: "3.11+"  # required by ansible-core 2.19
 ansible-core: ">=2.19.11,<2.20.0"
 
 ## Python packages

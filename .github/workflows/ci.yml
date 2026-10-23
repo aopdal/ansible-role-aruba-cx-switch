@@ -104,7 +104,7 @@ jobs:
     strategy:
       matrix:
         distro:
-          - ubuntu2204
+          - ubuntu2604
           - ubuntu2404
     steps:
       - name: Check out the codebase

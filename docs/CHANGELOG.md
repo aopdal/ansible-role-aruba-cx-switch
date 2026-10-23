@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `requirements-test.txt`.
 - `pynetbox` floor in `requirements-test.txt` corrected from the never-released
   `7.3.0` to `7.3.3`.
+- Molecule runs on Ubuntu 26.04 and 24.04 in CI (Ubuntu 22.04 dropped);
+  `ubuntu2604` is the new local default for `MOLECULE_DISTRO`.
 - `.devcontainer/Dockerfile` moves from Node.js 20 (end-of-life) to Node.js 24
   LTS, installs it with `--no-install-recommends`
   and now upgrades what the upstream base image ships: Debian packages
