@@ -31,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `requirements-test.txt`.
 - `pynetbox` floor in `requirements-test.txt` corrected from the never-released
   `7.3.0` to `7.3.3`.
-- `.devcontainer/Dockerfile` installs Node.js with `--no-install-recommends`
+- `.devcontainer/Dockerfile` moves from Node.js 20 (end-of-life) to Node.js 24
+  LTS, installs it with `--no-install-recommends`
   and now upgrades what the upstream base image ships: Debian packages
   (`apt-get upgrade`), npm (to 11.x), pip, GitPython and the base image's
   pipx tools. This clears 89 of 92 fixable HIGH/CRITICAL CVEs in the image;

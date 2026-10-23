@@ -24,8 +24,9 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     jq \
     yamllint
 
-# Install Node.js 20.x LTS (separate layer to debug issues)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+# Install Node.js 24.x LTS (separate layer to debug issues). Only needed by
+# editor tooling; nothing in the role or its tests uses Node.
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g npm@11 \
