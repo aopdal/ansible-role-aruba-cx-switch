@@ -50,7 +50,7 @@ This section covers using the role for network configuration. For development se
 ### Prerequisites
 
 1. **NetBox** - Install and configure NetBox with your network devices
-2. **Ansible-core** - `>=2.19.10,<2.20.0` (Ansible 2.19.x)
+2. **Ansible-core** - `>=2.19.11,<2.20.0` (Ansible 2.19.x)
 3. **Python** - 3.12
 4. **Python libraries** - See [Requirements](#requirements) below
 5. **Network access** - Connectivity to your Aruba switches and NetBox API
@@ -172,11 +172,15 @@ Required libraries:
 
 - **pyaoscx** >= 2.6.0 - Aruba AOS-CX Python SDK
 - **pynetbox** >= 6.0.0 - NetBox API client
-- **paramiko** >= 2.7.0 - SSH library for device connections
+- **paramiko** >= 5.0.0 - SSH library for device connections
 - **ansible-pylibssh** >= 1.0.0 - Python SSH library wrapper
-- **requests** >= 2.25.0 - HTTP library
+- **requests** >= 2.33.0 - HTTP library
 - **packaging** >= 20.0 - Version parsing
 - **pytz** >= 2021.1 - Timezone support
+
+Minimum versions are kept free of known vulnerabilities, but keeping your own
+environment up to date is your responsibility — see
+[Security and dependency checks](docs/SECURITY.md).
 
 ## Installation
 

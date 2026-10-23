@@ -21,8 +21,8 @@ This project uses multiple requirements files for different purposes. This docum
 
 **Contains:**
 
-- `ansible-core` >= 2.19.10, < 2.20.0 - Ansible automation platform (pinned to 2.19.x; arubanetworks.aoscx 4.5.1 is not compatible with newer cores)
-- `ansible-lint` - Ansible best practices linter (unpinned; also present, version-pinned, in `requirements-test.txt` — see the note under [Version Pinning](#version-pinning))
+- `ansible-core` >= 2.19.11, < 2.20.0 - Ansible automation platform (pinned to 2.19.x; arubanetworks.aoscx 4.5.1 is not compatible with newer cores)
+- `ansible-lint` - Ansible best practices linter (also present in `requirements-test.txt` — see the note under [Version Pinning](#version-pinning))
 - `pyaoscx` - Aruba AOS-CX Python SDK (required by arubanetworks.aoscx collection)
 - `pynetbox` - NetBox API client (required by netbox.netbox collection)
 - `paramiko` - SSH library (required by arubanetworks.aoscx collection)
@@ -230,7 +230,7 @@ ansible-galaxy collection install arubanetworks.aoscx --force
 
 ### Version Pinning
 
-- **requirements.txt**: Uses minimum versions (`>=`) for flexibility, except `ansible-core` which is capped (`>=2.19.10,<2.20.0`) because arubanetworks.aoscx 4.5.1 isn't compatible with newer cores. `ansible-lint` is listed here unpinned (for convenience when installing just `requirements.txt`); it's also listed, version-pinned, in `requirements-test.txt` — if you install both, pip resolves to whichever pin is stricter, so keep the two roughly in sync when bumping either.
+- **requirements.txt**: Uses minimum versions (`>=`) for flexibility, except `ansible-core` which is capped (`>=2.19.11,<2.20.0`) because arubanetworks.aoscx 4.5.1 isn't compatible with newer cores. Every minimum is kept at a version with no known vulnerabilities — see [Security](SECURITY.md). `ansible-lint` is listed here (for convenience when installing just `requirements.txt`) with the same `>=6.22.0` floor as in `requirements-test.txt` — if you install both, pip resolves to whichever pin is stricter, so keep the two roughly in sync when bumping either.
 - **requirements-test.txt**: Uses minimum versions (`>=`) for flexibility, same as requirements.txt
 - **requirements.yml**: Uses minimum versions (`>=`) for collections
 

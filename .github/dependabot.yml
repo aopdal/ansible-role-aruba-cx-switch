@@ -1,0 +1,24 @@
+---
+# Dependabot covers dependencies with pinned versions only. Python
+# requirements use minimum versions and are checked by the Security workflow
+# (pip-audit on latest and minimum versions) instead; see docs/SECURITY.md.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # No "docker" entry: .devcontainer/Dockerfile takes its base tag from
+  # ARG VARIANT, which Dependabot cannot resolve. The floating "3.12" tag is
+  # re-pulled and scanned weekly by the devcontainer-scan job instead.
+  - package-ecosystem: devcontainers
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly

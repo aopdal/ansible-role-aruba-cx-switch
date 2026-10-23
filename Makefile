@@ -1,4 +1,4 @@
-.PHONY: help install test lint syntax molecule clean pre-commit all venv docs docs-serve docs-build docs-sync
+.PHONY: help install test lint syntax molecule clean pre-commit all venv docs docs-serve docs-build docs-sync audit audit-repo
 
 # Default target
 .DEFAULT_GOAL := help
@@ -91,6 +91,23 @@ test-unit: ## Run unit tests for filter plugins
 	@echo "$(BLUE)Running unit tests...$(NC)"
 	@pytest tests/unit/ -v
 	@echo "$(GREEN)✅ Unit tests passed$(NC)"
+
+audit: venv ## Audit Python dependencies (latest + minimum versions) for known CVEs
+	@echo "$(BLUE)Auditing latest versions allowed by requirements...$(NC)"
+	@$(ACTIVATE) && pip-audit --progress-spinner off -r requirements.txt -r requirements-test.txt
+	@echo "$(BLUE)Auditing minimum versions declared in requirements...$(NC)"
+	@$(ACTIVATE) && floors=$$(mktemp) && trap 'rm -f '"$$floors" EXIT && \
+		for f in requirements.txt requirements-test.txt; do \
+			echo "$$f:"; \
+			python testing-scripts/requirement_floors.py --verify $$f > $$floors && \
+			pip-audit --progress-spinner off --no-deps --disable-pip -r $$floors || exit 1; \
+		done
+	@echo "$(GREEN)✅ No known vulnerabilities in latest or minimum versions$(NC)"
+
+audit-repo: ## Scan repo for misconfigurations and secrets (requires trivy)
+	@echo "$(BLUE)Running trivy misconfig + secret scan...$(NC)"
+	@trivy fs --scanners misconfig,secret --skip-dirs .venv --exit-code 1 .
+	@echo "$(GREEN)✅ No misconfigurations or secrets found$(NC)"
 
 test-unit-coverage: ## Run unit tests with coverage report
 	@echo "$(BLUE)Running unit tests with coverage...$(NC)"

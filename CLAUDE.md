@@ -399,6 +399,8 @@ the auto-generated list. Most targets depend on the venv created by
 | `make lint`         | `yamllint` + `ansible-lint`.                                         |
 | `make syntax`       | `ansible-playbook tests/test.yml --syntax-check`.                    |
 | `make pre-commit`   | Run all pre-commit hooks across the repo.                            |
+| `make audit`        | `pip-audit` on latest + declared minimum Python dependency versions. Run after touching `requirements*.txt` ([docs/SECURITY.md](docs/SECURITY.md)). |
+| `make audit-repo`   | `trivy fs` misconfig + secret scan (needs trivy installed).          |
 
 ### Tests
 

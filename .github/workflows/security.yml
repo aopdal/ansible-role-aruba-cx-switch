@@ -1,0 +1,96 @@
+---
+name: Security
+
+# Dependency and repository security checks. Runs weekly because new CVEs are
+# published against unchanged dependencies; see docs/SECURITY.md.
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  TRIVY_VERSION: "v0.76.1"
+
+jobs:
+  python-audit:
+    name: Python dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit packaging
+
+      # What a new user gets: the newest versions the requirements allow
+      - name: Audit latest allowed versions
+        run: pip-audit --progress-spinner off -r requirements.txt -r requirements-test.txt
+
+      # What an existing user may still run: the declared minimum versions
+      - name: Audit declared minimum versions
+        run: |
+          for f in requirements.txt requirements-test.txt; do
+            echo "::group::$f"
+            python testing-scripts/requirement_floors.py --verify "$f" > floors.txt
+            cat floors.txt
+            pip-audit --progress-spinner off --no-deps --disable-pip -r floors.txt
+            echo "::endgroup::"
+          done
+
+  repo-scan:
+    name: Misconfiguration and secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v6
+
+      - name: Install trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567  # v0.3.1
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+
+      - name: Run trivy fs
+        run: trivy fs --scanners misconfig,secret --exit-code 1 .
+
+  devcontainer-scan:
+    name: Devcontainer image scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v6
+
+      - name: Install trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567  # v0.3.1
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+
+      # Python tooling is installed by post-create.sh at container start, so it
+      # is not in the image; it is covered by the python-audit job instead.
+      - name: Build devcontainer image
+        run: docker build --pull -t devcontainer-scan:ci .devcontainer
+
+      # Informational: OS packages come from the upstream base image, which
+      # this repo cannot patch. Fixable HIGH/CRITICAL findings are shown in
+      # the log without failing the run.
+      - name: Scan devcontainer image
+        run: |
+          trivy image --scanners vuln --ignore-unfixed \
+            --severity HIGH,CRITICAL --exit-code 0 devcontainer-scan:ci

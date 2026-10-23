@@ -2,8 +2,10 @@
 ARG VARIANT="3.12"
 FROM mcr.microsoft.com/devcontainers/python:${VARIANT}
 
-# Install system dependencies
+# Install system dependencies. The upgrade pulls Debian security fixes the
+# upstream base image has not picked up yet.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y upgrade \
     && apt-get -y install --no-install-recommends \
     # Network tools for testing
     iputils-ping \
@@ -22,10 +24,13 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     jq \
     yamllint
 
-# Install Node.js 20.x LTS (separate layer to debug issues)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+# Install Node.js 24.x LTS (separate layer to debug issues). Only needed by
+# editor tooling; nothing in the role or its tests uses Node.
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get update \
-    && apt-get install -y nodejs \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g npm@11 \
+    && npm cache clean --force \
     && node --version \
     && npm --version
 
@@ -35,8 +40,11 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 # Set working directory
 WORKDIR /workspace
 
-# Install pre-commit (for git hooks)
-RUN pip install --no-cache-dir pre-commit
+# Install pre-commit (for git hooks). pip, GitPython and the base image's
+# pipx tools (/usr/local/py-utils) are upgraded for the same reason as apt.
+RUN pip install --no-cache-dir --upgrade pip gitpython \
+    && pip install --no-cache-dir pre-commit \
+    && pipx upgrade-all
 
 # Create directories for Ansible
 RUN mkdir -p /home/vscode/.ansible/collections \
