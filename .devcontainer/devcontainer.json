@@ -12,9 +12,8 @@
     "source=${localEnv:HOME}/code/iktnh-ansible,target=/workspaces/iktnh-ansible,type=bind"
   ],
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "moby": false,
-      "enableNonRootDocker": "true"
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
+      "moby": false
     },
     "ghcr.io/devcontainers/features/git:1": {}
   },
