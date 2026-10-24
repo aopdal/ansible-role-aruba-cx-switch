@@ -118,6 +118,7 @@ from netbox_filters_lib.snmp_filters import (
     get_snmpv3_plaintext_users,
     get_snmp_changes,
 )
+from netbox_filters_lib.central_filters import has_device_tag, get_central_changes
 
 # fmt: on
 
@@ -209,4 +210,7 @@ class FilterModule:
             "build_snmpv3_user_line": build_snmpv3_user_line,
             "get_snmpv3_plaintext_users": get_snmpv3_plaintext_users,
             "get_snmp_changes": get_snmp_changes,
+            # HPE Aruba Networking Central
+            "has_device_tag": has_device_tag,
+            "get_central_changes": get_central_changes,
         }

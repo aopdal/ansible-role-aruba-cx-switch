@@ -62,6 +62,7 @@ nav = [
     { "OSPF" = "OSPF_CONFIGURATION.md" },
     { "Static Routes" = "STATIC_ROUTES_CONFIGURATION.md" },
     { "SNMP" = "SNMP_CONFIGURATION.md" },
+    { "HPE Aruba Networking Central" = "CENTRAL_CONFIGURATION.md" },
     { "Tag-Dependent Tasks" = "TAG_DEPENDENT_INCLUDES.md" },
     { "VSX Configuration" = "VSX_CONFIGURATION.md" },
     { "Port access configuration" = "PORT_ACCESS_CONFIGURATION.md" },

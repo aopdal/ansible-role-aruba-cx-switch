@@ -89,6 +89,8 @@ EXPECTED_FILTER_NAMES = {
     "build_snmpv3_user_line",
     "get_snmpv3_plaintext_users",
     "get_snmp_changes",
+    "has_device_tag",
+    "get_central_changes",
 }
 
 

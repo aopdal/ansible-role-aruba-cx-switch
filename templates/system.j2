@@ -8,7 +8,11 @@ banner motd !
 user {{ ansible_user }} group administrators password plaintext {{ stage_password }}
 !
 hpe-anw-central
+{% if tags | default([]) | has_device_tag(aoscx_central_monitor_tag) %}
+    enable
+{% else %}
     disable
+{% endif %}
 ssh server vrf mgmt
 {% for vrf in interfaces | default([]) | get_server_vrfs(primary_ip4 | default(''), device_roles | default([])) %}
 ssh server vrf {{ vrf }}

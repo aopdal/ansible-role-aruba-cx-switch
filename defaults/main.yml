@@ -66,6 +66,14 @@ aoscx_configure_access_switch_server_vrfs: true
 # device_roles does not contain 'access-switch' or primary_ip4 is undefined.
 aoscx_configure_access_switch_default_gateway: true
 
+# HPE Aruba Networking Central connection (hpe-anw-central context). Devices with the NetBox device tag aoscx_central_monitor_tag get
+# the connection enabled; in aoscx_idempotent_mode, devices without the tag
+# get it disabled. Monitoring-only use is set up on the Central side. See
+# docs/CENTRAL_CONFIGURATION.md.
+aoscx_configure_central: true
+# NetBox device tag (slug or name) that enables the Central connection.
+aoscx_central_monitor_tag: hpe-anw-central-mon
+
 # Port-access / device-profile feature.
 # Renders port-access lldp-groups, mac-groups, roles and device-profiles
 # from the `port_access` config_context dict (NetBox). Auto-skipped when

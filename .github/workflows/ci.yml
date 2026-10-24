@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v6
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v6
@@ -72,7 +72,7 @@ jobs:
     needs: [lint, syntax]
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v6
@@ -89,7 +89,7 @@ jobs:
           pytest tests/unit/ -v --cov=filter_plugins --cov=netbox_filters_lib --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         if: always()
         with:
           files: ./coverage.xml
@@ -108,7 +108,7 @@ jobs:
           - ubuntu2404
     steps:
       - name: Check out the codebase
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v6
@@ -140,7 +140,7 @@ jobs:
   #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
   #   steps:
   #     - name: Check out the codebase
-  #       uses: actions/checkout@v6
+  #       uses: actions/checkout@v7
   #
   #     - name: Set up Python 3.x
   #       uses: actions/setup-python@v6

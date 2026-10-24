@@ -116,6 +116,27 @@
     - base_config
     - system
 
+# HPE Aruba Networking Central connection, enabled by a NetBox device tag
+# (aoscx_central_monitor_tag). No VRF dependency (the connection's VRF is
+# not configured by the role); placed in base-system block.
+- name: Include HPE Aruba Networking Central configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_central.yml
+    apply:
+      tags:
+        - central
+        - base_config
+        - system
+  when:
+    - aoscx_configure_central | bool
+    # Idempotent mode also runs without the tag, to disable the connection.
+    - (aoscx_idempotent_mode | bool) or
+      (tags | default([]) | has_device_tag(aoscx_central_monitor_tag))
+  tags:
+    - central
+    - base_config
+    - system
+
 # VRFs should be configured before L3 interfaces, NTP, and DNS
 # (NTP and DNS may reference a VRF that must already exist)
 - name: Identify VRF changes (before configuration)

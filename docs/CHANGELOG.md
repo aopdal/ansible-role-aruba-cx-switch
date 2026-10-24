@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-24
+
 ### Added
 
+- HPE Aruba Networking Central connection (`hpe-anw-central`) per device:
+  devices with the NetBox device tag `hpe-anw-central-mon`
+  (`aoscx_central_monitor_tag`) get the connection enabled; in
+  `aoscx_idempotent_mode`, devices without it get it disabled. Toggle with
+  `aoscx_configure_central` (default `true`), tag `central`. Current state is
+  read from REST facts (`/system/hpe_anw_central`, new
+  `aoscx_central_facts`) or the running-config. The ZTP starting config
+  (`templates/system.j2`) renders `enable` for tagged devices. See
+  [CENTRAL_CONFIGURATION.md](CENTRAL_CONFIGURATION.md).
 - Documentation is published to GitHub Pages at
   <https://aopdal.github.io/ansible-role-aruba-cx-switch/> by the
   `deploy-docs` workflow, alongside the existing self-hosted server. The

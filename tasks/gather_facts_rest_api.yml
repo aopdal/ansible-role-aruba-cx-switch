@@ -12,7 +12,7 @@
 # Some switch models (e.g., CX 6000) don't support these attributes.
 #
 # Feature-specific queries below (OSPF, VSX, static routes, VRFs, STP,
-# EVPN/VXLAN, port-access, DHCP relay) only run when their data has a
+# EVPN/VXLAN, port-access, DHCP relay, Central) only run when their data has a
 # consumer: the matching aoscx_configure_* flag must also be true, OR
 # aoscx_test_mode: true is set. aoscx_test_mode exists for test/report-only
 # playbooks that need REST facts gathered even when aoscx_configure_*: false
@@ -35,6 +35,7 @@
 # - aoscx_vsx_facts (when device_vsx enabled)
 # - aoscx_stp_global_facts (when aoscx_configure_stp enabled)
 # - aoscx_snmp_facts (when SNMP variables are set)
+# - aoscx_central_facts (when aoscx_configure_central enabled)
 # - aoscx_interface_split_facts (when a NetBox interface has `channels`
 #   and the device answers the split attributes; see
 #   docs/INTERFACE_SPLIT.md)
@@ -929,6 +930,38 @@
   tags:
     - always
 
+# Query HPE Aruba Networking Central connection state.
+# Used by configure_central.yml; 'disable' is the only attribute compared.
+# A 404 is tolerated: configure_central.yml then falls back to the
+# running-config.
+#
+# Output: aoscx_central_facts = { 'disable': bool }
+- name: Query Central connection facts from REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/hpe_anw_central?attributes=disable"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  register: _rest_central
+  delegate_to: localhost
+  check_mode: false
+  when: aoscx_configure_central | bool or aoscx_test_mode | bool
+  tags:
+    - always
+
+- name: Set Central connection facts from REST API response
+  ansible.builtin.set_fact:
+    aoscx_central_facts: "{{ _rest_central.json }}"
+  when:
+    - _rest_central is defined
+    - _rest_central.status | default(0) == 200
+    - _rest_central.json is mapping
+  tags:
+    - always
+
 # Logout to clean up session
 - name: Logout from AOS-CX REST API
   ansible.builtin.uri:
@@ -1061,7 +1094,8 @@
         'Static route facts available: ' ~ (aoscx_static_route_facts is defined),
         'VRF facts available: ' ~ (aoscx_vrf_facts is defined),
         'VRF route-target facts available: ' ~ (aoscx_vrf_rt_facts is defined),
-        'SNMP facts available: ' ~ (aoscx_snmp_facts is defined)
+        'SNMP facts available: ' ~ (aoscx_snmp_facts is defined),
+        'Central facts available: ' ~ (aoscx_central_facts is defined)
       ] }}
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1

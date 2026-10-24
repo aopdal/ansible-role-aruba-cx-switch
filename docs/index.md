@@ -95,6 +95,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **Static routing** - Forward, blackhole, and reject routes per VRF
 - ✅ **BFD** - For BGP
 - ✅ **SNMP** - Agent VRF, system location (from NetBox site/location), SNMPv3 users
+- ✅ **HPE ANW Central** - Monitoring connection to Central, enabled per device with the `hpe-anw-central-mon` NetBox tag
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
 - ❌ **DHCP Snooping** - on Roadmap
@@ -352,6 +353,8 @@ aoscx_configure_timezone: true
 aoscx_configure_icmp_redirect: true  # 'no ip icmp redirect' (anycast gateway prerequisite, device_anycast_gateway)
 aoscx_configure_access_switch_default_gateway: true  # access-switch: ip route 0.0.0.0/0 from primary_ip4
 aoscx_configure_access_switch_server_vrfs: true      # ssh/https-server VRFs (BASE_CONFIGURATION.md)
+aoscx_configure_central: true                   # hpe-anw-central on tagged devices (CENTRAL_CONFIGURATION.md)
+aoscx_central_monitor_tag: hpe-anw-central-mon  # NetBox device tag that enables the Central connection
 
 # Services (run after VRFs)
 aoscx_configure_ntp: true
@@ -753,6 +756,7 @@ applies to tags entered in a Semaphore UI task template.
 - `icmp_redirect`, `base_config`, `system` - ICMP redirect / Anycast Gateway prerequisite
 - `server_vrfs`, `base_config`, `system` - Access-switch server VRF configuration
 - `default_gateway`, `base_config`, `system` - Access-switch default gateway configuration
+- `central`, `base_config`, `system` - HPE Aruba Networking Central connection (NetBox device tag)
 - `vrfs`, `layer3`, `routing` - VRF configuration
 - `vlans`, `layer2` - VLAN configuration
 - `stp`, `layer2` - Spanning tree configuration
@@ -777,7 +781,7 @@ applies to tags entered in a Semaphore UI task template.
 
 ### Aggregate Tags
 
-- `base_config` - Base system configuration without VRF dependencies (template gen, hostname, banner, timezone, icmp_redirect, server_vrfs, default_gateway)
+- `base_config` - Base system configuration without VRF dependencies (template gen, hostname, banner, timezone, icmp_redirect, server_vrfs, default_gateway, central)
 - `services` - VRF-dependent services (NTP, DNS, SNMP)
 - `layer1` - Physical interface configuration
 - `layer2` - All L2 configuration (VLANs, L2 interfaces, LAG, STP, port-access)
@@ -787,7 +791,7 @@ applies to tags entered in a Semaphore UI task template.
 - `overlay` - All overlay configuration (EVPN, VXLAN)
 - `cleanup` - All cleanup tasks (idempotent mode only)
 - `idempotent` - All idempotent cleanup tasks
-- `system` - System configuration without VRF dependencies (hostname, banner, timezone, icmp_redirect, server_vrfs, default_gateway)
+- `system` - System configuration without VRF dependencies (hostname, banner, timezone, icmp_redirect, server_vrfs, default_gateway, central)
 - `vsx` - VSX/MCLAG configuration
 - `ha` - High availability configuration (VSX)
 
