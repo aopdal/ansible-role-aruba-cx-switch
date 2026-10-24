@@ -67,7 +67,8 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
    (`aoscx_generate_template_config`).
 3. Base system (no VRF dependency): hostname → banner → timezone →
    anycast gateway prerequisite (`no ip icmp redirect`) → access-switch
-   default gateway (`ip route 0.0.0.0/0`, default VRF only).
+   default gateway (`ip route 0.0.0.0/0`, default VRF only) → Central
+   connection (`hpe-anw-central`, NetBox device tag).
 4. **VRFs** (`identify_vrf_changes.yml` → `configure_vrfs.yml`) — must
    precede anything that can reference a VRF (L3 interfaces, NTP, DNS,
    ssh/https-server VRFs, SNMP, OSPF, BGP, static routes).
@@ -139,6 +140,7 @@ Existing dependency chains to preserve:
 | Port-access cleanup | Port-access configuration (idempotent mode)               |
 | Virtual-interface cleanup | Interface facts from the first gather; must precede L3 interfaces |
 | Access-switch default gateway | Default VRF only (base-system block)           |
+| Central connection (`hpe-anw-central`) | None (base-system block; connection VRF not configured) |
 | Cleanup tasks     | Re-gathered facts AFTER all configuration tasks             |
 | `save_when`       | Last (after every change)                                   |
 
@@ -295,6 +297,7 @@ Update the relevant topic page when you touch its area:
 | Port-access (device-profile)                  | [docs/PORT_ACCESS_CONFIGURATION.md](docs/PORT_ACCESS_CONFIGURATION.md)                       |
 | VSX                                           | [docs/VSX_CONFIGURATION.md](docs/VSX_CONFIGURATION.md)                                       |
 | SNMP                                          | [docs/SNMP_CONFIGURATION.md](docs/SNMP_CONFIGURATION.md)                                     |
+| HPE Aruba Networking Central                  | [docs/CENTRAL_CONFIGURATION.md](docs/CENTRAL_CONFIGURATION.md)                               |
 | DNS / NTP / banner / timezone                 | [docs/BASE_CONFIGURATION.md](docs/BASE_CONFIGURATION.md), [docs/DNS_CONFIGURATION.md](docs/DNS_CONFIGURATION.md) |
 | Filter plugins                                | [docs/FILTER_PLUGINS.md](docs/FILTER_PLUGINS.md), [docs/FILTER_PLUGINS_REUSE.md](docs/FILTER_PLUGINS_REUSE.md) |
 | NetBox custom fields / config context         | [docs/NETBOX_INTEGRATION.md](docs/NETBOX_INTEGRATION.md)                                     |

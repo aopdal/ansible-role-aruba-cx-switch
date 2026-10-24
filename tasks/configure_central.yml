@@ -1,0 +1,52 @@
+# code: language=ansible
+---
+# HPE Aruba Networking Central connection (hpe-anw-central)
+#
+# Devices with the NetBox device tag aoscx_central_monitor_tag (default
+# 'hpe-anw-central-mon') get the connection enabled. In
+# aoscx_idempotent_mode, devices without the tag get it disabled (matching
+# the ZTP starting config in templates/system.j2); otherwise they are left
+# alone. See docs/CENTRAL_CONFIGURATION.md.
+#
+# Current state comes from REST facts (aoscx_central_facts, gathered when
+# aoscx_gather_facts_rest_api: true) or, without those, from the
+# running-config. The enabled state is not rendered in the running-config,
+# so aoscx_config cannot diff 'enable' itself: it is only pushed when the
+# current state says disabled.
+
+- name: configure_central | Get running-config for Central state detection
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show running-config
+  vars:
+    ansible_connection: network_cli
+  register: _central_running_config
+  when: aoscx_central_facts is not defined
+
+- name: configure_central | Identify Central connection changes
+  ansible.builtin.set_fact:
+    _central_changes: >-
+      {{ aoscx_central_facts | default(None) | get_central_changes(
+           tags | default([]), aoscx_central_monitor_tag,
+           aoscx_idempotent_mode | bool,
+           (_central_running_config.stdout | default([None]))[0]) }}
+
+- name: configure_central | Display Central connection debug info
+  ansible.builtin.debug:
+    msg:
+      - "Central connection on {{ inventory_hostname }}"
+      - "Tag: {{ aoscx_central_monitor_tag }}"
+      - "Desired: {{ _central_changes.desired }}"
+      - "Current: {{ _central_changes.current }} (from {{ _central_changes.source }})"
+      - "Action: {{ _central_changes.action | default('none', true) }}"
+  when: aoscx_debug | bool or ansible_verbosity >= 1
+
+- name: configure_central | Configure Central connection
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "{{ _central_changes.action }}"
+    parents:
+      - hpe-anw-central
+  vars:
+    ansible_connection: network_cli
+  when: _central_changes.action is not none

@@ -129,6 +129,12 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for how the site is built
   NetBox site/location, SNMPv3 users with vaulted ciphertext secrets, and
   idempotency behaviour.
 
+### HPE Aruba Networking Central
+
+- **[CENTRAL_CONFIGURATION.md](CENTRAL_CONFIGURATION.md)** - Enabling the
+  Central connection (monitoring) per device with the `hpe-anw-central-mon`
+  NetBox device tag, change detection, and idempotent-mode disable.
+
 ### Spanning Tree (STP)
 
 - **[STP_CONFIGURATION.md](STP_CONFIGURATION.md)** - Global MSTP settings and

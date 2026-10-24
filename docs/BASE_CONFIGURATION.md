@@ -75,15 +75,17 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 1. Fact gathering (if enabled)
 2. **Banner configuration** ← Base config (`base_config`, `system`)
 3. **Timezone configuration** ← Base config (`base_config`, `system`)
-4. VRF configuration (`vrfs`, `layer3`, `routing`)
-5. **NTP configuration** ← Services (`ntp`, `services`)
-6. **DNS configuration** ← Services (`dns`, `services`)
-7. **ssh/https-server VRFs** ← (`server_vrfs`, `base_config`, `system`)
-8. **SNMP configuration** ← Services (`snmp`, `services`), see
+4. **HPE Aruba Networking Central** ← (`central`, `base_config`, `system`),
+   see [CENTRAL_CONFIGURATION.md](CENTRAL_CONFIGURATION.md)
+5. VRF configuration (`vrfs`, `layer3`, `routing`)
+6. **NTP configuration** ← Services (`ntp`, `services`)
+7. **DNS configuration** ← Services (`dns`, `services`)
+8. **ssh/https-server VRFs** ← (`server_vrfs`, `base_config`, `system`)
+9. **SNMP configuration** ← Services (`snmp`, `services`), see
    [SNMP_CONFIGURATION.md](SNMP_CONFIGURATION.md)
-9. VLAN configuration
-10. Physical interfaces
-11. ... (rest of configuration)
+10. VLAN configuration
+11. Physical interfaces
+12. ... (rest of configuration)
 
 ## Features
 

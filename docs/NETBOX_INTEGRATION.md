@@ -901,6 +901,15 @@ vlan.l2vpn_termination.id  # Termination exists check
 
 ---
 
+### Device tags
+
+Device tags are exposed by the NetBox inventory plugin as the `tags` host
+variable (a list of tag slugs). The role reads:
+
+| Tag                   | Variable                    | Effect                                                                 |
+| --------------------- | --------------------------- | ---------------------------------------------------------------------- |
+| `hpe-anw-central-mon` | `aoscx_central_monitor_tag` | Enables the HPE Aruba Networking Central connection, see [CENTRAL_CONFIGURATION.md](CENTRAL_CONFIGURATION.md) |
+
 ## NetBox Plugins
 
 ### netbox-bgp Plugin (Optional but required for BGP)
