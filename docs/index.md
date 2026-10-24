@@ -95,6 +95,7 @@ For a complete walkthrough, see [docs/QUICKSTART.md](QUICKSTART.md).
 - ✅ **Static routing** - Forward, blackhole, and reject routes per VRF
 - ✅ **BFD** - For BGP
 - ✅ **SNMP** - Agent VRF, system location (from NetBox site/location), SNMPv3 users
+- ✅ **HPE ANW Central** - Monitoring connection to Central, enabled per device with the `hpe-anw-central-mon` NetBox tag
 - ❌ **DHCP relay IPv6 Stateful** - on roadmap
 - ❌ **DHCP relay IPv6 Stateless** - on roadmap
 - ❌ **DHCP Snooping** - on Roadmap
