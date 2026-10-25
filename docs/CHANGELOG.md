@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `make install-trivy` installs the trivy version pinned in the Security
+  workflow to `~/.local/bin` (works in the dev container), verifying the
+  release checksum (`testing-scripts/install_trivy.sh`). `make audit-repo`
+  now points to it when trivy is missing instead of failing with
+  `trivy: No such file or directory`.
+
 ## [0.18.0] - 2026-10-24
 
 ### Added

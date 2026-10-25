@@ -404,6 +404,7 @@ the auto-generated list. Most targets depend on the venv created by
 | `make pre-commit`   | Run all pre-commit hooks across the repo.                            |
 | `make audit`        | `pip-audit` on latest + declared minimum Python dependency versions. Run after touching `requirements*.txt` ([docs/SECURITY.md](docs/SECURITY.md)). |
 | `make audit-repo`   | `trivy fs` misconfig + secret scan (needs trivy installed).          |
+| `make install-trivy` | Optional: install the CI-pinned trivy to `~/.local/bin` (checksum-verified). |
 
 ### Tests
 

@@ -396,7 +396,8 @@ Runs on pull requests, pushes to `main`, weekly, and on demand. It audits
 Python dependencies at their latest allowed and declared minimum versions
 (`pip-audit`), scans the repository for misconfigurations and secrets
 (`trivy fs`), and scans the devcontainer image (informational). Run the same
-checks locally with `make audit` and `make audit-repo`. See
+checks locally with `make audit` and `make audit-repo` (install trivy first
+with `make install-trivy`). See
 [Security and dependency checks](SECURITY.md).
 
 ### Viewing CI Results
@@ -2078,6 +2079,30 @@ Bootstrap script to configure initial management access on switches.
 - Enables SSH server
 - Creates admin user
 - Saves configuration
+
+#### install_trivy.sh
+
+Installs [trivy](https://trivy.dev/) for `make audit-repo`. Optional: only the
+repository misconfiguration/secret scan needs it, and CI runs that scan on
+every pull request anyway.
+
+**Usage:**
+```bash
+make install-trivy
+```
+
+**What it does:**
+- Reads the trivy version pinned in `.github/workflows/security.yml`
+  (`TRIVY_VERSION`), so local scans match CI; `TRIVY_VERSION=vX.Y.Z`
+  overrides it
+- Downloads the release archive for the current OS/architecture (Linux or
+  macOS, amd64 or arm64) and verifies it against the release checksums
+- Installs to `~/.local/bin` (on `PATH` in the dev container), or to the
+  directory given as the first argument; skips the download if that version
+  is already installed
+
+In the dev container, the binary lives in the container filesystem, so run
+`make install-trivy` again after a rebuild.
 
 ### Directory Structure
 

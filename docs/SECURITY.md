@@ -83,5 +83,8 @@ not support newer cores; upgrades stay within the 2.19 series.
   has no fixed version, raise the floor past the affected range (see
   `paramiko` in `requirements.txt`).
 - `make audit-repo` runs the same trivy scan as CI and needs trivy installed
-  locally. Suppressions live in [`.trivyignore`](../.trivyignore), each with
+  locally. trivy is optional for local work; `make install-trivy` installs
+  the CI-pinned version to `~/.local/bin` (also in the dev container) via
+  [`testing-scripts/install_trivy.sh`](../testing-scripts/install_trivy.sh),
+  after verifying the release checksum. Suppressions live in [`.trivyignore`](../.trivyignore), each with
   a justification.

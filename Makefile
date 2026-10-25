@@ -1,4 +1,4 @@
-.PHONY: help install test lint syntax molecule clean pre-commit all venv docs docs-serve docs-build docs-sync audit audit-repo
+.PHONY: help install test lint syntax molecule clean pre-commit all venv docs docs-serve docs-build docs-sync audit audit-repo install-trivy
 
 # Default target
 .DEFAULT_GOAL := help
@@ -104,9 +104,16 @@ audit: venv ## Audit Python dependencies (latest + minimum versions) for known C
 		done
 	@echo "$(GREEN)✅ No known vulnerabilities in latest or minimum versions$(NC)"
 
+install-trivy: ## Install trivy (CI-pinned version) to ~/.local/bin for audit-repo
+	@bash testing-scripts/install_trivy.sh
+
 audit-repo: ## Scan repo for misconfigurations and secrets (requires trivy)
-	@echo "$(BLUE)Running trivy misconfig + secret scan...$(NC)"
-	@trivy fs --scanners misconfig,secret --skip-dirs .venv --exit-code 1 .
+	@trivy=$$(command -v trivy || ls $$HOME/.local/bin/trivy 2>/dev/null) || { \
+		echo "$(YELLOW)trivy not found. Install it with 'make install-trivy' (optional; CI runs this scan).$(NC)"; \
+		exit 1; \
+	}; \
+	echo "$(BLUE)Running trivy misconfig + secret scan...$(NC)"; \
+	$$trivy fs --scanners misconfig,secret --skip-dirs .venv --exit-code 1 .
 	@echo "$(GREEN)✅ No misconfigurations or secrets found$(NC)"
 
 test-unit-coverage: ## Run unit tests with coverage report
