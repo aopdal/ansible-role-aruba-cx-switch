@@ -1,6 +1,13 @@
 # syntax=docker/dockerfile:1
+# Official slim Python image: far fewer packages (and CVEs) than the
+# mcr.microsoft.com/devcontainers images. The common-utils feature in
+# devcontainer.json adds sudo, locales and shell basics for the vscode user.
 ARG VARIANT="3.12"
-FROM mcr.microsoft.com/devcontainers/python:${VARIANT}
+FROM python:${VARIANT}-slim
+
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
 
 # Install system dependencies. The upgrade pulls Debian security fixes the
 # upstream base image has not picked up yet.
@@ -10,41 +17,36 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     # Network tools for testing
     iputils-ping \
     netcat-openbsd \
+    openssh-client \
+    ca-certificates \
     curl \
     wget \
-    # Build tools
+    # Build tools (Python packages without wheels)
     build-essential \
     # Git tools
     git \
     git-lfs \
     # Shell tools
     bash-completion \
+    less \
+    procps \
     vim \
     # Additional utilities
     jq \
-    yamllint
+    yamllint \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 24.x LTS (separate layer to debug issues). Only needed by
-# editor tooling; nothing in the role or its tests uses Node.
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g npm@11 \
-    && npm cache clean --force \
-    && node --version \
-    && npm --version
-
-# Clean up apt cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# Create the dev user here (not only via common-utils) because the steps
+# below write to its home directory before features run.
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME
 
 # Set working directory
 WORKDIR /workspace
 
-# Install pre-commit (for git hooks). pip, GitPython and the base image's
-# pipx tools (/usr/local/py-utils) are upgraded for the same reason as apt.
-RUN pip install --no-cache-dir --upgrade pip gitpython \
-    && pip install --no-cache-dir pre-commit \
-    && pipx upgrade-all
+# Install pre-commit (for git hooks). pip is upgraded for the same reason as apt.
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir pre-commit
 
 # Create directories for Ansible
 RUN mkdir -p /home/vscode/.ansible/collections \
@@ -64,11 +66,13 @@ RUN echo 'alias ll="ls -lah"' >> /home/vscode/.bashrc \
     && echo 'alias ansible-test="molecule test"' >> /home/vscode/.bashrc \
     && echo 'alias ansible-converge="molecule converge"' >> /home/vscode/.bashrc
 
-# Set environment variables
+# Set environment variables. /usr/local is root-owned, so post-create.sh's
+# pip installs land in the user site; put its scripts on PATH.
 ENV ANSIBLE_FORCE_COLOR=true
 ENV ANSIBLE_HOST_KEY_CHECKING=false
 ENV PY_COLORS=1
 ENV PYTHONUNBUFFERED=1
+ENV PATH="/home/vscode/.local/bin:${PATH}"
 
 # Switch to vscode user
 USER vscode
@@ -76,7 +80,5 @@ USER vscode
 # Add welcome message
 RUN echo 'echo "🚀 Ansible Role Development Environment"' >> /home/vscode/.bashrc \
     && echo 'echo "📦 Python: $(python --version)"' >> /home/vscode/.bashrc \
-    && echo 'echo "� Node.js: $(node --version)"' >> /home/vscode/.bashrc \
-    && echo 'echo "📦 npm: $(npm --version)"' >> /home/vscode/.bashrc \
-    && echo 'echo "�🔧 Quick commands: make test-quick, molecule test"' >> /home/vscode/.bashrc \
+    && echo 'echo "🔧 Quick commands: make test-quick, molecule test"' >> /home/vscode/.bashrc \
     && echo 'echo ""' >> /home/vscode/.bashrc
