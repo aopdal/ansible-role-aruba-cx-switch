@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-10-25
+
+### Added
+
+- `make install-trivy` installs the trivy version pinned in the Security
+  workflow to `~/.local/bin` (works in the dev container), verifying the
+  release checksum (`testing-scripts/install_trivy.sh`). `make audit-repo`
+  now points to it when trivy is missing instead of failing with
+  `trivy: No such file or directory`.
+
+### Changed
+
+- The devcontainer is built from the official `python:3.12-slim` image
+  instead of `mcr.microsoft.com/devcontainers/python:3.12`, with the
+  `common-utils` feature for the `vscode` user. The base image carries 170
+  known vulnerabilities (0 critical) instead of 4331 (18 critical). The
+  preinstalled pipx tools (black, pylint, flake8, ...) are gone; the ones the
+  project uses come from `requirements-test.txt`. Rebuild the container to
+  pick this up.
+
+### Removed
+
+- Node.js and npm from the devcontainer image. Nothing in the role, its
+  tests or its tooling uses them; dropping them shrinks the image and its
+  vulnerability surface.
+
+### Fixed
+
+- `make` targets no longer create an empty `.venv/` in the dev container.
+  A new `USE_VENV` Makefile switch (default `1`) is set to `0` in the
+  container image, so targets run in the container's Python, where
+  `post-create.sh` installs the requirements. This also fixes `make audit`
+  in the container, whose minimum-version check ran in the empty venv and
+  could not import `packaging`. `make USE_VENV=0 <target>` works for any
+  self-managed environment.
+
 ## [0.18.0] - 2026-10-24
 
 ### Added

@@ -12,6 +12,13 @@
     "source=${localEnv:HOME}/code/iktnh-ansible,target=/workspaces/iktnh-ansible,type=bind"
   ],
   "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "vscode",
+      "installZsh": false,
+      "installOhMyZsh": false,
+      "configureZshAsDefaultShell": false,
+      "upgradePackages": false
+    },
     "ghcr.io/devcontainers/features/docker-in-docker:4": {
       "moby": false
     },

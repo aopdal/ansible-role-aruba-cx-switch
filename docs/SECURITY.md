@@ -13,7 +13,7 @@ your responsibility.
 | Python dependencies, latest | The newest versions `requirements.txt` and `requirements-test.txt` allow have no known vulnerabilities (`pip-audit`, PyPI advisory database). This covers `ansible-core`. | `make audit`, Security workflow |
 | Python dependencies, minimum | Every declared `>=` minimum is a released version with no known vulnerabilities, so an older environment that still satisfies the requirements is not knowingly vulnerable. | `make audit`, Security workflow |
 | Repository | No misconfigurations or committed secrets (`trivy fs`). | `make audit-repo`, Security workflow |
-| Devcontainer | The image built from `.devcontainer/Dockerfile` is scanned for fixable HIGH/CRITICAL CVEs (informational). The Dockerfile upgrades Debian packages, npm, pip and the base image's Python tools, so a rebuild picks up current fixes. | Security workflow |
+| Devcontainer | The image built from `.devcontainer/Dockerfile` is scanned for fixable HIGH/CRITICAL CVEs (informational). It is based on the official `python:3.12-slim` image and upgrades Debian packages and pip, so a rebuild picks up current fixes. | Security workflow |
 | GitHub Actions, devcontainer features | Kept up to date by Dependabot. | `.github/dependabot.yml` |
 
 The [Security workflow](https://github.com/aopdal/ansible-role-aruba-cx-switch/actions/workflows/security.yml)
@@ -83,5 +83,8 @@ not support newer cores; upgrades stay within the 2.19 series.
   has no fixed version, raise the floor past the affected range (see
   `paramiko` in `requirements.txt`).
 - `make audit-repo` runs the same trivy scan as CI and needs trivy installed
-  locally. Suppressions live in [`.trivyignore`](../.trivyignore), each with
+  locally. trivy is optional for local work; `make install-trivy` installs
+  the CI-pinned version to `~/.local/bin` (also in the dev container) via
+  [`testing-scripts/install_trivy.sh`](../testing-scripts/install_trivy.sh),
+  after verifying the release checksum. Suppressions live in [`.trivyignore`](../.trivyignore), each with
   a justification.

@@ -381,6 +381,8 @@ any such feature:
 All canonical commands live in the [Makefile](Makefile). Run `make help` for
 the auto-generated list. Most targets depend on the venv created by
 `make venv` / `make setup` and activate it via `. .venv/bin/activate`.
+With `USE_VENV=0` (set in the dev container image) they use the current
+Python environment instead and no `.venv/` is created.
 
 ### Setup & environment
 
@@ -404,6 +406,7 @@ the auto-generated list. Most targets depend on the venv created by
 | `make pre-commit`   | Run all pre-commit hooks across the repo.                            |
 | `make audit`        | `pip-audit` on latest + declared minimum Python dependency versions. Run after touching `requirements*.txt` ([docs/SECURITY.md](docs/SECURITY.md)). |
 | `make audit-repo`   | `trivy fs` misconfig + secret scan (needs trivy installed).          |
+| `make install-trivy` | Optional: install the CI-pinned trivy to `~/.local/bin` (checksum-verified). |
 
 ### Tests
 

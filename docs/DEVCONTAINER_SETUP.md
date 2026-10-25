@@ -9,14 +9,22 @@ A dev container is a Docker container configured with all the tools, libraries, 
 ## Files in `.devcontainer/`
 
 - **`devcontainer.json`** - Main configuration
-  - Python 3.12 base image
+  - Builds from the `Dockerfile` (official `python:3.12-slim` image)
+  - `common-utils` feature: sudo, locales and shell basics for the `vscode` user
   - Docker-in-Docker support for Molecule tests
   - Pre-configured VS Code extensions
   - Automatic dependency installation
   - Custom VS Code settings for Ansible development
 
 - **`Dockerfile`** - Custom container image
-  - System dependencies (Docker, Git, network tools)
+  - Based on `python:3.12-slim`, which ships far fewer packages (and known
+    vulnerabilities) than the `mcr.microsoft.com/devcontainers` images
+  - Creates the `vscode` user; `pip install` as that user goes to
+    `~/.local`, which is on `PATH`
+  - Sets `USE_VENV=0`, so `make` targets use the container's Python
+    instead of creating `.venv/` (see [Makefile and virtual
+    environments](#makefile-and-virtual-environments))
+  - System dependencies (Git, SSH client, build tools, network tools)
   - Pre-commit installation
   - Bash completion for Ansible
   - Helpful command aliases
@@ -66,7 +74,7 @@ A dev container is a Docker container configured with all the tools, libraries, 
 
 ### Pre-configured VS Code Settings
 
-- Python default interpreter set to venv
+- Python default interpreter set to the container's Python (`/usr/local/bin/python`)
 - Ansible validation enabled
 - YAML schemas for Ansible files
 - Format on save enabled
@@ -103,6 +111,20 @@ ansible-lint
 yamllint .
 molecule test
 pre-commit run --all-files
+```
+
+### Makefile and virtual environments
+
+On a host, `make` targets create and use `.venv/`. In the dev container,
+`post-create.sh` installs the requirements into the container's Python
+instead, and the image sets `USE_VENV=0`: `make venv` does nothing and every
+target runs in that environment. No `.venv/` is created.
+
+`USE_VENV=0` works outside the container too, for an environment you manage
+yourself (an activated virtualenv, conda, ...):
+
+```bash
+make USE_VENV=0 test
 ```
 
 ## Customization
@@ -196,6 +218,6 @@ netstat -ano | findstr :8080  # Windows
 - [VS Code Dev Containers Documentation](https://code.visualstudio.com/docs/devcontainers/containers)
 - [Dev Container Specification](https://containers.dev/)
 - [Dev Containers Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-- [Microsoft Dev Container Images](https://github.com/devcontainers/images)
+- [Dev Container Features](https://github.com/devcontainers/features)
 
 See also [DEVELOPMENT.md](DEVELOPMENT.md) for the full development guide.
