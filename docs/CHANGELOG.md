@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project uses come from `requirements-test.txt`. Rebuild the container to
   pick this up.
 
+### Fixed
+
+- `make` targets no longer create an empty `.venv/` in the dev container.
+  A new `USE_VENV` Makefile switch (default `1`) is set to `0` in the
+  container image, so targets run in the container's Python, where
+  `post-create.sh` installs the requirements. This also fixes `make audit`
+  in the container, whose minimum-version check ran in the empty venv and
+  could not import `packaging`. `make USE_VENV=0 <target>` works for any
+  self-managed environment.
+
 ### Removed
 
 - Node.js and npm from the devcontainer image. Nothing in the role, its

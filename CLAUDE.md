@@ -381,6 +381,8 @@ any such feature:
 All canonical commands live in the [Makefile](Makefile). Run `make help` for
 the auto-generated list. Most targets depend on the venv created by
 `make venv` / `make setup` and activate it via `. .venv/bin/activate`.
+With `USE_VENV=0` (set in the dev container image) they use the current
+Python environment instead and no `.venv/` is created.
 
 ### Setup & environment
 

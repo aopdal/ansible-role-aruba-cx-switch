@@ -73,6 +73,8 @@ ENV ANSIBLE_HOST_KEY_CHECKING=false
 ENV PY_COLORS=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/home/vscode/.local/bin:${PATH}"
+# make targets use this environment instead of creating .venv/
+ENV USE_VENV=0
 
 # Switch to vscode user
 USER vscode

@@ -693,7 +693,7 @@ Quick reference for the most frequently used testing commands:
 
 ```bash
 # Setup and info
-make venv              # Create virtual environment
+make venv              # Create virtual environment (no-op with USE_VENV=0, e.g. in the dev container)
 make setup             # Complete setup (venv + dependencies)
 make info              # Show system and venv info
 make help              # Show all commands

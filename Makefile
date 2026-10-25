@@ -3,11 +3,18 @@
 # Default target
 .DEFAULT_GOAL := help
 
-# Virtual environment
+# Virtual environment. USE_VENV=0 runs every target in the current Python
+# environment instead (set in the dev container, whose post-create.sh installs
+# the requirements into the container's Python).
+USE_VENV ?= 1
 VENV := .venv
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
+ifeq ($(USE_VENV),1)
 ACTIVATE := . $(VENV)/bin/activate
+else
+ACTIVATE := true
+endif
 
 # Color output
 BLUE := \033[0;34m
@@ -25,9 +32,16 @@ help: ## Show this help message
 	@echo 'Targets:'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(GREEN)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ''
-	@echo '$(YELLOW)Note: Most commands require virtual environment. Run "make venv" first.$(NC)'
+ifeq ($(USE_VENV),1)
+	@echo '$(YELLOW)Note: Most commands use the virtual environment in $(VENV)/ (created on demand). Set USE_VENV=0 to use the current Python environment.$(NC)'
+else
+	@echo '$(YELLOW)Note: USE_VENV=0 - commands use the current Python environment, not $(VENV)/.$(NC)'
+endif
 
-venv: ## Create virtual environment
+venv: ## Create virtual environment (no-op with USE_VENV=0)
+ifneq ($(USE_VENV),1)
+	@echo "$(GREEN)✅ USE_VENV=0: using the current Python environment$(NC)"
+else
 	@if [ ! -d "$(VENV)" ]; then \
 		echo "$(BLUE)Creating virtual environment...$(NC)"; \
 		python3 -m venv $(VENV); \
@@ -36,6 +50,7 @@ venv: ## Create virtual environment
 	else \
 		echo "$(GREEN)✅ Virtual environment already exists$(NC)"; \
 	fi
+endif
 
 install: venv ## Install testing dependencies
 	@echo "$(BLUE)Installing test dependencies in virtual environment...$(NC)"
@@ -99,7 +114,7 @@ audit: venv ## Audit Python dependencies (latest + minimum versions) for known C
 	@$(ACTIVATE) && floors=$$(mktemp) && trap 'rm -f '"$$floors" EXIT && \
 		for f in requirements.txt requirements-test.txt; do \
 			echo "$$f:"; \
-			python testing-scripts/requirement_floors.py --verify $$f > $$floors && \
+			python3 testing-scripts/requirement_floors.py --verify $$f > $$floors && \
 			pip-audit --progress-spinner off --no-deps --disable-pip -r $$floors || exit 1; \
 		done
 	@echo "$(GREEN)✅ No known vulnerabilities in latest or minimum versions$(NC)"
@@ -148,7 +163,7 @@ clean: ## Clean up test artifacts
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	find . -type f -name "*.retry" -delete 2>/dev/null || true
-	@if [ -d "$(VENV)" ]; then $(ACTIVATE) && molecule destroy || true; fi
+	@if [ "$(USE_VENV)" != "1" ] || [ -d "$(VENV)" ]; then $(ACTIVATE) && molecule destroy || true; fi
 	@echo "$(GREEN)✅ Cleanup complete$(NC)"
 
 clean-all: clean ## Clean everything including virtual environment
@@ -168,7 +183,12 @@ info: ## Display testing information
 	@echo "$(BLUE)Testing Infrastructure Info$(NC)"
 	@echo ""
 	@echo "System Python: $$(python3 --version 2>&1)"
-	@if [ -d "$(VENV)" ]; then \
+	@if [ "$(USE_VENV)" != "1" ]; then \
+		echo "Virtual Environment: ➖ Disabled (USE_VENV=0, using $$(command -v python3))"; \
+		echo "Ansible: $$(ansible --version 2>&1 | head -n1)"; \
+		echo "Molecule: $$(molecule --version 2>&1 | head -n1)"; \
+		echo "Pre-commit: $$(pre-commit --version 2>&1)"; \
+	elif [ -d "$(VENV)" ]; then \
 		echo "Virtual Environment: ✅ $(VENV)/ (active)"; \
 		echo "Venv Python: $$($(PYTHON) --version 2>&1)"; \
 		echo "Ansible: $$($(ACTIVATE) && ansible --version | head -n1 2>&1 || echo 'Not installed in venv')"; \

@@ -21,6 +21,9 @@ A dev container is a Docker container configured with all the tools, libraries, 
     vulnerabilities) than the `mcr.microsoft.com/devcontainers` images
   - Creates the `vscode` user; `pip install` as that user goes to
     `~/.local`, which is on `PATH`
+  - Sets `USE_VENV=0`, so `make` targets use the container's Python
+    instead of creating `.venv/` (see [Makefile and virtual
+    environments](#makefile-and-virtual-environments))
   - System dependencies (Git, SSH client, build tools, network tools)
   - Pre-commit installation
   - Bash completion for Ansible
@@ -71,7 +74,7 @@ A dev container is a Docker container configured with all the tools, libraries, 
 
 ### Pre-configured VS Code Settings
 
-- Python default interpreter set to venv
+- Python default interpreter set to the container's Python (`/usr/local/bin/python`)
 - Ansible validation enabled
 - YAML schemas for Ansible files
 - Format on save enabled
@@ -108,6 +111,20 @@ ansible-lint
 yamllint .
 molecule test
 pre-commit run --all-files
+```
+
+### Makefile and virtual environments
+
+On a host, `make` targets create and use `.venv/`. In the dev container,
+`post-create.sh` installs the requirements into the container's Python
+instead, and the image sets `USE_VENV=0`: `make venv` does nothing and every
+target runs in that environment. No `.venv/` is created.
+
+`USE_VENV=0` works outside the container too, for an environment you manage
+yourself (an activated virtualenv, conda, ...):
+
+```bash
+make USE_VENV=0 test
 ```
 
 ## Customization
