@@ -46,6 +46,8 @@ docs/                      # User + developer docs (Zensical source). Index in
 examples/                  # Example playbooks / inventories.
 testing-scripts/           # Helper scripts for local testing.
 Makefile                   # Canonical entry point for lint / test / docs.
+.claude/skills/            # Shared Claude Code skills (committed; the rest
+                           # of .claude/ stays local via .gitignore).
 ```
 
 The companion workspace folder `aruba-role-testing/` (sibling repo) holds the
@@ -487,6 +489,20 @@ When acting on this repo:
    the role unless the user asks.
 10. **Run `make lint` and `make test-unit`** before declaring the task
     done.
+
+### Project skills
+
+Step-by-step procedures live in [.claude/skills/](.claude/skills/) and are
+shared with everyone who clones the repo. Use them instead of improvising:
+
+| Skill          | Use for                                                        |
+| -------------- | -------------------------------------------------------------- |
+| `add-feature`  | Adding or extending a switch feature end to end.               |
+| `add-filter`   | Adding or changing a filter in `netbox_filters_lib/`.          |
+| `pre-pr-check` | PR gate + convention review of the pending diff.               |
+| `release`      | Cutting a release (`/release`, user-invoked only).             |
+
+When a convention in this file changes, update the skills that repeat it.
 
 ## 8. Pointers
 

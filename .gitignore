@@ -59,8 +59,9 @@ _build/
 # Created by ansible-lint, ansible-galaxy, and other Ansible tools
 .ansible/
 
-# Settings for claude
-.claude/
+# Claude Code: share project skills, keep settings and worktrees local
+.claude/*
+!.claude/skills/
 
 # Molecule test symlinks
 molecule/*/roles/

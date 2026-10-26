@@ -220,6 +220,12 @@ ansible-role-aruba-cx-switch/
 
 ## Development Workflow
 
+If you use Claude Code, the repository ships shared skills in
+`.claude/skills/` that walk through the steps below: `add-feature`,
+`add-filter`, `pre-pr-check` and `release` (run with `/release`). They
+are loaded automatically when relevant; conventions themselves live in
+`CLAUDE.md`.
+
 ### 1. Create a Feature Branch
 
 ```bash
