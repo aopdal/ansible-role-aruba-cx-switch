@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Shared Claude Code skills in `.claude/skills/` (`add-feature`,
+  `add-filter`, `pre-pr-check`, `release`) so contributors using Claude
+  Code follow the same workflows. `.gitignore` now commits only
+  `.claude/skills/`; local Claude settings and worktrees stay ignored.
+
 ## [0.18.1] - 2026-10-25
 
 ### Added
