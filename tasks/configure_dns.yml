@@ -12,6 +12,20 @@
 #                       e.g. {"mgmt": {"0": "1.1.1.1"}, "default": {"0": "8.8.8.8"}}
 #   - dns_host_v4_address_mapping: Static host mappings (dict)
 #   - dns_vrf: VRF for domain/host/mgmt DNS settings (string, optional)
+#
+# A config context is often shared by many devices, so it can name VRFs a
+# given device does not have. aoscx_dns fails on a missing VRF ("VRF <name>
+# doesn't exist."), so settings for such VRFs are skipped with a message.
+# Available VRFs: default, mgmt (when the device has the OOBM 'mgmt'
+# interface), VRFs in use on the device in NetBox (created by
+# configure_vrfs.yml), and VRFs already on the device (aoscx_vrf_facts,
+# REST API fact gathering only).
+
+- name: configure_dns | Determine VRFs available on the device
+  ansible.builtin.set_fact:
+    _dns_available_vrfs: >-
+      {{ interfaces | default([])
+         | get_available_vrfs(ip_addresses | default([]), aoscx_vrf_facts | default(None)) }}
 
 - name: configure_dns | Display DNS configuration debug info
   ansible.builtin.debug:
@@ -23,6 +37,7 @@
       - "DNS nameservers VRFs: {{ dns_name_servers | default({}) | list | join(', ') }}"
       - "Domain list: {{ dns_domain_list | default({}) | length }} domains"
       - "Host mappings: {{ dns_host_v4_address_mapping | default({}) | length }} entries"
+      - "Available VRFs: {{ _dns_available_vrfs | join(', ') }}"
   when: aoscx_debug | bool or ansible_verbosity >= 1
 
 - name: configure_dns | Configure DNS settings
@@ -32,15 +47,41 @@
     domain_list: "{{ dns_domain_list | default(omit) }}"
     host_v4_address_mapping: "{{ dns_host_v4_address_mapping | default(omit) }}"
     vrf: "{{ dns_vrf | default(omit) }}"
-  when: >-
-    (dns_domain_name | default('') | length > 0) or
-    (dns_mgmt_nameservers | default({}) | length > 0) or
-    (dns_domain_list | default({}) | length > 0) or
-    (dns_host_v4_address_mapping | default({}) | length > 0)
+  when:
+    - >-
+      (dns_domain_name | default('') | length > 0) or
+      (dns_mgmt_nameservers | default({}) | length > 0) or
+      (dns_domain_list | default({}) | length > 0) or
+      (dns_host_v4_address_mapping | default({}) | length > 0)
+    - dns_vrf | default('default') in _dns_available_vrfs
+
+- name: configure_dns | Report skipped DNS settings for missing dns_vrf
+  ansible.builtin.debug:
+    msg: >-
+      Skipping DNS domain/host/mgmt name server settings on {{ inventory_hostname }}:
+      dns_vrf '{{ dns_vrf }}' does not exist on this device
+      (available: {{ _dns_available_vrfs | join(', ') }})
+  when:
+    - dns_vrf is defined
+    - dns_vrf not in _dns_available_vrfs
 
 - name: configure_dns | Configure DNS name servers per VRF
   arubanetworks.aoscx.aoscx_dns:
     name_servers: "{{ item.value }}"
     vrf: "{{ item.key }}"
-  loop: "{{ dns_name_servers | default({}) | dict2items }}"
+  loop: >-
+    {{ dns_name_servers | default({}) | dict2items
+       | selectattr('key', 'in', _dns_available_vrfs) | list }}
   when: dns_name_servers | default({}) | length > 0
+
+- name: configure_dns | Report skipped DNS name servers for missing VRFs
+  ansible.builtin.debug:
+    msg: >-
+      Skipping DNS name servers for VRF(s) not on {{ inventory_hostname }}:
+      {{ _dns_skipped_vrfs | join(', ') }}
+      (available: {{ _dns_available_vrfs | join(', ') }})
+  vars:
+    _dns_skipped_vrfs: >-
+      {{ dns_name_servers | default({}) | list
+         | reject('in', _dns_available_vrfs) | list }}
+  when: _dns_skipped_vrfs | length > 0

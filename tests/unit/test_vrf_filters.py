@@ -6,6 +6,7 @@ from netbox_filters_lib.vrf_filters import (
     extract_interface_vrfs,
     filter_vrfs_in_use,
     get_vrfs_in_use,
+    get_available_vrfs,
     filter_configurable_vrfs,
     get_all_rt_names,
     build_vrf_rt_config,
@@ -613,3 +614,40 @@ class TestGetVrfChanges:
                 "rt": "65000:1",
             }
         ]
+
+
+class TestGetAvailableVrfs:
+    """Tests for get_available_vrfs function"""
+
+    def test_default_only_without_interfaces(self):
+        assert get_available_vrfs(None) == ["default"]
+        assert get_available_vrfs([]) == ["default"]
+
+    def test_mgmt_added_with_oobm_interface(self):
+        interfaces = [{"name": "mgmt", "mgmt_only": True}]
+        assert get_available_vrfs(interfaces) == ["default", "mgmt"]
+
+    def test_no_mgmt_without_oobm_interface(self):
+        """CX 6000: in-band vlan1 flagged mgmt_only, no mgmt VRF"""
+        interfaces = [{"name": "vlan1", "mgmt_only": True, "vrf": None}]
+        assert get_available_vrfs(interfaces) == ["default"]
+
+    def test_in_use_vrfs_from_interfaces_and_ips(self):
+        interfaces = [
+            {"name": "mgmt", "mgmt_only": True},
+            {"name": "vlan10", "vrf": {"name": "lab-blue"}},
+        ]
+        ip_addresses = [{"address": "10.0.0.1/24", "vrf": {"name": "lab-green"}}]
+        assert get_available_vrfs(interfaces, ip_addresses) == [
+            "default",
+            "lab-blue",
+            "lab-green",
+            "mgmt",
+        ]
+
+    def test_device_vrf_facts_included(self):
+        facts = {"default": {"rd": None}, "legacy": {"rd": "1:1"}}
+        assert get_available_vrfs([], None, facts) == ["default", "legacy"]
+
+    def test_non_dict_device_vrf_facts_ignored(self):
+        assert get_available_vrfs([], None, "not-a-dict") == ["default"]

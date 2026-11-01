@@ -587,6 +587,13 @@ VRF extraction and filtering (8 filters):
     - Excludes built-in/non-configurable VRFs
     - Returns: Dict with `vrf_names` list and `vrfs` dict
 
+- **`get_available_vrfs(interfaces, ip_addresses=None, device_vrf_facts=None)`**
+    - VRFs that exist (or will exist) on the device: `default`, `mgmt` when the
+      device has the OOBM `mgmt` interface, VRFs in use on interfaces/IPs, and
+      keys of `device_vrf_facts` (`aoscx_vrf_facts`, REST API mode)
+    - Used by DNS to skip config-context VRFs the device does not have
+    - Returns: Sorted list of VRF names
+
 - **`filter_configurable_vrfs(vrfs)`**
     - Remove built-in VRFs that should not be configured
     - Filters out: mgmt, MGMT, Global, global, default, Default

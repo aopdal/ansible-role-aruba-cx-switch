@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `add-filter`, `pre-pr-check`, `release`) so contributors using Claude
   Code follow the same workflows. `.gitignore` now commits only
   `.claude/skills/`; local Claude settings and worktrees stay ignored.
+- `get_available_vrfs` filter: VRFs that exist (or will exist) on a device.
+
+### Fixed
+
+- DNS: config-context VRFs the device does not have (in `dns_name_servers`
+  or `dns_vrf`) are now skipped with a message instead of failing the play
+  with `VRF <name> doesn't exist.` This lets one DNS config context be shared
+  across devices with different VRFs.
 
 ## [0.18.1] - 2026-10-25
 

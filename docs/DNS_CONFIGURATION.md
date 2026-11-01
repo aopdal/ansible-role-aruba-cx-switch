@@ -73,7 +73,7 @@ Keep in mind, not all Aruba CX devices have a dedicated mgmt VRF and a dedicated
 | ----- | ---- | -------- | ----------- | ------- |
 | `dns_domain_name` | String | No | Primary domain name | `"opdal.net"` |
 | `dns_mgmt_nameservers` | Object | No | Management nameservers | `{"Primary": "10.1.1.1"}` |
-| `dns_name_servers` | Object | No | DNS nameservers with numeric keys | `{"0": "8.8.8.8"}` |
+| `dns_name_servers` | Object | No | DNS nameservers per VRF, numeric keys per VRF | `{"mgmt": {"0": "8.8.8.8"}}` |
 | `dns_domain_list` | Object | No | Search domains with numeric keys | `{"0": "local"}` |
 | `dns_host_v4_address_mapping` | Object | No | Static host-to-IP mappings | `{"host1": "1.1.1.1"}` |
 | `dns_vrf` | String | No | VRF for DNS traffic | `"mgmt"` |
@@ -108,6 +108,25 @@ If not specified, DNS will use the default VRF. For management networks, typical
   "dns_vrf": "mgmt"
 }
 ```
+
+### VRFs not on the device
+
+A config context is often shared by many devices, so it can name VRFs a
+device does not have (for example `lab-blue` on a switch that only uses
+`lab-green`, or `mgmt` on a CX 6000 without an out-of-band port). The role
+skips DNS settings for such VRFs and prints a message instead of failing.
+
+A VRF counts as available on the device when it is one of:
+
+- `default` (always present)
+- `mgmt`, when the device has the out-of-band `mgmt` interface in NetBox
+- a VRF in use on the device's interfaces or IP addresses in NetBox (the
+  role creates these in the VRF step before DNS runs)
+- a VRF already on the switch (only with `aoscx_gather_facts_rest_api: true`)
+
+This applies per VRF key in `dns_name_servers`. If `dns_vrf` names a missing
+VRF, the domain name, domain list, host mappings and management name
+servers are all skipped, since they are bound to that VRF.
 
 ### Host Mappings
 
