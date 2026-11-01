@@ -37,6 +37,7 @@ EXPECTED_FILTER_NAMES = {
     "extract_interface_vrfs",
     "filter_vrfs_in_use",
     "get_vrfs_in_use",
+    "get_available_vrfs",
     "filter_configurable_vrfs",
     "get_all_rt_names",
     "build_vrf_rt_config",

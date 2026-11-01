@@ -84,6 +84,7 @@ All core VRF operations work on standard NetBox VRF, interface, and IP address o
 | `extract_interface_vrfs` | Yes | Standard NetBox `vrf` field |
 | `filter_vrfs_in_use` | Yes | Standard filtering |
 | `get_vrfs_in_use` | Yes | Excludes built-in VRFs |
+| `get_available_vrfs` | Yes | Standard NetBox `vrf` field; OOBM port named `mgmt` |
 | `filter_configurable_vrfs` | Yes | Excludes built-in VRFs |
 | `get_all_rt_names` | Yes | Standard NetBox RT objects |
 | `build_vrf_rt_config` | Minor | Reads `custom_fields.address_family` — rename this field to match your NetBox schema if different |

@@ -427,3 +427,41 @@ def filter_configurable_vrfs(vrfs):
             _debug(f"VRF {vrf_name} is built-in/non-configurable - skipping")
 
     return configurable
+
+
+def get_available_vrfs(interfaces, ip_addresses=None, device_vrf_facts=None):
+    """
+    Return the VRFs that exist (or will exist) on the device
+
+    Used to skip VRF-bound settings (e.g. DNS name servers from a shared
+    config context) for VRFs the device does not have; aoscx_dns fails
+    with "VRF <name> doesn't exist." otherwise.
+
+    The list is:
+    - 'default' (always present)
+    - 'mgmt' when the device has the out-of-band 'mgmt' interface
+    - VRFs in use on the device's interfaces/IPs (created by configure_vrfs)
+    - VRFs already on the device (keys of aoscx_vrf_facts, REST API mode)
+
+    Args:
+        interfaces: List of interface objects from NetBox
+        ip_addresses: Optional list of IP address objects
+        device_vrf_facts: Optional dict keyed by VRF name (aoscx_vrf_facts)
+
+    Returns:
+        Sorted list of VRF names
+    """
+    available = {"default"}
+
+    for intf in interfaces or []:
+        if intf and str(intf.get("name", "")).lower() == "mgmt":
+            available.add("mgmt")
+            break
+
+    available.update(get_vrfs_in_use(interfaces, ip_addresses)["vrf_names"])
+
+    if isinstance(device_vrf_facts, dict):
+        available.update(str(name) for name in device_vrf_facts)
+
+    _debug(f"Available VRFs on device: {sorted(available)}")
+    return sorted(available)
