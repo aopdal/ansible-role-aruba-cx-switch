@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Raised the `pylint` minimum in `requirements-test.txt` to `>=4.0.9`
+  (CVE-2026-114608) and the pre-commit `pylint` hook from `v3.0.3` to
+  `v4.0.9`. Run `pre-commit install --install-hooks` (or
+  `make pre-commit-setup`) to pick up the new hook version.
+
 ## [0.18.2] - 2026-11-01
 
 ### Added
