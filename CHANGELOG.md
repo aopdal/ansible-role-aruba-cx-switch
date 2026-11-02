@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-11-02
+
+### Fixed
+
+- NTP: when `ntp_vrf` names a VRF the device does not have (for example
+  `mgmt` on a CX 6000/6100 without an out-of-band port), the `ntp vrf` line
+  is now skipped with a message instead of failing the CLI push. NTP servers
+  and `ntp enable` are still configured, and NTP uses the default VRF. Uses
+  the same available-VRF check as DNS (`get_available_vrfs`).
+
 ## [0.18.2] - 2026-11-01
 
 ### Added

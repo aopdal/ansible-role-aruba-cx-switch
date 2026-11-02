@@ -139,6 +139,14 @@ for SNMP `snmp_vrf: auto`.
 - **Preferred Server**: Supports marking servers as preferred with `iburst prefer`
 - **Regular Servers**: Non-preferred servers use `iburst` only
 - **VRF Support**: Routes NTP traffic through specified VRF (typically `mgmt`)
+- **Missing VRF**: When `ntp_vrf` names a VRF the device does not have (for
+  example `mgmt` on a CX 6000/6100 without an out-of-band port), the
+  `ntp vrf` line is skipped with a message. The servers and `ntp enable` are
+  still configured, and NTP uses the default VRF. A VRF is available when it
+  is `default`, `mgmt` (device has the `mgmt` interface in NetBox), in use on
+  the device's interfaces/IPs in NetBox, or already on the switch (REST API
+  fact gathering). This is the same check DNS uses, see
+  [DNS configuration](DNS_CONFIGURATION.md#vrfs-not-on-the-device).
 - **Service Enable**: Automatically enables NTP service
 
 ## Usage Example
