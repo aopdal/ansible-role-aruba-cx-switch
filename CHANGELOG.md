@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-11-02
+
 ### Fixed
 
 - NTP: when `ntp_vrf` names a VRF the device does not have (for example
