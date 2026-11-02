@@ -1,6 +1,6 @@
 
 https-server vrf mgmt
-{% for vrf in interfaces | default([]) | get_server_vrfs(primary_ip4 | default(''), device_roles | default([])) %}
+{% for vrf in interfaces | default([]) | get_server_vrfs(primary_ip4 | default(''), device_roles | default([]), aoscx_default_gateway_device_roles) %}
 https-server vrf {{ vrf }}
 {% endfor %}
 https-server rest access-mode read-write

@@ -351,7 +351,8 @@ aoscx_configure_hostname: true
 aoscx_configure_banner: true
 aoscx_configure_timezone: true
 aoscx_configure_icmp_redirect: true  # 'no ip icmp redirect' (anycast gateway prerequisite, device_anycast_gateway)
-aoscx_configure_access_switch_default_gateway: true  # access-switch: ip route 0.0.0.0/0 from primary_ip4
+aoscx_configure_access_switch_default_gateway: true  # ip route 0.0.0.0/0 from primary_ip4 (roles below)
+aoscx_default_gateway_device_roles: [access-switch]  # roles with default gateway + ssh/https-server in default VRF
 aoscx_configure_access_switch_server_vrfs: true      # ssh/https-server VRFs (docs/BASE_CONFIGURATION.md)
 aoscx_configure_central: true                   # hpe-anw-central on tagged devices (docs/CENTRAL_CONFIGURATION.md)
 aoscx_central_monitor_tag: hpe-anw-central-mon  # NetBox device tag that enables the Central connection
@@ -755,7 +756,7 @@ applies to tags entered in a Semaphore UI task template.
 - `snmp`, `services` - SNMP configuration: agent VRF, system location/contact, SNMPv3 users (depends on VRFs)
 - `icmp_redirect`, `base_config`, `system` - ICMP redirect / Anycast Gateway prerequisite
 - `server_vrfs`, `base_config`, `system` - Access-switch server VRF configuration
-- `default_gateway`, `base_config`, `system` - Access-switch default gateway configuration
+- `default_gateway`, `base_config`, `system` - Default gateway configuration (`aoscx_default_gateway_device_roles`)
 - `central`, `base_config`, `system` - HPE Aruba Networking Central connection (NetBox device tag)
 - `vrfs`, `layer3`, `routing` - VRF configuration
 - `vlans`, `layer2` - VLAN configuration

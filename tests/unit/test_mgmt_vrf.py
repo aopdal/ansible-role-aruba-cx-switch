@@ -85,3 +85,26 @@ class TestGetServerVrfs:
 
     def test_role_as_string(self):
         assert get_server_vrfs([], None, "access-switch") == ["default"]
+
+    def test_custom_default_vrf_roles(self):
+        roles = ["access-switch", "distribution-access-switch"]
+        assert get_server_vrfs([OOBM], "10.4.23.1", ["distribution-access-switch"], roles) == [
+            "default"
+        ]
+
+    def test_custom_default_vrf_roles_case_insensitive(self):
+        assert get_server_vrfs([], None, ["Dist-Switch"], ["DIST-SWITCH"]) == ["default"]
+
+    def test_custom_default_vrf_roles_replace_access_switch(self):
+        """access-switch only applies while it is in the list"""
+        assert get_server_vrfs([OOBM], "10.4.23.1", ["access-switch"], ["dist-switch"]) == []
+
+    def test_empty_default_vrf_roles(self):
+        assert get_server_vrfs([OOBM], "10.4.23.1", ["access-switch"], []) == []
+
+    def test_default_vrf_roles_as_string(self):
+        assert get_server_vrfs([], None, ["dist-switch"], "dist-switch") == ["default"]
+
+    def test_only_first_role_is_matched(self):
+        roles = ["leaf", "access-switch"]
+        assert get_server_vrfs([OOBM], "10.4.23.1", roles, ["access-switch"]) == []

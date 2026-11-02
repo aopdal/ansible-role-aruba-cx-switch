@@ -5,8 +5,9 @@
 #
 # These services are always present on the mgmt VRF (system.j2 / https.j2
 # generate those lines). This task adds (get_server_vrfs):
-#   - 'default' on access-switch devices (device_roles first element,
-#     case-insensitive == 'access-switch')
+#   - 'default' on devices whose first device_role is in
+#     aoscx_default_gateway_device_roles (case-insensitive; same roles that
+#     get the default gateway, default: access-switch)
 #   - the in-band management VRF: the VRF of the interface carrying
 #     primary_ip4, when that is not the out-of-band 'mgmt' port (e.g. vlan1
 #     on a CX 6000, also when flagged mgmt_only in NetBox)
@@ -19,7 +20,8 @@
   ansible.builtin.set_fact:
     _server_vrfs: >-
       {{ interfaces | default([]) | get_server_vrfs(
-           primary_ip4 | default(''), device_roles | default([])) }}
+           primary_ip4 | default(''), device_roles | default([]),
+           aoscx_default_gateway_device_roles) }}
 
 - name: configure_access_switch_server_vrfs | Configure ssh and https-server VRFs
   arubanetworks.aoscx.aoscx_config:

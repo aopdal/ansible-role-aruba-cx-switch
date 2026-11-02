@@ -29,6 +29,10 @@ aoscx_configure_dns: true
 # 'no ip icmp redirect' (anycast gateway prerequisite); only on devices
 # with the device_anycast_gateway custom field set
 aoscx_configure_icmp_redirect: true
+# ip route 0.0.0.0/0 from primary_ip4 on the device roles listed below
+aoscx_configure_access_switch_default_gateway: true
+aoscx_default_gateway_device_roles:
+  - access-switch
 # Write the running config to startup config at the end of the run,
 # only when something changed (aoscx_config save_when: modified)
 aoscx_save_config: true
@@ -103,6 +107,31 @@ The base configuration tasks execute in this order within `tasks/main.yml`:
 - **Validation**: Only runs if timezone is defined and non-empty
 - **Standard Format**: Supports standard timezone strings (e.g., "europe/oslo")
 
+### Default gateway (`tasks/configure_access_switch_default_gateway.yml`)
+
+Controlled by `aoscx_configure_access_switch_default_gateway` (default
+`true`). Pushes `ip route 0.0.0.0/0 <gateway>` in the default VRF, where
+`<gateway>` is the first usable host in the subnet of the device's
+`primary_ip4`.
+
+It only runs on devices whose first NetBox device role is listed in
+`aoscx_default_gateway_device_roles` (default `[access-switch]`, matched
+case-insensitively against the role slug). Add more roles in group_vars
+or playbook vars:
+
+```yaml
+aoscx_default_gateway_device_roles:
+  - access-switch
+  - distribution-access-switch
+```
+
+The same list decides whether the generated starting config
+(`templates/gateway.j2`) gets the default route, and which devices get
+ssh/https-server in the `default` VRF (see below). Devices that need a
+different default route, or one in another VRF, should use
+`static_routes` instead — see
+[STATIC_ROUTES_CONFIGURATION.md](STATIC_ROUTES_CONFIGURATION.md).
+
 ### Management VRF and ssh/https-server VRFs (`tasks/configure_access_switch_server_vrfs.yml`)
 
 The **management VRF** is the VRF of the interface carrying the device's
@@ -125,7 +154,9 @@ starting config (`system.j2` / `https.j2`). This task, controlled by
 `ssh server vrf <vrf>` and `https-server vrf <vrf>` for (filter
 `get_server_vrfs`):
 
-- `default` on devices whose first device role is `access-switch`
+- `default` on devices whose first device role is in
+  `aoscx_default_gateway_device_roles` (default `[access-switch]`), the
+  same roles that get the default gateway
 - the in-band management VRF, when the device is not managed through the
   `mgmt` port. Nothing is added when it is undetermined.
 
