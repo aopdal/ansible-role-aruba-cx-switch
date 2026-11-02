@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.4] - 2026-11-02
+
 ### Added
 
 - `aoscx_default_gateway_device_roles`: list of NetBox device roles managed
