@@ -72,13 +72,17 @@ def resolve_mgmt_vrf(interfaces=None, primary_ip4=None):
     return None
 
 
-def get_server_vrfs(interfaces=None, primary_ip4=None, device_roles=None):
+def get_server_vrfs(
+    interfaces=None, primary_ip4=None, device_roles=None, default_vrf_roles=None
+):
     """Return the extra VRFs ssh/https-server must listen in.
 
     ``ssh server vrf mgmt`` / ``https-server vrf mgmt`` are always
     configured (ZTP starting config); this returns the additional VRFs:
 
-    - ``default`` for devices whose first role is ``access-switch``
+    - ``default`` for devices whose first role is in ``default_vrf_roles``
+      (the role's ``aoscx_default_gateway_device_roles``; matched
+      case-insensitively, ``["access-switch"]`` when not given)
     - the in-band management VRF (``resolve_mgmt_vrf``) when the device is
       not managed through the ``mgmt`` port
 
@@ -89,7 +93,11 @@ def get_server_vrfs(interfaces=None, primary_ip4=None, device_roles=None):
     roles = device_roles or []
     if isinstance(roles, str):
         roles = [roles]
-    if roles and str(roles[0]).lower() == "access-switch":
+    if default_vrf_roles is None:
+        default_vrf_roles = ["access-switch"]
+    elif isinstance(default_vrf_roles, str):
+        default_vrf_roles = [default_vrf_roles]
+    if roles and str(roles[0]).lower() in {str(r).lower() for r in default_vrf_roles}:
         vrfs.add("default")
     mgmt_vrf = resolve_mgmt_vrf(interfaces, primary_ip4)
     if mgmt_vrf and mgmt_vrf != "mgmt":

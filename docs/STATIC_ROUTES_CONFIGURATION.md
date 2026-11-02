@@ -154,13 +154,14 @@ the underlying pyaoscx `StaticNexthop` implementation, which always
 operates on next-hop id `0` — adding a second next-hop for the same
 prefix replaces the first rather than adding a second path.
 
-### Overlap with the access-switch default gateway feature
+### Overlap with the default gateway feature
 
 `aoscx_configure_access_switch_default_gateway` (see
-[README.md](index.md)) independently pushes a default route
-(`0.0.0.0/0`) derived from `primary_ip4` for devices whose
-`device_roles` contains `access-switch`, using `aoscx_config` +
-`match: line`. If a device both has that role **and** defines a
+[BASE_CONFIGURATION.md](BASE_CONFIGURATION.md))
+independently pushes a default route (`0.0.0.0/0`) derived from
+`primary_ip4` for devices whose first device role is in
+`aoscx_default_gateway_device_roles` (default `access-switch`), using
+`aoscx_config` + `match: line`. If a device both has such a role **and** defines a
 `0.0.0.0/0` entry in `static_routes` for the same VRF, the two features
 will compete to manage the same route. Use only one mechanism for the
 default route on a given device.

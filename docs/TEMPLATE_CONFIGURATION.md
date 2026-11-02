@@ -22,7 +22,7 @@ Template generation can run in two scenarios:
 
 The `aoscx.j2` master template includes:
 
-1. **system.j2** - Hostname, banner (MOTD), user credentials, `ssh server vrf` (mgmt plus the in-band/access-switch VRFs from `get_server_vrfs`, see [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md))
+1. **system.j2** - Hostname, banner (MOTD), user credentials, `ssh server vrf` (mgmt plus the in-band VRF and, for roles in `aoscx_default_gateway_device_roles`, `default`, from `get_server_vrfs`, see [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md))
 2. **time.j2** - Timezone, NTP configuration
 3. **anycast_no_icmp_redirect.j2** - ICMP redirect disable (Anycast Gateway support)
 4. **vrf.j2** - VRF definitions with RD and route targets
@@ -39,7 +39,7 @@ The `aoscx.j2` master template includes:
 15. **snmp.j2** - SNMP agent VRF, system location/contact and SNMPv3 users, rendered after `interface vxlan 1` and before `vsx` (running-config order). Uses the same variables and filters as `configure_snmp.yml`, see [SNMP_CONFIGURATION.md](SNMP_CONFIGURATION.md#template-config)
 16. **vsx.j2** - Virtual Switching Extension (VSX) configuration
 17. **ospf.j2** - OSPF router instance and area configuration (`router ospf`/`area`; authentication is interface-level, see `int_phys.j2`/`int_lag.j2`/`int_vlan.j2`)
-18. **gateway.j2** - Default gateway (access-switch) and static routes (`ip route`/`ipv6 route`, from the `static_routes` config_context)
+18. **gateway.j2** - Default gateway (roles in `aoscx_default_gateway_device_roles`, default access-switch) and static routes (`ip route`/`ipv6 route`, from the `static_routes` config_context)
 19. **https.j2** - HTTPS/REST API configuration, `https-server vrf` (same VRFs as `ssh server vrf`)
 
 ## Not Included

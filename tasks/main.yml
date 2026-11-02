@@ -100,7 +100,8 @@
     - base_config
     - system
 
-# Default gateway for access-switches: ip route 0.0.0.0/0 derived from primary_ip4.
+# Default gateway for the roles in aoscx_default_gateway_device_roles
+# (default: access-switch): ip route 0.0.0.0/0 derived from primary_ip4.
 # No VRF dependency (default VRF only); placed in base-system block.
 - name: Include access-switch default gateway configuration tasks
   ansible.builtin.include_tasks:

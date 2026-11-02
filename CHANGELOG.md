@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `aoscx_default_gateway_device_roles`: list of NetBox device roles managed
+  through the default VRF. These devices get the `ip route 0.0.0.0/0`
+  default gateway derived from `primary_ip4` and `ssh server vrf default` /
+  `https-server vrf default`, both on the device and in the generated
+  starting config (`gateway.j2`, `system.j2`, `https.j2`). Defaults to
+  `[access-switch]`, so behaviour is unchanged unless you set it
+  ([#101](https://github.com/aopdal/ansible-role-aruba-cx-switch/issues/101)).
+- `get_server_vrfs` filter: optional fourth argument `default_vrf_roles`
+  (defaults to `["access-switch"]`).
+
 ## [0.18.3] - 2026-11-02
 
 ### Fixed

@@ -54,17 +54,26 @@ aoscx_configure_vsx: false
 aoscx_configure_static_routes: true
 
 # Configure ssh server vrf <vrf> and https-server vrf <vrf> in addition to
-# the mgmt VRF: 'default' on devices whose first device_role is
-# 'access-switch', plus the in-band management VRF (VRF of the interface
+# the mgmt VRF: 'default' on devices whose first device_role is in
+# aoscx_default_gateway_device_roles, plus the in-band management VRF (VRF of the interface
 # carrying primary_ip4, when that is not the OOBM 'mgmt' port). See
 # docs/BASE_CONFIGURATION.md.
 aoscx_configure_access_switch_server_vrfs: true
 
-# Configure ip route 0.0.0.0/0 (default gateway) on access-switch devices.
-# The gateway is derived from the device's primary_ip4 (set by the NetBox
-# inventory plugin): the first usable host in the same subnet. Skipped when
-# device_roles does not contain 'access-switch' or primary_ip4 is undefined.
+# Configure ip route 0.0.0.0/0 (default gateway) on devices whose role is
+# listed in aoscx_default_gateway_device_roles. The gateway is derived from
+# the device's primary_ip4 (set by the NetBox inventory plugin): the first
+# usable host in the same subnet. Skipped when the device's first
+# device_role is not in that list or primary_ip4 is undefined.
 aoscx_configure_access_switch_default_gateway: true
+
+# NetBox device role slugs managed through the default VRF. These devices
+# get the default gateway above and ssh/https-server in the 'default' VRF
+# (aoscx_configure_access_switch_server_vrfs), both on the device and in
+# the generated starting config (gateway.j2, system.j2, https.j2). Matched
+# case-insensitively against the device's first device_role.
+aoscx_default_gateway_device_roles:
+  - access-switch
 
 # HPE Aruba Networking Central connection (hpe-anw-central context). Devices with the NetBox device tag aoscx_central_monitor_tag get
 # the connection enabled; in aoscx_idempotent_mode, devices without the tag

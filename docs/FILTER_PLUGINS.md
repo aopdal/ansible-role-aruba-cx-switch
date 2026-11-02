@@ -993,8 +993,10 @@ recreates the route's next-hop).
   carrying `primary_ip4`: `mgmt` for the OOBM `mgmt` port, else the
   interface's NetBox VRF or `default`; `None` when not found. `mgmt_only`
   is deliberately ignored (also set on in-band SVIs)
-- **`get_server_vrfs(interfaces, primary_ip4, device_roles)`** - extra
-  ssh/https-server VRFs besides `mgmt`: `default` for `access-switch`, plus
+- **`get_server_vrfs(interfaces, primary_ip4, device_roles, default_vrf_roles)`** - extra
+  ssh/https-server VRFs besides `mgmt`: `default` when the first device
+  role is in `default_vrf_roles` (the role passes
+  `aoscx_default_gateway_device_roles`; `["access-switch"]` when omitted), plus
   the in-band management VRF — see [BASE_CONFIGURATION.md](BASE_CONFIGURATION.md)
 
 ### `snmp_filters.py` - SNMP Settings
