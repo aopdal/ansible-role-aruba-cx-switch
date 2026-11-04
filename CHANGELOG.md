@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-11-04
+
+### Added
+
+- Port-access policies: optional `port_access.classes` and
+  `port_access.policies` lists in config_context, plus an optional
+  `associate_policy` on `port_access.roles`. Renders
+  `class ip|ipv6 <name>`, `port-access policy <name>` and
+  `associate policy <name>` (on the device and in the generated starting
+  config). All three are optional, so existing `port_access` contexts
+  behave exactly as before. A role's `associate_policy` is compared
+  against the device's `in_policy` in the REST diff; classes and policies
+  rely on `aoscx_config` running-config matching for idempotency and are
+  not removed by idempotent cleanup.
+
+### Fixed
+
+- Port-access roles: `vlan_trunk_allowed` is now pushed in the range form
+  AOS-CX prints in running-config (`1,101,102,201,202` becomes
+  `1,101-102,201-202`, via `parse_vlan_id_spec | collapse_vlan_list`).
+  Before, whenever a role was pushed, the `vlan trunk allowed` line was
+  sent again even though the VLANs were unchanged. The generated
+  starting config (`port_access.j2`) uses the same form.
+
 ## [0.18.4] - 2026-11-02
 
 ### Added

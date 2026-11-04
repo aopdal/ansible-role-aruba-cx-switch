@@ -1,0 +1,24 @@
+---
+# Configure a single classifier class referenced by a port-access policy.
+# Required loop var: pa_class (dict with .name, optional .type, .entries list)
+
+- name: "configure_port_access | Push class {{ pa_class.type | default('ip') }} {{ pa_class.name }}"
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - "class {{ pa_class.type | default('ip') }} {{ pa_class.name }}"
+    lines: "{{ _pa_class_cli_lines }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+    _pa_class_cli_lines: >-
+      {%- set out = [] -%}
+      {%- for e in pa_class.entries | default([]) -%}
+      {%-   set seq = e.seq | default(loop.index * 10) -%}
+      {%-   if e.match is defined -%}
+      {%-     set _ = out.append(seq ~ ' match ' ~ e.match) -%}
+      {%-   elif e.ignore is defined -%}
+      {%-     set _ = out.append(seq ~ ' ignore ' ~ e.ignore) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ out }}
+  when: pa_class.entries | default([]) | length > 0

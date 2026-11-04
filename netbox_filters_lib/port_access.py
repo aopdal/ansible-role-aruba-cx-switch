@@ -28,6 +28,8 @@ Design notes:
 """
 from __future__ import annotations
 
+from urllib.parse import unquote
+
 from .utils import _debug
 from .vlan_filters import parse_vlan_id_spec
 
@@ -52,6 +54,25 @@ def _norm_int(value):
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _ref_name(ref):
+    """
+    Return the object name from a REST reference, or None.
+
+    Depending on the query depth, AOS-CX returns a reference as a URI
+    string (``/rest/v10.xx/system/port_access_policies/<name>``), as the
+    expanded object (dict with ``name``), or as a single-entry dict keyed
+    by the object name.
+    """
+    if isinstance(ref, str):
+        return unquote(ref.rstrip("/").rsplit("/", 1)[-1]) or None
+    if isinstance(ref, dict):
+        if ref.get("name"):
+            return ref["name"]
+        if len(ref) == 1:
+            return next(iter(ref))
+    return None
 
 
 def _normalise_match_entry(entry):
@@ -146,6 +167,8 @@ def _role_matches(desired, current):
     - vlan_trunk_native (REST: vlan_tag, when vlan_mode in
       'native-tagged'/'native-untagged')
     - vlan_trunk_allowed -> expanded into a set, compared to vlan_trunks
+    - associate_policy (REST: in_policy) - only when set in NetBox, so
+      roles without a policy never diff on it
 
     Roles with ``extra_lines`` always return False (force push) because
     arbitrary CLI lines cannot be compared against REST API fields.
@@ -153,6 +176,12 @@ def _role_matches(desired, current):
     if not isinstance(current, dict):
         return False
     if desired.get("extra_lines"):
+        return False
+
+    desired_policy = desired.get("associate_policy")
+    if desired_policy and _norm_str(desired_policy) != _norm_str(
+        _ref_name(current.get("in_policy"))
+    ):
         return False
 
     desired_native = _norm_int(desired.get("vlan_trunk_native"))

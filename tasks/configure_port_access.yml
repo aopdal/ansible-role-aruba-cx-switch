@@ -9,6 +9,16 @@
 # Schema (top-level `port_access` key from config_context):
 #
 #   port_access:
+#     classes:                   # optional: classes used by policies
+#       - name: AP-ip-allow
+#         type: ip               # ip (default) | ipv6
+#         entries:
+#           - { seq: 10, match: "any any any" }
+#     policies:                  # optional: port-access policies
+#       - name: AP-policy
+#         entries:
+#           - { seq: 10, class: AP-ip-allow }          # class_type defaults to ip
+#           - { seq: 20, class: other, action: drop }  # optional raw action
 #     lldp_groups:
 #       - name: Lab-IAP-group
 #         match:
@@ -20,6 +30,7 @@
 #         description: Aruba IAP
 #         poe_priority: high
 #         trust_mode: dscp
+#         associate_policy: AP-policy   # optional
 #         vlan_trunk_native: 11
 #         vlan_trunk_allowed: "11-13"
 #         extra_lines:           # optional: raw CLI lines appended verbatim
@@ -36,10 +47,17 @@
 # for the device (gate enforced in tasks/main.yml).
 #
 # Configuration order matters - device-profiles reference roles and lldp
-# groups; roles can reference VLANs - so:
-#   1. lldp-group
-#   2. role
-#   3. device-profile
+# groups; roles can reference VLANs and policies; policies reference
+# classes - so:
+#   1. class
+#   2. policy
+#   3. lldp-group
+#   4. role
+#   5. device-profile
+#
+# Classes and policies are optional and are not part of the REST diff:
+# they are always handed to aoscx_config, whose `match: line` compare
+# against running-config keeps them idempotent (no change -> ok).
 
 - name: configure_port_access | Skip when port_access not provided
   ansible.builtin.debug:
@@ -53,6 +71,8 @@
     msg:
       - "=== Port-Access Configuration ==="
       - "Device: {{ inventory_hostname }}"
+      - "Classes: {{ port_access.classes | default([]) | length }}"
+      - "Policies: {{ port_access.policies | default([]) | length }}"
       - "LLDP groups: {{ port_access.lldp_groups | default([]) | length }}"
       - "Roles: {{ port_access.roles | default([]) | length }}"
       - "Device-profiles: {{ port_access.device_profiles | default([]) | length }}"
@@ -101,7 +121,33 @@
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
 
 # ----------------------------------------------------------------------------
-# 1. LLDP groups
+# 1. Classes (optional, referenced by policies)
+# ----------------------------------------------------------------------------
+- name: configure_port_access | Configure each class used by port-access policies
+  ansible.builtin.include_tasks: configure_port_access_class.yml
+  loop: "{{ port_access.classes | default([]) }}"
+  loop_control:
+    loop_var: pa_class
+    label: "{{ inventory_hostname }} class {{ pa_class.type | default('ip') }} {{ pa_class.name }}"
+  when:
+    - port_access is defined and port_access | length > 0
+    - port_access.classes | default([]) | length > 0
+
+# ----------------------------------------------------------------------------
+# 2. Policies (optional, referenced by roles via associate_policy)
+# ----------------------------------------------------------------------------
+- name: configure_port_access | Configure each port-access policy
+  ansible.builtin.include_tasks: configure_port_access_policy.yml
+  loop: "{{ port_access.policies | default([]) }}"
+  loop_control:
+    loop_var: pa_policy
+    label: "{{ inventory_hostname }} policy {{ pa_policy.name }}"
+  when:
+    - port_access is defined and port_access | length > 0
+    - port_access.policies | default([]) | length > 0
+
+# ----------------------------------------------------------------------------
+# 3. LLDP groups
 # ----------------------------------------------------------------------------
 - name: configure_port_access | Configure each port-access lldp-group
   ansible.builtin.include_tasks: configure_port_access_lldp_group.yml
@@ -115,7 +161,7 @@
     - port_access_changes.lldp_groups | length > 0
 
 # ----------------------------------------------------------------------------
-# 2. Roles
+# 4. Roles
 # ----------------------------------------------------------------------------
 - name: configure_port_access | Configure each port-access role
   ansible.builtin.include_tasks: configure_port_access_role.yml
@@ -129,7 +175,7 @@
     - port_access_changes.roles | length > 0
 
 # ----------------------------------------------------------------------------
-# 3. Device-profiles
+# 5. Device-profiles
 # ----------------------------------------------------------------------------
 - name: configure_port_access | Configure each port-access device-profile
   ansible.builtin.include_tasks: configure_port_access_device_profile.yml

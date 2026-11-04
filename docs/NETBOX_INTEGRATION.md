@@ -665,6 +665,10 @@ idempotent deletion. Range and list syntax is supported.
 Roles that include `extra_lines` always push, this is a way to support
 more parameters without needing to rewrite the code.
 
+Optionally, `classes` and `policies` define port-access policies, and a
+role attaches one with `associate_policy`. See
+[PORT_ACCESS_CONFIGURATION.md](PORT_ACCESS_CONFIGURATION.md#policies-and-classes).
+
 ```json
 {
   "port_access": {
@@ -704,7 +708,8 @@ more parameters without needing to rewrite the code.
 ```
 
 Ansible access: `port_access`, `port_access.roles`,
-`port_access.lldp_groups`, `port_access.device_profiles`.
+`port_access.lldp_groups`, `port_access.device_profiles`,
+`port_access.policies`, `port_access.classes`.
 
 > The referenced VLANs (`11`, `12`, `13` in the example above) must exist
 > in NetBox and be scoped to the device. If a referenced VID is missing

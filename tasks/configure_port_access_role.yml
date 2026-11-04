@@ -37,6 +37,9 @@
       {%- elif _pa_role_current.get('description') -%}
       {%-   set _ = out.append('no description') -%}
       {%- endif -%}
+      {%- if pa_role.associate_policy is defined -%}
+      {%-   set _ = out.append('associate policy ' ~ pa_role.associate_policy) -%}
+      {%- endif -%}
       {%- if pa_role.poe_priority is defined -%}
       {%-   set _ = out.append('poe-priority ' ~ pa_role.poe_priority) -%}
       {%- endif -%}
@@ -50,7 +53,7 @@
       {%-   set _ = out.append('vlan trunk native ' ~ pa_role.vlan_trunk_native) -%}
       {%- endif -%}
       {%- if pa_role.vlan_trunk_allowed is defined -%}
-      {%-   set _ = out.append('vlan trunk allowed ' ~ pa_role.vlan_trunk_allowed) -%}
+      {%-   set _ = out.append('vlan trunk allowed ' ~ (pa_role.vlan_trunk_allowed | parse_vlan_id_spec | collapse_vlan_list)) -%}
       {%- endif -%}
       {%- for line in pa_role.extra_lines | default([]) -%}
       {%-   set _ = out.append(line) -%}
