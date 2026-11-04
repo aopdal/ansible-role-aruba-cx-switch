@@ -1,0 +1,24 @@
+---
+# Configure a single port-access policy.
+# Required loop var: pa_policy (dict with .name and .entries list)
+
+- name: "configure_port_access | Push policy {{ pa_policy.name }}"
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - "port-access policy {{ pa_policy.name }}"
+    lines: "{{ _pa_policy_cli_lines }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+    _pa_policy_cli_lines: >-
+      {%- set out = [] -%}
+      {%- for e in pa_policy.entries | default([]) -%}
+      {%-   set seq = e.seq | default(loop.index * 10) -%}
+      {%-   set line = seq ~ ' class ' ~ (e.class_type | default('ip')) ~ ' ' ~ e['class'] -%}
+      {%-   if e.action is defined -%}
+      {%-     set line = line ~ ' action ' ~ e.action -%}
+      {%-   endif -%}
+      {%-   set _ = out.append(line) -%}
+      {%- endfor -%}
+      {{ out }}
+  when: pa_policy.entries | default([]) | length > 0

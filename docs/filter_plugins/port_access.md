@@ -128,8 +128,10 @@ For each of the three object kinds, every desired item is compared field-by-fiel
 against the matching current object (if any exists):
 
 - **LLDP groups**: match-sets are compared sequence-number-agnostic — reordering the same match criteria doesn't count as a change, only actual criteria differences do.
-- **Roles**: compares `description`, `poe_priority`, `trust_mode` (against the device's `qos_trust_mode`), `vlan_trunk_native`/`vlan_access` (against `vlan_tag`), and `vlan_trunk_allowed` — with NetBox's range/list syntax (`"11-13"`) expanded before comparing against the device's `vlan_trunks` list. Roles using `extra_lines` always push (raw CLI content bypasses the REST diff — there's no reliable way to compare arbitrary CLI lines against structured facts).
+- **Roles**: compares `description`, `poe_priority`, `trust_mode` (against the device's `qos_trust_mode`), `vlan_trunk_native`/`vlan_access` (against `vlan_tag`), and `vlan_trunk_allowed` — with NetBox's range/list syntax (`"11-13"`) expanded before comparing against the device's `vlan_trunks` list. `associate_policy` is compared against the device's `in_policy` reference (URI, expanded object or name-keyed dict) only when the role sets it, so roles without a policy never diff on it. Roles using `extra_lines` always push (raw CLI content bypasses the REST diff — there's no reliable way to compare arbitrary CLI lines against structured facts).
 - **Device-profiles**: compares `enable`, `associate_role`, `associate_lldp_group`.
+
+`classes` and `policies` are not diffed by this filter — `configure_port_access.yml` hands them straight to `aoscx_config`, whose `match: line` compare against running-config keeps them idempotent.
 
 #### Parameters
 

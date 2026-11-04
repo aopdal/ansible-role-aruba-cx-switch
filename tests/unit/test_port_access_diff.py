@@ -368,3 +368,66 @@ class TestRoleExtraLines:
         }
         result = port_access_diff(desired, CURRENT_MATCHING)
         assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+
+# ---------------------------------------------------------------------------
+# Role associate_policy (optional, REST: in_policy)
+# ---------------------------------------------------------------------------
+
+
+def _with_policy(desired_policy, current_in_policy):
+    desired = {
+        **DESIRED_FULL,
+        "roles": [{**DESIRED_FULL["roles"][0], "associate_policy": desired_policy}],
+    }
+    current_role = dict(CURRENT_MATCHING["roles"]["LAB-SW01"])
+    if current_in_policy is not None:
+        current_role["in_policy"] = current_in_policy
+    current = {**CURRENT_MATCHING, "roles": {"LAB-SW01": current_role}}
+    return port_access_diff(desired, current)
+
+
+class TestRoleAssociatePolicy:
+    @pytest.mark.parametrize(
+        "in_policy",
+        [
+            "/rest/v10.16/system/port_access_policies/sys_policy_pap_AP-Device-Role",
+            {"name": "sys_policy_pap_AP-Device-Role", "cfg_entries": {}},
+            {
+                "sys_policy_pap_AP-Device-Role": (
+                    "/rest/v10.16/system/port_access_policies/"
+                    "sys_policy_pap_AP-Device-Role"
+                )
+            },
+        ],
+        ids=["uri", "expanded", "keyed"],
+    )
+    def test_policy_match_in_any_rest_shape(self, in_policy):
+        result = _with_policy("sys_policy_pap_AP-Device-Role", in_policy)
+        assert result["roles"] == []
+
+    def test_policy_missing_on_device_pushes_role(self):
+        result = _with_policy("sys_policy_pap_AP-Device-Role", None)
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_policy_differs_pushes_role(self):
+        result = _with_policy(
+            "new-policy", "/rest/v10.16/system/port_access_policies/old-policy"
+        )
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_url_encoded_policy_name(self):
+        result = _with_policy(
+            "my policy", "/rest/v10.16/system/port_access_policies/my%20policy"
+        )
+        assert result["roles"] == []
+
+    def test_no_policy_in_netbox_ignores_device_policy(self):
+        """Roles without associate_policy stay idempotent (backward compatible)."""
+        current_role = {
+            **CURRENT_MATCHING["roles"]["LAB-SW01"],
+            "in_policy": "/rest/v10.16/system/port_access_policies/legacy",
+        }
+        current = {**CURRENT_MATCHING, "roles": {"LAB-SW01": current_role}}
+        result = port_access_diff(DESIRED_FULL, current)
+        assert result["roles"] == []

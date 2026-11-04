@@ -8,6 +8,16 @@
    Expected schema (top-level `port_access` key from config_context):
 
      port_access:
+       classes:                            # optional
+         - name: <str>
+           type: ip|ipv6                   # default ip
+           entries:
+             - { seq: <int>, match: <str> }   # e.g. "any any any"
+             - { seq: <int>, ignore: <str> }
+       policies:                           # optional
+         - name: <str>
+           entries:
+             - { seq: <int>, class: <class-name>, class_type: ip|ipv6, action: <str> }
        lldp_groups:
          - name: <str>
            match:
@@ -19,6 +29,7 @@
            description: <str>
            poe_priority: low|high|critical
            trust_mode: dscp|cos|none
+           associate_policy: <policy-name>  # optional
            vlan_trunk_native: <int|str>
            vlan_trunk_allowed: <int|str>   # supports "11", "11,13", "11-13"
            vlan_access: <int|str>
@@ -30,6 +41,26 @@
 ============================================================================ #}
 {% if port_access is defined and port_access | length > 0 %}
 !
+{% for cls in port_access.classes | default([]) %}
+class {{ cls.type | default('ip') }} {{ cls.name }}
+{%   for e in cls.entries | default([]) %}
+{%     set seq = e.seq | default(loop.index * 10) %}
+{%     if e.match is defined %}
+    {{ seq }} match {{ e.match }}
+{%     elif e.ignore is defined %}
+    {{ seq }} ignore {{ e.ignore }}
+{%     endif %}
+{%   endfor %}
+!
+{% endfor %}
+{% for pol in port_access.policies | default([]) %}
+port-access policy {{ pol.name }}
+{%   for e in pol.entries | default([]) %}
+    {{ e.seq | default(loop.index * 10) }} class {{ e.class_type | default('ip') }} {{ e['class'] }}{% if e.action is defined %} action {{ e.action }}{% endif %}
+
+{%   endfor %}
+!
+{% endfor %}
 {% for grp in port_access.lldp_groups | default([]) %}
 port-access lldp-group {{ grp.name }}
 {%   for m in grp.match | default([]) %}
@@ -49,6 +80,9 @@ port-access role {{ role.name }}
 {%   if role.description is defined %}
     description {{ role.description }}
 {%   endif %}
+{%   if role.associate_policy is defined %}
+    associate policy {{ role.associate_policy }}
+{%   endif %}
 {%   if role.poe_priority is defined %}
     poe-priority {{ role.poe_priority }}
 {%   endif %}
@@ -62,7 +96,7 @@ port-access role {{ role.name }}
     vlan trunk native {{ role.vlan_trunk_native }}
 {%   endif %}
 {%   if role.vlan_trunk_allowed is defined %}
-    vlan trunk allowed {{ role.vlan_trunk_allowed }}
+    vlan trunk allowed {{ role.vlan_trunk_allowed | parse_vlan_id_spec | collapse_vlan_list }}
 {%   endif %}
 !
 {% endfor %}

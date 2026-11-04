@@ -4,7 +4,8 @@ This page is the single reference for AOS-CX port-access (device-profile)
 configuration with this role. It covers:
 
 1. [How port-access is modelled in NetBox](#how-port-access-is-modelled-in-netbox)
-2. [Object reference](#object-reference) (lldp-groups, roles, device-profiles)
+2. [Object reference](#object-reference) (lldp-groups, roles, device-profiles,
+   and the optional [policies and classes](#policies-and-classes))
 3. [Complete config_context example](#complete-config_context-example)
 4. [Change detection and idempotency](#change-detection-and-idempotency)
 5. [Cleanup](#cleanup)
@@ -24,6 +25,8 @@ all under a single top-level `port_access` key:
 | `lldp_groups` | Match-sets used to fingerprint a connected device via its LLDP advertisement (vendor OUI, system name, or system description) |
 | `roles` | What to apply once a device is identified — VLANs, PoE priority, QoS trust mode, and arbitrary extra CLI lines |
 | `device_profiles` | Ties an `lldp_group` to a `role` and enables/disables the combination |
+| `policies` (optional) | Port-access policy applied to traffic of clients in a role, built from class entries |
+| `classes` (optional) | Classifier classes (`class ip` / `class ipv6`) referenced by policy entries |
 
 Configuration is gated by `aoscx_configure_port_access` (default `true`)
 **and** the device's `port_access` config_context key being defined and
@@ -32,10 +35,13 @@ that don't use port-access at all. Task files:
 `tasks/configure_port_access.yml`,
 `tasks/configure_port_access_lldp_group.yml`,
 `tasks/configure_port_access_role.yml`,
-`tasks/configure_port_access_device_profile.yml`.
+`tasks/configure_port_access_device_profile.yml`,
+`tasks/configure_port_access_class.yml`,
+`tasks/configure_port_access_policy.yml`.
 
-Configuration order matters — device-profiles reference roles and LLDP
-groups, so they're always pushed in the order **lldp-group → role →
+Configuration order matters — policies reference classes, roles reference
+policies, device-profiles reference roles and LLDP groups, so they're
+always pushed in the order **class → policy → lldp-group → role →
 device-profile**; cleanup (see below) runs the reverse order.
 
 ## Object reference
@@ -60,7 +66,8 @@ device-profile**; cleanup (see below) runs the reverse order.
 | `trust_mode` | No | `trust-mode <value>` | e.g. `dscp` |
 | `vlan_access` | No | `vlan access <vid>` | Access-mode VLAN |
 | `vlan_trunk_native` | No | `vlan trunk native <vid>` | Native VLAN for a trunk-mode role |
-| `vlan_trunk_allowed` | No | `vlan trunk allowed <vids>` | Accepts NetBox range/list syntax (`"11-13"`, `"11,13,15-20"`) |
+| `vlan_trunk_allowed` | No | `vlan trunk allowed <vids>` | Accepts NetBox range/list syntax (`"11-13"`, `"11,13,15-20"`). Pushed in the switch's own range form (`"1,101,102"` → `1,101-102`), so the CLI push matches running-config |
+| `associate_policy` | No | `associate policy <name>` | Must reference a `policies[].name` (or a policy that already exists on the switch) |
 | `extra_lines` | No | Appended verbatim | Escape hatch for CLI this table doesn't cover — see the idempotency note below |
 
 `vlan_trunk_native` and `vlan_trunk_allowed` VLAN IDs referenced here are
@@ -77,6 +84,82 @@ idempotent VLAN cleanup — see
 | `enable` | No (default `true`) | `enable` / `disable` | |
 | `associate_role` | No | `associate role <name>` | Must reference a `roles[].name` |
 | `associate_lldp_group` | No | `associate lldp-group <name>` | Must reference an `lldp_groups[].name` |
+
+### Policies and classes
+
+Both lists are optional. Leave them out and a role without
+`associate_policy` is configured exactly as before, so existing sites are
+unaffected.
+
+`classes`:
+
+| Field | Required | CLI command | Notes |
+|---|---|---|---|
+| `name` | Yes | `class <type> <name>` | |
+| `type` | No (default `ip`) | | `ip` or `ipv6` |
+| `entries` | No | | List of entries, each with an optional `seq` (auto-numbered `10, 20, 30...`) and one of: |
+| `entries[].match` | | `<seq> match <text>` | Raw match criteria, e.g. `"any any any"` or `"tcp any any eq 443"` |
+| `entries[].ignore` | | `<seq> ignore <text>` | Raw ignore criteria |
+
+`policies`:
+
+| Field | Required | CLI command | Notes |
+|---|---|---|---|
+| `name` | Yes | `port-access policy <name>` | |
+| `entries` | No | | List of entries, each with an optional `seq` (auto-numbered) and: |
+| `entries[].class` | Yes | `<seq> class <class_type> <class>` | Class name |
+| `entries[].class_type` | No (default `ip`) | | `ip` or `ipv6` (MAC classes aren't allowed in a port-access policy) |
+| `entries[].action` | No | `... action <text>` | Raw action, e.g. `drop` or `dscp 46`. Omit to permit |
+
+Example — the policy that HPE Aruba Networking Central generates for an AP
+role:
+
+```json
+{
+  "port_access": {
+    "classes": [
+      {
+        "name": "sys_pap_AP-Device-Role_ip_allow_1",
+        "entries": [{ "seq": 10, "match": "any any any" }]
+      }
+    ],
+    "policies": [
+      {
+        "name": "sys_policy_pap_AP-Device-Role",
+        "entries": [{ "seq": 10, "class": "sys_pap_AP-Device-Role_ip_allow_1" }]
+      }
+    ],
+    "roles": [
+      {
+        "name": "AP-Device-Role",
+        "associate_policy": "sys_policy_pap_AP-Device-Role",
+        "poe_priority": "critical",
+        "vlan_trunk_native": 1,
+        "vlan_trunk_allowed": "1,10,20,30,40,50",
+        "extra_lines": ["auth-mode device-mode", "poe-allocate-by usage"]
+      }
+    ]
+  }
+}
+```
+
+renders:
+
+```text
+class ip sys_pap_AP-Device-Role_ip_allow_1
+    10 match any any any
+port-access policy sys_policy_pap_AP-Device-Role
+    10 class ip sys_pap_AP-Device-Role_ip_allow_1
+port-access role AP-Device-Role
+    associate policy sys_policy_pap_AP-Device-Role
+    poe-priority critical
+    ...
+```
+
+Write `match`, `ignore` and `action` text the way the switch prints it in
+`show running-config`. `aoscx_config` compares line by line against
+running-config, so text in a different form shows `changed: true` on every
+run.
 
 ## Complete config_context example
 
@@ -139,6 +222,14 @@ the objects that actually differ:
   deliberate exception, not a bug.
 - **Device-profiles**: `enable`, `associate_role`, `associate_lldp_group`
   are compared.
+- **Role `associate_policy`**: compared against the role's `in_policy` on
+  the device, but only when the role sets it. Removing `associate_policy`
+  from NetBox does not emit `no associate policy` (same as `poe_priority`
+  and the other attributes below).
+- **Classes and policies** are not part of the REST diff. They are always
+  passed to `aoscx_config`, whose `match: line` compare against
+  running-config pushes only missing lines, so a rerun reports `ok`.
+  Entries removed from NetBox are not removed from the device.
 
 ### Removing a role attribute (e.g. `description`)
 
@@ -179,6 +270,10 @@ computes the orphan list; `tasks/cleanup_port_access.yml`
 removes them in the reverse of configuration order —
 device-profiles first (they reference roles/groups), then roles, then
 LLDP groups.
+
+Policies and classes are **not** cleaned up. Classes are shared with ACL
+and QoS policies, and port-access policies can also come from ClearPass or
+RADIUS, so the role does not delete either.
 
 ## Task ordering and tags
 
