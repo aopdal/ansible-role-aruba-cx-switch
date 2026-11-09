@@ -1,4 +1,5 @@
 import pytest
+from netbox_filters_lib.port_access import port_access_facts_from_device_profiles
 from netbox_filters_lib.port_access_orphans import port_access_orphans
 
 def test_port_access_orphans_basic():
@@ -45,3 +46,16 @@ def test_port_access_orphans_missing_keys():
     assert out["device_profiles"] == ["B"]
     assert out["roles"] == ["R"]
     assert out["lldp_groups"] == []
+
+
+def test_user_role_removed_from_netbox_is_orphan():
+    """Local user roles (no device-profile) are cleanup candidates."""
+    current = port_access_facts_from_device_profiles(
+        {},
+        {
+            "Pod5-Ansatt": {"name": "Pod5-Ansatt", "origin": "local"},
+            "cppm-guest": {"name": "cppm-guest", "origin": "downloaded"},
+        },
+    )
+    out = port_access_orphans({"roles": []}, current)
+    assert out["roles"] == ["Pod5-Ansatt"]

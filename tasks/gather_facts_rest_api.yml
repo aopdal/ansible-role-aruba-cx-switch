@@ -40,8 +40,9 @@
 #   and the device answers the split attributes; see
 #   docs/INTERFACE_SPLIT.md)
 # - aoscx_port_access_facts (when port_access is defined in the device's
-#   NetBox config_context). Built from a single REST call to
-#   /system/device_profiles?depth=5, then flattened by the
+#   NetBox config_context). Built from /system/device_profiles?depth=5
+#   plus /system/port_access_roles?depth=2 (local roles only, so user
+#   roles no profile references are included), flattened by the
 #   port_access_facts_from_device_profiles filter into:
 #     {
 #       'device_profiles': <full payload, dict keyed by profile name>,
@@ -422,6 +423,31 @@
     status_code: [200, 400, 404]
     return_content: true
   register: _rest_port_access_profiles
+  delegate_to: localhost
+  check_mode: false
+  when:
+    - (port_access | default({})) | length > 0
+    - aoscx_configure_port_access | default(true) | bool or aoscx_test_mode | bool
+  tags:
+    - always
+
+# Query every port-access role, not just the ones a device-profile
+# references. User roles (assigned by ClearPass/RADIUS via Aruba-User-Role
+# after 802.1X/MAC auth) are attached to no device-profile, so the
+# device_profiles query above never returns them - without this they would
+# never be diffed or cleaned up. port_access_facts_from_device_profiles
+# keeps only origin == local roles: downloaded (ClearPass) and radius
+# roles are not managed by this role and must never be cleanup candidates.
+- name: Query port-access roles via REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/port_access_roles?attributes=&depth=2"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 400, 404]
+    return_content: true
+  register: _rest_port_access_roles
   delegate_to: localhost
   check_mode: false
   when:
@@ -1058,19 +1084,24 @@
     - always
 
 # Aggregate port-access facts. Only set when port-access fact gathering ran.
-# The depth=4 device_profiles response is the single source - flatten it
-# into {device_profiles, roles, lldp_groups, mac_groups} for the diff
-# filter. When the endpoint returned non-200 (400/404 on firmware that
-# doesn't expose it) the filter degrades to all-empty sub-dicts and
+# The depth=5 device_profiles response is flattened into
+# {device_profiles, roles, lldp_groups, mac_groups} for the diff filter;
+# the port_access_roles response adds the local roles no profile
+# references (user roles). When an endpoint returned non-200 (400/404 on
+# firmware that doesn't expose it) its part degrades to empty and
 # port_access_diff falls back to "push everything".
 - name: Set port-access facts from REST API response
   ansible.builtin.set_fact:
     aoscx_port_access_facts: >-
       {{ ((_rest_port_access_profiles.json | default({}))
             if (_rest_port_access_profiles is defined
-                  and _rest_port_access_profiles.status == 200)
+                  and _rest_port_access_profiles.status | default(0) == 200)
             else {})
-         | port_access_facts_from_device_profiles }}
+         | port_access_facts_from_device_profiles(
+             (_rest_port_access_roles.json | default({}))
+               if (_rest_port_access_roles is defined
+                     and _rest_port_access_roles.status | default(0) == 200)
+               else {}) }}
   when:
     - aoscx_configure_port_access | default(true) | bool or aoscx_test_mode | bool
     - (port_access | default({})) | length > 0

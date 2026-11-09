@@ -21,6 +21,14 @@ This task sets the following facts used by all downstream tasks:
 | `vlans_in_use` | VLANs currently in use on interfaces (or all NetBox VLANs when `aoscx_configure_vlans_all=true`) | configure_vlans.yml, configure_evpn.yml, configure_vxlan.yml |
 | `vlan_changes` | VLANs to create/delete based on analysis | configure_vlans.yml, cleanup_*.yml |
 
+### Reserved VLANs (UBT client VLAN)
+
+The UBT client VLAN (`ubt.client_vlan` in config_context, see
+[UBT_CONFIGURATION.md](UBT_CONFIGURATION.md)) is passed to
+`get_vlans_needing_changes` as `reserved_vids`. A reserved VID is never
+added to `vlans_to_create` and never added to `vlans_to_delete`, because
+`ubt-client-vlan` owns it on the switch.
+
 ### Configure-All Mode (`aoscx_configure_vlans_all`)
 
 By default, `vlans_in_use` is built from VLANs referenced by interfaces

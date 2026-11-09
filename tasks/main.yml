@@ -417,6 +417,27 @@
     - stp
     - layer2
 
+# UBT (User-Based Tunneling) - depends on VRFs (each zone is bound to a VRF)
+# and must precede port-access, whose roles reference a zone through
+# `gateway-zone`. Auto-enabled when NetBox config_context provides a `ubt`
+# dict for the device.
+- name: Include UBT configuration tasks
+  ansible.builtin.include_tasks:
+    file: configure_ubt.yml
+    apply:
+      tags:
+        - ubt
+        - port_access
+        - layer2
+  when:
+    - aoscx_configure_ubt | bool
+    - ubt is defined
+    - ubt | length > 0
+  tags:
+    - ubt
+    - port_access
+    - layer2
+
 # Port-access (device-profile) - depends on VLANs (roles reference VLAN IDs)
 # and on L2 interfaces (port-access objects are switch-global but typically
 # applied on access ports). Auto-enabled when NetBox config_context

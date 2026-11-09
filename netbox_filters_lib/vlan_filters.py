@@ -376,7 +376,9 @@ def get_vlans_in_use(interfaces, vlan_interfaces=None, port_access=None):
     return result
 
 
-def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None):
+def get_vlans_needing_changes(
+    device_vlans, vlans_in_use_dict, device_facts=None, reserved_vids=None
+):
     """
     Determine which VLANs need to be added or removed
 
@@ -384,6 +386,9 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
         device_vlans: List of VLAN objects available for this device from NetBox
         vlans_in_use_dict: Dict from get_vlans_in_use() with 'vids' and 'vlans'
         device_facts: Optional device facts for checking current state
+        reserved_vids: Optional list of VLAN IDs that some other feature owns
+            on the device (e.g. the UBT client VLAN). They are never created
+            as regular VLANs and never deleted.
 
     Returns:
         Dict with:
@@ -412,7 +417,13 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
             "vlans_in_use": vlans_in_use,
         }
 
-    vids_in_use = set(vlans_in_use_dict["vids"])
+    reserved = set()
+    for vid in reserved_vids or []:
+        try:
+            reserved.add(int(vid))
+        except (TypeError, ValueError):
+            _debug(f"WARNING: ignoring invalid reserved VLAN ID {vid!r}")
+    vids_in_use = set(vlans_in_use_dict["vids"]) - reserved
 
     # Get VLANs currently on device (if facts provided)
     device_vids = set()
@@ -516,6 +527,10 @@ def get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None
         for vid in device_vids:
             # Skip VLAN 1 - never delete the default VLAN
             if vid == 1:
+                continue
+
+            # Owned by another feature (e.g. ubt-client-vlan)
+            if vid in reserved:
                 continue
 
             # Validate VLAN ID is in valid range (1-4094)

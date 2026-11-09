@@ -71,7 +71,20 @@
 
 - name: Determine VLAN changes needed
   ansible.builtin.set_fact:
-    vlan_changes: "{{ vlans | get_vlans_needing_changes(vlans_in_use, ansible_facts | default({})) }}"
+    vlan_changes: >-
+      {{ vlans | get_vlans_needing_changes(
+           vlans_in_use,
+           ansible_facts | default({}),
+           _ubt_reserved_vids
+         ) }}
+  vars:
+    # The UBT client VLAN is owned by `ubt-client-vlan` (configure_ubt.yml),
+    # not by the VLAN tasks: never create it as a regular VLAN, never clean
+    # it up.
+    _ubt_reserved_vids: >-
+      {{ [ubt.client_vlan]
+         if (ubt | default({})).client_vlan | default('') | string | length > 0
+         else [] }}
 
 - name: Debug - Show VLAN analysis results
   ansible.builtin.debug:

@@ -11,7 +11,8 @@ configuration with this role. It covers:
 5. [Cleanup](#cleanup)
 6. [Task ordering and tags](#task-ordering-and-tags)
 7. [Not yet implemented: mac-groups](#not-yet-implemented-mac-groups)
-8. [Operational notes](#operational-notes)
+8. [User roles (RADIUS / ClearPass)](#user-roles-radius--clearpass)
+9. [Operational notes](#operational-notes)
 
 ## How port-access is modelled in NetBox
 
@@ -67,6 +68,9 @@ device-profile**; cleanup (see below) runs the reverse order.
 | `vlan_access` | No | `vlan access <vid>` | Access-mode VLAN |
 | `vlan_trunk_native` | No | `vlan trunk native <vid>` | Native VLAN for a trunk-mode role |
 | `vlan_trunk_allowed` | No | `vlan trunk allowed <vids>` | Accepts NetBox range/list syntax (`"11-13"`, `"11,13,15-20"`). Pushed in the switch's own range form (`"1,101,102"` → `1,101-102`), so the CLI push matches running-config |
+| `auth_mode` | No | `auth-mode <value>` | `client-mode`, `device-mode` or `multi-domain`. `auth-mode` (CLI spelling) is accepted as an alias. Unset means the role inherits the port's auth-mode |
+| `gateway_zone` | No | `gateway-zone zone <zone> gateway-role <role>` | Tunnels the role's clients to a UBT zone — see [UBT_CONFIGURATION.md](UBT_CONFIGURATION.md) |
+| `gateway_role` | No | (part of the `gateway-zone` line) | Role on the gateway. Defaults to the role's `name` |
 | `associate_policy` | No | `associate policy <name>` | Must reference a `policies[].name` (or a policy that already exists on the switch) |
 | `extra_lines` | No | Appended verbatim | Escape hatch for CLI this table doesn't cover — see the idempotency note below |
 
@@ -208,9 +212,11 @@ every object in `port_access` is pushed unconditionally on every run.
 
 [`port_access_diff`](filter_plugins/port_access.md#2-port_access_diffdesired-current)
 compares each object against `aoscx_port_access_facts` (built by
-[`port_access_facts_from_device_profiles`](filter_plugins/port_access.md#1-port_access_facts_from_device_profilesprofiles_payload)
-from a single `GET /system/device_profiles?depth=4` call) and returns only
-the objects that actually differ:
+[`port_access_facts_from_device_profiles`](filter_plugins/port_access.md#1-port_access_facts_from_device_profilesprofiles_payload-roles_payload)
+from `GET /system/device_profiles?depth=5` plus
+`GET /system/port_access_roles?depth=2`, so roles that no device-profile
+references are included) and returns only the objects that actually
+differ:
 
 - **LLDP groups**: match-sets compared sequence-number-agnostic —
   reordering the same criteria isn't a change.
@@ -226,6 +232,12 @@ the objects that actually differ:
   the device, but only when the role sets it. Removing `associate_policy`
   from NetBox does not emit `no associate policy` (same as `poe_priority`
   and the other attributes below).
+- **Role `auth_mode`**: compared against the role's `auth_mode` on the
+  device, but only when the role sets it. Removing it from NetBox does not
+  emit `no auth-mode`.
+- **Role `gateway_zone` / `gateway_role`**: compared against the role's
+  `gateway_zone` and `ubt_gateway_role` on the device, but only when the
+  role sets `gateway_zone`. Removing it does not emit `no gateway-zone`.
 - **Classes and policies** are not part of the REST diff. They are always
   passed to `aoscx_config`, whose `match: line` compare against
   running-config pushes only missing lines, so a rerun reports `ok`.
@@ -271,6 +283,13 @@ removes them in the reverse of configuration order —
 device-profiles first (they reference roles/groups), then roles, then
 LLDP groups.
 
+Roles are cleanup candidates whether or not a device-profile references
+them, but only roles the switch reports with `origin: local`. Roles
+downloaded from ClearPass (`origin: downloaded`) or built from RADIUS
+attributes (`origin: radius`) are never compared or removed. A local role
+configured outside NetBox (by hand or from Central) **is** removed in
+idempotent mode — add it to `port_access.roles` to keep it.
+
 Policies and classes are **not** cleaned up. Classes are shared with ACL
 and QoS policies, and port-access policies can also come from ClearPass or
 RADIUS, so the role does not delete either.
@@ -298,6 +317,46 @@ will be pushed, diffed, or cleaned up for it. `port_access_diff` and
 lab/example setup yet to validate the implementation against real
 hardware. Use `lldp_groups` for device matching until mac-groups support
 is completed.
+
+## User roles (RADIUS / ClearPass)
+
+A port-access role doesn't need a device-profile. With 802.1X or MAC
+authentication, ClearPass (or another RADIUS server) returns the role name
+in the `Aruba-User-Role` attribute and the switch applies that local role
+to the client. These **user roles** use the same `port_access.roles`
+entries as device-profile roles; just leave them out of
+`device_profiles`:
+
+```json
+{
+  "port_access": {
+    "roles": [
+      {
+        "name": "Pod5-Ansatt",
+        "description": "Pod5-Ansatt",
+        "associate_policy": "sys_policy_pap_Pod5-Ansatt",
+        "auth_mode": "client-mode",
+        "vlan_access": 10
+      }
+    ]
+  }
+}
+```
+
+renders:
+
+```text
+port-access role Pod5-Ansatt
+    description Pod5-Ansatt
+    associate policy sys_policy_pap_Pod5-Ansatt
+    auth-mode client-mode
+    vlan access 10
+```
+
+User roles get the same change detection and cleanup as device-profile
+roles, because role facts are read from `/system/port_access_roles`
+rather than only through the device-profiles. The 802.1X / MAC-auth port
+and RADIUS server configuration itself is not managed by this role.
 
 ## Operational notes
 

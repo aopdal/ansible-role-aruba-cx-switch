@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.6] - 2026-11-09
+
+### Added
+
+- Port-access roles: optional `auth_mode` (`client-mode`, `device-mode`,
+  `multi-domain`) renders `auth-mode <value>` on the role, on the device
+  and in the generated starting config. The CLI spelling `auth-mode` is
+  accepted as an alias. Compared against the role's REST `auth_mode` in
+  the port-access diff when set.
+- Port-access user roles: roles that no device-profile references (applied
+  by ClearPass/RADIUS via `Aruba-User-Role`) are now read from
+  `/system/port_access_roles` during REST fact gathering. They get the
+  same change detection as device-profile roles instead of being pushed
+  every run, and are removed by idempotent cleanup when deleted from
+  NetBox. Documented in a new "User roles" section of
+  `docs/PORT_ACCESS_CONFIGURATION.md`.
+
+- User-based tunneling (UBT): new `ubt` config_context key renders
+  `ubt-client-vlan` and `ubt zone <name> vrf <vrf>` blocks
+  (`primary-controller ip`, `backup-controller ip`, `enable`), toggled by
+  `aoscx_configure_ubt` (default `true`, skipped without a `ubt` context).
+  Runs after VRFs and before port-access. New page
+  `docs/UBT_CONFIGURATION.md`.
+- Port-access roles: optional `gateway_zone` / `gateway_role` render
+  `gateway-zone zone <zone> gateway-role <role>` (`gateway_role` defaults
+  to the role name). Compared against the role's REST `gateway_zone` /
+  `ubt_gateway_role` when set.
+- `get_vlans_needing_changes` accepts `reserved_vids`: VLANs owned by
+  another feature are never created or cleaned up. The UBT client VLAN is
+  passed in, so idempotent VLAN cleanup leaves it alone.
+
+### Changed
+
+- Port-access idempotent cleanup now considers every role the switch
+  reports with `origin: local`, not just roles attached to a
+  device-profile. A local role configured outside NetBox is removed in
+  idempotent mode; add it to `port_access.roles` to keep it. Roles
+  downloaded from ClearPass or built from RADIUS attributes are never
+  compared or removed.
+- Port-access role comparison accepts VLAN references in any REST shape
+  (plain ID, URI, expanded object or dict keyed by ID) for `vlan_tag` and
+  `vlan_trunks`.
+
 ## [0.18.5] - 2026-11-04
 
 ### Added

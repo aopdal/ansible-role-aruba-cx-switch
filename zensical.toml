@@ -66,6 +66,7 @@ nav = [
     { "Tag-Dependent Tasks" = "TAG_DEPENDENT_INCLUDES.md" },
     { "VSX Configuration" = "VSX_CONFIGURATION.md" },
     { "Port access configuration" = "PORT_ACCESS_CONFIGURATION.md" },
+    { "UBT configuration" = "UBT_CONFIGURATION.md" },
     { "STP Configuration" = "STP_CONFIGURATION.md" },
     { "Generate configs" = "TEMPLATE_CONFIGURATION.md" },
   ] },

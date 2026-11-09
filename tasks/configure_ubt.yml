@@ -1,0 +1,78 @@
+---
+# Configure User-Based Tunneling (UBT) on AOS-CX switches
+#
+# Renders the UBT client VLAN and UBT zones from the `ubt` config_context
+# dict (NetBox) and pushes them via arubanetworks.aoscx.aoscx_config
+# (network_cli connection). Port-access roles tunnel clients to a zone
+# with `gateway_zone` / `gateway_role` (see configure_port_access_role.yml).
+#
+# Schema (top-level `ubt` key from config_context):
+#
+#   ubt:
+#     client_vlan: 4000          # optional: ubt-client-vlan <vid>
+#     zones:
+#       - name: UBT-Zone
+#         vrf: default           # optional, default "default"
+#         primary_controller: 192.168.1.1
+#         backup_controller: 192.168.1.2   # optional
+#         enable: true           # optional, default true
+#         extra_lines:           # optional: raw CLI lines appended verbatim
+#           - "sac-heartbeat-interval 2"
+#
+# The client VLAN is reserved for UBT: identify_vlan_changes.yml keeps it
+# out of the regular VLAN create list and out of idempotent VLAN cleanup.
+# Do not also scope it to the device as a regular NetBox VLAN in use.
+#
+# Must run after VRFs (zones are bound to a VRF) and before port-access
+# roles (gateway-zone references the zone) - see tasks/main.yml.
+#
+# There is no REST diff: the AOS-CX REST API schema does not publish the
+# UBT objects, so every line is handed to aoscx_config, whose `match: line`
+# compare against running-config keeps a rerun at `ok`. Zones removed from
+# NetBox are not removed from the device. `enable: false` pushes
+# `no enable`, which never appears in running-config, so a disabled zone
+# reports `changed` on every run.
+
+- name: Display UBT summary
+  ansible.builtin.debug:
+    msg:
+      - "=== UBT Configuration ==="
+      - "Device: {{ inventory_hostname }}"
+      - "Client VLAN: {{ ubt.client_vlan | default('not set') }}"
+      - "Zones: {{ ubt.zones | default([]) | map(attribute='name') | list }}"
+  when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+
+- name: Configure UBT client VLAN
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - "ubt-client-vlan {{ ubt.client_vlan }}"
+    match: line
+  vars:
+    ansible_connection: network_cli
+  when: ubt.client_vlan | default('') | string | length > 0
+
+- name: "Configure UBT zones"
+  arubanetworks.aoscx.aoscx_config:
+    parents:
+      - "ubt zone {{ ubt_zone.name }} vrf {{ ubt_zone.vrf | default('default') }}"
+    lines: "{{ _ubt_zone_cli_lines }}"
+    match: line
+  loop: "{{ ubt.zones | default([]) }}"
+  loop_control:
+    loop_var: ubt_zone
+    label: "{{ inventory_hostname }} ubt zone {{ ubt_zone.name }}"
+  vars:
+    ansible_connection: network_cli
+    _ubt_zone_cli_lines: >-
+      {%- set out = [] -%}
+      {%- if ubt_zone.primary_controller is defined -%}
+      {%-   set _ = out.append('primary-controller ip ' ~ ubt_zone.primary_controller) -%}
+      {%- endif -%}
+      {%- if ubt_zone.backup_controller is defined -%}
+      {%-   set _ = out.append('backup-controller ip ' ~ ubt_zone.backup_controller) -%}
+      {%- endif -%}
+      {%- for line in ubt_zone.extra_lines | default([]) -%}
+      {%-   set _ = out.append(line) -%}
+      {%- endfor -%}
+      {%- set _ = out.append('enable' if ubt_zone.enable | default(true) | bool else 'no enable') -%}
+      {{ out }}

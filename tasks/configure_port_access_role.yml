@@ -40,6 +40,13 @@
       {%- if pa_role.associate_policy is defined -%}
       {%-   set _ = out.append('associate policy ' ~ pa_role.associate_policy) -%}
       {%- endif -%}
+      {%- set _auth_mode = pa_role.auth_mode | default(pa_role['auth-mode'] | default(none)) -%}
+      {%- if _auth_mode -%}
+      {%-   set _ = out.append('auth-mode ' ~ _auth_mode) -%}
+      {%- endif -%}
+      {%- if pa_role.gateway_zone is defined -%}
+      {%-   set _ = out.append('gateway-zone zone ' ~ pa_role.gateway_zone ~ ' gateway-role ' ~ (pa_role.gateway_role | default(pa_role.name))) -%}
+      {%- endif -%}
       {%- if pa_role.poe_priority is defined -%}
       {%-   set _ = out.append('poe-priority ' ~ pa_role.poe_priority) -%}
       {%- endif -%}

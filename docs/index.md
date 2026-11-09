@@ -373,6 +373,7 @@ aoscx_configure_l2_interfaces: true
 aoscx_configure_l3_interfaces: true  # includes loopback interfaces
 aoscx_configure_stp: true            # docs/STP_CONFIGURATION.md
 aoscx_configure_port_access: true    # skipped without a port_access config_context
+aoscx_configure_ubt: true            # skipped without a ubt config_context (UBT_CONFIGURATION.md)
 aoscx_force_l2_config: false         # push all L2 interfaces, bypassing change detection
 
 # Routing and overlay (also gated by device_* custom fields in NetBox)
@@ -767,6 +768,7 @@ applies to tags entered in a Semaphore UI task template.
 - `interfaces`, `lag_interfaces`, `mclag_interfaces`, `lag_assignment` - LAG member assignment
 - `interfaces`, `l2_interfaces`, `layer2` - L2 interface configuration (access/trunk)
 - `interfaces`, `l3_interfaces`, `layer3` - L3 interface configuration (IP addresses, including loopbacks)
+- `ubt`, `port_access`, `layer2` - UBT client VLAN and zones
 - `port_access`, `device_profile`, `layer2` - Port-access role/device-profile configuration
 - `evpn`, `overlay` - EVPN configuration
 - `vxlan`, `overlay` - VXLAN configuration

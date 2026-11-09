@@ -30,6 +30,9 @@
            poe_priority: low|high|critical
            trust_mode: dscp|cos|none
            associate_policy: <policy-name>  # optional
+           auth_mode: client-mode           # optional (alias: auth-mode)
+           gateway_zone: <ubt-zone-name>    # optional, UBT (see ubt.j2)
+           gateway_role: <controller-role>  # optional, defaults to role name
            vlan_trunk_native: <int|str>
            vlan_trunk_allowed: <int|str>   # supports "11", "11,13", "11-13"
            vlan_access: <int|str>
@@ -82,6 +85,13 @@ port-access role {{ role.name }}
 {%   endif %}
 {%   if role.associate_policy is defined %}
     associate policy {{ role.associate_policy }}
+{%   endif %}
+{%   set auth_mode = role.auth_mode | default(role['auth-mode'] | default(none)) %}
+{%   if auth_mode %}
+    auth-mode {{ auth_mode }}
+{%   endif %}
+{%   if role.gateway_zone is defined %}
+    gateway-zone zone {{ role.gateway_zone }} gateway-role {{ role.gateway_role | default(role.name) }}
 {%   endif %}
 {%   if role.poe_priority is defined %}
     poe-priority {{ role.poe_priority }}

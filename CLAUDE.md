@@ -85,7 +85,7 @@ Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
    lag_members / lag_removals / no_changes). Required by all interface tasks.
 9. Interfaces: physical (interface split runs first inside this step) →
    LAG → MCLAG → assign-to-LAG (including LAG removals) → L2 → STP →
-   port-access → port-access cleanup (idempotent mode) → virtual-interface
+   UBT → port-access → port-access cleanup (idempotent mode) → virtual-interface
    cleanup (idempotent mode, `aoscx_cleanup_virtual_interfaces`) → L3.
    Virtual-interface cleanup deliberately runs **before** L3: a stale SVI,
    loopback or sub-interface can hold the IP its NetBox replacement needs,
@@ -138,7 +138,8 @@ Existing dependency chains to preserve:
 | VSX               | MCLAG, ISL/keepalive interfaces                             |
 | Interface split   | Runs first in the physical step; children exist only after `split` |
 | STP (per-interface) | L2 interfaces                                             |
-| Port-access       | VLANs, L2 interfaces                                        |
+| UBT (`ubt` zones) | VRFs (zone VRF); must precede port-access                   |
+| Port-access       | VLANs, L2 interfaces, UBT (roles with `gateway_zone`)       |
 | Port-access cleanup | Port-access configuration (idempotent mode)               |
 | Virtual-interface cleanup | Interface facts from the first gather; must precede L3 interfaces |
 | Access-switch default gateway | Default VRF only (base-system block)           |
@@ -297,6 +298,7 @@ Update the relevant topic page when you touch its area:
 | EVPN / VXLAN                                  | [docs/EVPN_VXLAN_CONFIGURATION.md](docs/EVPN_VXLAN_CONFIGURATION.md)                         |
 | STP                                           | [docs/STP_CONFIGURATION.md](docs/STP_CONFIGURATION.md)                                       |
 | Port-access (device-profile)                  | [docs/PORT_ACCESS_CONFIGURATION.md](docs/PORT_ACCESS_CONFIGURATION.md)                       |
+| UBT (user-based tunneling)                    | [docs/UBT_CONFIGURATION.md](docs/UBT_CONFIGURATION.md)                                       |
 | VSX                                           | [docs/VSX_CONFIGURATION.md](docs/VSX_CONFIGURATION.md)                                       |
 | SNMP                                          | [docs/SNMP_CONFIGURATION.md](docs/SNMP_CONFIGURATION.md)                                     |
 | HPE Aruba Networking Central                  | [docs/CENTRAL_CONFIGURATION.md](docs/CENTRAL_CONFIGURATION.md)                               |
