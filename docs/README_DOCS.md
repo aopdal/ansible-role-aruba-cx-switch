@@ -145,6 +145,9 @@ See **[DOCUMENTATION_SITE.md](DOCUMENTATION_SITE.md)** for how the site is built
 - **[PORT_ACCESS_CONFIGURATION.md](PORT_ACCESS_CONFIGURATION.md)** -
   LLDP-group / role / device-profile modelling, change detection, and
   cleanup. Notes that `mac_groups` support is not yet implemented.
+- **[UBT_CONFIGURATION.md](UBT_CONFIGURATION.md)** - User-based tunneling:
+  UBT client VLAN, UBT zones and the `gateway-zone` link on port-access
+  roles.
 
 ### VSX
 

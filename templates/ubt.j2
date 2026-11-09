@@ -1,0 +1,43 @@
+{# ============================================================================
+   User-Based Tunneling (UBT)
+
+   Renders the UBT client VLAN and zones from the `ubt` config_context dict
+   (NetBox). Port-access roles reference a zone with gateway_zone /
+   gateway_role (see port_access.j2), so this is rendered before it.
+
+   Expected schema (top-level `ubt` key from config_context):
+
+     ubt:
+       client_vlan: <int>                  # optional
+       zones:
+         - name: <str>
+           vrf: <str>                      # default "default"
+           primary_controller: <ip>
+           backup_controller: <ip>         # optional
+           enable: true|false              # default true
+           extra_lines: [<str>, ...]       # optional, verbatim
+============================================================================ #}
+{% if ubt is defined and ubt | length > 0 %}
+!
+{%   if ubt.client_vlan is defined %}
+ubt-client-vlan {{ ubt.client_vlan }}
+{%   endif %}
+{%   for zone in ubt.zones | default([]) %}
+ubt zone {{ zone.name }} vrf {{ zone.vrf | default('default') }}
+{%     if zone.primary_controller is defined %}
+    primary-controller ip {{ zone.primary_controller }}
+{%     endif %}
+{%     if zone.backup_controller is defined %}
+    backup-controller ip {{ zone.backup_controller }}
+{%     endif %}
+{%     for line in zone.extra_lines | default([]) %}
+    {{ line }}
+{%     endfor %}
+{%     if zone.enable | default(true) | bool %}
+    enable
+{%     else %}
+    no enable
+{%     endif %}
+!
+{%   endfor %}
+{% endif %}

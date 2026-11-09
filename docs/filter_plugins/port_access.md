@@ -71,20 +71,28 @@ lldp-group → role → device-profile; cleanup runs the reverse order.
 
 ## Filters
 
-### 1. `port_access_facts_from_device_profiles(profiles_payload)`
+### 1. `port_access_facts_from_device_profiles(profiles_payload, roles_payload)`
 
 #### Purpose
 
-`GET /system/device_profiles?depth=4` returns each profile with its
+`GET /system/device_profiles?depth=5` returns each profile with its
 associated `role` and `lldp_groups` nested inline — one REST call covers
 every object kind, instead of three separate ones. But that nested shape
 isn't directly comparable to the flat, per-object-kind NetBox structure
 above. This filter merges the nested dicts up to the top level so
 `port_access_diff` can compare like-for-like.
 
+Roles that no device-profile references (user roles assigned by
+ClearPass/RADIUS) are missing from that response, so the optional
+`roles_payload` (`GET /system/port_access_roles`) adds them. Only roles
+with `origin: local` (or no `origin`) are kept — `downloaded` and
+`radius` roles are created by the switch at runtime and must never be
+diffed or cleaned up.
+
 #### Parameters
 
 - **profiles_payload** (dict): Keyed by profile name, e.g. `{"LAB-SW": {"role": {"LAB-SW01": {...}}, "lldp_groups": {"AP-group": {...}}, ...}, ...}`. `None`/non-dict/empty input returns empty sub-dicts.
+- **roles_payload** (dict, optional): `/system/port_access_roles` response keyed by role name. Non-local roles are skipped; a role here replaces the copy nested in a profile.
 
 #### Returns
 
@@ -96,18 +104,28 @@ above. This filter merges the nested dicts up to the top level so
 # tasks/gather_facts_rest_api.yml
 - name: Query port-access device-profiles via REST API
   ansible.builtin.uri:
-    url: "https://{{ ansible_host }}/rest/v10.16/system/device_profiles?depth=4"
+    url: "https://{{ ansible_host }}/rest/v10.16/system/device_profiles?depth=5"
     headers:
       Cookie: "{{ login_cookie }}"
     validate_certs: false
   register: _rest_port_access_profiles
   when: (port_access | default({})) | length > 0
 
+- name: Query port-access roles via REST API
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}/rest/v10.16/system/port_access_roles?depth=2"
+    headers:
+      Cookie: "{{ login_cookie }}"
+    validate_certs: false
+  register: _rest_port_access_roles
+  when: (port_access | default({})) | length > 0
+
 - name: Build aoscx_port_access_facts
   ansible.builtin.set_fact:
     aoscx_port_access_facts: >-
       {{ (_rest_port_access_profiles.json | default({}))
-         | port_access_facts_from_device_profiles }}
+         | port_access_facts_from_device_profiles(
+             _rest_port_access_roles.json | default({})) }}
   when: _rest_port_access_profiles is defined
 ```
 

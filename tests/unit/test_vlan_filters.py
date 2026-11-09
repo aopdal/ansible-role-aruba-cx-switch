@@ -288,6 +288,35 @@ class TestGetVlansNeedingChanges:
         assert 99 in result["vlans_to_delete"]
         assert 1 not in result["vlans_to_delete"]
 
+    def test_reserved_vid_never_deleted(self):
+        """A reserved VLAN (e.g. ubt-client-vlan) is never cleaned up"""
+        vlans = get_sample_vlans()
+        vlans_in_use = {"vids": [10]}
+        ansible_facts = {
+            "ansible_network_resources": {
+                "vlans": {"10": {}, "99": {}, "4000": {}}
+            }
+        }
+        result = get_vlans_needing_changes(
+            vlans, vlans_in_use, ansible_facts, [4000]
+        )
+        assert result["vlans_to_delete"] == [99]
+
+    def test_reserved_vid_never_created(self):
+        """A reserved VLAN in use and in NetBox is still not created"""
+        vlans = get_sample_vlans() + [{"vid": 4000, "name": "UBT"}]
+        vlans_in_use = {"vids": [10, 4000]}
+        result = get_vlans_needing_changes(vlans, vlans_in_use, {}, ["4000"])
+        assert [v["vid"] for v in result["vlans_to_create"]] == [10]
+
+    def test_reserved_vid_invalid_values_ignored(self):
+        vlans = get_sample_vlans()
+        vlans_in_use = {"vids": [10]}
+        result = get_vlans_needing_changes(
+            vlans, vlans_in_use, {}, [None, "abc"]
+        )
+        assert [v["vid"] for v in result["vlans_to_create"]] == [10]
+
     def test_vlans_needing_changes_skip_vlan_1(self):
         """Test that VLAN 1 is never marked for deletion"""
         vlans = []

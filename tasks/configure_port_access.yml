@@ -31,6 +31,10 @@
 #         poe_priority: high
 #         trust_mode: dscp
 #         associate_policy: AP-policy   # optional
+#         auth_mode: client-mode        # optional: client-mode | device-mode |
+#                                       # multi-domain (alias: auth-mode)
+#         gateway_zone: UBT-Zone        # optional: UBT zone (see configure_ubt.yml)
+#         gateway_role: Pod5-IoT        # optional: defaults to the role name
 #         vlan_trunk_native: 11
 #         vlan_trunk_allowed: "11-13"
 #         extra_lines:           # optional: raw CLI lines appended verbatim

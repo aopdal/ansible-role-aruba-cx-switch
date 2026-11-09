@@ -338,7 +338,7 @@ filter_plugins/
     ├── interface_orphans.py             # Orphaned virtual interface (SVI/loopback/sub-if) cleanup (56 lines)
     ├── comparison.py                    # State comparison (291 lines)
     ├── ospf_filters.py                  # OSPF operations (438 lines)
-    ├── port_access.py                   # Port-access (device-profile) idempotency (355 lines)
+    ├── port_access.py                   # Port-access (device-profile) idempotency (492 lines)
     ├── port_access_orphans.py           # Orphaned port-access object cleanup (36 lines)
     ├── static_route_filters.py          # Static route change detection (136 lines)
     ├── stp.py                           # Global + per-interface STP change detection (134 lines)
@@ -511,9 +511,10 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
       reverse ranges normalised; out-of-range and non-numeric tokens skipped.
     - Returns: Sorted list of unique VLAN IDs (1-4094)
 
-- **`get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None)`**
+- **`get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None, reserved_vids=None)`**
     - Determine which VLANs need to be added or removed
     - Compares NetBox with current device state
+    - `reserved_vids` (e.g. the UBT client VLAN) are never created or deleted
     - Returns: Dict with `vlans_to_create` and `vlans_to_delete` lists
 
 - **`parse_evpn_evi_output(output)`**
@@ -782,14 +783,16 @@ BGP session enrichment and config-building against the NetBox BGP plugin
 ### `port_access.py` - Port-Access Diff
 
 Idempotency comparison for port-access (device-profile) configuration
-(2 filters, 355 lines):
+(2 filters, 492 lines):
 
-- **`port_access_facts_from_device_profiles(profiles_payload)`**
-    - Flattens the `/system/device_profiles?depth=4` REST payload (which
+- **`port_access_facts_from_device_profiles(profiles_payload, roles_payload=None)`**
+    - Flattens the `/system/device_profiles?depth=5` REST payload (which
       nests each profile's `role` and `lldp_groups` inline) into the
       `aoscx_port_access_facts` shape expected by `port_access_diff` —
       `{device_profiles, roles, lldp_groups}`, each a flat dict keyed by
       object name
+    - Optional `roles_payload` (`/system/port_access_roles`) adds roles no
+      profile references (user roles); only `origin: local` roles are kept
     - Returns: Dict with keys `device_profiles`, `roles`, `lldp_groups`
 
 - **`port_access_diff(desired, current)`**

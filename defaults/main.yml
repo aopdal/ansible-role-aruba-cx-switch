@@ -90,6 +90,14 @@ aoscx_central_monitor_tag: hpe-anw-central-mon
 # stay enabled globally.
 aoscx_configure_port_access: true
 
+# User-Based Tunneling (UBT) feature.
+# Renders `ubt-client-vlan` and `ubt zone` blocks from the `ubt`
+# config_context dict (NetBox). Auto-skipped when the device has no `ubt`
+# key in its config_context, so this can stay enabled globally. Port-access
+# roles tunnel clients to a zone via `gateway_zone` / `gateway_role`.
+# See docs/UBT_CONFIGURATION.md.
+aoscx_configure_ubt: true
+
 # Idempotency mode - when true, removes configs not in NetBox
 aoscx_idempotent_mode: false
 

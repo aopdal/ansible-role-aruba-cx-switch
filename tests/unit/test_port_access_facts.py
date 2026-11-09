@@ -181,3 +181,174 @@ def test_diff_lldp_sys_desc_match_via_system_description_key():
     facts = port_access_facts_from_device_profiles(payload)
     diff = port_access_diff(desired, facts)
     assert diff["lldp_groups"] == []
+
+
+# ---------------------------------------------------------------------------
+# User roles from /system/port_access_roles (no device-profile reference)
+# ---------------------------------------------------------------------------
+
+# Trimmed /system/port_access_roles?depth=2 response: one profile role,
+# one local user role, one ClearPass-downloaded and one RADIUS role.
+ROLES_PAYLOAD = {
+    "Lab-IAP-role": {
+        "name": "Lab-IAP-role",
+        "origin": "local",
+        "description": "Aruba IAP",
+        "qos_trust_mode": "dscp",
+        "vlan_mode": "native-untagged",
+        "vlan_tag": "/rest/v10.09/system/vlans/11",
+        "vlan_trunks": [
+            "/rest/v10.09/system/vlans/11",
+            "/rest/v10.09/system/vlans/12",
+            "/rest/v10.09/system/vlans/13",
+        ],
+    },
+    "Pod5-Ansatt": {
+        "name": "Pod5-Ansatt",
+        "origin": "local",
+        "description": "Pod5-Ansatt",
+        "auth_mode": "client-mode",
+        "in_policy": "/rest/v10.09/system/port_access_policies/sys_policy_pap_Pod5-Ansatt",
+        "vlan_mode": "access",
+        "vlan_tag": {"id": 10, "name": "VLAN10"},
+        "vlan_trunks": [],
+    },
+    "cppm-guest-3001-1": {"name": "cppm-guest-3001-1", "origin": "downloaded"},
+    "radius-Ansatt": {"name": "radius-Ansatt", "origin": "radius"},
+}
+
+USER_ROLE_DESIRED = {
+    "roles": [
+        {
+            "name": "Pod5-Ansatt",
+            "description": "Pod5-Ansatt",
+            "associate_policy": "sys_policy_pap_Pod5-Ansatt",
+            "auth_mode": "client-mode",
+            "vlan_access": 10,
+        }
+    ],
+}
+
+
+def test_roles_payload_adds_user_roles():
+    facts = port_access_facts_from_device_profiles(DEPTH5_PAYLOAD, ROLES_PAYLOAD)
+    assert "Pod5-Ansatt" in facts["roles"]
+    # Profile roles are still present.
+    assert {"LAB-SW01", "Lab-IAP-role"} <= set(facts["roles"])
+
+
+def test_roles_payload_skips_downloaded_and_radius_roles():
+    facts = port_access_facts_from_device_profiles(DEPTH5_PAYLOAD, ROLES_PAYLOAD)
+    assert "cppm-guest-3001-1" not in facts["roles"]
+    assert "radius-Ansatt" not in facts["roles"]
+
+
+def test_roles_payload_without_origin_is_kept():
+    facts = port_access_facts_from_device_profiles({}, {"r1": {"name": "r1"}})
+    assert set(facts["roles"]) == {"r1"}
+
+
+def test_roles_payload_only():
+    facts = port_access_facts_from_device_profiles(None, ROLES_PAYLOAD)
+    assert facts["device_profiles"] == {}
+    assert set(facts["roles"]) == {"Lab-IAP-role", "Pod5-Ansatt"}
+
+
+def test_roles_payload_bad_shapes_ignored():
+    facts = port_access_facts_from_device_profiles(
+        DEPTH5_PAYLOAD, {"bad": "string", "also": None}
+    )
+    assert set(facts["roles"]) == {"LAB-SW01", "Lab-IAP-role"}
+    assert port_access_facts_from_device_profiles(DEPTH5_PAYLOAD, "nope")[
+        "roles"
+    ] == port_access_facts_from_device_profiles(DEPTH5_PAYLOAD)["roles"]
+
+
+def test_user_role_steady_state_is_idempotent():
+    facts = port_access_facts_from_device_profiles({}, ROLES_PAYLOAD)
+    assert port_access_diff(USER_ROLE_DESIRED, facts)["roles"] == []
+
+
+def test_user_role_vlan_change_detected():
+    facts = port_access_facts_from_device_profiles({}, ROLES_PAYLOAD)
+    desired = {"roles": [{**USER_ROLE_DESIRED["roles"][0], "vlan_access": 20}]}
+    assert [r["name"] for r in port_access_diff(desired, facts)["roles"]] == [
+        "Pod5-Ansatt"
+    ]
+
+
+def test_uri_vlan_references_compare_equal():
+    """vlan_tag / vlan_trunks as REST URIs compare like plain ints."""
+    facts = port_access_facts_from_device_profiles({}, ROLES_PAYLOAD)
+    desired = {
+        "roles": [
+            {
+                "name": "Lab-IAP-role",
+                "description": "Aruba IAP",
+                "trust_mode": "dscp",
+                "vlan_trunk_native": 11,
+                "vlan_trunk_allowed": "11-13",
+            }
+        ]
+    }
+    assert port_access_diff(desired, facts)["roles"] == []
+
+
+def test_keyed_vlan_trunks_compare_equal():
+    """vlan_trunks expanded as a dict keyed by VLAN ID."""
+    role = {
+        **ROLES_PAYLOAD["Lab-IAP-role"],
+        "vlan_tag": 11,
+        "vlan_trunks": {"11": {"id": 11}, "12": {"id": 12}, "13": {"id": 13}},
+    }
+    facts = port_access_facts_from_device_profiles({}, {"Lab-IAP-role": role})
+    desired = {
+        "roles": [
+            {
+                "name": "Lab-IAP-role",
+                "description": "Aruba IAP",
+                "trust_mode": "dscp",
+                "vlan_trunk_native": 11,
+                "vlan_trunk_allowed": "11-13",
+            }
+        ]
+    }
+    assert port_access_diff(desired, facts)["roles"] == []
+
+
+def test_lab_stack_user_role_real_payload_is_idempotent():
+    """Real lab-stack (6200F, 10.16) /system/port_access_roles?depth=2 shape.
+
+    in_policy comes back as a single-entry dict keyed by policy name,
+    vlan_tag as a plain int; the role is referenced by no device-profile.
+    """
+    roles_payload = {
+        "AO-Ansatt-role": {
+            "auth_mode": "client-mode",
+            "description": None,
+            "in_policy": {
+                "AO-Ansatt-policy": (
+                    "/rest/v10.16/system/port_access_policies/AO-Ansatt-policy"
+                )
+            },
+            "name": "AO-Ansatt-role",
+            "origin": "local",
+            "poe_priority": None,
+            "qos_trust_mode": None,
+            "vlan_mode": "access",
+            "vlan_tag": 102,
+            "vlan_trunks": [],
+        }
+    }
+    desired = {
+        "roles": [
+            {
+                "associate_policy": "AO-Ansatt-policy",
+                "auth-mode": "client-mode",
+                "name": "AO-Ansatt-role",
+                "vlan_access": 102,
+            }
+        ]
+    }
+    facts = port_access_facts_from_device_profiles({}, roles_payload)
+    assert port_access_diff(desired, facts)["roles"] == []

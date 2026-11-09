@@ -431,3 +431,115 @@ class TestRoleAssociatePolicy:
         current = {**CURRENT_MATCHING, "roles": {"LAB-SW01": current_role}}
         result = port_access_diff(DESIRED_FULL, current)
         assert result["roles"] == []
+
+
+# ---------------------------------------------------------------------------
+# Role auth_mode (optional, REST: auth_mode)
+# ---------------------------------------------------------------------------
+
+
+def _with_auth_mode(desired_fields, current_auth_mode):
+    desired = {
+        **DESIRED_FULL,
+        "roles": [{**DESIRED_FULL["roles"][0], **desired_fields}],
+    }
+    current_role = dict(CURRENT_MATCHING["roles"]["LAB-SW01"])
+    if current_auth_mode is not None:
+        current_role["auth_mode"] = current_auth_mode
+    current = {**CURRENT_MATCHING, "roles": {"LAB-SW01": current_role}}
+    return port_access_diff(desired, current)
+
+
+class TestRoleAuthMode:
+    @pytest.mark.parametrize("key", ["auth_mode", "auth-mode"])
+    def test_auth_mode_matches(self, key):
+        result = _with_auth_mode({key: "client-mode"}, "client-mode")
+        assert result["roles"] == []
+
+    @pytest.mark.parametrize("key", ["auth_mode", "auth-mode"])
+    def test_auth_mode_missing_on_device_pushes_role(self, key):
+        result = _with_auth_mode({key: "client-mode"}, None)
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_auth_mode_differs_pushes_role(self):
+        result = _with_auth_mode({"auth_mode": "client-mode"}, "device-mode")
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_underscore_key_wins_over_alias(self):
+        result = _with_auth_mode(
+            {"auth_mode": "client-mode", "auth-mode": "device-mode"}, "client-mode"
+        )
+        assert result["roles"] == []
+
+    def test_no_auth_mode_in_netbox_ignores_device_value(self):
+        """Roles without auth_mode stay idempotent (backward compatible)."""
+        result = _with_auth_mode({}, "device-mode")
+        assert result["roles"] == []
+
+
+# ---------------------------------------------------------------------------
+# Role gateway_zone / gateway_role (UBT)
+# ---------------------------------------------------------------------------
+
+
+def _with_gateway(desired_fields, current_fields):
+    desired = {
+        **DESIRED_FULL,
+        "roles": [{**DESIRED_FULL["roles"][0], **desired_fields}],
+    }
+    current_role = {**CURRENT_MATCHING["roles"]["LAB-SW01"], **current_fields}
+    current = {**CURRENT_MATCHING, "roles": {"LAB-SW01": current_role}}
+    return port_access_diff(desired, current)
+
+
+class TestRoleGatewayZone:
+    @pytest.mark.parametrize(
+        "gateway_zone",
+        [
+            "UBT-Zone",
+            "/rest/v10.16/system/ubt_zones/UBT-Zone,default",
+            {"UBT-Zone,default": "/rest/v10.16/system/ubt_zones/UBT-Zone,default"},
+            {"name": "UBT-Zone", "vrf": "default"},
+        ],
+        ids=["name", "uri-with-vrf", "keyed", "expanded"],
+    )
+    def test_gateway_matches_in_any_rest_shape(self, gateway_zone):
+        result = _with_gateway(
+            {"gateway_zone": "UBT-Zone", "gateway_role": "Pod5-IoT"},
+            {"gateway_zone": gateway_zone, "ubt_gateway_role": "Pod5-IoT"},
+        )
+        assert result["roles"] == []
+
+    def test_gateway_role_defaults_to_role_name(self):
+        result = _with_gateway(
+            {"gateway_zone": "UBT-Zone"},
+            {"gateway_zone": "UBT-Zone", "ubt_gateway_role": "LAB-SW01"},
+        )
+        assert result["roles"] == []
+
+    def test_gateway_missing_on_device_pushes_role(self):
+        result = _with_gateway(
+            {"gateway_zone": "UBT-Zone"},
+            {"gateway_zone": None, "ubt_gateway_role": None},
+        )
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_gateway_role_differs_pushes_role(self):
+        result = _with_gateway(
+            {"gateway_zone": "UBT-Zone", "gateway_role": "new"},
+            {"gateway_zone": "UBT-Zone", "ubt_gateway_role": "old"},
+        )
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_gateway_zone_differs_pushes_role(self):
+        result = _with_gateway(
+            {"gateway_zone": "Zone-B"},
+            {"gateway_zone": "UBT-Zone", "ubt_gateway_role": "LAB-SW01"},
+        )
+        assert [r["name"] for r in result["roles"]] == ["LAB-SW01"]
+
+    def test_no_gateway_in_netbox_ignores_device_value(self):
+        result = _with_gateway(
+            {}, {"gateway_zone": "UBT-Zone", "ubt_gateway_role": "x"}
+        )
+        assert result["roles"] == []

@@ -457,7 +457,7 @@ protected from deletion in idempotent mode.
 
 ---
 
-### 6. `get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None)`
+### 6. `get_vlans_needing_changes(device_vlans, vlans_in_use_dict, device_facts=None, reserved_vids=None)`
 
 Determines which VLANs need to be added or removed by comparing NetBox with device state.
 
@@ -473,6 +473,7 @@ Idempotent VLAN management - only create or delete VLANs when necessary. Compare
 - **device_vlans** (list): List of VLAN objects available for this device from NetBox
 - **vlans_in_use_dict** (dict): Dict from `get_vlans_in_use()` with `vids` and `vlans` keys
 - **device_facts** (dict, optional): Device facts from `ansible_facts` for current state
+- **reserved_vids** (list, optional): VLAN IDs owned by another feature (the UBT client VLAN). They are never created and never deleted
 
 #### Returns
 

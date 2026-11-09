@@ -716,6 +716,27 @@ Ansible access: `port_access`, `port_access.roles`,
 > from NetBox the role will log a warning during VLAN change identification:
 > `VLAN X is in use but not available in NetBox for this device!`
 
+### UBT Config Context
+
+User-based tunneling is defined under a top-level `ubt` key; port-access
+roles reference a zone with `gateway_zone` / `gateway_role`. See
+[UBT_CONFIGURATION.md](UBT_CONFIGURATION.md) for the full schema.
+
+```json
+{
+  "ubt": {
+    "client_vlan": 4000,
+    "zones": [
+      {"name": "UBT-Zone", "vrf": "default", "primary_controller": "192.168.1.1"}
+    ]
+  }
+}
+```
+
+Ansible access: `ubt`, `ubt.client_vlan`, `ubt.zones`. The `client_vlan`
+VID is reserved for UBT and is never created or cleaned up as a regular
+VLAN.
+
 ### Static Routes Config Context
 
 Static routes are defined under a top-level `static_routes` key,

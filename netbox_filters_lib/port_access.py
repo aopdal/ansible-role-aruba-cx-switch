@@ -13,9 +13,10 @@ Public filters:
   containing the list of *desired* objects that differ from the device
   (or are missing from it). Items already matching the device are
   filtered out so the configure tasks skip them entirely.
-- ``port_access_facts_from_device_profiles(profiles)`` -> flatten a
-  single ``/system/device_profiles?depth=4`` REST response into the
-  facts shape expected by ``port_access_diff``.
+- ``port_access_facts_from_device_profiles(profiles, roles=None)`` ->
+  flatten the ``/system/device_profiles?depth=5`` REST response (plus,
+  optionally, ``/system/port_access_roles``) into the facts shape
+  expected by ``port_access_diff``.
 
 Design notes:
 - Pure function. No I/O, no global state.
@@ -54,6 +55,38 @@ def _norm_int(value):
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _vlan_id(ref):
+    """
+    Return the VLAN ID from a REST VLAN reference, or None.
+
+    Accepts the shapes AOS-CX uses depending on query depth: a plain int
+    (or numeric string), a URI string (``/rest/v10.xx/system/vlans/11``),
+    an expanded VLAN object (dict with ``id``) or a single-entry dict
+    keyed by the VLAN ID.
+    """
+    value = _norm_int(ref)
+    if value is not None:
+        return value
+    if isinstance(ref, dict) and "id" in ref:
+        return _norm_int(ref["id"])
+    return _norm_int(_ref_name(ref))
+
+
+def _vlan_id_set(refs):
+    """
+    Return the set of VLAN IDs in a REST ``vlan_trunks`` value, or None.
+
+    A list holds one reference per VLAN; a dict (expanded form) is keyed
+    by VLAN ID. Any other shape returns None so the caller can treat the
+    comparison as failed ("if in doubt, push").
+    """
+    if isinstance(refs, dict):
+        refs = list(refs)
+    if not isinstance(refs, list):
+        return None
+    return {v for v in (_vlan_id(x) for x in refs) if v is not None}
 
 
 def _ref_name(ref):
@@ -146,6 +179,45 @@ def _entries_match_set(entries):
 # ---------------------------------------------------------------------------
 
 
+def _role_auth_mode(role):
+    """
+    Return a role's desired ``auth_mode``, or None when unset.
+
+    ``auth-mode`` (the CLI keyword) is accepted as an alias so contexts
+    written with the CLI spelling work too; ``auth_mode`` wins if both
+    are given.
+    """
+    value = role.get("auth_mode")
+    if value in (None, ""):
+        value = role.get("auth-mode")
+    return value if value not in (None, "") else None
+
+
+def _role_gateway(role):
+    """
+    Return a role's desired UBT ``(gateway_zone, gateway_role)``, or None.
+
+    ``gateway_role`` defaults to the role's own name, matching the common
+    setup where the controller-side role has the same name as the switch
+    role.
+    """
+    zone = role.get("gateway_zone")
+    if zone in (None, ""):
+        return None
+    return (_norm_str(zone), _norm_str(role.get("gateway_role") or role.get("name")))
+
+
+def _zone_name(ref):
+    """
+    Return the UBT zone name from a role's REST ``gateway_zone`` value.
+
+    Zones are keyed per VRF, so a reference can carry a ``<name>,<vrf>``
+    key; only the name part is compared.
+    """
+    name = _ref_name(ref)
+    return name.split(",", 1)[0] if name else None
+
+
 def _lldp_group_matches(desired, current):
     """Return True when device LLDP group entry-set equals desired."""
     if not isinstance(current, dict):
@@ -169,6 +241,10 @@ def _role_matches(desired, current):
     - vlan_trunk_allowed -> expanded into a set, compared to vlan_trunks
     - associate_policy (REST: in_policy) - only when set in NetBox, so
       roles without a policy never diff on it
+    - auth_mode (alias ``auth-mode``) - only when set in NetBox; an
+      unset role inherits the port's auth-mode on the device
+    - gateway_zone / gateway_role (REST: gateway_zone / ubt_gateway_role)
+      - only when gateway_zone is set in NetBox
 
     Roles with ``extra_lines`` always return False (force push) because
     arbitrary CLI lines cannot be compared against REST API fields.
@@ -184,16 +260,24 @@ def _role_matches(desired, current):
     ):
         return False
 
+    desired_auth_mode = _role_auth_mode(desired)
+    if desired_auth_mode and _norm_str(desired_auth_mode) != _norm_str(
+        current.get("auth_mode")
+    ):
+        return False
+
+    desired_gateway = _role_gateway(desired)
+    if desired_gateway and desired_gateway != (
+        _norm_str(_zone_name(current.get("gateway_zone"))),
+        _norm_str(current.get("ubt_gateway_role")),
+    ):
+        return False
+
     desired_native = _norm_int(desired.get("vlan_trunk_native"))
     desired_access = _norm_int(desired.get("vlan_access"))
-    current_vlan_tag = _norm_int(current.get("vlan_tag"))
-    current_trunks_raw = current.get("vlan_trunks") or []
+    current_vlan_tag = _vlan_id(current.get("vlan_tag"))
     desired_trunks = set(parse_vlan_id_spec(desired.get("vlan_trunk_allowed")))
-    current_trunks = (
-        {v for v in (_norm_int(x) for x in current_trunks_raw) if v is not None}
-        if isinstance(current_trunks_raw, list)
-        else None
-    )
+    current_trunks = _vlan_id_set(current.get("vlan_trunks") or [])
 
     return (
         _norm_str(desired.get("description")) == _norm_str(current.get("description"))
@@ -339,46 +423,70 @@ def port_access_diff(desired, current):
     return out
 
 
-def port_access_facts_from_device_profiles(profiles_payload):
+# Role origins (REST ``origin``) that are not configured locally. Roles
+# downloaded from ClearPass or translated from RADIUS attributes are created
+# by the switch itself at runtime, so they are never compared against NetBox
+# and never offered to cleanup.
+_UNMANAGED_ROLE_ORIGINS = ("downloaded", "radius")
+
+
+def port_access_facts_from_device_profiles(profiles_payload, roles_payload=None):
     """
-    Flatten ``/system/device_profiles?depth=4`` REST payload into the
+    Flatten ``/system/device_profiles?depth=5`` REST payload into the
     ``aoscx_port_access_facts`` shape expected by ``port_access_diff``.
 
-    The depth=4 response nests each profile's ``role`` and ``lldp_groups``
-    inline, so a single REST call is enough to compare every object kind.
-    This filter merges those nested dicts up to the top level.
+    The depth=5 response nests each profile's ``role`` and ``lldp_groups``
+    inline, so a single REST call is enough to compare every object kind
+    a device-profile references. This filter merges those nested dicts up
+    to the top level.
+
+    Roles that no device-profile references (user roles, assigned by
+    ClearPass/RADIUS after authentication) only show up in
+    ``/system/port_access_roles``; pass that response as
+    ``roles_payload`` to include them.
 
     Args:
         profiles_payload: dict keyed by profile name, e.g.
             ``{"LAB-SW": {"role": {"LAB-SW01": {...}},
                           "lldp_groups": {"AP-group": {...}}, ...}, ...}``.
             ``None`` / non-dict / empty inputs return empty sub-dicts.
+        roles_payload: optional dict keyed by role name from
+            ``/system/port_access_roles``. Only roles whose ``origin`` is
+            ``local`` (or not reported) are kept; ``downloaded`` and
+            ``radius`` roles are skipped.
 
     Returns:
         dict with keys ``device_profiles``, ``roles``, ``lldp_groups``.
         Each value is a flat dict keyed by object name. If the same
         role/group name appears under multiple profiles the last one wins
-        (the device guarantees uniqueness, so this is just a defensive merge).
+        (the device guarantees uniqueness, so this is just a defensive
+        merge); a role in ``roles_payload`` replaces the profile copy.
     """
     out = {
         "device_profiles": {},
         "roles": {},
         "lldp_groups": {},
     }
-    if not isinstance(profiles_payload, dict):
-        return out
+    if isinstance(profiles_payload, dict):
+        out["device_profiles"] = profiles_payload
 
-    out["device_profiles"] = profiles_payload
+        for profile in profiles_payload.values():
+            if not isinstance(profile, dict):
+                continue
+            for src_key, dst_key in (
+                ("role", "roles"),
+                ("lldp_groups", "lldp_groups"),
+            ):
+                sub = profile.get(src_key)
+                if isinstance(sub, dict):
+                    out[dst_key].update(sub)
 
-    for profile in profiles_payload.values():
-        if not isinstance(profile, dict):
-            continue
-        for src_key, dst_key in (
-            ("role", "roles"),
-            ("lldp_groups", "lldp_groups"),
-        ):
-            sub = profile.get(src_key)
-            if isinstance(sub, dict):
-                out[dst_key].update(sub)
+    if isinstance(roles_payload, dict):
+        for name, role in roles_payload.items():
+            if not isinstance(role, dict):
+                continue
+            if role.get("origin") in _UNMANAGED_ROLE_ORIGINS:
+                continue
+            out["roles"][name] = role
 
     return out
