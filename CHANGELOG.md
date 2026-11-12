@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- STP docs: `mstp_priority` is now documented as the AOS-CX priority step
+  `0`–`15` (multiplied by 4096 on the device), not a multiple of 4096. The
+  config_context example used `4096`, which the device rejects; it now uses `1`.
+
 ## [0.18.6] - 2026-11-09
 
 ### Added

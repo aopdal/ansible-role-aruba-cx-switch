@@ -34,7 +34,7 @@ Read from the device's config_context (not a custom field):
 |-----|------|---------|-------------|
 | `mstp_config_name` | String | — (required to enable global STP config) | `spanning-tree config-name <name>` |
 | `mstp_config_revision` | Integer | `0` (role default when unset) | `spanning-tree config-revision <n>` |
-| `mstp_priority` | Integer | `8` (role default when unset) | `spanning-tree priority <n>` |
+| `mstp_priority` | Integer `0`–`15` (step, not bridge priority) | `8` (role default when unset, = 32768) | `spanning-tree priority <n>` |
 
 **Global STP config is only pushed when `mstp_config_name` is defined** — an
 unset `mstp_config_name` means "don't touch global STP settings on this
@@ -44,9 +44,13 @@ region must share the same `mstp_config_name` and `mstp_config_revision`
 mismatched values put switches in different regions and break the shared
 spanning-tree topology across them.
 
-`mstp_priority` must be a multiple of 4096 (AOS-CX/802.1s requirement) —
-the role does not validate this; an invalid value will be rejected by the
-device at push time.
+`mstp_priority` is the AOS-CX priority **step** (`0`–`15`), not the raw
+802.1D/802.1s bridge priority. The switch multiplies it by 4096 to get the
+effective bridge priority, so `0` = 0 (most preferred root), `1` = 4096,
+`8` = 32768 (the 802.1D default), and `15` = 61440. Do not enter the bridge
+priority itself (e.g. `4096`). Lower values win the root election. The role
+does not validate the range, so the device rejects an out-of-range value
+when the config is pushed.
 
 ## Per-interface STP settings
 
@@ -78,7 +82,7 @@ toward the actual STP root.
 {
   "mstp_config_name": "DC1-REGION",
   "mstp_config_revision": 1,
-  "mstp_priority": 4096
+  "mstp_priority": 1
 }
 ```
 
