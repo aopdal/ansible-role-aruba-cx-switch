@@ -111,7 +111,7 @@ jobs:
           echo "✅ All required secrets are configured"
 
       - name: Deploy to server via rsync
-        uses: burnett01/rsync-deployments@9.0.2
+        uses: burnett01/rsync-deployments@9.0.3
         with:
           switches: -avz --delete --exclude='.git' --exclude='.DS_Store'
           path: site/
