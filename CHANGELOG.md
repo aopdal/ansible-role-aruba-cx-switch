@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nullroute`, which `get_static_route_changes` compared literally against
   `blackhole` from NetBox.
 
+### Changed
+
+- Docs: `aoscx_configure_vlans_all` is documented as not supported when
+  NetBox offers a device several VLANs with the same VID. The role still
+  resolves the duplicates to one VLAN per VID, but the catalog does not
+  decide which one is used.
+
 ## [0.18.7] - 2026-11-13
 
 ### Fixed

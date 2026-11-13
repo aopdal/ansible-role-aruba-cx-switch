@@ -63,6 +63,26 @@ networks to a different VID. Other devices are not affected - the check
 is per host, and the same two VLANs may each be used on different
 switches.
 
+#### Configure-all mode with duplicate VIDs: not supported
+
+`aoscx_configure_vlans_all: true` is not supported on a device that NetBox
+offers duplicate VIDs to. Configure-all promises that every VLAN in the
+device's NetBox catalog exists on the switch, and two VLAN objects with
+one VID cannot both exist. The role does not fail in this case: it still
+runs `resolve_duplicate_vlan_vids`, creates one VLAN per VID and logs the
+duplicate warning. But which object wins depends on interface references
+(or falls back to the lowest NetBox ID), not on the catalog, so the
+resulting name, IGMP and voice settings for that VID may not be the ones
+you intended.
+
+Fix the catalog before enabling configure-all on such a device: remove the
+duplicate, narrow the second VLAN group's scope, or exclude that group
+with `aoscx_configure_vlans_all_exclude_vlan_groups` (see
+[Excluding VLAN groups from configure-all](#excluding-vlan-groups-from-configure-all-aoscx_configure_vlans_all_exclude_vlan_groups)).
+Note that duplicates are resolved before the group exclusion, so the
+exclusion only helps when the kept VLAN is not in the excluded group; the
+reliable fix is in NetBox.
+
 #### Warnings for resolved duplicates
 
 The warning names the kept and ignored VLANs with their NetBox IDs and
@@ -91,6 +111,10 @@ NetBox returns for the device as "in use". This:
 
 Typical use: access/edge switches where the VLAN catalog should always
 match NetBox regardless of current port assignments.
+
+Configure-all is **not supported** when NetBox offers the device more than
+one VLAN with the same VID - see
+[Configure-all mode with duplicate VIDs](#configure-all-mode-with-duplicate-vids-not-supported).
 
 #### Excluding VLAN groups from configure-all (`aoscx_configure_vlans_all_exclude_vlan_groups`)
 

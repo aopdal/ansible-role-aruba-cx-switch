@@ -405,7 +405,8 @@ aoscx_cleanup_virtual_interfaces: true
 
 # Configure ALL NetBox-scoped VLANs on the device, regardless of whether
 # they are currently used by an interface or port-access role.
-# Useful for access/edge switches.
+# Useful for access/edge switches. Not supported when NetBox offers the
+# device several VLANs with the same VID (see VLAN change identification docs).
 aoscx_configure_vlans_all: false
 
 # NetBox VLAN group slugs to exclude from the aoscx_configure_vlans_all
