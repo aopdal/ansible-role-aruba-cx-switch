@@ -289,6 +289,110 @@ def filter_out_vlan_groups(vlans, group_slugs):
     return filtered
 
 
+def _vlan_summary(vlan):
+    """Compact, log-friendly view of a NetBox VLAN object."""
+    group = vlan.get("group")
+    return {
+        "id": vlan.get("id"),
+        "vid": vlan.get("vid"),
+        "name": vlan.get("name"),
+        "group": group.get("name") if isinstance(group, dict) else None,
+    }
+
+
+def _referenced_vlan_object_ids(interfaces):
+    """NetBox VLAN object IDs referenced by interface untagged/tagged VLANs."""
+    ids = set()
+    for intf in interfaces or []:
+        if not intf or not isinstance(intf, dict):
+            continue
+        refs = [intf.get("untagged_vlan")]
+        tagged = intf.get("tagged_vlans")
+        if isinstance(tagged, list):
+            refs.extend(tagged)
+        for ref in refs:
+            if isinstance(ref, dict) and ref.get("id") is not None:
+                ids.add(ref["id"])
+    return ids
+
+
+def resolve_duplicate_vlan_vids(vlans, interfaces=None):
+    """
+    Collapse NetBox VLANs that share a VID down to one object per VID.
+
+    A switch has one VLAN per VID, but NetBox's ``available_on_device``
+    query can return several VLAN objects with the same VID (e.g. a second
+    VLAN group scoped to the same site). Everything downstream keys VLANs by
+    VID, so duplicates make the role push whichever object comes last
+    (wrong name/IGMP/voice settings, and flapping on every run).
+
+    Resolution per duplicated VID, using the NetBox object IDs that the
+    device's interfaces reference (``untagged_vlan`` / ``tagged_vlans``):
+
+    - exactly one duplicate referenced -> keep it (``reason: referenced``)
+    - none referenced -> keep the lowest NetBox ID, so the choice is stable
+      across runs (``reason: unreferenced``)
+    - more than one referenced -> genuine conflict; reported in
+      ``conflicts`` (the caller is expected to fail). The lowest referenced
+      ID is kept so the output stays deterministic.
+
+    Args:
+        vlans: List of VLAN objects from NetBox.
+        interfaces: List of NetBox interface objects for the device.
+
+    Returns:
+        Dict with:
+        - 'vlans': VLAN list with one object per VID (original order kept)
+        - 'resolved': list of {vid, kept, dropped, reason} for duplicates
+          resolved automatically
+        - 'conflicts': list of {vid, vlans} where several duplicates are
+          referenced by interfaces
+    """
+    result = {"vlans": [], "resolved": [], "conflicts": []}
+    if not vlans:
+        return result
+
+    by_vid = {}
+    for vlan in vlans:
+        if not vlan or not isinstance(vlan, dict):
+            continue
+        by_vid.setdefault(vlan.get("vid"), []).append(vlan)
+
+    referenced = _referenced_vlan_object_ids(interfaces)
+    keep_ids = set()
+
+    for vid, candidates in by_vid.items():
+        if len(candidates) == 1:
+            keep_ids.add(id(candidates[0]))
+            continue
+
+        ordered = sorted(
+            candidates,
+            key=lambda v: (v.get("id") is None, v.get("id") or 0),
+        )
+        used = [v for v in ordered if v.get("id") in referenced]
+
+        if len(used) > 1:
+            kept = used[0]
+            result["conflicts"].append(
+                {"vid": vid, "vlans": [_vlan_summary(v) for v in used]})
+            _debug(f"VLAN {vid}: {len(used)} NetBox VLANs referenced - conflict")
+        else:
+            kept = used[0] if used else ordered[0]
+            result["resolved"].append({
+                "vid": vid,
+                "kept": _vlan_summary(kept),
+                "dropped": [_vlan_summary(v) for v in ordered if v is not kept],
+                "reason": "referenced" if used else "unreferenced",
+            })
+            _debug(f"VLAN {vid}: keeping NetBox VLAN id {kept.get('id')}")
+        keep_ids.add(id(kept))
+
+    result["vlans"] = [
+        v for v in vlans if isinstance(v, dict) and id(v) in keep_ids]
+    return result
+
+
 def get_vlans_in_use(interfaces, vlan_interfaces=None, port_access=None):
     """
     Extract all VLANs that are in use on interfaces

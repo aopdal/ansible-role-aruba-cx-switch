@@ -23,6 +23,7 @@ EXPECTED_FILTER_NAMES = {
     "parse_vlan_id_spec",
     "filter_vlans_in_use",
     "filter_out_vlan_groups",
+    "resolve_duplicate_vlan_vids",
     "extract_evpn_vlans",
     "extract_vxlan_mappings",
     "get_vlans_in_use",

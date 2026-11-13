@@ -860,6 +860,14 @@ The role uses standard NetBox objects for configuration.
 - `description` - VLAN description
 - `l2vpn_termination` - Link to L2VPN (for EVPN/VXLAN)
 
+**One VLAN per VID per device:** a switch has only one VLAN per VID. If
+NetBox offers several VLANs with the same VID to a device (overlapping
+VLAN group scopes), the role uses the one the device's interfaces
+reference and ignores the rest with a warning. If interfaces on the same
+device reference two of them, the role cannot compensate and fails the
+host. See
+[Duplicate VLAN IDs in NetBox](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md#duplicate-vlan-ids-in-netbox).
+
 ### Interfaces
 
 **Source:** NetBox → Interfaces (per device)

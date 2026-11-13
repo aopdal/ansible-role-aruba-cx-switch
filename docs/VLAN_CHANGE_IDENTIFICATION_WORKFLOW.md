@@ -21,6 +21,55 @@ This task sets the following facts used by all downstream tasks:
 | `vlans_in_use` | VLANs currently in use on interfaces (or all NetBox VLANs when `aoscx_configure_vlans_all=true`) | configure_vlans.yml, configure_evpn.yml, configure_vxlan.yml |
 | `vlan_changes` | VLANs to create/delete based on analysis | configure_vlans.yml, cleanup_*.yml |
 
+### Duplicate VLAN IDs in NetBox
+
+NetBox allows several VLAN objects with the same VID as long as they live
+in different VLAN groups (or scopes). `available_on_device` returns all of
+them when their scopes overlap - for example a second VLAN group scoped to
+the same site. A switch has exactly one VLAN per VID, and every VLAN task
+keys on VID, so without a guard the role would push whichever duplicate
+NetBox lists last (wrong name, IGMP and voice settings) and flap between
+them on later runs.
+
+Right after fetching the VLAN list, `identify_vlan_changes.yml` runs
+`resolve_duplicate_vlan_vids` and keeps one NetBox VLAN per VID:
+
+| Interfaces reference (by NetBox VLAN ID) | Result |
+| --- | --- |
+| Exactly one of the duplicates | That VLAN is used; the others are ignored with a warning |
+| None of them (VID unused, or used only by an SVI name / port-access VID) | The lowest NetBox ID is used, so the choice is stable across runs; warning |
+| More than one of them | The play **fails** for that host - not supported, see below |
+
+#### Both duplicates used on one device: not supported
+
+If interfaces on the **same device** reference two different NetBox VLANs
+with the same VID (for example `1/1/1` untagged in "zL2 vlan 20" and
+`1/1/2` tagged in "Bad - VLAN 20"), the role cannot compensate. The switch
+has only one VLAN 20, so both ports end up in the same broadcast domain no
+matter which name or settings the role picks, and silently choosing one
+would hide a real design error in NetBox. The role therefore fails the
+host before any VLAN is configured:
+
+```text
+VLAN 20 is ambiguous in NetBox: interfaces on this device reference 2
+different VLAN objects with this VID (zL2 vlan 20, Bad - VLAN 20; NetBox
+IDs 852, 875). A switch has only one VLAN 20 - point all interfaces at the
+same NetBox VLAN.
+```
+
+There is no variable to override this. Fix it in NetBox: point every
+interface on the device at the same VLAN object, or move one of the
+networks to a different VID. Other devices are not affected - the check
+is per host, and the same two VLANs may each be used on different
+switches.
+
+#### Warnings for resolved duplicates
+
+The warning names the kept and ignored VLANs with their NetBox IDs and
+groups. Ignored duplicates are never created, renamed or protected by the
+role. The real fix is in NetBox: remove the duplicate, or narrow the
+second VLAN group's scope so it no longer overlaps this device.
+
 ### Reserved VLANs (UBT client VLAN)
 
 The UBT client VLAN (`ubt.client_vlan` in config_context, see
