@@ -479,6 +479,15 @@ Complete VLAN lifecycle management (8 filters, 454 lines):
     - Filter VLAN objects to only those actually in use on interfaces
     - Returns: List of VLAN objects
 
+- **`resolve_duplicate_vlan_vids(vlans, interfaces=None)`**
+    - Collapse NetBox VLANs that share a VID to one object per VID, keeping
+      the one the interfaces reference by NetBox object ID (lowest ID when
+      none is referenced)
+    - Returns: Dict with `vlans` (de-duplicated list), `resolved` (duplicates
+      handled automatically, with `kept`/`dropped`/`reason`) and `conflicts`
+      (VIDs where interfaces reference more than one object)
+    - See [Duplicate VLAN IDs](VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md#duplicate-vlan-ids-in-netbox)
+
 - **`extract_evpn_vlans(vlans, interfaces, check_noevpn=True)`**
     - Get VLANs that should be configured for EVPN
     - Checks `vlan_noevpn` custom field and L2VPN termination

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.7] - 2026-11-13
+
+### Fixed
+
+- VLANs: when NetBox offers several VLANs with the same VID to a device
+  (e.g. two VLAN groups with overlapping scope), the role now keeps the one
+  the device's interfaces reference instead of whichever NetBox listed last.
+  Previously an unused duplicate could rename the switch VLAN and change its
+  IGMP/voice settings, and the name flapped between runs. Unreferenced
+  duplicates fall back to the lowest NetBox ID with a warning; interfaces
+  referencing two different VLANs with one VID now fail the host with a
+  clear message: the role cannot compensate when both duplicates are used
+  on one device, so this must be fixed in NetBox (documented in
+  `docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md`). New filter
+  `resolve_duplicate_vlan_vids`.
+- STP docs: `mstp_priority` is now documented as the AOS-CX priority step
+  `0`–`15` (multiplied by 4096 on the device), not a multiple of 4096. The
+  config_context example used `4096`, which the device rejects; it now uses `1`.
+
 ## [0.18.6] - 2026-11-09
 
 ### Added

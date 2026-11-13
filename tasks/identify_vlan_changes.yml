@@ -38,6 +38,48 @@
     - nb_vlans_response.json is defined
     - nb_vlans_response.json.results is defined
 
+# NetBox can offer several VLAN objects with the same VID to one device
+# (e.g. two VLAN groups scoped to the same site). Everything below keys VLANs
+# by VID, so collapse duplicates first: keep the object the interfaces
+# reference, fail if interfaces reference more than one. See
+# docs/VLAN_CHANGE_IDENTIFICATION_WORKFLOW.md "Duplicate VLAN IDs".
+- name: Resolve NetBox VLANs that share a VID
+  ansible.builtin.set_fact:
+    _vlan_vid_resolution: "{{ vlans | default([]) | resolve_duplicate_vlan_vids(interfaces | default([])) }}"
+
+- name: Fail on VIDs referenced through more than one NetBox VLAN
+  ansible.builtin.fail:
+    msg: >-
+      VLAN {{ item.vid }} is ambiguous in NetBox: interfaces on this device
+      reference {{ item.vlans | length }} different VLAN objects with this VID
+      ({{ item.vlans | map(attribute='name') | join(', ') }}; NetBox IDs
+      {{ item.vlans | map(attribute='id') | join(', ') }}). A switch has only
+      one VLAN {{ item.vid }} - point all interfaces at the same NetBox VLAN.
+  loop: "{{ _vlan_vid_resolution.conflicts }}"
+  loop_control:
+    label: "VLAN {{ item.vid }}"
+
+- name: Warn about duplicate NetBox VLAN IDs that were ignored
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: NetBox offers {{ item.dropped | length + 1 }} VLANs with VID
+      {{ item.vid }} to this device. Using '{{ item.kept.name }}' (NetBox ID
+      {{ item.kept.id }}, group {{ item.kept.group | default('none', true) }})
+      {{ _why }}; ignoring {{ item.dropped | map(attribute='name') | join(', ') }}
+      (ID {{ item.dropped | map(attribute='id') | join(', ') }}).
+  vars:
+    _why: >-
+      {{ 'because interfaces reference it' if item.reason == 'referenced'
+         else 'because it has the lowest NetBox ID (no interface references any of them)' }}
+  loop: "{{ _vlan_vid_resolution.resolved }}"
+  loop_control:
+    label: "VLAN {{ item.vid }}"
+
+- name: Use de-duplicated VLAN list
+  ansible.builtin.set_fact:
+    vlans: "{{ _vlan_vid_resolution.vlans }}"
+  when: _vlan_vid_resolution.resolved | length > 0
+
 # Note: We use existing facts gathered by gather_facts.yml (earlier in main.yml)
 # No need to re-gather here - facts are already available in ansible_facts.network_resources
 # This avoids duplicate API calls and improves performance
