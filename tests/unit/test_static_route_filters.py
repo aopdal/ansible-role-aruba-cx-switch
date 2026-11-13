@@ -88,6 +88,46 @@ class TestGetStaticRouteChanges:
         assert result["routes_to_apply"] == []
         assert result["routes_to_delete"] == []
 
+    def test_device_nullroute_matches_blackhole(self):
+        """REST reports blackhole routes as type "nullroute"; that is a match"""
+        static_routes = {
+            "lab-blue": [
+                {"prefix": "172.27.4.0/24", "type": "blackhole"},
+                {"prefix": "2a02:20c8:5921:da10::/60", "type": "blackhole"},
+            ]
+        }
+        nullroute = {
+            "type": "nullroute",
+            "distance": 1,
+            "next_hop_ip_address": None,
+            "next_hop_interface": None,
+        }
+        facts = {
+            "lab-blue": {
+                "172.27.4.0/24": dict(nullroute),
+                "2a02:20c8:5921:da10::/60": dict(nullroute),
+            }
+        }
+        result = get_static_route_changes(static_routes, facts)
+        assert result["routes_to_apply"] == []
+        assert result["routes_to_delete"] == []
+
+    def test_device_nullroute_differs_from_forward(self):
+        """A nullroute on the device still differs from a desired forward route"""
+        static_routes = {"default": [{"prefix": "10.0.0.0/8", "next_hop": "192.0.2.1"}]}
+        facts = {
+            "default": {
+                "10.0.0.0/8": {
+                    "type": "nullroute",
+                    "distance": 1,
+                    "next_hop_ip_address": None,
+                    "next_hop_interface": None,
+                }
+            }
+        }
+        result = get_static_route_changes(static_routes, facts)
+        assert len(result["routes_to_apply"]) == 1
+
     def test_changed_next_hop_needs_update(self):
         """A route whose next-hop differs from device facts needs an update"""
         static_routes = {

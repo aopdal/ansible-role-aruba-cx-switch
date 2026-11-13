@@ -123,6 +123,10 @@ configured. This mirrors the pattern used for non-idempotent L3 interface
 configuration (see
 `netbox_filters_lib/l3_config_helpers.py`).
 
+The device reports a `blackhole` route's next-hop type as `nullroute` (the
+CLI keyword) over REST. The comparison treats `nullroute` on the device as
+equal to `blackhole` in NetBox; `forward` and `reject` are compared as-is.
+
 The comparison logic lives in
 `get_static_route_changes`,
 used by `tasks/configure_static_routes.yml`.
