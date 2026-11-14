@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.8] - 2026-11-14
+
 ### Fixed
 
 - Static routes: `blackhole` routes are no longer re-pushed on every run
