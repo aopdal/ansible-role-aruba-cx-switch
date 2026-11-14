@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.8] - 2026-11-14
+
+### Fixed
+
+- Static routes: `blackhole` routes are no longer re-pushed on every run
+  and no longer show as drift. The REST API reports them as type
+  `nullroute`, which `get_static_route_changes` compared literally against
+  `blackhole` from NetBox.
+
+### Changed
+
+- Docs: `aoscx_configure_vlans_all` is documented as not supported when
+  NetBox offers a device several VLANs with the same VID. The role still
+  resolves the duplicates to one VLAN per VID, but the catalog does not
+  decide which one is used.
+
 ## [0.18.7] - 2026-11-13
 
 ### Fixed

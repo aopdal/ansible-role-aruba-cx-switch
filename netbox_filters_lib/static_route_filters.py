@@ -22,6 +22,17 @@ from .utils import _debug
 _DEFAULT_TYPE = "forward"
 _DEFAULT_DISTANCE = 1
 
+# The REST API reports a blackhole route's next-hop type as "nullroute"
+# (the CLI keyword), while NetBox and the aoscx_static_route module call it
+# "blackhole". Map device types to the module's names before comparing.
+_DEVICE_TYPE_ALIASES = {"nullroute": "blackhole"}
+
+
+def _normalise_route_type(route_type):
+    """Return the module-side name for a route type read from the device."""
+    route_type = str(route_type or _DEFAULT_TYPE)
+    return _DEVICE_TYPE_ALIASES.get(route_type, route_type)
+
 
 def get_static_route_changes(static_routes, static_route_facts=None):
     """Compute static routes that need to be created/updated or deleted.
@@ -108,7 +119,7 @@ def get_static_route_changes(static_routes, static_route_facts=None):
                 continue
 
             if (
-                str(current.get("type")) != str(route_type)
+                _normalise_route_type(current.get("type")) != str(route_type)
                 or int(current.get("distance", _DEFAULT_DISTANCE)) != distance
                 or (current.get("next_hop_ip_address") or None) != next_hop_ip
                 or (current.get("next_hop_interface") or None) != next_hop_interface
