@@ -12,6 +12,7 @@ Args:
 
 Orphan = present on device but not in NetBox.
 """
+from .port_access_normalize import port_access_normalize
 
 
 def port_access_orphans(desired, current):
@@ -20,6 +21,7 @@ def port_access_orphans(desired, current):
         return out
     if not isinstance(desired, dict):
         desired = {}
+    desired = port_access_normalize(desired)
     # For each kind, find names present in current but not in desired
     for kind in out:
         current_names = set((current.get(kind) or {}).keys())

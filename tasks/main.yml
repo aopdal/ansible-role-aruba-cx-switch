@@ -1,6 +1,21 @@
 ---
 # Main task file for aruba_cx_switch role
 
+# Port-access input normalisation - no dependencies, so it runs first.
+# Converts name-keyed `port_access` collections (which NetBox can merge
+# across config contexts) to the list form every later consumer expects:
+# fact gathering, template generation, VLAN identification, port-access
+# configuration and cleanup. Tagged `always` so `--tags port_access` and
+# `--tags vlans` runs see the normalised data too.
+- name: Normalise port-access config_context
+  ansible.builtin.set_fact:
+    port_access: "{{ port_access | port_access_normalize }}"
+  when:
+    - port_access is defined
+    - port_access is mapping
+  tags:
+    - always
+
 - name: Include fact gathering tasks
   ansible.builtin.include_tasks:
     file: gather_facts.yml

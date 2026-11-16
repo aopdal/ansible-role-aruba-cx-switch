@@ -106,6 +106,10 @@ from netbox_filters_lib.port_access import (
     port_access_facts_from_device_profiles,
 )
 from netbox_filters_lib.port_access_orphans import port_access_orphans
+from netbox_filters_lib.port_access_normalize import (
+    port_access_missing_ubt_zones,
+    port_access_normalize,
+)
 from netbox_filters_lib.interface_orphans import get_virtual_interfaces_to_delete
 from netbox_filters_lib.interface_split import get_interfaces_to_split
 from netbox_filters_lib.stp import stp_global_config_diff, stp_interface_changes
@@ -198,6 +202,8 @@ class FilterModule:
             "port_access_diff": port_access_diff,
             "port_access_facts_from_device_profiles": port_access_facts_from_device_profiles,
             "port_access_orphans": port_access_orphans,
+            "port_access_normalize": port_access_normalize,
+            "port_access_missing_ubt_zones": port_access_missing_ubt_zones,
             # STP
             "stp_global_config_diff": stp_global_config_diff,
             "stp_interface_changes": stp_interface_changes,

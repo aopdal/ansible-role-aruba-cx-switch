@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.9] - 2026-11-16
+
+### Added
+
+- Port-access: each object collection under `port_access` (`classes`,
+  `policies`, `lldp_groups`, `roles`, `device_profiles`) can be written as
+  a dict keyed by object name instead of a list. NetBox merges that form
+  across config contexts, so profiles can live in separate contexts, and
+  a feature overlay (such as UBT `gateway_zone`) can extend a role defined
+  elsewhere. Objects set to `null` are dropped. The list form keeps
+  working. New filters: `port_access_normalize`,
+  `port_access_missing_ubt_zones`.
+- Port-access: configuration fails before pushing anything when a role's
+  `gateway_zone` is not defined in the device's `ubt` config_context (for
+  example a UBT overlay that reaches a CX 6000).
+
 ## [0.18.8] - 2026-11-14
 
 ### Fixed

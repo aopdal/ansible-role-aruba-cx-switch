@@ -339,6 +339,7 @@ filter_plugins/
     ├── comparison.py                    # State comparison (291 lines)
     ├── ospf_filters.py                  # OSPF operations (438 lines)
     ├── port_access.py                   # Port-access (device-profile) idempotency (492 lines)
+    ├── port_access_normalize.py         # Name-keyed port-access input -> list form
     ├── port_access_orphans.py           # Orphaned port-access object cleanup (36 lines)
     ├── static_route_filters.py          # Static route change detection (136 lines)
     ├── stp.py                           # Global + per-interface STP change detection (134 lines)
@@ -817,6 +818,28 @@ Idempotency comparison for port-access (device-profile) configuration
     - Returns: Dict with `lldp_groups`, `roles`, `device_profiles` lists.
       When current facts are missing, returns every desired item (safe
       fallback).
+
+### `port_access_normalize.py` - Port-Access Input Normalisation
+
+Lets port-access objects be merged across NetBox config contexts
+(2 filters):
+
+- **`port_access_normalize(port_access)`**
+    - Converts each name-keyed collection (`classes`, `policies`,
+      `lldp_groups`, `mac_groups`, `roles`, `device_profiles`) into the
+      list form, setting `name` from the key and sorting by name. Entries
+      set to `null` are dropped; lists pass through unchanged; other keys
+      are untouched.
+    - Runs once at the start of `tasks/main.yml`. `port_access_diff`,
+      `port_access_orphans` and `extract_port_access_vlan_ids` also call
+      it, so they accept either form when used on their own.
+    - Returns: Dict (`{}` for non-dict input)
+    - Example: `{"roles": {"AP": {"trust_mode": "dscp"}}}` →
+      `{"roles": [{"trust_mode": "dscp", "name": "AP"}]}`
+
+- **`port_access_missing_ubt_zones(port_access, ubt)`**
+    - Lists roles whose `gateway_zone` is not in `ubt.zones[].name`
+    - Returns: Sorted list of `"<role> -> <zone>"` strings
 
 ### `port_access_orphans.py` - Port-Access Cleanup
 

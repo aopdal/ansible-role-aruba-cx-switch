@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from urllib.parse import unquote
 
+from .port_access_normalize import port_access_normalize
 from .utils import _debug
 from .vlan_filters import parse_vlan_id_spec
 
@@ -373,6 +374,7 @@ def port_access_diff(desired, current):
             "roles": [],
             "device_profiles": [],
         }
+    desired = port_access_normalize(desired)
 
     safe_current = current if isinstance(current, dict) else {}
 
