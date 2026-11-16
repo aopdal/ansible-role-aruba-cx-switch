@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.9] - 2026-11-16
+
 ### Added
 
 - Port-access: each object collection under `port_access` (`classes`,
