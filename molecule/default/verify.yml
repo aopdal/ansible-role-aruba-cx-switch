@@ -114,6 +114,11 @@
         that:
           - ({} | port_access_orphans({})) is mapping
 
+    - name: "Loader smoke test: port_access_normalize (port_access_normalize)"
+      ansible.builtin.assert:
+        that:
+          - ({} | port_access_normalize) is mapping
+
     - name: "Loader smoke test: get_virtual_interfaces_to_delete (interface_orphans)"
       ansible.builtin.assert:
         that:

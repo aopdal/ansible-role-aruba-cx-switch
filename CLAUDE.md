@@ -63,6 +63,9 @@ modified when working on role changes unless explicitly asked — see
 
 Order matters and is encoded in `tasks/main.yml`. Do not reorder casually.
 
+0. Port-access input normalisation (`port_access_normalize`, tag `always`):
+   name-keyed `port_access` collections become lists before anything reads
+   them.
 1. Fact gathering (`gather_facts.yml`, optionally `gather_facts_rest_api.yml`
    when `aoscx_gather_facts_rest_api: true`).
 2. Optional template-based config generation
@@ -140,6 +143,7 @@ Existing dependency chains to preserve:
 | STP (per-interface) | L2 interfaces                                             |
 | UBT (`ubt` zones) | VRFs (zone VRF); must precede port-access                   |
 | Port-access       | VLANs, L2 interfaces, UBT (roles with `gateway_zone`)       |
+| Port-access normalisation | None; runs first so every `port_access` consumer sees list form |
 | Port-access cleanup | Port-access configuration (idempotent mode)               |
 | Virtual-interface cleanup | Interface facts from the first gather; must precede L3 interfaces |
 | Access-switch default gateway | Default VRF only (base-system block)           |

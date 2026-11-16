@@ -47,6 +47,11 @@
 #         associate_role: Lab-IAP-role
 #         associate_lldp_group: Lab-IAP-group
 #
+# Every collection may instead be a dict keyed by object name, so NetBox
+# can merge objects from several config contexts. tasks/main.yml converts
+# it to the list form above (port_access_normalize) before this file runs;
+# see docs/PORT_ACCESS_CONFIGURATION.md.
+#
 # Auto-enabled when NetBox config_context provides a `port_access` dict
 # for the device (gate enforced in tasks/main.yml).
 #
@@ -62,6 +67,24 @@
 # Classes and policies are optional and are not part of the REST diff:
 # they are always handed to aoscx_config, whose `match: line` compare
 # against running-config keeps them idempotent (no change -> ok).
+
+# A role with `gateway_zone` needs that zone in the device's `ubt` context.
+# Devices without UBT support (CX 6000) have no `ubt` context, so a
+# gateway_zone reaching one means the UBT overlay context is scoped too
+# widely - stop before pushing CLI the device rejects.
+- name: configure_port_access | Check UBT zones referenced by roles
+  ansible.builtin.assert:
+    that:
+      - _pa_missing_ubt_zones | length == 0
+    fail_msg: >-
+      Port-access roles reference UBT zones not defined in the `ubt`
+      config_context of {{ inventory_hostname }}: {{ _pa_missing_ubt_zones | join(', ') }}.
+      Scope the context carrying `gateway_zone` to UBT-capable devices only,
+      or add the zone to `ubt.zones`.
+    quiet: true
+  vars:
+    _pa_missing_ubt_zones: "{{ port_access | default({}) | port_access_missing_ubt_zones(ubt | default({})) }}"
+  when: port_access is defined and port_access | length > 0
 
 - name: configure_port_access | Skip when port_access not provided
   ansible.builtin.debug:

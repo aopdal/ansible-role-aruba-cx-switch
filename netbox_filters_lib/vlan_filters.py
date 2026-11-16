@@ -4,6 +4,7 @@ VLAN-related filters for NetBox data transformation
 
 import re
 
+from .port_access_normalize import port_access_normalize
 from .utils import _debug, get_interface_type_value
 
 
@@ -237,7 +238,7 @@ def extract_port_access_vlan_ids(port_access):
         return []
 
     vids = set()
-    for role in port_access.get("roles") or []:
+    for role in port_access_normalize(port_access).get("roles") or []:
         if not isinstance(role, dict):
             continue
         vids.update(parse_vlan_id_spec(role.get("vlan_trunk_native")))

@@ -45,6 +45,98 @@ policies, device-profiles reference roles and LLDP groups, so they're
 always pushed in the order **class → policy → lldp-group → role →
 device-profile**; cleanup (see below) runs the reverse order.
 
+## Combining profiles from several config contexts
+
+NetBox merges the config contexts that apply to a device recursively for
+dicts, but a **list in a later context replaces the whole list** from an
+earlier one. With the list form, two contexts that both define
+`port_access.roles` cannot be combined: only the context applied last
+(highest weight, then name order) reaches the device.
+
+Each object collection (`classes`, `policies`, `lldp_groups`, `roles`,
+`device_profiles`) can therefore also be written as a **dict keyed by
+object name**. NetBox merges that form object by object, and even
+attribute by attribute for an object defined in more than one context:
+
+```json
+{
+  "port_access": {
+    "classes": {
+      "AO-Ansatt-ip-allow": {
+        "type": "ip",
+        "entries": [{ "seq": 10, "match": "any any any" }]
+      }
+    },
+    "policies": {
+      "AO-Ansatt-policy": {
+        "entries": [{ "seq": 10, "class": "AO-Ansatt-ip-allow" }]
+      }
+    },
+    "roles": {
+      "AO-Ansatt-role": {
+        "associate_policy": "AO-Ansatt-policy",
+        "auth_mode": "client-mode",
+        "vlan_access": 102
+      }
+    }
+  }
+}
+```
+
+The role converts the keyed form to the list form at the start of every
+run (`port_access_normalize` filter), so both forms work and can be mixed
+per collection. The rules:
+
+- The key is the object's name. A `name` field inside the object is
+  ignored.
+- An object set to `null` is dropped. A more specific (higher weight)
+  context can use this to remove an object a broader context defines.
+- An overlay can add or change attributes of an object, but cannot remove
+  an attribute. Put attributes that only some devices support in the
+  overlay, not in the base context.
+- Lists *inside* an object (`entries`, `match`) are still replaced whole.
+  Define each object in one context, or repeat the full list in the
+  overriding context.
+- Mixing forms for the **same** collection across contexts does not merge:
+  NetBox replaces a dict with a list (or the other way round). Convert all
+  contexts that share a collection to the keyed form.
+
+### Example: one profile per context, UBT only where supported
+
+Split the data so every device gets exactly the profiles it should, with
+no duplicated objects:
+
+| Context | Assigned to | Contents |
+| --- | --- | --- |
+| `lab-ap-profile` | access switches | AP class, policy, LLDP group, role, device-profile |
+| `lab-ansatt-profile` | access switches | Ansatt class, policy, role (local `vlan_access`) |
+| `lab-ansatt-ubt` | UBT-capable device types (not CX 6000) | `gateway_zone` / `gateway_role` for the Ansatt role |
+| `lab-ubt` | UBT-capable device types | `ubt` zones and client VLAN |
+
+`lab-ansatt-ubt` only carries the UBT attributes:
+
+```json
+{
+  "port_access": {
+    "roles": {
+      "AO-Ansatt-role": {
+        "gateway_zone": "LAB-UBT-Zone",
+        "gateway_role": "Ansatt"
+      }
+    }
+  }
+}
+```
+
+A CX 6200F renders the Ansatt role tunnelled to the zone; a CX 6000 renders
+the same role with a local `vlan access 102`.
+
+As a safety check, `configure_port_access.yml` fails before pushing any
+port-access config when a role's `gateway_zone` is not one of the zones in
+the device's `ubt` config_context (see
+[UBT_CONFIGURATION.md](UBT_CONFIGURATION.md#tunnelling-a-port-access-role)).
+That catches a UBT overlay scoped to a device that has no UBT.
+
 ## Object reference
 
 ### `lldp_groups`

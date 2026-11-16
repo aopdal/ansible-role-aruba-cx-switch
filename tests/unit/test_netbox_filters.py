@@ -79,6 +79,8 @@ EXPECTED_FILTER_NAMES = {
     "port_access_diff",
     "port_access_facts_from_device_profiles",
     "port_access_orphans",
+    "port_access_normalize",
+    "port_access_missing_ubt_zones",
     "stp_global_config_diff",
     "stp_interface_changes",
     "vsx_config_diff",
@@ -138,6 +140,7 @@ class TestFilterModule:
             "get_bgp_session_vrf_info",  # bgp_filters
             "port_access_diff",  # port_access
             "port_access_orphans",  # port_access_orphans
+            "port_access_normalize",  # port_access_normalize
             "get_virtual_interfaces_to_delete",  # interface_orphans
             "get_interfaces_to_split",  # interface_split
             "stp_global_config_diff",  # stp

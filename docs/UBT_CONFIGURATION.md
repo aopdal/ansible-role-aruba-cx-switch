@@ -92,6 +92,17 @@ port-access role Pod5-IoT
 and `gateway_role` are compared against the device's `gateway_zone` and
 `ubt_gateway_role` REST fields in the port-access diff.
 
+The zone must be defined in the device's own `ubt.zones`. Port-access
+configuration fails before pushing anything when a role references a zone
+that is missing there — for example when the context carrying
+`gateway_zone` also reaches a CX 6000, which does not support UBT.
+
+To share one role definition between devices with and without UBT, write
+the roles in the name-keyed form and keep `gateway_zone` / `gateway_role`
+in a separate context scoped to UBT-capable devices only. NetBox merges it
+into the base role. See
+[Combining profiles from several config contexts](PORT_ACCESS_CONFIGURATION.md#combining-profiles-from-several-config-contexts).
+
 ## UBT client VLAN
 
 The VLAN set with `client_vlan` belongs to UBT, not to the VLAN tasks:
