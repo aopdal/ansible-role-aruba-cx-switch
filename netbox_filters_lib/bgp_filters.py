@@ -5,6 +5,7 @@ Provides functions to enrich BGP session data with VRF and address-family
 information derived from the device's interface assignments in NetBox.
 """
 
+import ipaddress
 import re
 
 from .utils import _debug, is_ipv6_address
@@ -493,6 +494,14 @@ def _iter_bgp_lines(running_config, local_asn):
         if not line:
             continue
 
+        # AOS-CX prints a column-0 '!' between the global section and each
+        # 'vrf <name>' section inside 'router bgp' (no 'exit-vrf'), so a
+        # comment line must not end the block. The next real top-level
+        # statement does.
+        if line == "!":
+            current_af = None
+            continue
+
         # A new top-level (non-indented) statement ends the router bgp block.
         if not raw_line[0].isspace():
             in_bgp = bool(router_bgp_re.match(line))
@@ -897,3 +906,275 @@ def get_stale_bgp_bfd(bgp_neighbor_options, sessions, running_config):
         _debug("get_stale_bgp_bfd: global 'bfd' is stale, no longer needed by BGP")
 
     return stale
+
+
+# ============================================================================
+# REST-fact based change detection (aoscx_bgp_facts)
+# ============================================================================
+# aoscx_bgp_facts is built by rest_api_to_aoscx_bgp
+# (filter_plugins/rest_api_transforms.py) from tasks/gather_facts_rest_api.yml.
+# AF names: 'ipv4' / 'ipv6' (unicast) and 'evpn' (l2vpn evpn).
+
+_AF_CLI = {
+    "ipv4": "address-family ipv4 unicast",
+    "ipv6": "address-family ipv6 unicast",
+    "evpn": "address-family l2vpn evpn",
+}
+_AF_ORDER = ("evpn", "ipv4", "ipv6")
+
+
+def _normalize_ip(address):
+    """Host part of an address/CIDR in canonical (compressed) form, or None
+    for anything that is not an IP (peer-group or interface names)."""
+    if not address:
+        return None
+    try:
+        return ipaddress.ip_address(str(address).split("/")[0]).compressed
+    except ValueError:
+        return None
+
+
+def _policy_name(policies):
+    if isinstance(policies, list) and policies and isinstance(policies[0], dict):
+        return policies[0].get("name") or None
+    return None
+
+
+def build_bgp_desired_neighbors(
+    sessions, device_vxlan=False, route_reflector=False, evpn_ipv4_unicast=False
+):
+    """
+    Desired per-neighbor BGP state from netbox-bgp sessions, mirroring what
+    tasks/configure_bgp.yml configures.
+
+    Rules (same split as configure_bgp.yml):
+      - EVPN neighbor: a default-VRF session when device_vxlan is true.
+        remote-as, update-source <local ip>, 'l2vpn evpn' activate +
+        send-community extended (+ route-reflector-client for iBGP when
+        route_reflector), and ipv4 unicast activate when evpn_ipv4_unicast
+        (bgp_ipv4_enabled).
+      - Address-family neighbor: every other session, in its own AF
+        (ipv4/ipv6 from the local address).
+          iBGP: update-source <local ip>, next-hop-self, activate
+                (+ route-reflector-client when route_reflector).
+          eBGP: activate, route-map <first import policy> in /
+                <first export policy> out.
+          IPv6 (both): send-community extended.
+
+    Args:
+        sessions: Sessions enriched with '_vrf' / '_af' by
+            get_bgp_session_vrf_info.
+        device_vxlan: custom_fields.device_vxlan.
+        route_reflector: True when the device role is a route reflector
+            ('spine', 'route-reflector', 'rr').
+        evpn_ipv4_unicast: bgp_ipv4_enabled.
+
+    Returns:
+        {vrf: {ip: {"name", "remote_as", "update_source", "ibgp", "afs":
+        {af: {"activate": True, "next_hop_self": bool,
+              "route_reflector_client": bool, "send_community": str|None,
+              "route_map_in": str|None, "route_map_out": str|None}}}}}
+        IPs are in canonical form; sessions without a usable remote address
+        are skipped.
+    """
+    result = {}
+    for session in sessions or []:
+        if not isinstance(session, dict):
+            continue
+        ip = _normalize_ip((session.get("remote_address") or {}).get("address"))
+        local_ip = _normalize_ip((session.get("local_address") or {}).get("address"))
+        if not ip:
+            continue
+        vrf = session.get("_vrf") or "default"
+        local_as = (session.get("local_as") or {}).get("asn")
+        remote_as = (session.get("remote_as") or {}).get("asn")
+        ibgp = local_as is not None and local_as == remote_as
+        evpn = bool(device_vxlan) and vrf == "default"
+
+        def _af(**kwargs):
+            entry = {
+                "activate": True,
+                "next_hop_self": False,
+                "route_reflector_client": False,
+                "send_community": None,
+                "route_map_in": None,
+                "route_map_out": None,
+            }
+            entry.update(kwargs)
+            return entry
+
+        if evpn:
+            afs = {"evpn": _af(
+                send_community="extended",
+                route_reflector_client=ibgp and bool(route_reflector))}
+            if evpn_ipv4_unicast:
+                afs["ipv4"] = _af()
+            update_source = local_ip
+        else:
+            af = session.get("_af") or "ipv4"
+            send_community = "extended" if af == "ipv6" else None
+            if ibgp:
+                afs = {af: _af(
+                    next_hop_self=True,
+                    send_community=send_community,
+                    route_reflector_client=bool(route_reflector))}
+                update_source = local_ip
+            else:
+                afs = {af: _af(
+                    send_community=send_community,
+                    route_map_in=_policy_name(session.get("import_policies")),
+                    route_map_out=_policy_name(session.get("export_policies")))}
+                update_source = None
+
+        result.setdefault(vrf, {})[ip] = {
+            "name": session.get("name"),
+            "remote_as": remote_as,
+            "update_source": update_source,
+            "ibgp": ibgp,
+            "afs": afs,
+        }
+    return result
+
+
+def _neighbor_af_lines(ip, af, want, have, ibgp, idempotent):
+    lines = []
+    if af not in have.get("activate", []):
+        lines.append(f"neighbor {ip} activate")
+    if want["next_hop_self"] and af not in have.get("next_hop_self", []):
+        lines.append(f"neighbor {ip} next-hop-self")
+    if want["send_community"] and (have.get("send_community") or {}).get(af) not in (
+            want["send_community"], "both"):
+        lines.append(f"neighbor {ip} send-community {want['send_community']}")
+    have_rrc = af in have.get("route_reflector_client", [])
+    if want["route_reflector_client"] and not have_rrc:
+        lines.append(f"neighbor {ip} route-reflector-client")
+    elif ibgp and idempotent and have_rrc and not want["route_reflector_client"]:
+        lines.append(f"no neighbor {ip} route-reflector-client")
+    have_maps = (have.get("route_maps") or {}).get(af, {})
+    for direction in ("in", "out"):
+        wanted = want[f"route_map_{direction}"]
+        current = have_maps.get(direction)
+        if wanted and wanted != current:
+            lines.append(f"neighbor {ip} route-map {wanted} {direction}")
+        elif not ibgp and idempotent and current and not wanted:
+            lines.append(f"no neighbor {ip} route-map {current} {direction}")
+    return lines
+
+
+def get_bgp_neighbor_changes(desired, bgp_facts, local_asn, idempotent=False):
+    """
+    Diff desired BGP neighbors (build_bgp_desired_neighbors) against
+    aoscx_bgp_facts and return the CLI needed to converge.
+
+    Only what differs is pushed: a neighbor that already matches produces no
+    commands. Without facts (bgp_facts None, REST fact gathering off) every
+    desired neighbor is pushed in full, as before, and nothing is removed.
+
+    With idempotent=True (and facts) it also:
+      - removes neighbors (IP keys only - peer groups/interfaces are left
+        alone) in any VRF on the device that NetBox has no session for;
+      - removes route-reflector-client from iBGP neighbors that should not
+        have it, and route-maps from eBGP neighbors that NetBox no longer
+        gives a policy for.
+
+    Args:
+        desired: Output of build_bgp_desired_neighbors.
+        bgp_facts: aoscx_bgp_facts, or None.
+        local_asn: The device's BGP ASN (from NetBox sessions).
+        idempotent: aoscx_idempotent_mode.
+
+    Returns:
+        {"push": [{"vrf", "ip", "name", "commands": [...]}],
+         "remove": [{"vrf", "ip", "commands": [...]}],
+         "source": "rest" | "none"}
+        Each 'commands' list is a complete aoscx_command sequence
+        ('configure terminal' ... 'end').
+    """
+    desired = desired or {}
+    have_vrfs = (bgp_facts or {}).get("vrfs") if isinstance(bgp_facts, dict) else None
+    source = "rest" if isinstance(have_vrfs, dict) else "none"
+    have_vrfs = have_vrfs if isinstance(have_vrfs, dict) else {}
+
+    def _wrap(vrf, body):
+        head = ["configure terminal", f"router bgp {local_asn}"]
+        if vrf != "default":
+            return head + [f"vrf {vrf}"] + body + ["exit-vrf", "end"]
+        return head + body + ["end"]
+
+    push = []
+    for vrf in sorted(desired):
+        have_neighbors = {
+            _normalize_ip(k) or k: v
+            for k, v in ((have_vrfs.get(vrf) or {}).get("neighbors") or {}).items()
+        }
+        for ip in sorted(desired[vrf]):
+            want = desired[vrf][ip]
+            have = have_neighbors.get(ip) or {}
+            body = []
+            if have.get("remote_as") != want["remote_as"]:
+                body.append(f"neighbor {ip} remote-as {want['remote_as']}")
+            if want["update_source"] and _normalize_ip(
+                    have.get("update_source")) != want["update_source"]:
+                body.append(f"neighbor {ip} update-source {want['update_source']}")
+            for af in _AF_ORDER:
+                if af not in want["afs"]:
+                    continue
+                lines = _neighbor_af_lines(
+                    ip, af, want["afs"][af], have, want["ibgp"], idempotent)
+                if lines:
+                    body += [_AF_CLI[af]] + lines + ["exit-address-family"]
+            if body:
+                push.append({"vrf": vrf, "ip": ip, "name": want.get("name"),
+                             "commands": _wrap(vrf, body)})
+
+    remove = []
+    if idempotent and source == "rest":
+        for vrf in sorted(have_vrfs):
+            wanted = desired.get(vrf, {})
+            for key in sorted((have_vrfs[vrf] or {}).get("neighbors") or {}):
+                ip = _normalize_ip(key)
+                if ip and ip not in wanted:
+                    remove.append({"vrf": vrf, "ip": key,
+                                   "commands": _wrap(vrf, [f"no neighbor {key}"])})
+
+    return {"push": push, "remove": remove, "source": source}
+
+
+def get_bgp_redistribute_changes(bgp_redistribute, bgp_facts, idempotent=False):
+    """
+    Diff the 'bgp_redistribute' config_context against aoscx_bgp_facts.
+
+    Args:
+        bgp_redistribute: The 'bgp_redistribute' config_context (see
+            get_bgp_redistribute_config).
+        bgp_facts: aoscx_bgp_facts, or None.
+        idempotent: aoscx_idempotent_mode.
+
+    Returns:
+        {"add": [{"vrf", "af", "protocol"}], "remove": [...],
+         "source": "rest" | "none"}
+        Without facts every desired entry is in 'add' and 'remove' is empty
+        (configure_bgp.yml then falls back to the running-config cleanup).
+        'remove' holds every redistribute on the device (any protocol) that
+        the config_context does not list, only when idempotent.
+    """
+    desired = get_bgp_redistribute_config(bgp_redistribute)
+    have_vrfs = (bgp_facts or {}).get("vrfs") if isinstance(bgp_facts, dict) else None
+    if not isinstance(have_vrfs, dict):
+        return {"add": desired, "remove": [], "source": "none"}
+
+    current = [
+        {"vrf": vrf, "af": af, "protocol": protocol}
+        for vrf, data in sorted(have_vrfs.items())
+        for af, protocols in sorted(((data or {}).get("redistribute") or {}).items())
+        if af in _VALID_BGP_ADDRESS_FAMILIES
+        for protocol in protocols
+    ]
+    key = lambda e: (e["vrf"], e["af"], e["protocol"])  # noqa: E731
+    desired_keys = {key(e) for e in desired}
+    current_keys = {key(e) for e in current}
+    return {
+        "add": [e for e in desired if key(e) not in current_keys],
+        "remove": [e for e in current if key(e) not in desired_keys] if idempotent else [],
+        "source": "rest",
+    }

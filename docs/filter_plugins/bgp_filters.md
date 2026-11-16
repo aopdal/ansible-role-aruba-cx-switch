@@ -511,6 +511,62 @@ Determine whether the global `bfd` line is currently configured on the device bu
 
 ---
 
+## Change Detection Against REST Facts
+
+These three filters compare NetBox with `aoscx_bgp_facts` (built by
+`rest_api_to_aoscx_bgp`, see [REST API Transforms](rest_api_transforms.md)).
+AF names are `ipv4`, `ipv6` (unicast) and `evpn` (l2vpn evpn).
+
+### `build_bgp_desired_neighbors(sessions, device_vxlan=False, route_reflector=False, evpn_ipv4_unicast=False)`
+
+Turns sessions enriched by `get_bgp_session_vrf_info` into the per-neighbor
+state `configure_bgp.yml` sets:
+
+| Neighbor | Settings |
+| --- | --- |
+| EVPN (default VRF, `device_vxlan`) | remote-as, update-source local address, `evpn` activate + send-community extended, `ipv4` activate when `evpn_ipv4_unicast` |
+| iBGP, address-family | update-source local address, next-hop-self, activate |
+| eBGP, address-family | activate, route-map from the first import/export policy |
+| IPv6 (iBGP or eBGP) | send-community extended |
+| iBGP on a route reflector | route-reflector-client |
+
+- **Returns**: `{vrf: {ip: {"name", "remote_as", "update_source", "ibgp", "afs": {af: {"activate", "next_hop_self", "route_reflector_client", "send_community", "route_map_in", "route_map_out"}}}}}`.
+  IPs are canonical (`2a02::0:3` becomes `2a02::3`), so they match the
+  device's keys.
+
+### `get_bgp_neighbor_changes(desired, bgp_facts, local_asn, idempotent=False)`
+
+Diffs `build_bgp_desired_neighbors` against `aoscx_bgp_facts`.
+
+- **Returns**: `{"push": [{vrf, ip, name, commands}], "remove": [{vrf, ip, commands}], "source": "rest"|"none"}`.
+  `commands` is a complete `aoscx_command` sequence (`configure terminal`,
+  `router bgp`, `vrf` when not default, only the missing lines, `end`).
+  `send-community both` on the device satisfies `extended`.
+- **Idempotent**: also removes IP neighbors that NetBox does not list (any
+  VRF with a BGP router), route-reflector-client from iBGP neighbors that
+  should not have it, and route-maps from eBGP neighbors without a policy.
+- **Without facts** (`bgp_facts` None): every desired neighbor is pushed in
+  full and nothing is removed.
+
+```yaml
+_bgp_neighbor_changes: >-
+  {{ device_bgp_sessions_enriched
+     | build_bgp_desired_neighbors(device_vxlan, is_rr, bgp_ipv4_enabled)
+     | get_bgp_neighbor_changes(aoscx_bgp_facts | default(None), asn, aoscx_idempotent_mode) }}
+```
+
+### `get_bgp_redistribute_changes(bgp_redistribute, bgp_facts, idempotent=False)`
+
+Diffs `bgp_redistribute` (see `get_bgp_redistribute_config`) against the
+`redistribute` attribute of each router in `aoscx_bgp_facts`.
+
+- **Returns**: `{"add": [{vrf, af, protocol}], "remove": [...], "source"}`.
+  `remove` (idempotent only) holds every entry on the device, any protocol,
+  that the config_context does not list. Without facts, `add` is every
+  desired entry and `remove` is empty.
+
+---
+
 ## See Also
 
 - [Filter Plugins Overview](../FILTER_PLUGINS.md)

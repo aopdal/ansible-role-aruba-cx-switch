@@ -74,6 +74,49 @@
     - device_bgp_sessions_enriched is defined
     - device_bgp_sessions_enriched | length > 0
 
+
+# ============================================================================
+# Desired vs. actual (REST facts)
+# ============================================================================
+# build_bgp_desired_neighbors mirrors what this file configures per neighbor
+# (EVPN vs. address-family split, iBGP update-source/next-hop-self, eBGP
+# route-maps, IPv6 send-community, route-reflector-client on RR roles).
+# get_bgp_neighbor_changes / get_bgp_redistribute_changes diff that against
+# aoscx_bgp_facts (tasks/gather_facts_rest_api.yml, needs
+# aoscx_gather_facts_rest_api: true) so only what differs is pushed. Without
+# REST facts every neighbor is pushed in full each run, as before, and the
+# running-config/REST cleanup fallbacks below are used.
+- name: Compute BGP neighbor and redistribute changes
+  ansible.builtin.set_fact:
+    _bgp_neighbor_changes: >-
+      {{ device_bgp_sessions_enriched |
+         build_bgp_desired_neighbors(
+           custom_fields.device_vxlan | default(false) | bool,
+           (device_roles | default([]) | first | default('') | lower) in ['spine', 'route-reflector', 'rr'],
+           bgp_ipv4_enabled | bool) |
+         get_bgp_neighbor_changes(
+           aoscx_bgp_facts | default(None),
+           device_bgp_sessions[0].local_as.asn,
+           aoscx_idempotent_mode | bool) }}
+    _bgp_redistribute_changes: >-
+      {{ bgp_redistribute | default({}) |
+         get_bgp_redistribute_changes(aoscx_bgp_facts | default(None), aoscx_idempotent_mode | bool) }}
+  when:
+    - device_bgp_sessions_enriched is defined
+    - device_bgp_sessions_enriched | length > 0
+
+- name: Debug BGP changes
+  ansible.builtin.debug:
+    msg:
+      - "REST facts used: {{ _bgp_neighbor_changes.source == 'rest' }}"
+      - "Neighbors to update: {{ _bgp_neighbor_changes.push | map(attribute='ip') | list }}"
+      - "Neighbors to remove: {{ _bgp_neighbor_changes.remove | map(attribute='ip') | list }}"
+      - "Redistribute to add: {{ _bgp_redistribute_changes.add }}"
+      - "Redistribute to remove: {{ _bgp_redistribute_changes.remove }}"
+  when:
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+    - _bgp_neighbor_changes is defined
+
 - name: Get BGP routing policy rules and prefix list rules from NetBox BGP plugin
   when:
     - aoscx_use_netbox_bgp_plugin | default(true) | bool
@@ -183,6 +226,12 @@
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
+    # Skip when REST facts show the router with this ASN and router-id.
+    - >-
+      aoscx_bgp_facts is not defined
+      or (aoscx_bgp_facts.asn | string) != (device_bgp_sessions[0].local_as.asn | string)
+      or (aoscx_bgp_facts.vrfs.default | default({})).router_id | default('', true)
+         != custom_fields.device_bgp_routerid | default('not set')
   vars:
     ansible_connection: network_cli
 
@@ -192,9 +241,10 @@
 # Not covered by the netbox-bgp plugin's session data model, so redistribution
 # is driven by the 'bgp_redistribute' config_context key instead - see
 # docs/BGP_CONFIGURATION.md#bgp-redistribution for the expected shape.
-# aoscx_config + match: line diffs against the real running-config, so
-# adding entries is naturally idempotent. Removing entries deleted from
-# config_context is handled separately below, under aoscx_idempotent_mode.
+# With REST facts only entries missing on the device are pushed
+# (get_bgp_redistribute_changes); without them every entry is, and
+# aoscx_config + match: line keeps that idempotent. Removing entries deleted
+# from config_context is handled separately below, under aoscx_idempotent_mode.
 
 - name: Configure BGP redistribution
   arubanetworks.aoscx.aoscx_config:
@@ -205,7 +255,7 @@
          + (['vrf ' ~ item.vrf] if item.vrf != 'default' else [])
          + ['address-family ' ~ item.af ~ ' unicast'] }}
     match: line
-  loop: "{{ bgp_redistribute | default({}) | get_bgp_redistribute_config }}"
+  loop: "{{ _bgp_redistribute_changes.add | default([]) }}"
   loop_control:
     label: "VRF {{ item.vrf }} ({{ item.af }}): redistribute {{ item.protocol }}"
   when:
@@ -213,56 +263,6 @@
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
     - bgp_redistribute | default({}) | length > 0
-  vars:
-    ansible_connection: network_cli
-
-# ============================================================================
-# BGP EVPN Neighbors Configuration
-# ============================================================================
-
-- name: Configure BGP EVPN neighbors from netbox-bgp plugin
-  arubanetworks.aoscx.aoscx_command:
-    commands:
-      - configure terminal
-      - router bgp {{ item.local_as.asn }}
-      - neighbor {{ item.remote_address.address.split('/')[0] }} remote-as {{ item.remote_as.asn }}
-      - neighbor {{ item.remote_address.address.split('/')[0] }} update-source {{ item.local_address.address.split('/')[0] }}
-      - address-family l2vpn evpn
-      - neighbor {{ item.remote_address.address.split('/')[0] }} send-community extended
-      - neighbor {{ item.remote_address.address.split('/')[0] }} activate
-      - exit-address-family
-  loop: "{{ bgp_evpn_sessions | default([]) }}"
-  loop_control:
-    label: "Device: {{ inventory_hostname }} → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }})"
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_evpn_sessions is defined
-    - bgp_evpn_sessions | length > 0
-  vars:
-    ansible_connection: network_cli
-
-# ============================================================================
-# BGP IPv4 Unicast Neighbors (EVPN underlay, dual-AFI on the same session)
-# ============================================================================
-
-- name: Configure BGP IPv4 unicast neighbors from netbox-bgp plugin
-  arubanetworks.aoscx.aoscx_command:
-    commands:
-      - configure terminal
-      - router bgp {{ item.local_as.asn }}
-      - neighbor {{ item.remote_address.address.split('/')[0] }} remote-as {{ item.remote_as.asn }}
-      - neighbor {{ item.remote_address.address.split('/')[0] }} update-source {{ item.local_address.address.split('/')[0] }}
-      - address-family ipv4 unicast
-      - neighbor {{ item.remote_address.address.split('/')[0] }} activate
-      - exit-address-family
-  loop: "{{ bgp_evpn_sessions | default([]) }}"
-  loop_control:
-    label: "Device: {{ inventory_hostname }} → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }})"
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_evpn_sessions is defined
-    - bgp_evpn_sessions | length > 0
-    - bgp_ipv4_enabled | default(false) | bool
   vars:
     ansible_connection: network_cli
 
@@ -339,231 +339,37 @@
     ansible_connection: network_cli
 
 # ============================================================================
-# BGP VRF Neighbors (from netbox-bgp plugin)
+# BGP Neighbors (from netbox-bgp plugin, diffed against REST facts)
 # ============================================================================
-# Sessions whose local_address is assigned to an interface in a non-default VRF
-# are configured here under the matching VRF context inside 'router bgp'.
-# Default-VRF sessions land here too when 'device_vxlan' is not true (see the
-# split above) - for those, 'item._vrf' is 'default' and the 'vrf <name>' /
-# 'exit-vrf' wrapper is omitted below, since the default VRF is the 'router
-# bgp' context itself and AOS-CX has no 'vrf default' sub-mode to enter.
-#
-# The VRF and address-family are derived automatically:
-#   local_address IP → interface in NetBox → interface VRF
-#   IPv4 address → address-family ipv4 unicast
-#   IPv6 address → address-family ipv6 unicast
-#
-# iBGP sessions also get 'update-source <local_address>' so the session
-# sources from the peering address (typically loopback0) rather than
-# whatever interface the device's route to the neighbor happens to egress
-# through - matching the EVPN/underlay neighbor tasks above. eBGP VRF
-# sessions are directly connected by convention and do not need it.
+# One aoscx_command sequence per neighbor that differs, built by
+# get_bgp_neighbor_changes (netbox_filters_lib/bgp_filters.py):
+#   - EVPN neighbors (default VRF when device_vxlan): remote-as,
+#     update-source, 'l2vpn evpn' activate + send-community extended, plus
+#     ipv4 unicast activate when bgp_ipv4_enabled.
+#   - Address-family neighbors (every other VRF, and the default VRF without
+#     VXLAN - no 'vrf' wrapper there, AOS-CX has no 'vrf default' sub-mode).
+#     VRF and AF come from the local address (get_bgp_session_vrf_info).
+#     iBGP: update-source <local address> (the session then sources from the
+#     peering address, typically a loopback), next-hop-self. eBGP: route-map
+#     from the first import/export policy (directly connected by convention,
+#     no update-source). IPv6: send-community extended.
+#   - Route reflector: device role 'spine', 'route-reflector' or 'rr' makes
+#     every iBGP neighbor a route-reflector-client in its AF ('l2vpn evpn'
+#     for EVPN). eBGP neighbors never are.
+# Runs after the prefix lists and route-maps above, which the neighbors
+# reference. Reports changed only when the diff came from REST facts;
+# without them every neighbor is pushed each run and reported unchanged.
 
-- name: Configure BGP VRF iBGP neighbors from netbox-bgp plugin (with next-hop-self)
+- name: Configure BGP neighbors
   arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' remote-as ' ~ item.remote_as.asn,
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' update-source ' ~ item.local_address.address.split('/')[0],
-            'address-family ' ~ item._af ~ ' unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' next-hop-self',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' activate',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
+    commands: "{{ item.commands }}"
+  loop: "{{ _bgp_neighbor_changes.push | default([]) }}"
   loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }} ({{ item._af }})
-      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [iBGP]
+    label: "VRF {{ item.vrf }} → {{ item.ip }} ({{ item.name }})"
+  changed_when: _bgp_neighbor_changes.source == 'rest'
   when:
     - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn == item.remote_as.asn
-  vars:
-    ansible_connection: network_cli
-
-- name: Configure BGP VRF eBGP neighbors from netbox-bgp plugin
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' remote-as ' ~ item.remote_as.asn,
-            'address-family ' ~ item._af ~ ' unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' activate',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }} ({{ item._af }})
-      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [eBGP]
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn != item.remote_as.asn
-  vars:
-    ansible_connection: network_cli
-
-- name: Configure send-community extended for iBGP VRF IPv6 neighbors
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['address-family ipv6 unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' send-community extended',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }}
-      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [iBGP send-community extended]
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn == item.remote_as.asn
-    - item._af == 'ipv6'
-  vars:
-    ansible_connection: network_cli
-
-- name: Configure send-community extended for eBGP VRF IPv6 neighbors
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['address-family ipv6 unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' send-community extended',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }}
-      → {{ item.remote_address.address.split('/')[0] }} ({{ item.name }}) [eBGP send-community extended]
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn != item.remote_as.asn
-    - item._af == 'ipv6'
-  vars:
-    ansible_connection: network_cli
-
-- name: Apply export route-maps to eBGP VRF IPv4 neighbors
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['address-family ipv4 unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~
-              ' route-map ' ~ item.export_policies[0].name ~ ' out',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }}
-      → {{ item.remote_address.address.split('/')[0] }}
-      export: {{ (item.export_policies | default([]))[0].name if item.export_policies | default([]) | length > 0 else 'n/a' }}
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn != item.remote_as.asn
-    - item._af == 'ipv4'
-    - item.export_policies | default([]) | length > 0
-  vars:
-    ansible_connection: network_cli
-
-- name: Apply export route-maps to eBGP VRF IPv6 neighbors
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['address-family ipv6 unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' activate',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~
-              ' route-map ' ~ item.export_policies[0].name ~ ' out',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }}
-      → {{ item.remote_address.address.split('/')[0] }}
-      export: {{ (item.export_policies | default([]))[0].name if item.export_policies | default([]) | length > 0 else 'n/a' }}
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn != item.remote_as.asn
-    - item._af == 'ipv6'
-    - item.export_policies | default([]) | length > 0
-  vars:
-    ansible_connection: network_cli
-
-- name: Apply import route-maps to eBGP VRF IPv4 neighbors
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['address-family ipv4 unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~
-              ' route-map ' ~ item.import_policies[0].name ~ ' in',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }}
-      → {{ item.remote_address.address.split('/')[0] }}
-      import: {{ (item.import_policies | default([]))[0].name if item.import_policies | default([]) | length > 0 else 'n/a' }}
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn != item.remote_as.asn
-    - item._af == 'ipv4'
-    - item.import_policies | default([]) | length > 0
-  vars:
-    ansible_connection: network_cli
-
-- name: Apply import route-maps to eBGP VRF IPv6 neighbors
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['address-family ipv6 unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' activate',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~
-              ' route-map ' ~ item.import_policies[0].name ~ ' in',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }}
-      → {{ item.remote_address.address.split('/')[0] }}
-      import: {{ (item.import_policies | default([]))[0].name if item.import_policies | default([]) | length > 0 else 'n/a' }}
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn != item.remote_as.asn
-    - item._af == 'ipv6'
-    - item.import_policies | default([]) | length > 0
+    - _bgp_neighbor_changes is defined
   vars:
     ansible_connection: network_cli
 
@@ -634,79 +440,31 @@
     ansible_connection: network_cli
 
 # ============================================================================
-# BGP Route Reflector Settings
-# ============================================================================
-# If device role is "spine", "route-reflector", or "rr", automatically
-# configure all iBGP neighbors as route-reflector clients. 'route-reflector-
-# client' only has meaning for iBGP (remote_as == local_as); eBGP sessions
-# are never made RR clients.
-#
-# Two independent groups are covered, matching the EVPN/VRF split earlier in
-# this file:
-#   - 'bgp_evpn_sessions': EVPN/L2VPN overlay neighbors (device_vxlan mode).
-#     'l2vpn evpn' is not a per-VRF address-family on AOS-CX, so this is
-#     always pushed at the 'router bgp' level (no 'vrf' wrapper).
-#   - 'bgp_vrf_sessions': address-family (ipv4/ipv6 unicast) iBGP sessions -
-#     every non-default-VRF session, plus default-VRF sessions when
-#     'device_vxlan' is not true (plain iBGP in the default VRF without
-#     EVPN/VXLAN - see docs/BGP_CONFIGURATION.md#vrf-bgp-sessions-and-routing-policies).
-#     This makes route reflection generic across VRFs and address families,
-#     not just the EVPN/VXLAN fabric case.
-
-- name: Configure BGP EVPN route reflector settings from netbox-bgp plugin (spine role)
-  arubanetworks.aoscx.aoscx_command:
-    commands:
-      - configure terminal
-      - router bgp {{ item.local_as.asn }}
-      - address-family l2vpn evpn
-      - neighbor {{ item.remote_address.address.split('/')[0] }} route-reflector-client
-      - exit-address-family
-  loop: "{{ bgp_evpn_sessions | default([]) }}"
-  loop_control:
-    label: "Device: {{ inventory_hostname }} RR Client: {{ item.remote_address.address.split('/')[0] }}"
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_evpn_sessions is defined
-    - bgp_evpn_sessions | length > 0
-    - item.local_as.asn == item.remote_as.asn
-    - (device_roles | default([]) | first | lower) in ['spine', 'route-reflector', 'rr']
-  vars:
-    ansible_connection: network_cli
-
-- name: Configure BGP address-family route reflector settings from netbox-bgp plugin (spine role)
-  arubanetworks.aoscx.aoscx_command:
-    commands: >-
-      {{ ['configure terminal', 'router bgp ' ~ item.local_as.asn]
-         + (['vrf ' ~ item._vrf] if item._vrf != 'default' else [])
-         + ['address-family ' ~ item._af ~ ' unicast',
-            'neighbor ' ~ item.remote_address.address.split('/')[0] ~ ' route-reflector-client',
-            'exit-address-family']
-         + (['exit-vrf'] if item._vrf != 'default' else []) }}
-  loop: "{{ bgp_vrf_sessions | default([]) }}"
-  loop_control:
-    label: >-
-      Device: {{ inventory_hostname }}
-      VRF: {{ item._vrf }} ({{ item._af }})
-      RR Client: {{ item.remote_address.address.split('/')[0] }}
-  when:
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-    - item.local_as.asn == item.remote_as.asn
-    - (device_roles | default([]) | first | lower) in ['spine', 'route-reflector', 'rr']
-  vars:
-    ansible_connection: network_cli
-
-# ============================================================================
 # BGP Stale Neighbor Cleanup (idempotent mode)
 # ============================================================================
 # Removes BGP neighbors present on the device but absent from NetBox.
 # Only runs when aoscx_idempotent_mode is true and the NetBox BGP plugin is
-# available.  Uses the REST API to read the current device neighbor table and
-# compares it per-VRF against the desired set from NetBox.
+# available. With REST facts, get_bgp_neighbor_changes already lists them,
+# for every VRF on the device with a BGP router (IP neighbors only - peer
+# groups are left alone). Without facts the fallback block below logs in to
+# the REST API itself and checks the default VRF plus the session VRFs.
 
-- name: Remove stale BGP neighbors (idempotent mode)
+- name: Remove stale BGP neighbors from device (REST facts)
+  arubanetworks.aoscx.aoscx_command:
+    commands: "{{ item.commands }}"
+  loop: "{{ _bgp_neighbor_changes.remove | default([]) }}"
+  loop_control:
+    label: "VRF {{ item.vrf }}: no neighbor {{ item.ip }}"
+  changed_when: true
   when:
+    - netbox_bgp_plugin_available | default(false)
+    - _bgp_neighbor_changes is defined
+  vars:
+    ansible_connection: network_cli
+
+- name: Remove stale BGP neighbors (idempotent mode, no REST facts)
+  when:
+    - aoscx_bgp_facts is not defined
     - aoscx_idempotent_mode | default(false) | bool
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
@@ -864,14 +622,18 @@
       vars:
         ansible_connection: network_cli
 
+    # REST facts (get_bgp_redistribute_changes) when available, else the
+    # running-config.
     - name: Identify stale BGP redistribute entries
       ansible.builtin.set_fact:
         _bgp_redistribute_stale: >-
-          {{ bgp_redistribute | default({}) |
-             get_stale_bgp_redistribute(
-               _bgp_running_config.stdout[0],
-               device_bgp_sessions[0].local_as.asn
-             ) }}
+          {{ _bgp_redistribute_changes.remove
+             if _bgp_redistribute_changes.source | default('none') == 'rest' else
+             (bgp_redistribute | default({}) |
+              get_stale_bgp_redistribute(
+                _bgp_running_config.stdout[0],
+                device_bgp_sessions[0].local_as.asn
+              )) }}
 
     - name: Debug stale BGP redistribute entries
       ansible.builtin.debug:

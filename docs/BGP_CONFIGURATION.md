@@ -193,7 +193,45 @@ aoscx_configure_bgp: true
 aoscx_use_netbox_bgp_plugin: true
 # Validate TLS certificates on the role's NetBox API calls
 aoscx_netbox_validate_certs: true
+# EVPN fabrics (device_vxlan): also activate the EVPN neighbors in
+# 'address-family ipv4 unicast' (dual-AFI underlay on the same session)
+bgp_ipv4_enabled: false
+# Recommended: compare against REST facts and push only what differs
+aoscx_gather_facts_rest_api: true
 ```
+
+### Change detection (REST facts)
+
+With `aoscx_gather_facts_rest_api: true`, fact gathering reads the device's
+BGP state into `aoscx_bgp_facts` (see
+[FACT_GATHERING.md](FACT_GATHERING.md)): the router per VRF (`router_id`,
+`redistribute`) and every neighbor (remote-as, update-source, activated
+address families, next-hop-self, route-reflector-client, send-community,
+route-maps, soft-reconfiguration, BFD, password ciphertext, session state).
+`tasks/configure_bgp.yml` then:
+
+1. Builds the desired neighbor state from the netbox-bgp sessions with
+   `build_bgp_desired_neighbors` (the rules in the sections below).
+2. Diffs it with `get_bgp_neighbor_changes` and pushes one CLI sequence per
+   neighbor that differs, containing only the missing lines. A converged
+   device gets no BGP pushes and the run reports `changed=0`. A line the
+   switch rejects (for example a route-map that does not exist) shows up
+   as `changed` again on the next run instead of being silently ignored.
+3. Diffs `bgp_redistribute` with `get_bgp_redistribute_changes`.
+4. Skips the router process push when the ASN and router-id already match.
+
+In `aoscx_idempotent_mode` the same diff also lists what to remove:
+neighbors (IP addresses only; peer groups are left alone) in any VRF on the
+device that NetBox has no session for, `redistribute` entries not in
+`bgp_redistribute`, route-reflector-client on iBGP neighbors that should not
+have it, and route-maps on eBGP neighbors whose NetBox policy was removed.
+
+Without REST facts every neighbor is pushed in full on each run (reported
+unchanged), and cleanup falls back to its own REST query (stale neighbors,
+default VRF plus session VRFs) and `show running-config`
+(redistribute). Neighbor options and global `bfd` cleanup always use
+`show running-config`, because REST has no field for arbitrary
+`bgp_neighbor_options` lines.
 
 ## Running BGP Configuration
 
@@ -725,9 +763,10 @@ router bgp 65015
   flattens `bgp_redistribute` into a list of `{vrf, af, protocol}` entries.
 - `tasks/configure_bgp.yml` pushes each entry with `aoscx_config` using
   nested `parents` (`router bgp <asn>` → `vrf <name>` if not `default` →
-  `address-family <af> unicast`) and `match: line`, the same pattern used
-  for the BGP router process task — this diffs against the real
-  running-config, so adding entries is naturally idempotent.
+  `address-family <af> unicast`) and `match: line`. With REST facts only
+  entries missing on the device are pushed
+  (`get_bgp_redistribute_changes`); without them `match: line` keeps the
+  push idempotent.
 - The BGP ASN and router-id always come from the netbox-bgp plugin session
   data (`device_bgp_sessions[0].local_as.asn`), not from a separate
   config_context value, so there is a single source of truth for the ASN.
@@ -737,17 +776,15 @@ router bgp 65015
 `aoscx_config` only ever adds missing lines — it never removes a
 `redistribute` statement that was deleted from `bgp_redistribute`. When
 `aoscx_idempotent_mode: true`, a separate cleanup step in
-`tasks/configure_bgp.yml`:
+`tasks/configure_bgp.yml` pushes `no redistribute <protocol>` for every
+`redistribute` on the device (any protocol, any VRF) that
+`bgp_redistribute` does not list for that VRF/address-family:
 
-1. Runs `show running-config` on the device (CLI, not REST — there is no
-   documented REST field for per-address-family redistribute state).
-2. Parses the `router bgp <asn>` block with `get_stale_bgp_redistribute()`
-   to find `redistribute` statements no longer present in
-   `bgp_redistribute` for their VRF/address-family.
-3. Pushes `no redistribute <protocol>` for each stale entry.
-
-This mirrors the existing stale-BGP-neighbor cleanup in the same file, just
-driven by CLI text instead of a REST facts diff.
+- With REST facts the stale entries come from
+  `get_bgp_redistribute_changes` (the router's `redistribute` attribute,
+  per address family).
+- Without them, `show running-config` is parsed with
+  `get_stale_bgp_redistribute()`.
 
 ---
 

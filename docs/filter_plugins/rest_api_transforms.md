@@ -239,6 +239,52 @@ Flattens DHCP relay (`ip helper-address`) REST API data into a simple per-interf
 
 ---
 
+### 6. `rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None)`
+
+Builds `aoscx_bgp_facts` from the three BGP queries in
+`tasks/gather_facts_rest_api.yml`.
+
+#### Parameters
+
+- **vrfs_data**: JSON from `/system/vrfs?attributes=name,bgp_routers&depth=4`
+  (`bgp_neighbors` stays a URI at any depth, hence the second query).
+- **neighbor_results**: the registered `results` of the
+  `.../bgp_routers/{asn}/bgp_neighbors?depth=2` loop; each entry needs
+  `item: {vrf, asn}`, `status` and `json`. Non-200 entries are ignored.
+- **system_data**: JSON from `/system?attributes=bfd_enable`.
+
+#### Returns
+
+```python
+{
+  "asn": 65015,            # None when no BGP router exists
+  "bfd_enable": True,      # global 'bfd'
+  "vrfs": {
+    "lab-blue": {
+      "router_id": None,
+      "redistribute": {"ipv4": ["static"]},
+      "neighbors": {
+        "172.27.250.32": {
+          "remote_as": 65020, "update_source": None, "shutdown": False,
+          "activate": ["ipv4"], "next_hop_self": [],
+          "route_reflector_client": [], "soft_reconfiguration_inbound": ["ipv4"],
+          "send_community": {},               # only AFs not 'none'
+          "route_maps": {"ipv4": {"in": "GW-IN", "out": "BLUE-OUT"}},
+          "bfd": True, "fall_over": False,
+          "password": None,                   # ciphertext when set
+          "state": "Established",
+        }
+      }
+    }
+  }
+}
+```
+
+REST AF keys are shortened (`ipv4-unicast` → `ipv4`, `l2vpn-evpn` →
+`evpn`); route-map names come from the last segment of the route-map URI.
+
+---
+
 ## Complete Enhanced Facts Workflow
 
 This example shows how these transforms work together to provide full device state for idempotent change detection:

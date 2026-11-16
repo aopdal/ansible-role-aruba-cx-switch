@@ -309,6 +309,159 @@ def rest_api_to_aoscx_dhcp_relays(rest_data):
     return result
 
 
+# AOS-CX REST address-family keys -> the role's short names. 'evpn' is the
+# 'address-family l2vpn evpn' context.
+_BGP_AF_NAMES = {
+    "ipv4-unicast": "ipv4",
+    "ipv6-unicast": "ipv6",
+    "l2vpn-evpn": "evpn",
+    "vpnv4-unicast": "vpnv4",
+}
+
+
+def _bgp_afs_enabled(af_map):
+    """Sorted short AF names whose value is true in a REST per-AF bool map."""
+    if not isinstance(af_map, dict):
+        return []
+    return sorted(
+        _BGP_AF_NAMES[key]
+        for key, enabled in af_map.items()
+        if key in _BGP_AF_NAMES and enabled is True
+    )
+
+
+def _bgp_neighbor_facts(neighbor):
+    """Normalise one REST BGP_Neighbor object (depth=2)."""
+    send_community = {}
+    for key, value in (neighbor.get("send_community") or {}).items():
+        if key in _BGP_AF_NAMES and value and value != "none":
+            send_community[_BGP_AF_NAMES[key]] = value
+
+    # route_maps is keyed "<af>,<in|out>" with a URI whose last path
+    # segment is the (URL-encoded) route-map name.
+    route_maps = {}
+    for key, uri in (neighbor.get("route_maps") or {}).items():
+        af_key, _, direction = key.partition(",")
+        if af_key not in _BGP_AF_NAMES or direction not in ("in", "out"):
+            continue
+        name = unquote(str(uri).rstrip("/").rsplit("/", 1)[-1]) if uri else None
+        if name:
+            route_maps.setdefault(_BGP_AF_NAMES[af_key], {})[direction] = name
+
+    status = neighbor.get("status") or {}
+    return {
+        "remote_as": neighbor.get("remote_as"),
+        "update_source": neighbor.get("update_source") or None,
+        "shutdown": neighbor.get("shutdown") is True,
+        "activate": _bgp_afs_enabled(neighbor.get("activate")),
+        "next_hop_self": _bgp_afs_enabled(neighbor.get("next_hop_self")),
+        "route_reflector_client": _bgp_afs_enabled(
+            neighbor.get("route_reflector_client")
+        ),
+        "soft_reconfiguration_inbound": _bgp_afs_enabled(
+            neighbor.get("inbound_soft_reconfiguration")
+        ),
+        "send_community": send_community,
+        "route_maps": route_maps,
+        "bfd": neighbor.get("bfd_enable") is True,
+        "fall_over": neighbor.get("fall_over") is True,
+        # Ciphertext as stored on the device (never cleartext).
+        "password": neighbor.get("password") or None,
+        "state": status.get("bgp_peer_state") if isinstance(status, dict) else None,
+    }
+
+
+def rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None):
+    """Build aoscx_bgp_facts from the BGP REST queries.
+
+    Args:
+        vrfs_data: JSON from
+            ``/system/vrfs?attributes=name,bgp_routers&depth=4`` - VRFs
+            keyed by name, each with ``bgp_routers`` keyed by ASN
+            (``bgp_neighbors`` stays a URI at any depth).
+        neighbor_results: The registered ``results`` list of the per-router
+            ``.../bgp_routers/{asn}/bgp_neighbors?depth=2`` loop. Each entry
+            needs ``item`` (``{"vrf": ..., "asn": ...}``), ``status`` and
+            ``json``; non-200 entries are ignored.
+        system_data: JSON from ``/system?attributes=bfd_enable``.
+
+    Returns:
+        Dict::
+
+            {
+              "asn": 65015,              # None when no BGP router exists
+              "bfd_enable": True,        # global 'bfd'
+              "vrfs": {
+                "lab-blue": {
+                  "router_id": None,
+                  "redistribute": {"ipv4": ["static"]},
+                  "neighbors": {
+                    "172.27.250.32": {
+                      "remote_as": 65020, "update_source": None,
+                      "activate": ["ipv4"], "next_hop_self": [],
+                      "route_reflector_client": [],
+                      "soft_reconfiguration_inbound": ["ipv4"],
+                      "send_community": {},
+                      "route_maps": {"ipv4": {"in": "GW-IN", "out": "OUT"}},
+                      "bfd": True, "fall_over": False, "password": None,
+                      "shutdown": False, "state": "Established"
+                    }
+                  }
+                }
+              }
+            }
+
+        Only VRFs with a BGP router appear under ``vrfs``. AF names are
+        ``ipv4``/``ipv6``/``evpn``/``vpnv4``; AF lists are sorted.
+    """
+    result = {
+        "asn": None,
+        "bfd_enable": bool((system_data or {}).get("bfd_enable"))
+        if isinstance(system_data, dict)
+        else False,
+        "vrfs": {},
+    }
+    if not isinstance(vrfs_data, dict):
+        return result
+
+    for vrf_name, vrf in sorted(vrfs_data.items()):
+        routers = vrf.get("bgp_routers") if isinstance(vrf, dict) else None
+        if not isinstance(routers, dict) or not routers:
+            continue
+        # AOS-CX runs a single BGP instance; every VRF carries the same ASN.
+        asn_key, router = sorted(routers.items())[0]
+        if result["asn"] is None:
+            try:
+                result["asn"] = int(asn_key)
+            except (TypeError, ValueError):
+                result["asn"] = asn_key
+        router = router if isinstance(router, dict) else {}
+        redistribute = {}
+        for af_key, protocols in (router.get("redistribute") or {}).items():
+            if af_key in _BGP_AF_NAMES and isinstance(protocols, list) and protocols:
+                redistribute[_BGP_AF_NAMES[af_key]] = sorted(protocols)
+        result["vrfs"][vrf_name] = {
+            "router_id": router.get("router_id") or None,
+            "redistribute": redistribute,
+            "neighbors": {},
+        }
+
+    for entry in neighbor_results or []:
+        if not isinstance(entry, dict) or entry.get("status") != 200:
+            continue
+        vrf_name = (entry.get("item") or {}).get("vrf")
+        neighbors = entry.get("json")
+        if vrf_name not in result["vrfs"] or not isinstance(neighbors, dict):
+            continue
+        for ip, neighbor in neighbors.items():
+            if isinstance(neighbor, dict):
+                result["vrfs"][vrf_name]["neighbors"][ip] = _bgp_neighbor_facts(
+                    neighbor
+                )
+
+    return result
+
+
 class FilterModule:
     """Ansible filter plugin for REST API data transformation."""
 
@@ -320,4 +473,5 @@ class FilterModule:
             "rest_api_to_aoscx_evpn_vlans": rest_api_to_aoscx_evpn_vlans,
             "rest_api_to_aoscx_vnis": rest_api_to_aoscx_vnis,
             "rest_api_to_aoscx_dhcp_relays": rest_api_to_aoscx_dhcp_relays,
+            "rest_api_to_aoscx_bgp": rest_api_to_aoscx_bgp,
         }

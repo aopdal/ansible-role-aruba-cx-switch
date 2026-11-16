@@ -166,6 +166,9 @@ aoscx_force_l2_config: false
 
 # NetBox BGP plugin settings
 aoscx_use_netbox_bgp_plugin: true # Query the netbox-bgp plugin for BGP sessions; set false to disable BGP configuration
+# EVPN fabrics (device_vxlan): also activate the default-VRF EVPN neighbors in
+# 'address-family ipv4 unicast' (dual-AFI underlay on the same session).
+bgp_ipv4_enabled: false
 aoscx_netbox_validate_certs: true # Validate SSL certificates when querying NetBox API
 # DEPRECATED: aoscx_no_log has no effect and will be removed in a future
 # version. Every task in the role that touches a secret (NetBox API tokens,

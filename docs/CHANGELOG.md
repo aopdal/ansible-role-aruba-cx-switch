@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- BGP: REST fact gathering (`aoscx_bgp_facts`, with
+  `aoscx_gather_facts_rest_api: true`) for the router in each VRF, every
+  neighbor and the global `bfd`. New filters: `rest_api_to_aoscx_bgp`,
+  `build_bgp_desired_neighbors`, `get_bgp_neighbor_changes`,
+  `get_bgp_redistribute_changes`.
+- `bgp_ipv4_enabled` is declared in `defaults/main.yml` (`false`) and
+  documented. It was read before but never declared.
+
+### Changed
+
+- BGP: with REST facts, neighbors and `redistribute` entries are compared
+  with the device and only what differs is pushed, so a converged device
+  reports `changed=0`. A neighbor line the switch rejects (for example a
+  route-map that does not exist) is reported as `changed` on every run
+  instead of being silently ignored. The router process push is skipped
+  when ASN and router-id match. The per-attribute neighbor tasks (EVPN,
+  IPv4 underlay, VRF iBGP/eBGP, send-community, route-maps, route
+  reflector) are replaced by one push per neighbor. Without REST facts
+  every neighbor is still pushed in full, as before.
+- BGP idempotent mode with REST facts: stale neighbors are removed in every
+  VRF on the device that has a BGP router (before: only the default VRF and
+  VRFs with a NetBox session), IP neighbors only. It also removes
+  route-reflector-client from iBGP neighbors that should not have it and
+  route-maps from eBGP neighbors whose NetBox policy was removed.
+
+### Fixed
+
+- BGP: idempotent cleanup of stale `redistribute` entries and
+  `bgp_neighbor_options` now works inside VRFs. AOS-CX prints a `!` line
+  between the global `router bgp` section and each `vrf` section, and the
+  running-config parser treated it as the end of `router bgp`, so nothing
+  under a VRF was ever found or removed.
+
 ## [0.18.9] - 2026-11-16
 
 ### Added
