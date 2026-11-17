@@ -649,8 +649,68 @@ class TestRestApiToAoscxBgp:
 
     def test_no_bgp_configured(self):
         result = rest_api_to_aoscx_bgp({"default": {"bgp_routers": {}}}, [], {"bfd_enable": False})
-        assert result == {"asn": None, "bfd_enable": False, "vrfs": {}}
+        assert result == {"asn": None, "bfd_enable": False, "prefix_lists": None, "route_maps": None, "vrfs": {}}
 
     @pytest.mark.parametrize("bad", [None, [], "x"])
     def test_invalid_input(self, bad):
-        assert rest_api_to_aoscx_bgp(bad, bad, bad) == {"asn": None, "bfd_enable": False, "vrfs": {}}
+        assert rest_api_to_aoscx_bgp(bad, bad, bad) == {"asn": None, "bfd_enable": False, "prefix_lists": None, "route_maps": None, "vrfs": {}}
+
+    def test_prefix_lists_and_route_maps(self):
+        prefix_lists = {
+            "LAB-GW-IPV4": {
+                "address_family": "ipv4", "name": "LAB-GW-IPV4", "origin": "local-prefix-list",
+                "prefix_list_entries": {
+                    "10": {"action": "permit", "ge": None, "le": None, "preference": 10, "prefix": "0.0.0.0/0"},
+                    "15": {"action": "permit", "ge": None, "le": 24, "preference": 15, "prefix": "172.16.3.0/24"},
+                },
+            },
+            "EMPTY": {"address_family": "ipv6", "name": "EMPTY", "prefix_list_entries": {}},
+        }
+        route_maps = {
+            "LAB-GW-IPV4-IN-01": {
+                "name": "LAB-GW-IPV4-IN-01",
+                "route_map_entries": {
+                    "10": {
+                        "action": "permit", "preference": 10,
+                        "match_ipv4_prefix_list": {"LAB-GW-IPV4": "/rest/v10.16/system/prefix_lists/LAB-GW-IPV4"},
+                        "match_ipv6_prefix_list": None,
+                        "set": {"local_preference": 300},
+                    },
+                    "20": {
+                        "action": "deny", "preference": 20,
+                        "match_ipv4_prefix_list": None,
+                        "match_ipv6_prefix_list": {"LAB-GW-IPV6": "/x"},
+                        "set": {"as_path_prepend": "65015  65015", "metric": 5, "weight": None},
+                    },
+                },
+            },
+        }
+        result = rest_api_to_aoscx_bgp(self._VRFS, None, None, prefix_lists, route_maps)
+        assert result["prefix_lists"] == {
+            "LAB-GW-IPV4": {"af": "ipv4", "entries": {
+                10: {"action": "permit", "prefix": "0.0.0.0/0", "ge": None, "le": None},
+                15: {"action": "permit", "prefix": "172.16.3.0/24", "ge": None, "le": 24},
+            }},
+            "EMPTY": {"af": "ipv6", "entries": {}},
+        }
+        assert result["route_maps"] == {
+            "LAB-GW-IPV4-IN-01": {
+                10: {"action": "permit", "lines": [
+                    "match ip address prefix-list LAB-GW-IPV4",
+                    "set local-preference 300"]},
+                20: {"action": "deny", "lines": [
+                    "match ipv6 address prefix-list LAB-GW-IPV6",
+                    "set as-path prepend 65015 65015",
+                    "set metric 5"]},
+            }
+        }
+
+    def test_policy_facts_none_when_not_queried(self):
+        result = rest_api_to_aoscx_bgp(self._VRFS)
+        assert result["prefix_lists"] is None
+        assert result["route_maps"] is None
+
+    def test_no_policies_on_device(self):
+        result = rest_api_to_aoscx_bgp(self._VRFS, None, None, {}, {})
+        assert result["prefix_lists"] == {}
+        assert result["route_maps"] == {}

@@ -84,13 +84,15 @@ means no `aoscx_interface_split_facts`, and the split task then reads the
 running-config instead. See [INTERFACE_SPLIT.md](INTERFACE_SPLIT.md).
 
 BGP facts (`aoscx_bgp_facts`, devices with `device_bgp` when
-`aoscx_configure_bgp` or `aoscx_test_mode` is set) take three requests:
+`aoscx_configure_bgp` or `aoscx_test_mode` is set) take these requests:
 `/system/vrfs?attributes=name,bgp_routers&depth=4` for the router in each
 VRF, one `.../bgp_routers/{asn}/bgp_neighbors?depth=2` per router
 (`bgp_neighbors` stays a URI at any depth), and
-`/system?attributes=bfd_enable` for the global `bfd`. The ASN comes from
-the device, so no NetBox data is needed. `rest_api_to_aoscx_bgp` turns
-these into `{asn, bfd_enable, vrfs: {vrf: {router_id, redistribute,
+`/system?attributes=bfd_enable` for the global `bfd`, and
+`/system/prefix_lists?depth=4` plus `/system/route_maps?depth=4` (entries
+are inline from depth 4). The ASN comes from the device, so no NetBox data
+is needed. `rest_api_to_aoscx_bgp` turns these into `{asn, bfd_enable,
+prefix_lists, route_maps, vrfs: {vrf: {router_id, redistribute,
 neighbors}}}`; see [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md#change-detection-rest-facts).
 
 #### Interface MTU fields

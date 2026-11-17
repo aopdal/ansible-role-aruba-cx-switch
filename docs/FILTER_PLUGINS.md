@@ -322,7 +322,7 @@ ansible-playbook your-playbook.yml
 
 ```
 filter_plugins/
-├── netbox_filters.py                    # Main entry point (FilterModule class, 62 filters)
+├── netbox_filters.py                    # Main entry point (FilterModule class, 85 filters)
 ├── rest_api_transforms.py               # Separate FilterModule (6 filters)
 └── netbox_filters_lib/                  # Package directory (role root, not inside filter_plugins/)
     ├── __init__.py                      # Package initialization
@@ -330,7 +330,7 @@ filter_plugins/
     ├── l3_config_helpers.py             # L3 configuration optimization (583 lines)
     ├── vlan_filters.py                  # VLAN operations (952 lines)
     ├── vrf_filters.py                   # VRF operations (428 lines)
-    ├── bgp_filters.py                   # BGP session enrichment, policy, redistribute, neighbor options, BFD (899 lines)
+    ├── bgp_filters.py                   # BGP session enrichment, policy, redistribute, neighbor options, BFD (1344 lines)
     ├── interface_categorization.py      # L2/L3 interface categorization (325 lines)
     ├── interface_ip_processing.py       # IP address matching (103 lines)
     ├── interface_change_detection.py    # Change detection orchestration (760 lines)
@@ -732,7 +732,7 @@ orchestration described below and calls into those helpers per interface.
 ### `bgp_filters.py` - BGP Session Enrichment, Policy, Redistribution, Neighbor Options, BFD
 
 BGP session enrichment and config-building against the NetBox BGP plugin
-(8 filters, 899 lines):
+(13 filters, 1344 lines):
 
 - **`get_bgp_session_vrf_info(sessions, interfaces)`**
     - Enrich BGP session objects with VRF and address-family by cross-referencing interface IP assignments
@@ -808,6 +808,17 @@ BGP session enrichment and config-building against the NetBox BGP plugin
 - **`get_bgp_redistribute_changes(bgp_redistribute, bgp_facts, idempotent=False)`**
     - Diffs the `bgp_redistribute` config_context against `aoscx_bgp_facts`
     - Returns: `{add: [{vrf, af, protocol}], remove: [...], source}`
+
+- **`get_bgp_policy_changes(policy_data, bgp_facts)`**
+    - Reduces `collect_ebgp_vrf_policy_config` output to the prefix-list
+      entries and route-map rules missing from `aoscx_bgp_facts`
+    - Returns: `{prefix_lists, route_map_rules, source}`; without the
+      policy facts everything is returned (`source: none`)
+
+- **`get_missing_bgp_neighbor_options(bgp_neighbor_options, sessions, running_config, local_asn)`**
+    - Counterpart of `get_stale_bgp_neighbor_options`: desired
+      `bgp_neighbor_options` lines not yet in the running-config
+    - Returns: List of `{vrf, af, neighbor_ip, command}`
 
 ### `port_access.py` - Port-Access Diff
 
@@ -1486,7 +1497,7 @@ Debug messages show:
 ### Module Dependencies
 
 ```
-netbox_filters.py (main entry point, 62 filters)
+netbox_filters.py (main entry point, 85 filters)
     ├── utils.py (no dependencies)
     ├── vlan_filters.py → utils
     ├── vrf_filters.py → utils
@@ -1519,7 +1530,7 @@ rest_api_transforms.py (separate entry point, 6 filters — no dependency on net
 
 ## Statistics
 
-- **Total Filters**: 78 (72 in `netbox_filters.py` + 6 in `rest_api_transforms.py`)
+- **Total Filters**: 91 (85 in `netbox_filters.py` + 6 in `rest_api_transforms.py`)
 - **Total Lines**: ~6,500 in `netbox_filters_lib/` (including docstrings and comments), plus ~460 across the two plugin entry-point files
 - **Modules**: 19 in `netbox_filters_lib/`, across 2 plugin files
 - **Test Coverage**: Unit-tested per module under `tests/unit/`; used in production for 100+ switches
@@ -1530,7 +1541,7 @@ rest_api_transforms.py (separate entry point, 6 filters — no dependency on net
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
 | `vlan_filters.py` | 14 | 952 | VLAN lifecycle management (incl. IGMP/voice/name change detection, VLAN-group exclusion) |
-| `bgp_filters.py` | 11 | 899 | BGP session enrichment, policy, redistribute, neighbor options, BFD |
+| `bgp_filters.py` | 13 | 1344 | BGP session enrichment, policy, redistribute, neighbor options, BFD |
 | `interface_change_detection.py` | 1 | 760 | Change detection orchestration & idempotency |
 | `interface_ip_comparisons.py` | 0 (internal) | 681 | IPv4/IPv6/VRF/anycast/DHCP relay comparison |
 | `l3_config_helpers.py` | 8 | 583 | L3 configuration optimization (incl. ip helper-address) |

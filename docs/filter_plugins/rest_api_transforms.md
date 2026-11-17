@@ -241,9 +241,9 @@ Flattens DHCP relay (`ip helper-address`) REST API data into a simple per-interf
 
 ---
 
-### 6. `rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None)`
+### 6. `rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None, prefix_lists_data=None, route_maps_data=None)`
 
-Builds `aoscx_bgp_facts` from the three BGP queries in
+Builds `aoscx_bgp_facts` from the BGP queries in
 `tasks/gather_facts_rest_api.yml`.
 
 #### Parameters
@@ -254,6 +254,10 @@ Builds `aoscx_bgp_facts` from the three BGP queries in
   `.../bgp_routers/{asn}/bgp_neighbors?depth=2` loop; each entry needs
   `item: {vrf, asn}`, `status` and `json`. Non-200 entries are ignored.
 - **system_data**: JSON from `/system?attributes=bfd_enable`.
+- **prefix_lists_data**: JSON from `/system/prefix_lists?depth=4`. At depth
+  3 and below the entries are only URIs; from depth 4 they are inline.
+- **route_maps_data**: JSON from `/system/route_maps?depth=4` (same depth
+  rule).
 
 #### Returns
 
@@ -261,6 +265,15 @@ Builds `aoscx_bgp_facts` from the three BGP queries in
 {
   "asn": 65015,            # None when no BGP router exists
   "bfd_enable": True,      # global 'bfd'
+  "prefix_lists": {        # None when not queried
+    "LAB-GW-IPV4": {"af": "ipv4", "entries": {
+      10: {"action": "permit", "prefix": "0.0.0.0/0", "ge": None, "le": None}}}
+  },
+  "route_maps": {          # None when not queried
+    "LAB-GW-IPV4-IN-01": {10: {"action": "permit", "lines": [
+      "match ip address prefix-list LAB-GW-IPV4",
+      "set local-preference 300"]}}
+  },
   "vrfs": {
     "lab-blue": {
       "router_id": None,
@@ -284,6 +297,12 @@ Builds `aoscx_bgp_facts` from the three BGP queries in
 
 REST AF keys are shortened (`ipv4-unicast` → `ipv4`, `l2vpn-evpn` →
 `evpn`); route-map names come from the last segment of the route-map URI.
+Route-map entries are turned back into the CLI lines the role pushes
+(`match_ipv4_prefix_list` → `match ip address prefix-list <name>`,
+`set.local_preference` → `set local-preference <n>`,
+`set.as_path_prepend` → `set as-path prepend <asns>`; other `set` keys
+become `set <key-with-dashes> <value>`), so `get_bgp_policy_changes` can
+compare them line by line.
 
 ---
 

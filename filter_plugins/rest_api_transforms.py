@@ -391,7 +391,90 @@ def _bgp_neighbor_facts(neighbor):
     }
 
 
-def rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None):
+def _bgp_prefix_list_facts(prefix_lists_data):
+    """Prefix lists from ``/system/prefix_lists?depth=4``, or None."""
+    if not isinstance(prefix_lists_data, dict):
+        return None
+    result = {}
+    for name, plist in prefix_lists_data.items():
+        if not isinstance(plist, dict):
+            continue
+        entries = {}
+        for seq, entry in (plist.get("prefix_list_entries") or {}).items():
+            if not isinstance(entry, dict):
+                continue
+            try:
+                seq = int(seq)
+            except (TypeError, ValueError):
+                continue
+            entries[seq] = {
+                "action": entry.get("action"),
+                "prefix": entry.get("prefix"),
+                "ge": entry.get("ge"),
+                "le": entry.get("le"),
+            }
+        result[name] = {"af": plist.get("address_family") or "ipv4", "entries": entries}
+    return result
+
+
+# REST 'set' keys of a route-map entry and the CLI keyword they map to.
+_ROUTE_MAP_SET_CLI = {
+    "local_preference": "local-preference",
+    "as_path_prepend": "as-path prepend",
+}
+
+
+def _bgp_route_map_lines(entry):
+    """CLI match/set lines for one REST route-map entry, sorted."""
+    lines = []
+    for field, cli in (
+        ("match_ipv4_prefix_list", "match ip address prefix-list"),
+        ("match_ipv6_prefix_list", "match ipv6 address prefix-list"),
+    ):
+        for name in entry.get(field) or {}:
+            lines.append(f"{cli} {name}")
+    for key, value in (entry.get("set") or {}).items():
+        if value is None:
+            continue
+        if isinstance(value, list):
+            value = " ".join(str(v) for v in value)
+        value = " ".join(str(value).split())
+        cli = _ROUTE_MAP_SET_CLI.get(key, key.replace("_", "-"))
+        lines.append(f"set {cli} {value}")
+    return sorted(lines)
+
+
+def _bgp_route_map_facts(route_maps_data):
+    """Route-maps from ``/system/route_maps?depth=4``, or None."""
+    if not isinstance(route_maps_data, dict):
+        return None
+    result = {}
+    for name, rmap in route_maps_data.items():
+        if not isinstance(rmap, dict):
+            continue
+        entries = {}
+        for seq, entry in (rmap.get("route_map_entries") or {}).items():
+            if not isinstance(entry, dict):
+                continue
+            try:
+                seq = int(seq)
+            except (TypeError, ValueError):
+                continue
+            entries[seq] = {
+                "action": entry.get("action"),
+                "lines": _bgp_route_map_lines(entry),
+            }
+        result[name] = entries
+    return result
+
+
+def rest_api_to_aoscx_bgp(
+    vrfs_data,
+    neighbor_results=None,
+    system_data=None,
+    prefix_lists_data=None,
+    route_maps_data=None,
+):
     """Build aoscx_bgp_facts from the BGP REST queries.
 
     Args:
@@ -404,6 +487,9 @@ def rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None):
             needs ``item`` (``{"vrf": ..., "asn": ...}``), ``status`` and
             ``json``; non-200 entries are ignored.
         system_data: JSON from ``/system?attributes=bfd_enable``.
+        prefix_lists_data: JSON from ``/system/prefix_lists?depth=4``
+            (entries are inline from depth 4).
+        route_maps_data: JSON from ``/system/route_maps?depth=4``.
 
     Returns:
         Dict::
@@ -411,6 +497,16 @@ def rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None):
             {
               "asn": 65015,              # None when no BGP router exists
               "bfd_enable": True,        # global 'bfd'
+              "prefix_lists": {          # None when not queried
+                "LAB-GW-IPV4": {"af": "ipv4", "entries": {
+                  10: {"action": "permit", "prefix": "0.0.0.0/0",
+                       "ge": None, "le": None}}}
+              },
+              "route_maps": {            # None when not queried
+                "LAB-GW-IPV4-IN-01": {10: {"action": "permit", "lines": [
+                  "match ip address prefix-list LAB-GW-IPV4",
+                  "set local-preference 300"]}}
+              },
               "vrfs": {
                 "lab-blue": {
                   "router_id": None,
@@ -439,6 +535,8 @@ def rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None):
         "bfd_enable": bool((system_data or {}).get("bfd_enable"))
         if isinstance(system_data, dict)
         else False,
+        "prefix_lists": _bgp_prefix_list_facts(prefix_lists_data),
+        "route_maps": _bgp_route_map_facts(route_maps_data),
         "vrfs": {},
     }
     if not isinstance(vrfs_data, dict):

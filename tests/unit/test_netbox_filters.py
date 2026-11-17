@@ -79,6 +79,8 @@ EXPECTED_FILTER_NAMES = {
     "build_bgp_desired_neighbors",
     "get_bgp_neighbor_changes",
     "get_bgp_redistribute_changes",
+    "get_bgp_policy_changes",
+    "get_missing_bgp_neighbor_options",
     "port_access_diff",
     "port_access_facts_from_device_profiles",
     "port_access_orphans",

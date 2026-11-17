@@ -14,7 +14,10 @@ from netbox_filters_lib.bgp_filters import (
     build_bgp_desired_neighbors,
     get_bgp_neighbor_changes,
     get_bgp_redistribute_changes,
+    get_bgp_policy_changes,
+    get_missing_bgp_neighbor_options,
 )
+from rest_api_transforms import rest_api_to_aoscx_bgp
 
 
 def _session(name, local_address):
@@ -1724,3 +1727,232 @@ class TestGetBgpRedistributeChanges:
             {"vrf": "lab-blue", "af": "ipv4", "protocol": "connected"},
         ]
         assert get_bgp_redistribute_changes(self._CTX, facts, False)["remove"] == []
+
+
+# ---------------------------------------------------------------------------
+# Running-config based change detection (prefix lists, route-maps, options)
+# ---------------------------------------------------------------------------
+
+# Trimmed from ao-02 'show running-config' (AOS-CX 10.16).
+_POLICY_RUNNING_CONFIG = """bfd
+ip prefix-list LAB-BLUE-IPV4 seq 10 permit 172.27.4.0/24
+ipv6 prefix-list LAB-BLUE-IPV6 seq 10 permit 2a02:20c8:5921:da10::/60
+ip prefix-list LAB-GW-IPV4 seq 10 permit 0.0.0.0/0
+ip prefix-list LAB-GW-IPV4 seq 15 permit 172.16.3.0/24
+route-map LAB-BLUE-IPV4-OUT-02 permit seq 10
+     match ip address prefix-list LAB-BLUE-IPV4
+     set as-path prepend 65015 65015
+route-map LAB-GW-IPV6-IN-02 permit seq 10
+     match ipv6 address prefix-list LAB-GW-IPV6
+     set local-preference 200
+router bgp 65015
+    bgp router-id 172.27.252.1
+!
+    vrf lab-blue
+        neighbor 172.27.250.34 remote-as 65020
+        neighbor 172.27.250.34 fall-over bfd
+        neighbor 2a02:20c8:5921:da1f::2 remote-as 65020
+        address-family ipv4 unicast
+            neighbor 172.27.250.34 soft-reconfiguration inbound
+            neighbor 172.27.250.34 activate
+        exit-address-family
+!
+"""
+
+_POLICY_DATA = {
+    "prefix_lists": [
+        {"name": "LAB-BLUE-IPV4", "af": "ipv4",
+         "rules": [{"index": 10, "action": "permit", "prefix": "172.27.4.0/24"}]},
+        {"name": "LAB-BLUE-IPV6", "af": "ipv6",
+         "rules": [{"index": 10, "action": "permit",
+                    "prefix": "2a02:20c8:5921:da10:0::/60"}]},
+        {"name": "LAB-GW-IPV4", "af": "ipv4",
+         "rules": [{"index": 10, "action": "permit", "prefix": "0.0.0.0/0"},
+                   {"index": 15, "action": "permit", "prefix": "172.16.3.0/24"}]},
+    ],
+    "route_map_rules": [
+        {"name": "LAB-BLUE-IPV4-OUT-02", "index": 10, "action": "permit",
+         "commands": ["route-map LAB-BLUE-IPV4-OUT-02 permit seq 10",
+                      "match ip address prefix-list LAB-BLUE-IPV4",
+                      "set as-path prepend 65015 65015"]},
+        {"name": "LAB-GW-IPV6-IN-02", "index": 10, "action": "permit",
+         "commands": ["route-map LAB-GW-IPV6-IN-02 permit seq 10",
+                      "match ipv6 address prefix-list LAB-GW-IPV6",
+                      "set local-preference 200"]},
+    ],
+}
+
+
+def _policy_facts(**overrides):
+    """aoscx_bgp_facts policy part built from trimmed ao-02 REST payloads."""
+    prefix_lists = {
+        "LAB-BLUE-IPV4": {"address_family": "ipv4", "name": "LAB-BLUE-IPV4",
+                          "prefix_list_entries": {"10": {
+                              "action": "permit", "ge": None, "le": None,
+                              "preference": 10, "prefix": "172.27.4.0/24"}}},
+        "LAB-BLUE-IPV6": {"address_family": "ipv6", "name": "LAB-BLUE-IPV6",
+                          "prefix_list_entries": {"10": {
+                              "action": "permit", "ge": None, "le": None,
+                              "preference": 10,
+                              "prefix": "2a02:20c8:5921:da10::/60"}}},
+        "LAB-GW-IPV4": {"address_family": "ipv4", "name": "LAB-GW-IPV4",
+                        "prefix_list_entries": {
+                            "10": {"action": "permit", "ge": None, "le": None,
+                                   "preference": 10, "prefix": "0.0.0.0/0"},
+                            "15": {"action": "permit", "ge": None, "le": None,
+                                   "preference": 15, "prefix": "172.16.3.0/24"}}},
+    }
+    route_maps = {
+        "LAB-BLUE-IPV4-OUT-02": {"name": "LAB-BLUE-IPV4-OUT-02",
+                                 "route_map_entries": {"10": {
+                                     "action": "permit", "preference": 10,
+                                     "match_ipv4_prefix_list": {
+                                         "LAB-BLUE-IPV4": "/rest/v10.16/x"},
+                                     "match_ipv6_prefix_list": None,
+                                     "set": {"as_path_prepend": "65015 65015"}}}},
+        "LAB-GW-IPV6-IN-02": {"name": "LAB-GW-IPV6-IN-02",
+                              "route_map_entries": {"10": {
+                                  "action": "permit", "preference": 10,
+                                  "match_ipv4_prefix_list": None,
+                                  "match_ipv6_prefix_list": {
+                                      "LAB-GW-IPV6": "/rest/v10.16/x"},
+                                  "set": {"local_preference": 200}}}},
+    }
+    prefix_lists.update(overrides.get("prefix_lists", {}))
+    route_maps.update(overrides.get("route_maps", {}))
+    return rest_api_to_aoscx_bgp({}, None, None, prefix_lists, route_maps)
+
+
+class TestGetBgpPolicyChanges:
+    """Tests for get_bgp_policy_changes"""
+
+    def test_converged_device_needs_nothing(self):
+        result = get_bgp_policy_changes(_POLICY_DATA, _policy_facts())
+        assert result == {"prefix_lists": [], "route_map_rules": [],
+                          "source": "rest"}
+
+    def test_no_facts_returns_everything(self):
+        for facts in (None, {}, {"prefix_lists": None, "route_maps": None}):
+            result = get_bgp_policy_changes(_POLICY_DATA, facts)
+            assert result["source"] == "none"
+            assert result["prefix_lists"] == _POLICY_DATA["prefix_lists"]
+            assert result["route_map_rules"] == _POLICY_DATA["route_map_rules"]
+
+    def test_none_inputs(self):
+        assert get_bgp_policy_changes(None, None) == {
+            "prefix_lists": [], "route_map_rules": [], "source": "none"}
+
+    def test_missing_prefix_list_entry_only(self):
+        facts = _policy_facts()
+        del facts["prefix_lists"]["LAB-GW-IPV4"]["entries"][15]
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert result["prefix_lists"] == [
+            {"name": "LAB-GW-IPV4", "af": "ipv4",
+             "rules": [{"index": 15, "action": "permit",
+                        "prefix": "172.16.3.0/24"}]}]
+        assert result["route_map_rules"] == []
+
+    def test_missing_prefix_list(self):
+        facts = _policy_facts()
+        del facts["prefix_lists"]["LAB-BLUE-IPV4"]
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert [p["name"] for p in result["prefix_lists"]] == ["LAB-BLUE-IPV4"]
+
+    def test_changed_action_is_pushed(self):
+        facts = _policy_facts()
+        facts["prefix_lists"]["LAB-BLUE-IPV4"]["entries"][10]["action"] = "deny"
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert [p["name"] for p in result["prefix_lists"]] == ["LAB-BLUE-IPV4"]
+
+    def test_ge_le_on_device_is_not_in_sync(self):
+        facts = _policy_facts()
+        facts["prefix_lists"]["LAB-GW-IPV4"]["entries"][10]["le"] = 32
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert result["prefix_lists"][0]["rules"] == [
+            {"index": 10, "action": "permit", "prefix": "0.0.0.0/0"}]
+
+    def test_ipv6_prefix_is_normalised(self):
+        # NetBox side is written '2a02:20c8:5921:da10:0::/60'.
+        result = get_bgp_policy_changes(_POLICY_DATA, _policy_facts())
+        assert not any(p["name"] == "LAB-BLUE-IPV6"
+                       for p in result["prefix_lists"])
+
+    def test_same_name_other_af_does_not_match(self):
+        facts = _policy_facts()
+        facts["prefix_lists"]["LAB-BLUE-IPV6"]["af"] = "ipv4"
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert [p["name"] for p in result["prefix_lists"]] == ["LAB-BLUE-IPV6"]
+
+    def test_missing_route_map_set_line(self):
+        facts = _policy_facts()
+        facts["route_maps"]["LAB-GW-IPV6-IN-02"][10]["lines"].remove(
+            "set local-preference 200")
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert [r["name"] for r in result["route_map_rules"]] == [
+            "LAB-GW-IPV6-IN-02"]
+
+    def test_wrong_set_value_is_pushed(self):
+        facts = _policy_facts(route_maps={"LAB-GW-IPV6-IN-02": {
+            "route_map_entries": {"10": {
+                "action": "permit",
+                "match_ipv6_prefix_list": {"LAB-GW-IPV6": "/x"},
+                "set": {"local_preference": 300}}}}})
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert [r["name"] for r in result["route_map_rules"]] == [
+            "LAB-GW-IPV6-IN-02"]
+
+    def test_missing_route_map_sequence(self):
+        facts = _policy_facts()
+        facts["route_maps"]["LAB-BLUE-IPV4-OUT-02"] = {
+            20: facts["route_maps"]["LAB-BLUE-IPV4-OUT-02"][10]}
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert [r["name"] for r in result["route_map_rules"]] == [
+            "LAB-BLUE-IPV4-OUT-02"]
+
+    def test_extra_route_map_line_is_ignored(self):
+        facts = _policy_facts()
+        facts["route_maps"]["LAB-GW-IPV6-IN-02"][10]["lines"].append(
+            "set metric 5")
+        result = get_bgp_policy_changes(_POLICY_DATA, facts)
+        assert result["route_map_rules"] == []
+
+
+class TestGetMissingBgpNeighborOptions:
+    """Tests for get_missing_bgp_neighbor_options"""
+
+    _SESSIONS = [
+        _enriched_session("172.27.250.34", vrf="lab-blue", af="ipv4"),
+        _enriched_session("2a02:20c8:5921:da1f::2", vrf="lab-blue", af="ipv6"),
+    ]
+    _OPTIONS = {
+        "172.27.250.34": {"general": ["fall-over bfd"],
+                          "ipv4": ["soft-reconfiguration inbound"]},
+        "2a02:20c8:5921:da1f::2": {"general": ["fall-over bfd"]},
+    }
+
+    def test_only_missing_options_returned(self):
+        result = get_missing_bgp_neighbor_options(
+            self._OPTIONS, self._SESSIONS, _POLICY_RUNNING_CONFIG, 65015)
+        assert result == [{"vrf": "lab-blue", "af": None,
+                           "neighbor_ip": "2a02:20c8:5921:da1f::2",
+                           "command": "fall-over bfd"}]
+
+    def test_everything_present(self):
+        options = {"172.27.250.34": self._OPTIONS["172.27.250.34"]}
+        assert get_missing_bgp_neighbor_options(
+            options, self._SESSIONS, _POLICY_RUNNING_CONFIG, 65015) == []
+
+    def test_no_running_config_returns_all_desired(self):
+        result = get_missing_bgp_neighbor_options(
+            self._OPTIONS, self._SESSIONS, "", 65015)
+        assert len(result) == 3
+
+    def test_af_scope_must_match(self):
+        options = {"172.27.250.34": {"general": ["soft-reconfiguration inbound"]}}
+        result = get_missing_bgp_neighbor_options(
+            options, self._SESSIONS, _POLICY_RUNNING_CONFIG, 65015)
+        assert len(result) == 1
+
+    def test_empty_options(self):
+        assert get_missing_bgp_neighbor_options(
+            {}, self._SESSIONS, _POLICY_RUNNING_CONFIG, 65015) == []

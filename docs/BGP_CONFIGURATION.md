@@ -218,7 +218,16 @@ route-maps, soft-reconfiguration, BFD, password ciphertext, session state).
    switch rejects (for example a route-map that does not exist) shows up
    as `changed` again on the next run instead of being silently ignored.
 3. Diffs `bgp_redistribute` with `get_bgp_redistribute_changes`.
-4. Skips the router process push when the ASN and router-id already match.
+4. Skips the router process push when the ASN and router-id already match,
+   and the global `bfd` push when the facts show it is already enabled.
+
+Prefix lists and route-maps are part of the facts too
+(`/system/prefix_lists` and `/system/route_maps` at depth 4):
+`get_bgp_policy_changes` returns only the entries the device is missing.
+`bgp_neighbor_options` lines are free-form CLI with no general REST field,
+so `get_missing_bgp_neighbor_options` compares them against one `show
+running-config` fetch, which the idempotent cleanup reuses. A converged
+device skips all of these push tasks instead of reporting them `ok`.
 
 In `aoscx_idempotent_mode` the same diff also lists what to remove:
 neighbors (IP addresses only; peer groups are left alone) in any VRF on the
