@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.11] - 2026-11-17
+
+### Fixed
+
+- REST fact gathering: `aoscx_evpn_vlans_facts` and `aoscx_vni_facts` were
+  queried at `depth=1`, which returns only URI references, so they never
+  held the per-VLAN `rd` / route-targets or the VNI `vlan` / `state`. Both
+  are now queried at `depth=2`. The EVPN queries are gated on
+  `device_evpn` instead of `device_vxlan`.
+- `rest_api_to_aoscx_vnis` resolves the `vlan`, `vrf` and `interface`
+  references to plain values (`vlan` as an int) and defaults `type` to
+  `vxlan_vni`, the type AOS-CX reports.
+
+### Changed
+
+- BGP: `aoscx_bgp_facts` now includes prefix lists and route-maps
+  (`/system/prefix_lists` and `/system/route_maps` at depth 4), and only
+  the entries the device is missing are pushed (new filter
+  `get_bgp_policy_changes`). `bgp_neighbor_options` are compared against
+  one `show running-config` fetch (new filter
+  `get_missing_bgp_neighbor_options`), which the idempotent cleanup now
+  reuses. Global `bfd` is skipped when the REST facts show it already
+  enabled. A converged device skips these tasks instead of running them
+  every time; prefix-list pushes report `changed`.
+
 ## [0.18.10] - 2026-11-17
 
 ### Added

@@ -565,6 +565,38 @@ Diffs `bgp_redistribute` (see `get_bgp_redistribute_config`) against the
   that the config_context does not list. Without facts, `add` is every
   desired entry and `remove` is empty.
 
+### `get_bgp_policy_changes(policy_data, bgp_facts)`
+
+Reduces the output of `collect_ebgp_vrf_policy_config` to what the device
+is missing, using `aoscx_bgp_facts.prefix_lists` / `route_maps`
+(`/system/prefix_lists` and `/system/route_maps` at depth 4).
+
+- A prefix-list entry is in sync when the list has the same address
+  family and the same sequence with the same action and prefix, and no
+  `ge`/`le` (prefixes are normalized, so IPv6 notation differences do not
+  matter).
+- A route-map rule is in sync when the same sequence exists with the same
+  action and every match/set line. Extra lines or entries on the device
+  are not reported.
+- **Returns**: `{"prefix_lists": [{name, af, rules: [missing rules]}],
+  "route_map_rules": [rules with anything missing], "source":
+  "rest"|"none"}`. Without these facts everything is returned.
+
+## Change Detection Against the Running-Config
+
+`bgp_neighbor_options` lines are free-form CLI that REST has no general
+field for, so they are compared against a single `show running-config`
+fetch.
+
+### `get_missing_bgp_neighbor_options(bgp_neighbor_options, sessions, running_config, local_asn)`
+
+The desired entries from `get_bgp_neighbor_options_config` that are not
+yet in the `router bgp <asn>` block (counterpart of
+`get_stale_bgp_neighbor_options`).
+
+- **Returns**: List of `{vrf, af, neighbor_ip, command}` dicts. Without
+  running-config text every desired entry is returned.
+
 ---
 
 ## See Also

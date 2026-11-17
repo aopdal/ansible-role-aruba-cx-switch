@@ -272,6 +272,51 @@
 # Prefix lists and route-maps are global (not VRF-scoped) on AOS-CX.
 # They must be configured before any BGP neighbor or VRF statements
 # that reference them.
+#
+# Prefix lists and route-maps are compared against aoscx_bgp_facts (REST,
+# /system/prefix_lists and /system/route_maps at depth=4). Neighbor options
+# are free-form CLI, so they are compared against one 'show running-config'
+# fetch, which the idempotent cleanup further down reuses. Only missing
+# entries are pushed.
+
+- name: Get current running-config for BGP neighbor option change detection
+  arubanetworks.aoscx.aoscx_command:
+    commands:
+      - show running-config
+  register: _bgp_running_config
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+  vars:
+    ansible_connection: network_cli
+
+- name: Compute BGP policy and neighbor option changes
+  ansible.builtin.set_fact:
+    _bgp_policy_changes: >-
+      {{ bgp_ebgp_policy_data | default({}) |
+         get_bgp_policy_changes(aoscx_bgp_facts | default({})) }}
+    _bgp_neighbor_options_missing: >-
+      {{ bgp_neighbor_options | default({}) |
+         get_missing_bgp_neighbor_options(
+           device_bgp_sessions_enriched | default([]),
+           _bgp_running_config.stdout[0] | default(''),
+           device_bgp_sessions[0].local_as.asn
+         ) }}
+  when:
+    - netbox_bgp_plugin_available | default(false)
+    - device_bgp_sessions is defined
+    - device_bgp_sessions | length > 0
+
+- name: Debug BGP policy and neighbor option changes
+  ansible.builtin.debug:
+    msg:
+      prefix_lists: "{{ _bgp_policy_changes.prefix_lists | default([]) }}"
+      route_map_rules: "{{ _bgp_policy_changes.route_map_rules | default([]) | map(attribute='commands') | list }}"
+      neighbor_options: "{{ _bgp_neighbor_options_missing | default([]) }}"
+  when:
+    - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+    - _bgp_policy_changes is defined
 
 - name: Configure IPv4 prefix lists for eBGP VRF sessions
   arubanetworks.aoscx.aoscx_command:
@@ -284,7 +329,7 @@
         {{ item.1.prefix }}
       - end
   loop: >-
-    {{ bgp_ebgp_policy_data.prefix_lists | default([]) |
+    {{ _bgp_policy_changes.prefix_lists | default([]) |
        selectattr('af', 'equalto', 'ipv4') | list |
        subelements('rules') }}
   loop_control:
@@ -293,8 +338,9 @@
       {{ item.1.action }} {{ item.1.prefix }}
   when:
     - netbox_bgp_plugin_available | default(false)
-    - bgp_ebgp_policy_data is defined
-    - bgp_ebgp_policy_data.prefix_lists | default([]) | selectattr('af', 'equalto', 'ipv4') | list | length > 0
+    - _bgp_policy_changes is defined
+    - _bgp_policy_changes.prefix_lists | selectattr('af', 'equalto', 'ipv4') | list | length > 0
+  changed_when: true
   vars:
     ansible_connection: network_cli
 
@@ -309,7 +355,7 @@
         {{ item.1.prefix }}
       - end
   loop: >-
-    {{ bgp_ebgp_policy_data.prefix_lists | default([]) |
+    {{ _bgp_policy_changes.prefix_lists | default([]) |
        selectattr('af', 'equalto', 'ipv6') | list |
        subelements('rules') }}
   loop_control:
@@ -318,8 +364,9 @@
       {{ item.1.action }} {{ item.1.prefix }}
   when:
     - netbox_bgp_plugin_available | default(false)
-    - bgp_ebgp_policy_data is defined
-    - bgp_ebgp_policy_data.prefix_lists | default([]) | selectattr('af', 'equalto', 'ipv6') | list | length > 0
+    - _bgp_policy_changes is defined
+    - _bgp_policy_changes.prefix_lists | selectattr('af', 'equalto', 'ipv6') | list | length > 0
+  changed_when: true
   vars:
     ansible_connection: network_cli
 
@@ -328,13 +375,13 @@
     lines: "{{ item.commands[1:] }}"
     parents: "{{ item.commands[0] }}"
     match: line
-  loop: "{{ bgp_ebgp_policy_data.route_map_rules | default([]) }}"
+  loop: "{{ _bgp_policy_changes.route_map_rules | default([]) }}"
   loop_control:
     label: "route-map {{ item.name }} {{ item.action }} seq {{ item.index }}"
   when:
     - netbox_bgp_plugin_available | default(false)
-    - bgp_ebgp_policy_data is defined
-    - bgp_ebgp_policy_data.route_map_rules | default([]) | length > 0
+    - _bgp_policy_changes is defined
+    - _bgp_policy_changes.route_map_rules | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -398,6 +445,7 @@
     - device_bgp_sessions | length > 0
     - bgp_neighbor_options | default({}) |
       get_bgp_bfd_enabled(device_bgp_sessions_enriched | default([]))
+    - not (aoscx_bgp_facts.bfd_enable | default(false) | bool)
   vars:
     ansible_connection: network_cli
 
@@ -413,9 +461,9 @@
 # address-family block, e.g. 'fall-over bfd') - item.af is None for 'general'
 # entries, which get_bgp_neighbor_options_config() encodes by simply omitting
 # the address-family parent below.
-# aoscx_config + match: line diffs against the real running-config, so
-# adding entries is naturally idempotent. Removing entries deleted from
-# config_context is handled separately below, under aoscx_idempotent_mode.
+# Only options missing from the running-config (get_missing_bgp_neighbor_options)
+# are pushed. Removing entries deleted from config_context is handled
+# separately below, under aoscx_idempotent_mode.
 
 - name: Configure BGP neighbor options
   arubanetworks.aoscx.aoscx_config:
@@ -426,16 +474,14 @@
          + (['vrf ' ~ item.vrf] if item.vrf != 'default' else [])
          + (['address-family ' ~ item.af ~ ' unicast'] if item.af else []) }}
     match: line
-  loop: >-
-    {{ bgp_neighbor_options | default({}) |
-       get_bgp_neighbor_options_config(device_bgp_sessions_enriched | default([])) }}
+  loop: "{{ _bgp_neighbor_options_missing | default([]) }}"
   loop_control:
     label: "VRF {{ item.vrf }} ({{ item.af | default('general', true) }}): neighbor {{ item.neighbor_ip }} {{ item.command }}"
   when:
     - netbox_bgp_plugin_available | default(false)
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
-    - bgp_neighbor_options | default({}) | length > 0
+    - _bgp_neighbor_options_missing | default([]) | length > 0
   vars:
     ansible_connection: network_cli
 
@@ -614,14 +660,8 @@
     - device_bgp_sessions is defined
     - device_bgp_sessions | length > 0
   block:
-    - name: Get current running-config for BGP redistribute/neighbor-option cleanup
-      arubanetworks.aoscx.aoscx_command:
-        commands:
-          - show running-config
-      register: _bgp_running_config
-      vars:
-        ansible_connection: network_cli
-
+    # Reuses the running-config fetched before the push. Pushes only add
+    # desired lines, so nothing they add can be stale.
     # REST facts (get_bgp_redistribute_changes) when available, else the
     # running-config.
     - name: Identify stale BGP redistribute entries
@@ -655,6 +695,7 @@
       vars:
         ansible_connection: network_cli
 
+    # Options of neighbors already removed above went with them.
     - name: Identify stale BGP neighbor options
       ansible.builtin.set_fact:
         _bgp_neighbor_options_stale: >-
@@ -663,7 +704,11 @@
                device_bgp_sessions_enriched | default([]),
                _bgp_running_config.stdout[0],
                device_bgp_sessions[0].local_as.asn
-             ) }}
+             ) | rejectattr('neighbor_ip', 'in', _bgp_removed_neighbor_ips) | list }}
+      vars:
+        _bgp_removed_neighbor_ips: >-
+          {{ (_bgp_neighbor_changes.remove | default([]) | map(attribute='ip') | list)
+             + (_bgp_stale_neighbors | default([]) | map(attribute='ip', default='') | list) }}
 
     - name: Debug stale BGP neighbor options
       ansible.builtin.debug:

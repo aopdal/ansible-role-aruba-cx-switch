@@ -356,6 +356,7 @@ class TestRestApiToAoscxVnis:
         assert "10100" in result
         assert result["10100"]["id"] == 10100
         assert result["10100"]["type"] == "vxlan"
+        assert result["10100"]["vlan"] == 100
 
     def test_l3_vni(self):
         """Test L3 VNI with VRF"""
@@ -392,6 +393,50 @@ class TestRestApiToAoscxVnis:
         }
         result = rest_api_to_aoscx_vnis(rest_data)
         assert len(result) == 0
+
+    def test_depth2_references_normalised(self):
+        """depth=2 REST shape: dict references become plain values"""
+        rest_data = {
+            "vxlan_vni,1000101": {
+                "id": 1000101,
+                "type": "vxlan_vni",
+                "vlan": {"101": "/rest/v10.16/system/vlans/101"},
+                "vrf": None,
+                "routing": False,
+                "state": "operational",
+                "interface": {"vxlan1": "/rest/v10.16/system/interfaces/vxlan1"},
+            }
+        }
+        result = rest_api_to_aoscx_vnis(rest_data)
+        assert result["1000101"] == {
+            "id": 1000101,
+            "type": "vxlan_vni",
+            "vlan": 101,
+            "vrf": None,
+            "routing": False,
+            "state": "operational",
+            "interface": "vxlan1",
+        }
+
+    def test_uri_string_references(self):
+        """Bare URI string references resolve to the last path segment"""
+        rest_data = {
+            "vxlan_vni,50000": {
+                "id": 50000,
+                "vlan": None,
+                "vrf": "/rest/v10.16/system/vrfs/CUSTOMER_A",
+                "routing": True,
+            }
+        }
+        result = rest_api_to_aoscx_vnis(rest_data)
+        assert result["50000"]["vrf"] == "CUSTOMER_A"
+        assert result["50000"]["vlan"] is None
+        assert result["50000"]["type"] == "vxlan_vni"
+
+    def test_depth1_uri_values_skipped(self):
+        """depth=1 returns URI strings per VNI; nothing usable"""
+        rest_data = {"vxlan_vni,100": "/rest/v10.16/system/virtual_network_ids/vxlan_vni,100"}
+        assert rest_api_to_aoscx_vnis(rest_data) == {}
 
     def test_multiple_vnis(self):
         """Test conversion of multiple VNIs"""
@@ -604,8 +649,68 @@ class TestRestApiToAoscxBgp:
 
     def test_no_bgp_configured(self):
         result = rest_api_to_aoscx_bgp({"default": {"bgp_routers": {}}}, [], {"bfd_enable": False})
-        assert result == {"asn": None, "bfd_enable": False, "vrfs": {}}
+        assert result == {"asn": None, "bfd_enable": False, "prefix_lists": None, "route_maps": None, "vrfs": {}}
 
     @pytest.mark.parametrize("bad", [None, [], "x"])
     def test_invalid_input(self, bad):
-        assert rest_api_to_aoscx_bgp(bad, bad, bad) == {"asn": None, "bfd_enable": False, "vrfs": {}}
+        assert rest_api_to_aoscx_bgp(bad, bad, bad) == {"asn": None, "bfd_enable": False, "prefix_lists": None, "route_maps": None, "vrfs": {}}
+
+    def test_prefix_lists_and_route_maps(self):
+        prefix_lists = {
+            "LAB-GW-IPV4": {
+                "address_family": "ipv4", "name": "LAB-GW-IPV4", "origin": "local-prefix-list",
+                "prefix_list_entries": {
+                    "10": {"action": "permit", "ge": None, "le": None, "preference": 10, "prefix": "0.0.0.0/0"},
+                    "15": {"action": "permit", "ge": None, "le": 24, "preference": 15, "prefix": "172.16.3.0/24"},
+                },
+            },
+            "EMPTY": {"address_family": "ipv6", "name": "EMPTY", "prefix_list_entries": {}},
+        }
+        route_maps = {
+            "LAB-GW-IPV4-IN-01": {
+                "name": "LAB-GW-IPV4-IN-01",
+                "route_map_entries": {
+                    "10": {
+                        "action": "permit", "preference": 10,
+                        "match_ipv4_prefix_list": {"LAB-GW-IPV4": "/rest/v10.16/system/prefix_lists/LAB-GW-IPV4"},
+                        "match_ipv6_prefix_list": None,
+                        "set": {"local_preference": 300},
+                    },
+                    "20": {
+                        "action": "deny", "preference": 20,
+                        "match_ipv4_prefix_list": None,
+                        "match_ipv6_prefix_list": {"LAB-GW-IPV6": "/x"},
+                        "set": {"as_path_prepend": "65015  65015", "metric": 5, "weight": None},
+                    },
+                },
+            },
+        }
+        result = rest_api_to_aoscx_bgp(self._VRFS, None, None, prefix_lists, route_maps)
+        assert result["prefix_lists"] == {
+            "LAB-GW-IPV4": {"af": "ipv4", "entries": {
+                10: {"action": "permit", "prefix": "0.0.0.0/0", "ge": None, "le": None},
+                15: {"action": "permit", "prefix": "172.16.3.0/24", "ge": None, "le": 24},
+            }},
+            "EMPTY": {"af": "ipv6", "entries": {}},
+        }
+        assert result["route_maps"] == {
+            "LAB-GW-IPV4-IN-01": {
+                10: {"action": "permit", "lines": [
+                    "match ip address prefix-list LAB-GW-IPV4",
+                    "set local-preference 300"]},
+                20: {"action": "deny", "lines": [
+                    "match ipv6 address prefix-list LAB-GW-IPV6",
+                    "set as-path prepend 65015 65015",
+                    "set metric 5"]},
+            }
+        }
+
+    def test_policy_facts_none_when_not_queried(self):
+        result = rest_api_to_aoscx_bgp(self._VRFS)
+        assert result["prefix_lists"] is None
+        assert result["route_maps"] is None
+
+    def test_no_policies_on_device(self):
+        result = rest_api_to_aoscx_bgp(self._VRFS, None, None, {}, {})
+        assert result["prefix_lists"] == {}
+        assert result["route_maps"] == {}

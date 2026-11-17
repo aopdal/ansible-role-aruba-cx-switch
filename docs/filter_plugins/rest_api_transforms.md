@@ -125,11 +125,11 @@ Converts REST API EVPN VLAN data into a usable format for EVPN configuration che
 
 #### How It Works
 
-Takes the raw dict from `GET /system/evpn/evpn_vlans?depth=1` and extracts the EVPN-specific fields for each VLAN: route distinguisher, route targets, and redistribution settings.
+Takes the raw dict from `GET /system/evpn/evpn_vlans?depth=2` and extracts the EVPN-specific fields for each VLAN: route distinguisher, route targets, and redistribution settings.
 
 #### Parameters
 
-- **rest_data** (dict): Raw response from `GET /rest/v10.xx/system/evpn/evpn_vlans?depth=1`. Keys are VLAN IDs, values are EVPN config dicts.
+- **rest_data** (dict): Raw response from `GET /rest/v10.xx/system/evpn/evpn_vlans?depth=2`. Keys are VLAN IDs, values are EVPN config dicts.
 
 #### Returns
 
@@ -140,7 +140,7 @@ Takes the raw dict from `GET /system/evpn/evpn_vlans?depth=1` and extracts the E
 ```yaml
 - name: Get EVPN VLAN config from REST API
   uri:
-    url: "https://{{ ansible_host }}/rest/v10.16/system/evpn/evpn_vlans?depth=1"
+    url: "https://{{ ansible_host }}/rest/v10.16/system/evpn/evpn_vlans?depth=2"
     headers:
       Cookie: "{{ login_cookie }}"
     validate_certs: false
@@ -159,22 +159,24 @@ Converts REST API VNI (Virtual Network Identifier) data into a usable format.
 
 #### How It Works
 
-Takes the raw dict from `GET /system/virtual_network_ids?depth=1` where keys are in `"type,id"` format (e.g., `"vxlan,100"`) and extracts VNI details into a clean dict keyed by VNI ID.
+Takes the raw dict from `GET /system/virtual_network_ids?depth=2` where keys are in `"type,id"` format (e.g., `"vxlan_vni,100"`) and extracts VNI details into a clean dict keyed by VNI ID. REST references (`{"101": "/rest/.../vlans/101"}` or a bare URI string) are resolved to their key, so `vlan` is the VLAN ID and `vrf` / `interface` are names.
+
+Use `depth=2`: at `depth=1` each value is only a URI string and is skipped. The same applies to `rest_api_to_aoscx_evpn_vlans`.
 
 #### Parameters
 
-- **rest_data** (dict): Raw response from `GET /rest/v10.xx/system/virtual_network_ids?depth=1`. Keys are `"type,id"` strings, values are VNI detail dicts.
+- **rest_data** (dict): Raw response from `GET /rest/v10.xx/system/virtual_network_ids?depth=2`. Keys are `"type,id"` strings, values are VNI detail dicts.
 
 #### Returns
 
-- **dict**: VNI config keyed by VNI ID string. Each value contains: `id`, `type`, `vlan`, `vrf`, `routing`, `state`, `interface`.
+- **dict**: VNI config keyed by VNI ID string. Each value contains: `id`, `type` (`vxlan_vni`), `vlan` (int or `None`), `vrf` (name or `None`), `routing`, `state` (for example `operational`), `interface` (for example `vxlan1`).
 
 #### Usage Example
 
 ```yaml
 - name: Get VNI config from REST API
   uri:
-    url: "https://{{ ansible_host }}/rest/v10.16/system/virtual_network_ids?depth=1"
+    url: "https://{{ ansible_host }}/rest/v10.16/system/virtual_network_ids?depth=2"
     headers:
       Cookie: "{{ login_cookie }}"
     validate_certs: false
@@ -239,9 +241,9 @@ Flattens DHCP relay (`ip helper-address`) REST API data into a simple per-interf
 
 ---
 
-### 6. `rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None)`
+### 6. `rest_api_to_aoscx_bgp(vrfs_data, neighbor_results=None, system_data=None, prefix_lists_data=None, route_maps_data=None)`
 
-Builds `aoscx_bgp_facts` from the three BGP queries in
+Builds `aoscx_bgp_facts` from the BGP queries in
 `tasks/gather_facts_rest_api.yml`.
 
 #### Parameters
@@ -252,6 +254,10 @@ Builds `aoscx_bgp_facts` from the three BGP queries in
   `.../bgp_routers/{asn}/bgp_neighbors?depth=2` loop; each entry needs
   `item: {vrf, asn}`, `status` and `json`. Non-200 entries are ignored.
 - **system_data**: JSON from `/system?attributes=bfd_enable`.
+- **prefix_lists_data**: JSON from `/system/prefix_lists?depth=4`. At depth
+  3 and below the entries are only URIs; from depth 4 they are inline.
+- **route_maps_data**: JSON from `/system/route_maps?depth=4` (same depth
+  rule).
 
 #### Returns
 
@@ -259,6 +265,15 @@ Builds `aoscx_bgp_facts` from the three BGP queries in
 {
   "asn": 65015,            # None when no BGP router exists
   "bfd_enable": True,      # global 'bfd'
+  "prefix_lists": {        # None when not queried
+    "LAB-GW-IPV4": {"af": "ipv4", "entries": {
+      10: {"action": "permit", "prefix": "0.0.0.0/0", "ge": None, "le": None}}}
+  },
+  "route_maps": {          # None when not queried
+    "LAB-GW-IPV4-IN-01": {10: {"action": "permit", "lines": [
+      "match ip address prefix-list LAB-GW-IPV4",
+      "set local-preference 300"]}}
+  },
   "vrfs": {
     "lab-blue": {
       "router_id": None,
@@ -282,6 +297,12 @@ Builds `aoscx_bgp_facts` from the three BGP queries in
 
 REST AF keys are shortened (`ipv4-unicast` → `ipv4`, `l2vpn-evpn` →
 `evpn`); route-map names come from the last segment of the route-map URI.
+Route-map entries are turned back into the CLI lines the role pushes
+(`match_ipv4_prefix_list` → `match ip address prefix-list <name>`,
+`set.local_preference` → `set local-preference <n>`,
+`set.as_path_prepend` → `set as-path prepend <asns>`; other `set` keys
+become `set <key-with-dashes> <value>`), so `get_bgp_policy_changes` can
+compare them line by line.
 
 ---
 

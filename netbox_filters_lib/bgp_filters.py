@@ -909,6 +909,144 @@ def get_stale_bgp_bfd(bgp_neighbor_options, sessions, running_config):
 
 
 # ============================================================================
+# Prefix-list / route-map change detection (aoscx_bgp_facts)
+# ============================================================================
+
+
+def _normalize_prefix(prefix):
+    """Canonical CIDR text for comparison; the raw string if not a prefix."""
+    try:
+        return ipaddress.ip_network(str(prefix), strict=False).compressed
+    except ValueError:
+        return str(prefix).strip().lower()
+
+
+def get_bgp_policy_changes(policy_data, bgp_facts):
+    """
+    Reduce the prefix lists and route-map rules built by
+    collect_ebgp_vrf_policy_config to the entries the device is missing,
+    using the 'prefix_lists' / 'route_maps' parts of aoscx_bgp_facts
+    (rest_api_to_aoscx_bgp, from /system/prefix_lists and
+    /system/route_maps at depth=4).
+
+    A prefix-list entry is in sync when the list has the same address
+    family and the same sequence with the same action and prefix, and no
+    ge/le. A route-map rule is in sync when the same sequence exists with
+    the same action and every match/set line. Extra lines or entries on the
+    device are not reported (the role never removed them before either).
+
+    Without those facts every entry is returned, so the push tasks behave
+    as before.
+
+    Args:
+        policy_data: Output of collect_ebgp_vrf_policy_config
+            ({"prefix_lists": [...], "route_map_rules": [...]}).
+        bgp_facts: aoscx_bgp_facts, or empty/None.
+
+    Returns:
+        {"prefix_lists": [{"name", "af", "rules": [missing rules]}],
+         "route_map_rules": [rules with anything missing],
+         "source": "rest"|"none"}
+        Prefix lists with no missing rules are left out.
+
+    Example:
+        >>> get_bgp_policy_changes(
+        ...     {"prefix_lists": [{"name": "PL", "af": "ipv4", "rules": [
+        ...         {"index": 10, "action": "permit", "prefix": "10.0.0.0/8"}]}],
+        ...      "route_map_rules": []},
+        ...     {"prefix_lists": {"PL": {"af": "ipv4", "entries": {10: {
+        ...         "action": "permit", "prefix": "10.0.0.0/8",
+        ...         "ge": None, "le": None}}}}, "route_maps": {}})
+        {'prefix_lists': [], 'route_map_rules': [], 'source': 'rest'}
+    """
+    policy_data = policy_data or {}
+    prefix_lists = policy_data.get("prefix_lists") or []
+    route_map_rules = policy_data.get("route_map_rules") or []
+
+    facts = bgp_facts if isinstance(bgp_facts, dict) else {}
+    have_pl = facts.get("prefix_lists")
+    have_rm = facts.get("route_maps")
+    if not isinstance(have_pl, dict) or not isinstance(have_rm, dict):
+        return {"prefix_lists": list(prefix_lists),
+                "route_map_rules": list(route_map_rules),
+                "source": "none"}
+
+    missing_pl = []
+    for plist in prefix_lists:
+        af = plist.get("af") or "ipv4"
+        have = have_pl.get(plist.get("name")) or {}
+        entries = (have.get("entries") or {}) if have.get("af", af) == af else {}
+        missing = []
+        for rule in plist.get("rules") or []:
+            entry = entries.get(int(rule.get("index", 0)))
+            if not (
+                entry
+                and entry.get("action") == rule.get("action")
+                and _normalize_prefix(entry.get("prefix"))
+                == _normalize_prefix(rule.get("prefix"))
+                and entry.get("ge") is None
+                and entry.get("le") is None
+            ):
+                missing.append(rule)
+        if missing:
+            missing_pl.append({**plist, "rules": missing})
+
+    missing_rm = []
+    for rule in route_map_rules:
+        entry = (have_rm.get(rule.get("name")) or {}).get(int(rule.get("index", 0)))
+        commands = rule.get("commands") or []
+        lines = set((entry or {}).get("lines") or [])
+        if (
+            not entry
+            or entry.get("action") != rule.get("action")
+            or any(" ".join(c.split()) not in lines for c in commands[1:])
+        ):
+            missing_rm.append(rule)
+
+    if missing_pl or missing_rm:
+        _debug(f"get_bgp_policy_changes: {len(missing_pl)} prefix list(s), "
+               f"{len(missing_rm)} route-map rule(s) to push")
+
+    return {"prefix_lists": missing_pl, "route_map_rules": missing_rm,
+            "source": "rest"}
+
+
+def get_missing_bgp_neighbor_options(
+    bgp_neighbor_options, sessions, running_config, local_asn
+):
+    """
+    Counterpart of get_stale_bgp_neighbor_options: the desired neighbor
+    options (get_bgp_neighbor_options_config) not yet present in the
+    'router bgp <local_asn>' block of the running-config.
+
+    Without running-config text every desired option is returned.
+
+    Args:
+        bgp_neighbor_options: The 'bgp_neighbor_options' config_context dict.
+        sessions: BGP sessions enriched by get_bgp_session_vrf_info.
+        running_config: Full 'show running-config' text, or empty/None.
+        local_asn: The device's BGP ASN.
+
+    Returns:
+        List of {"vrf", "af", "neighbor_ip", "command"} dicts to push.
+    """
+    desired = get_bgp_neighbor_options_config(bgp_neighbor_options, sessions)
+    if not running_config:
+        return desired
+
+    current = {
+        (e["vrf"], e["af"], _normalize_ip(e["neighbor_ip"]) or e["neighbor_ip"],
+         e["command"])
+        for e in _parse_bgp_neighbor_options_from_config(running_config, local_asn)
+    }
+    return [
+        d for d in desired
+        if (d["vrf"], d["af"], _normalize_ip(d["neighbor_ip"]) or d["neighbor_ip"],
+            d["command"]) not in current
+    ]
+
+
+# ============================================================================
 # REST-fact based change detection (aoscx_bgp_facts)
 # ============================================================================
 # aoscx_bgp_facts is built by rest_api_to_aoscx_bgp

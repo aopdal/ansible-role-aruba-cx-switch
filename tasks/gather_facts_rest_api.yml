@@ -30,8 +30,8 @@
 # - ansible_facts.network_resources.interfaces
 # - ansible_facts.network_resources.vlans
 # - aoscx_enhanced_interface_facts (raw REST API response)
-# - aoscx_evpn_facts (when EVPN enabled)
-# - aoscx_vni_facts (when VXLAN enabled)
+# - aoscx_evpn_facts, aoscx_evpn_vlans_facts (device_evpn; per-VLAN rd/route-targets)
+# - aoscx_vni_facts (device_vxlan; keyed "vxlan_vni,<id>", vlan/state per VNI)
 # - aoscx_vsx_facts (when device_vsx enabled)
 # - aoscx_stp_global_facts (when aoscx_configure_stp enabled)
 # - aoscx_snmp_facts (when SNMP variables are set)
@@ -324,7 +324,7 @@
   delegate_to: localhost
   check_mode: false
   when:
-    - custom_fields.device_vxlan | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
     - aoscx_configure_evpn | default(false) | bool or aoscx_test_mode | bool
   tags:
     - always
@@ -332,7 +332,8 @@
 # Query EVPN VLANs (full mode, optional)
 - name: Query EVPN VLANs via REST API
   ansible.builtin.uri:
-    url: "{{ _rest_api_base }}/system/evpn/evpn_vlans?depth=1"
+    # depth=2: depth=1 only returns URI references, without rd/route-targets.
+    url: "{{ _rest_api_base }}/system/evpn/evpn_vlans?depth=2"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
@@ -343,7 +344,7 @@
   delegate_to: localhost
   check_mode: false
   when:
-    - custom_fields.device_vxlan | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
     - aoscx_configure_evpn | default(false) | bool or aoscx_test_mode | bool
   tags:
     - always
@@ -351,7 +352,8 @@
 # Query VNI/VXLAN mappings (full mode, optional)
 - name: Query VNI mappings via REST API
   ansible.builtin.uri:
-    url: "{{ _rest_api_base }}/system/virtual_network_ids?depth=1"
+    # depth=2: depth=1 only returns URI references, without vlan/state.
+    url: "{{ _rest_api_base }}/system/virtual_network_ids?attributes=id,type,vlan,vrf,routing,state,interface&depth=2"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
@@ -992,14 +994,17 @@
 # Query BGP facts (only for devices with device_bgp, see configure_bgp.yml)
 # Used by configure_bgp.yml to push only the neighbor/redistribute settings
 # that differ and, in aoscx_idempotent_mode, to remove neighbors and
-# redistribute entries NetBox no longer has. Three queries:
+# redistribute entries NetBox no longer has. Queries:
 #   /system/vrfs?attributes=name,bgp_routers&depth=4  -> router per VRF
 #     (router_id, redistribute); bgp_neighbors stays a URI at any depth
 #   /system/vrfs/{vrf}/bgp_routers/{asn}/bgp_neighbors?depth=2 per router
 #   /system?attributes=bfd_enable                     -> global 'bfd'
+#   /system/prefix_lists?depth=4, /system/route_maps?depth=4
+#     -> prefix lists / route-maps with their entries inline
 # No NetBox data is needed: the ASN comes from the device.
 #
 # Output: aoscx_bgp_facts = { 'asn': int|None, 'bfd_enable': bool,
+#   'prefix_lists': {...}, 'route_maps': {...},
 #   'vrfs': { vrf: { 'router_id', 'redistribute': {af: [...]},
 #   'neighbors': { ip: {...} } } } } - see rest_api_to_aoscx_bgp in
 # filter_plugins/rest_api_transforms.py for the neighbor keys.
@@ -1015,6 +1020,9 @@
   loop:
     - /system/vrfs?attributes=name,bgp_routers&depth=4
     - /system?attributes=bfd_enable
+    # Prefix-list and route-map entries are inline from depth 4.
+    - /system/prefix_lists?depth=4
+    - /system/route_maps?depth=4
   register: _rest_bgp
   delegate_to: localhost
   check_mode: false
@@ -1058,12 +1066,14 @@
     aoscx_bgp_facts: >-
       {{ _rest_bgp.results[0].json | rest_api_to_aoscx_bgp(
            _rest_bgp_neighbors.results | default([]),
-           _rest_bgp.results[1].json) }}
+           _rest_bgp.results[1].json,
+           _rest_bgp.results[2].json,
+           _rest_bgp.results[3].json) }}
   no_log: true
   when:
     - _rest_bgp is defined
     - _rest_bgp.results is defined
-    - _rest_bgp.results | selectattr('json', 'defined') | list | length == 2
+    - _rest_bgp.results | selectattr('json', 'defined') | list | length == 4
   tags:
     - always
 
@@ -1115,7 +1125,7 @@
     aoscx_evpn_facts: "{{ _rest_evpn.json | default({}) }}"
     aoscx_evpn_vlans_facts: "{{ _rest_evpn_vlans.json | default({}) }}"
   when:
-    - custom_fields.device_vxlan | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
     - aoscx_configure_evpn | default(false) | bool or aoscx_test_mode | bool
     - _rest_evpn is defined
     - _rest_evpn.status | default(0) == 200
