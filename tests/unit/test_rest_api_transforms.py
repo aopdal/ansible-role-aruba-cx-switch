@@ -356,6 +356,7 @@ class TestRestApiToAoscxVnis:
         assert "10100" in result
         assert result["10100"]["id"] == 10100
         assert result["10100"]["type"] == "vxlan"
+        assert result["10100"]["vlan"] == 100
 
     def test_l3_vni(self):
         """Test L3 VNI with VRF"""
@@ -392,6 +393,50 @@ class TestRestApiToAoscxVnis:
         }
         result = rest_api_to_aoscx_vnis(rest_data)
         assert len(result) == 0
+
+    def test_depth2_references_normalised(self):
+        """depth=2 REST shape: dict references become plain values"""
+        rest_data = {
+            "vxlan_vni,1000101": {
+                "id": 1000101,
+                "type": "vxlan_vni",
+                "vlan": {"101": "/rest/v10.16/system/vlans/101"},
+                "vrf": None,
+                "routing": False,
+                "state": "operational",
+                "interface": {"vxlan1": "/rest/v10.16/system/interfaces/vxlan1"},
+            }
+        }
+        result = rest_api_to_aoscx_vnis(rest_data)
+        assert result["1000101"] == {
+            "id": 1000101,
+            "type": "vxlan_vni",
+            "vlan": 101,
+            "vrf": None,
+            "routing": False,
+            "state": "operational",
+            "interface": "vxlan1",
+        }
+
+    def test_uri_string_references(self):
+        """Bare URI string references resolve to the last path segment"""
+        rest_data = {
+            "vxlan_vni,50000": {
+                "id": 50000,
+                "vlan": None,
+                "vrf": "/rest/v10.16/system/vrfs/CUSTOMER_A",
+                "routing": True,
+            }
+        }
+        result = rest_api_to_aoscx_vnis(rest_data)
+        assert result["50000"]["vrf"] == "CUSTOMER_A"
+        assert result["50000"]["vlan"] is None
+        assert result["50000"]["type"] == "vxlan_vni"
+
+    def test_depth1_uri_values_skipped(self):
+        """depth=1 returns URI strings per VNI; nothing usable"""
+        rest_data = {"vxlan_vni,100": "/rest/v10.16/system/virtual_network_ids/vxlan_vni,100"}
+        assert rest_api_to_aoscx_vnis(rest_data) == {}
 
     def test_multiple_vnis(self):
         """Test conversion of multiple VNIs"""

@@ -30,8 +30,8 @@
 # - ansible_facts.network_resources.interfaces
 # - ansible_facts.network_resources.vlans
 # - aoscx_enhanced_interface_facts (raw REST API response)
-# - aoscx_evpn_facts (when EVPN enabled)
-# - aoscx_vni_facts (when VXLAN enabled)
+# - aoscx_evpn_facts, aoscx_evpn_vlans_facts (device_evpn; per-VLAN rd/route-targets)
+# - aoscx_vni_facts (device_vxlan; keyed "vxlan_vni,<id>", vlan/state per VNI)
 # - aoscx_vsx_facts (when device_vsx enabled)
 # - aoscx_stp_global_facts (when aoscx_configure_stp enabled)
 # - aoscx_snmp_facts (when SNMP variables are set)
@@ -324,7 +324,7 @@
   delegate_to: localhost
   check_mode: false
   when:
-    - custom_fields.device_vxlan | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
     - aoscx_configure_evpn | default(false) | bool or aoscx_test_mode | bool
   tags:
     - always
@@ -332,7 +332,8 @@
 # Query EVPN VLANs (full mode, optional)
 - name: Query EVPN VLANs via REST API
   ansible.builtin.uri:
-    url: "{{ _rest_api_base }}/system/evpn/evpn_vlans?depth=1"
+    # depth=2: depth=1 only returns URI references, without rd/route-targets.
+    url: "{{ _rest_api_base }}/system/evpn/evpn_vlans?depth=2"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
@@ -343,7 +344,7 @@
   delegate_to: localhost
   check_mode: false
   when:
-    - custom_fields.device_vxlan | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
     - aoscx_configure_evpn | default(false) | bool or aoscx_test_mode | bool
   tags:
     - always
@@ -351,7 +352,8 @@
 # Query VNI/VXLAN mappings (full mode, optional)
 - name: Query VNI mappings via REST API
   ansible.builtin.uri:
-    url: "{{ _rest_api_base }}/system/virtual_network_ids?depth=1"
+    # depth=2: depth=1 only returns URI references, without vlan/state.
+    url: "{{ _rest_api_base }}/system/virtual_network_ids?attributes=id,type,vlan,vrf,routing,state,interface&depth=2"
     method: GET
     headers:
       Cookie: "{{ _rest_login.cookies_string }}"
@@ -1126,7 +1128,7 @@
   ansible.builtin.set_fact:
     aoscx_vni_facts: "{{ _rest_vnis.json | default({}) }}"
   when:
-    - custom_fields.device_vxlan | default(false) | bool
+    - custom_fields.device_evpn | default(false) | bool
     - aoscx_configure_vxlan | default(false) | bool or aoscx_test_mode | bool
     - _rest_vnis is defined
     - _rest_vnis.status | default(0) == 200

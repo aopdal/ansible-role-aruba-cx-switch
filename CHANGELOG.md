@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- REST fact gathering: `aoscx_evpn_vlans_facts` and `aoscx_vni_facts` were
+  queried at `depth=1`, which returns only URI references, so they never
+  held the per-VLAN `rd` / route-targets or the VNI `vlan` / `state`. Both
+  are now queried at `depth=2`. The EVPN queries are gated on
+  `device_evpn` instead of `device_vxlan`.
+- `rest_api_to_aoscx_vnis` resolves the `vlan`, `vrf` and `interface`
+  references to plain values (`vlan` as an int) and defaults `type` to
+  `vxlan_vni`, the type AOS-CX reports.
+
 ## [0.18.10] - 2026-11-17
 
 ### Added

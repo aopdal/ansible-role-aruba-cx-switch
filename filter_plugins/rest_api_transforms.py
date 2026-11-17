@@ -191,8 +191,9 @@ def rest_api_to_aoscx_evpn_vlans(rest_data):
     """Convert REST API EVPN VLAN data to a usable format.
 
     Args:
-        rest_data: Dict from REST API /system/evpn/evpn_vlans?depth=1
-                   Format: {"10": {...}, "20": {...}, ...}
+        rest_data: Dict from REST API /system/evpn/evpn_vlans?depth=2
+                   Format: {"10": {"vlan": "10", "rd": "auto", ...}, ...}
+                   (depth=1 only returns URI strings, which are skipped)
 
     Returns:
         Dict with VLAN ID as key and EVPN config as value
@@ -224,15 +225,33 @@ def rest_api_to_aoscx_evpn_vlans(rest_data):
     return result
 
 
+def _rest_reference_name(ref):
+    """Return the object key of a REST reference.
+
+    AOS-CX returns references either as {"<key>": "<uri>"} or as a bare
+    "<uri>" string; the key is the last URI path segment.
+    """
+    if isinstance(ref, dict):
+        return str(next(iter(ref))) if ref else None
+    if isinstance(ref, str) and ref:
+        return ref.rstrip("/").rsplit("/", 1)[-1]
+    if isinstance(ref, int):
+        return str(ref)
+    return None
+
+
 def rest_api_to_aoscx_vnis(rest_data):
     """Convert REST API VNI data to a usable format.
 
     Args:
-        rest_data: Dict from REST API /system/virtual_network_ids?depth=1
-                   Format: {"vxlan,100": {...}, "vxlan,200": {...}, ...}
+        rest_data: Dict from REST API /system/virtual_network_ids?depth=2
+                   Format: {"vxlan_vni,100": {"id": 100, "type": "vxlan_vni",
+                   "vlan": {"10": "/rest/.../vlans/10"}, ...}, ...}
+                   (depth=1 only returns URI strings, which are skipped)
 
     Returns:
-        Dict with VNI ID as key and VNI config as value
+        Dict with VNI ID as key. ``vlan`` is the mapped VLAN ID (int) or
+        None, ``vrf`` / ``interface`` are names or None.
     """
     if not isinstance(rest_data, dict):
         return {}
@@ -242,19 +261,20 @@ def rest_api_to_aoscx_vnis(rest_data):
         if not isinstance(vni_data, dict):
             continue
 
-        # Key format is "type,id" (e.g., "vxlan,100") - we extract from data instead
-        vni_type = vni_data.get("type", "vxlan")
+        # Key format is "type,id" (e.g., "vxlan_vni,100") - we extract from data instead
+        vni_type = vni_data.get("type", "vxlan_vni")
         vni_id = vni_data.get("id")
 
         if vni_id is not None:
+            vlan = _rest_reference_name(vni_data.get("vlan"))
             result[str(vni_id)] = {
                 "id": vni_id,
                 "type": vni_type,
-                "vlan": vni_data.get("vlan"),
-                "vrf": vni_data.get("vrf"),
+                "vlan": int(vlan) if vlan and vlan.isdigit() else vlan,
+                "vrf": _rest_reference_name(vni_data.get("vrf")),
                 "routing": vni_data.get("routing"),
                 "state": vni_data.get("state"),
-                "interface": vni_data.get("interface"),
+                "interface": _rest_reference_name(vni_data.get("interface")),
             }
 
     return result
