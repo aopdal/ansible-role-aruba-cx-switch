@@ -8,6 +8,7 @@ from rest_api_transforms import (
     rest_api_to_aoscx_evpn_vlans,
     rest_api_to_aoscx_vnis,
     rest_api_to_aoscx_dhcp_relays,
+    rest_api_to_aoscx_bgp,
 )
 
 
@@ -489,3 +490,122 @@ class TestRestApiToAoscxDhcpRelays:
         }
         result = rest_api_to_aoscx_dhcp_relays(rest_data)
         assert result["vlan101"] == ["172.16.3.10"]
+
+
+class TestRestApiToAoscxBgp:
+    """Tests for rest_api_to_aoscx_bgp (payloads trimmed from an 8360, 10.16)"""
+
+    _VRFS = {
+        "default": {
+            "name": "default",
+            "bgp_routers": {
+                "65015": {
+                    "router_id": "172.27.252.0",
+                    "redistribute": {},
+                    "bgp_neighbors": "/rest/v10.16/system/vrfs/default/bgp_routers/65015/bgp_neighbors",
+                }
+            },
+        },
+        "lab-blue": {
+            "name": "lab-blue",
+            "bgp_routers": {
+                "65015": {
+                    "router_id": None,
+                    "redistribute": {"ipv4-unicast": ["static"], "ipv6-unicast": ["static", "connected"]},
+                }
+            },
+        },
+        "mgmt": {"name": "mgmt", "bgp_routers": {}},
+    }
+
+    _EVPN_NEIGHBOR = {
+        "remote_as": 65015,
+        "update_source": "172.27.252.0",
+        "activate": {"ipv4-unicast": False, "ipv6-unicast": False, "l2vpn-evpn": True, "vpnv4-unicast": False},
+        "next_hop_self": {"ipv4-unicast": False, "ipv6-unicast": False, "l2vpn-evpn": False},
+        "route_reflector_client": {"ipv4-unicast": False, "l2vpn-evpn": False},
+        "send_community": {"ipv4-unicast": "none", "l2vpn-evpn": "extended"},
+        "route_maps": {},
+        "inbound_soft_reconfiguration": {"ipv4-unicast": False, "ipv6-unicast": False},
+        "bfd_enable": False,
+        "fall_over": False,
+        "password": "AQBapWeH",
+        "shutdown": False,
+        "status": {"bgp_peer_state": "Established"},
+    }
+
+    _EBGP_NEIGHBOR = {
+        "remote_as": 65020,
+        "update_source": None,
+        "activate": {"ipv4-unicast": True, "ipv6-unicast": False},
+        "next_hop_self": {"ipv4-unicast": False},
+        "route_reflector_client": {"ipv4-unicast": False},
+        "send_community": {"ipv4-unicast": "none"},
+        "route_maps": {
+            "ipv4-unicast,in": "/rest/v10.16/system/route_maps/LAB-GW-IPV4-IN-01",
+            "ipv4-unicast,out": "/rest/v10.16/system/route_maps/LAB-BLUE%2DOUT",
+        },
+        "inbound_soft_reconfiguration": {"ipv4-unicast": True, "ipv6-unicast": False},
+        "bfd_enable": True,
+        "fall_over": False,
+        "password": None,
+        "shutdown": False,
+        "status": {"bgp_peer_state": "Idle"},
+    }
+
+    def _results(self):
+        return [
+            {"item": {"vrf": "default", "asn": "65015"}, "status": 200,
+             "json": {"172.27.252.1": self._EVPN_NEIGHBOR}},
+            {"item": {"vrf": "lab-blue", "asn": "65015"}, "status": 200,
+             "json": {"172.27.250.32": self._EBGP_NEIGHBOR}},
+        ]
+
+    def test_router_and_redistribute(self):
+        result = rest_api_to_aoscx_bgp(self._VRFS, self._results(), {"bfd_enable": True})
+        assert result["asn"] == 65015
+        assert result["bfd_enable"] is True
+        assert sorted(result["vrfs"]) == ["default", "lab-blue"]
+        assert result["vrfs"]["default"]["router_id"] == "172.27.252.0"
+        assert result["vrfs"]["default"]["redistribute"] == {}
+        assert result["vrfs"]["lab-blue"]["router_id"] is None
+        assert result["vrfs"]["lab-blue"]["redistribute"] == {
+            "ipv4": ["static"], "ipv6": ["connected", "static"]}
+
+    def test_evpn_neighbor(self):
+        n = rest_api_to_aoscx_bgp(self._VRFS, self._results())["vrfs"]["default"]["neighbors"]["172.27.252.1"]
+        assert n["remote_as"] == 65015
+        assert n["update_source"] == "172.27.252.0"
+        assert n["activate"] == ["evpn"]
+        assert n["next_hop_self"] == []
+        assert n["send_community"] == {"evpn": "extended"}
+        assert n["password"] == "AQBapWeH"
+        assert n["state"] == "Established"
+
+    def test_ebgp_neighbor_route_maps_and_options(self):
+        n = rest_api_to_aoscx_bgp(self._VRFS, self._results())["vrfs"]["lab-blue"]["neighbors"]["172.27.250.32"]
+        assert n["activate"] == ["ipv4"]
+        assert n["route_maps"] == {"ipv4": {"in": "LAB-GW-IPV4-IN-01", "out": "LAB-BLUE-OUT"}}
+        assert n["soft_reconfiguration_inbound"] == ["ipv4"]
+        assert n["bfd"] is True
+        assert n["send_community"] == {}
+        assert n["password"] is None
+        assert n["state"] == "Idle"
+
+    def test_non_200_and_unknown_vrf_results_ignored(self):
+        results = [
+            {"item": {"vrf": "default", "asn": "65015"}, "status": 404, "json": None},
+            {"item": {"vrf": "other", "asn": "65015"}, "status": 200,
+             "json": {"10.0.0.1": self._EBGP_NEIGHBOR}},
+        ]
+        result = rest_api_to_aoscx_bgp(self._VRFS, results)
+        assert result["vrfs"]["default"]["neighbors"] == {}
+        assert "other" not in result["vrfs"]
+
+    def test_no_bgp_configured(self):
+        result = rest_api_to_aoscx_bgp({"default": {"bgp_routers": {}}}, [], {"bfd_enable": False})
+        assert result == {"asn": None, "bfd_enable": False, "vrfs": {}}
+
+    @pytest.mark.parametrize("bad", [None, [], "x"])
+    def test_invalid_input(self, bad):
+        assert rest_api_to_aoscx_bgp(bad, bad, bad) == {"asn": None, "bfd_enable": False, "vrfs": {}}

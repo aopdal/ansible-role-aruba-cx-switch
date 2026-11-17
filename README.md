@@ -381,6 +381,7 @@ aoscx_configure_ospf: true
 aoscx_configure_static_routes: true
 aoscx_configure_bgp: false
 aoscx_use_netbox_bgp_plugin: true    # BGP sessions come from the netbox-bgp plugin; false skips BGP
+bgp_ipv4_enabled: false              # EVPN fabrics: also activate EVPN neighbors in ipv4 unicast
 aoscx_configure_evpn: false
 aoscx_configure_vxlan: false
 aoscx_configure_vsx: false

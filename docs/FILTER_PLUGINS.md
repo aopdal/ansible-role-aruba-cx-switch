@@ -4,7 +4,7 @@ Custom Ansible filters for transforming NetBox data for use with Aruba AOS-CX sw
 
 ## Overview
 
-This library provides **67 custom filters** organized into 17 modules in `netbox_filters_lib/`, registered across 2 Ansible filter plugin files (`netbox_filters.py` and `rest_api_transforms.py`). The filters handle VLAN management, VRF configuration and route targets, interface categorization, interface IP processing, L3 configuration optimization, interface/VLAN/VRF/OSPF/BGP/port-access/STP/VSX/static-route change detection, REST API data normalization, and state comparison between NetBox (source of truth) and device facts.
+This library provides **70 custom filters** organized into 17 modules in `netbox_filters_lib/`, registered across 2 Ansible filter plugin files (`netbox_filters.py` and `rest_api_transforms.py`). The filters handle VLAN management, VRF configuration and route targets, interface categorization, interface IP processing, L3 configuration optimization, interface/VLAN/VRF/OSPF/BGP/port-access/STP/VSX/static-route change detection, REST API data normalization, and state comparison between NetBox (source of truth) and device facts.
 
 For a full per-filter reference (parameters, return values, and one-line "what does this actually do" summaries) grouped the same way, see [docs/filter_plugins/index.md](filter_plugins/index.md) — that page is the better starting point if you don't already know which module you need.
 
@@ -323,7 +323,7 @@ ansible-playbook your-playbook.yml
 ```
 filter_plugins/
 ├── netbox_filters.py                    # Main entry point (FilterModule class, 62 filters)
-├── rest_api_transforms.py               # Separate FilterModule (5 filters)
+├── rest_api_transforms.py               # Separate FilterModule (6 filters)
 └── netbox_filters_lib/                  # Package directory (role root, not inside filter_plugins/)
     ├── __init__.py                      # Package initialization
     ├── utils.py                         # Helper functions (246 lines)
@@ -789,6 +789,25 @@ BGP session enrichment and config-building against the NetBox BGP plugin
     - Cleanup counterpart: `True` when `bfd` is currently configured on the
       device but no neighbor declares `fall-over bfd` anymore, so `no bfd`
       should be pushed
+
+- **`build_bgp_desired_neighbors(sessions, device_vxlan=False, route_reflector=False, evpn_ipv4_unicast=False)`**
+    - Desired per-neighbor state from enriched netbox-bgp sessions, with the
+      same rules as `configure_bgp.yml` (EVPN vs. address-family split,
+      iBGP update-source/next-hop-self, eBGP route-maps, IPv6
+      send-community, route-reflector-client on RR roles)
+    - Returns: `{vrf: {ip: {name, remote_as, update_source, ibgp, afs: {af: {...}}}}}`
+      with IPs in canonical form
+
+- **`get_bgp_neighbor_changes(desired, bgp_facts, local_asn, idempotent=False)`**
+    - Diffs `build_bgp_desired_neighbors` against `aoscx_bgp_facts`
+    - Returns: `{push: [{vrf, ip, name, commands}], remove: [{vrf, ip, commands}], source}`;
+      `commands` is a complete `aoscx_command` sequence with only the
+      missing lines. Without facts every neighbor is pushed and nothing
+      removed (`source: none`)
+
+- **`get_bgp_redistribute_changes(bgp_redistribute, bgp_facts, idempotent=False)`**
+    - Diffs the `bgp_redistribute` config_context against `aoscx_bgp_facts`
+    - Returns: `{add: [{vrf, af, protocol}], remove: [...], source}`
 
 ### `port_access.py` - Port-Access Diff
 
@@ -1488,7 +1507,7 @@ netbox_filters.py (main entry point, 62 filters)
     ├── stp.py (no dependencies)
     └── vsx.py (no dependencies)
 
-rest_api_transforms.py (separate entry point, 5 filters — no dependency on netbox_filters_lib)
+rest_api_transforms.py (separate entry point, 6 filters — no dependency on netbox_filters_lib)
 ```
 
 ### Performance Considerations
@@ -1500,7 +1519,7 @@ rest_api_transforms.py (separate entry point, 5 filters — no dependency on net
 
 ## Statistics
 
-- **Total Filters**: 74 (69 in `netbox_filters.py` + 5 in `rest_api_transforms.py`)
+- **Total Filters**: 78 (72 in `netbox_filters.py` + 6 in `rest_api_transforms.py`)
 - **Total Lines**: ~6,500 in `netbox_filters_lib/` (including docstrings and comments), plus ~460 across the two plugin entry-point files
 - **Modules**: 19 in `netbox_filters_lib/`, across 2 plugin files
 - **Test Coverage**: Unit-tested per module under `tests/unit/`; used in production for 100+ switches
@@ -1511,7 +1530,7 @@ rest_api_transforms.py (separate entry point, 5 filters — no dependency on net
 | Module | Filters | Lines | Description |
 |--------|---------|-------|-------------|
 | `vlan_filters.py` | 14 | 952 | VLAN lifecycle management (incl. IGMP/voice/name change detection, VLAN-group exclusion) |
-| `bgp_filters.py` | 8 | 899 | BGP session enrichment, policy, redistribute, neighbor options, BFD |
+| `bgp_filters.py` | 11 | 899 | BGP session enrichment, policy, redistribute, neighbor options, BFD |
 | `interface_change_detection.py` | 1 | 760 | Change detection orchestration & idempotency |
 | `interface_ip_comparisons.py` | 0 (internal) | 681 | IPv4/IPv6/VRF/anycast/DHCP relay comparison |
 | `l3_config_helpers.py` | 8 | 583 | L3 configuration optimization (incl. ip helper-address) |
@@ -1530,8 +1549,8 @@ rest_api_transforms.py (separate entry point, 5 filters — no dependency on net
 | `interface_orphans.py` | 1 | 56 | Orphaned virtual interface cleanup |
 | `port_access_orphans.py` | 1 | 36 | Orphaned port-access object cleanup |
 | **Subtotal (`netbox_filters_lib/`, 17 modules)** | **62 unique** *(rows above sum to 64 — `is_ipv4_address`/`is_ipv6_address` appear in both `utils.py`'s row and `l3_config_helpers.py`'s row, see note)* | **~6,500** | |
-| `rest_api_transforms.py` *(separate plugin)* | 5 | 275 | REST API → `aoscx_facts` format normalization |
-| **Total** | **67** | **~6,960** | **17 lib modules + 1 separate plugin** |
+| `rest_api_transforms.py` *(separate plugin)* | 6 | 275 | REST API → `aoscx_facts` format normalization |
+| **Total** | **70** | **~6,960** | **17 lib modules + 1 separate plugin** |
 
 Note: `is_ipv4_address` / `is_ipv6_address` are implemented in `utils.py` but
 their Ansible filter names are registered from `l3_config_helpers.py` (which

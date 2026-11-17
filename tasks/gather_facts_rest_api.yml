@@ -36,6 +36,7 @@
 # - aoscx_stp_global_facts (when aoscx_configure_stp enabled)
 # - aoscx_snmp_facts (when SNMP variables are set)
 # - aoscx_central_facts (when aoscx_configure_central enabled)
+# - aoscx_bgp_facts (when device_bgp and aoscx_configure_bgp enabled)
 # - aoscx_interface_split_facts (when a NetBox interface has `channels`
 #   and the device answers the split attributes; see
 #   docs/INTERFACE_SPLIT.md)
@@ -985,6 +986,84 @@
     - _rest_central is defined
     - _rest_central.status | default(0) == 200
     - _rest_central.json is mapping
+  tags:
+    - always
+
+# Query BGP facts (only for devices with device_bgp, see configure_bgp.yml)
+# Used by configure_bgp.yml to push only the neighbor/redistribute settings
+# that differ and, in aoscx_idempotent_mode, to remove neighbors and
+# redistribute entries NetBox no longer has. Three queries:
+#   /system/vrfs?attributes=name,bgp_routers&depth=4  -> router per VRF
+#     (router_id, redistribute); bgp_neighbors stays a URI at any depth
+#   /system/vrfs/{vrf}/bgp_routers/{asn}/bgp_neighbors?depth=2 per router
+#   /system?attributes=bfd_enable                     -> global 'bfd'
+# No NetBox data is needed: the ASN comes from the device.
+#
+# Output: aoscx_bgp_facts = { 'asn': int|None, 'bfd_enable': bool,
+#   'vrfs': { vrf: { 'router_id', 'redistribute': {af: [...]},
+#   'neighbors': { ip: {...} } } } } - see rest_api_to_aoscx_bgp in
+# filter_plugins/rest_api_transforms.py for the neighbor keys.
+- name: Query BGP router facts from REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}{{ item }}"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  loop:
+    - /system/vrfs?attributes=name,bgp_routers&depth=4
+    - /system?attributes=bfd_enable
+  register: _rest_bgp
+  delegate_to: localhost
+  check_mode: false
+  when:
+    - custom_fields.device_bgp | default(false) | bool
+    - aoscx_configure_bgp | bool or aoscx_test_mode | bool
+  tags:
+    - always
+
+- name: Query BGP neighbor facts from REST API
+  ansible.builtin.uri:
+    url: "{{ _rest_api_base }}/system/vrfs/{{ item.vrf | urlencode }}/bgp_routers/{{ item.asn }}/bgp_neighbors?depth=2"
+    method: GET
+    headers:
+      Cookie: "{{ _rest_login.cookies_string }}"
+    validate_certs: "{{ _rest_validate_certs }}"
+    status_code: [200, 404]
+    return_content: true
+  loop: >-
+    {%- set routers = [] -%}
+    {%- for vrf, data in (_rest_bgp.results[0].json | default({})).items() -%}
+      {%- for asn in ((data.bgp_routers | default({}, true)) if data is mapping else {}).keys() -%}
+        {%- set _ = routers.append({'vrf': vrf, 'asn': asn}) -%}
+      {%- endfor -%}
+    {%- endfor -%} {{ routers }}
+  loop_control:
+    label: "VRF {{ item.vrf }} AS {{ item.asn }}"
+  register: _rest_bgp_neighbors
+  delegate_to: localhost
+  check_mode: false
+  # Neighbor objects carry the BGP password ciphertext.
+  no_log: true
+  when:
+    - _rest_bgp is defined
+    - _rest_bgp.results is defined
+  tags:
+    - always
+
+- name: Build BGP facts from REST API responses
+  ansible.builtin.set_fact:
+    aoscx_bgp_facts: >-
+      {{ _rest_bgp.results[0].json | rest_api_to_aoscx_bgp(
+           _rest_bgp_neighbors.results | default([]),
+           _rest_bgp.results[1].json) }}
+  no_log: true
+  when:
+    - _rest_bgp is defined
+    - _rest_bgp.results is defined
+    - _rest_bgp.results | selectattr('json', 'defined') | list | length == 2
   tags:
     - always
 

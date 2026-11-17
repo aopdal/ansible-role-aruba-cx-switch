@@ -11,6 +11,9 @@ from netbox_filters_lib.bgp_filters import (
     get_stale_bgp_neighbor_options,
     get_bgp_bfd_enabled,
     get_stale_bgp_bfd,
+    build_bgp_desired_neighbors,
+    get_bgp_neighbor_changes,
+    get_bgp_redistribute_changes,
 )
 
 
@@ -1409,3 +1412,315 @@ router bgp 65015
             {"172.27.250.32": {"general": ["fall-over bfd"]}}, self._SESSIONS, None
         )
         assert result is False
+
+
+class TestBgpRunningConfigDeviceFormat:
+    """The parsers against 'show running-config' as AOS-CX 10.16 prints it
+    (8360 lab switch): no 'exit-vrf', and a column-0 '!' between the global
+    section and each 'vrf' section. The '!' must not end 'router bgp'."""
+
+    _RUNNING_CONFIG = """
+bfd
+router bgp 65015
+    bgp router-id 172.27.252.0
+    neighbor 172.27.252.1 remote-as 65015
+    neighbor 172.27.252.1 password ciphertext AQBapWeH
+    neighbor 172.27.252.1 update-source 172.27.252.0
+    address-family l2vpn evpn
+        neighbor 172.27.252.1 send-community extended
+        neighbor 172.27.252.1 activate
+    exit-address-family
+!
+    vrf lab-blue
+        neighbor 172.27.250.32 remote-as 65020
+        neighbor 172.27.250.32 fall-over bfd
+        address-family ipv4 unicast
+            neighbor 172.27.250.32 route-map LAB-GW-IPV4-IN-01 in
+            neighbor 172.27.250.32 soft-reconfiguration inbound
+            neighbor 172.27.250.32 activate
+            redistribute static
+        exit-address-family
+!
+    vrf lab-green
+        neighbor 172.27.250.38 remote-as 65020
+        address-family ipv4 unicast
+            redistribute connected
+        exit-address-family
+!
+https-server vrf mgmt
+"""
+
+    _SESSIONS = [
+        _enriched_session("172.27.252.1", vrf="default", af="ipv4"),
+        _enriched_session("172.27.250.32", vrf="lab-blue", af="ipv4"),
+        _enriched_session("172.27.250.38", vrf="lab-green", af="ipv4"),
+    ]
+
+    def test_redistribute_after_bang_is_parsed(self):
+        desired = {"lab-blue": {"ipv4": ["static"]}}
+        result = get_stale_bgp_redistribute(desired, self._RUNNING_CONFIG, 65015)
+        assert result == [{"vrf": "lab-green", "af": "ipv4", "protocol": "connected"}]
+
+    def test_vrf_neighbor_options_after_bang_are_parsed(self):
+        result = get_stale_bgp_neighbor_options(
+            {}, self._SESSIONS, self._RUNNING_CONFIG, 65015)
+        assert result == [
+            {"vrf": "default", "af": None, "neighbor_ip": "172.27.252.1",
+             "command": "password ciphertext AQBapWeH"},
+            {"vrf": "lab-blue", "af": None, "neighbor_ip": "172.27.250.32",
+             "command": "fall-over bfd"},
+            {"vrf": "lab-blue", "af": "ipv4", "neighbor_ip": "172.27.250.32",
+             "command": "soft-reconfiguration inbound"},
+        ]
+
+    def test_no_stale_options_when_config_matches(self):
+        desired = {
+            "172.27.252.1": {"general": ["password ciphertext AQBapWeH"]},
+            "172.27.250.32": {
+                "general": ["fall-over bfd"],
+                "ipv4": ["soft-reconfiguration inbound"],
+            },
+        }
+        result = get_stale_bgp_neighbor_options(
+            desired, self._SESSIONS, self._RUNNING_CONFIG, 65015)
+        assert result == []
+
+    def test_next_top_level_statement_ends_router_bgp(self):
+        config = self._RUNNING_CONFIG + "router ospf 1\n    redistribute static\n"
+        result = get_stale_bgp_redistribute(
+            {"lab-blue": {"ipv4": ["static"]}, "lab-green": {"ipv4": ["connected"]}},
+            config, 65015)
+        assert result == []
+
+
+def _nb_session(name, local, remote, vrf, af, local_as=65015, remote_as=65015,
+                import_policy=None, export_policy=None):
+    return {
+        "name": name,
+        "local_address": {"address": local},
+        "remote_address": {"address": remote},
+        "local_as": {"asn": local_as},
+        "remote_as": {"asn": remote_as},
+        "import_policies": [{"name": import_policy}] if import_policy else [],
+        "export_policies": [{"name": export_policy}] if export_policy else [],
+        "_vrf": vrf,
+        "_af": af,
+    }
+
+
+_LAB_SESSIONS = [
+    _nb_session("ao-01-ao-02", "172.27.252.0/32", "172.27.252.1/32", "default", "ipv4"),
+    _nb_session("ao-01-ao-02-blue", "172.27.4.2/27", "172.27.4.3/27", "lab-blue", "ipv4"),
+    _nb_session("ao-01-ao-02-blue", "2a02:20c8:5921:da10::2/64",
+                "2a02:20c8:5921:da10:0:0:0:3/64", "lab-blue", "ipv6"),
+    _nb_session("ao-01-lab-gw-blue", "172.27.250.33/31", "172.27.250.32/31", "lab-blue",
+                "ipv4", remote_as=65020, import_policy="GW-IN", export_policy="BLUE-OUT"),
+]
+
+
+def _have(**kwargs):
+    """A neighbor as rest_api_to_aoscx_bgp returns it."""
+    n = {
+        "remote_as": None, "update_source": None, "shutdown": False,
+        "activate": [], "next_hop_self": [], "route_reflector_client": [],
+        "soft_reconfiguration_inbound": [], "send_community": {},
+        "route_maps": {}, "bfd": False, "fall_over": False,
+        "password": None, "state": "Established",
+    }
+    n.update(kwargs)
+    return n
+
+
+def _converged_facts():
+    return {
+        "asn": 65015,
+        "bfd_enable": True,
+        "vrfs": {
+            "default": {"router_id": "172.27.252.0", "redistribute": {}, "neighbors": {
+                "172.27.252.1": _have(remote_as=65015, update_source="172.27.252.0",
+                                      activate=["evpn"], send_community={"evpn": "extended"}),
+            }},
+            "lab-blue": {"router_id": None, "redistribute": {"ipv4": ["static"]}, "neighbors": {
+                "172.27.4.3": _have(remote_as=65015, update_source="172.27.4.2",
+                                    activate=["ipv4"], next_hop_self=["ipv4"]),
+                "2a02:20c8:5921:da10::3": _have(
+                    remote_as=65015, update_source="2a02:20c8:5921:da10::2",
+                    activate=["ipv6"], next_hop_self=["ipv6"],
+                    send_community={"ipv6": "extended"}),
+                "172.27.250.32": _have(remote_as=65020, activate=["ipv4"],
+                                       route_maps={"ipv4": {"in": "GW-IN", "out": "BLUE-OUT"}}),
+            }},
+        },
+    }
+
+
+class TestBuildBgpDesiredNeighbors:
+    """Tests for build_bgp_desired_neighbors"""
+
+    def test_evpn_neighbor_with_vxlan(self):
+        result = build_bgp_desired_neighbors(_LAB_SESSIONS, device_vxlan=True)
+        n = result["default"]["172.27.252.1"]
+        assert n["update_source"] == "172.27.252.0"
+        assert list(n["afs"]) == ["evpn"]
+        assert n["afs"]["evpn"]["send_community"] == "extended"
+        assert n["afs"]["evpn"]["route_reflector_client"] is False
+
+    def test_default_vrf_without_vxlan_is_address_family_neighbor(self):
+        n = build_bgp_desired_neighbors(_LAB_SESSIONS)["default"]["172.27.252.1"]
+        assert list(n["afs"]) == ["ipv4"]
+        assert n["afs"]["ipv4"]["next_hop_self"] is True
+
+    def test_evpn_ipv4_unicast(self):
+        n = build_bgp_desired_neighbors(
+            _LAB_SESSIONS, device_vxlan=True, evpn_ipv4_unicast=True)["default"]["172.27.252.1"]
+        assert sorted(n["afs"]) == ["evpn", "ipv4"]
+
+    def test_vrf_ibgp_ipv4_and_ipv6(self):
+        vrf = build_bgp_desired_neighbors(_LAB_SESSIONS, device_vxlan=True)["lab-blue"]
+        v4 = vrf["172.27.4.3"]
+        assert v4["ibgp"] is True and v4["update_source"] == "172.27.4.2"
+        assert v4["afs"]["ipv4"]["next_hop_self"] is True
+        assert v4["afs"]["ipv4"]["send_community"] is None
+        # NetBox address written uncompressed is normalised
+        v6 = vrf["2a02:20c8:5921:da10::3"]
+        assert v6["afs"]["ipv6"]["send_community"] == "extended"
+
+    def test_vrf_ebgp_route_maps(self):
+        n = build_bgp_desired_neighbors(_LAB_SESSIONS)["lab-blue"]["172.27.250.32"]
+        assert n["ibgp"] is False
+        assert n["update_source"] is None
+        assert n["afs"]["ipv4"]["route_map_in"] == "GW-IN"
+        assert n["afs"]["ipv4"]["route_map_out"] == "BLUE-OUT"
+        assert n["afs"]["ipv4"]["next_hop_self"] is False
+
+    def test_route_reflector_only_on_ibgp(self):
+        vrf = build_bgp_desired_neighbors(_LAB_SESSIONS, route_reflector=True)["lab-blue"]
+        assert vrf["172.27.4.3"]["afs"]["ipv4"]["route_reflector_client"] is True
+        assert vrf["172.27.250.32"]["afs"]["ipv4"]["route_reflector_client"] is False
+
+    def test_session_without_remote_address_skipped(self):
+        bad = dict(_LAB_SESSIONS[0], remote_address=None)
+        assert build_bgp_desired_neighbors([bad, None]) == {}
+
+    def test_empty(self):
+        assert build_bgp_desired_neighbors(None) == {}
+
+
+class TestGetBgpNeighborChanges:
+    """Tests for get_bgp_neighbor_changes"""
+
+    _DESIRED = build_bgp_desired_neighbors(_LAB_SESSIONS, device_vxlan=True)
+
+    def test_converged_device_needs_nothing(self):
+        result = get_bgp_neighbor_changes(self._DESIRED, _converged_facts(), 65015, True)
+        assert result == {"push": [], "remove": [], "source": "rest"}
+
+    def test_without_facts_everything_pushed_nothing_removed(self):
+        result = get_bgp_neighbor_changes(self._DESIRED, None, 65015, True)
+        assert result["source"] == "none"
+        assert len(result["push"]) == 4
+        assert result["remove"] == []
+        evpn = [p for p in result["push"] if p["vrf"] == "default"][0]
+        assert evpn["commands"] == [
+            "configure terminal", "router bgp 65015",
+            "neighbor 172.27.252.1 remote-as 65015",
+            "neighbor 172.27.252.1 update-source 172.27.252.0",
+            "address-family l2vpn evpn",
+            "neighbor 172.27.252.1 activate",
+            "neighbor 172.27.252.1 send-community extended",
+            "exit-address-family", "end",
+        ]
+
+    def test_only_missing_lines_pushed_in_vrf_context(self):
+        facts = _converged_facts()
+        facts["vrfs"]["lab-blue"]["neighbors"]["172.27.4.3"]["next_hop_self"] = []
+        result = get_bgp_neighbor_changes(self._DESIRED, facts, 65015)
+        assert result["push"] == [{
+            "vrf": "lab-blue", "ip": "172.27.4.3", "name": "ao-01-ao-02-blue",
+            "commands": [
+                "configure terminal", "router bgp 65015", "vrf lab-blue",
+                "address-family ipv4 unicast",
+                "neighbor 172.27.4.3 next-hop-self",
+                "exit-address-family", "exit-vrf", "end",
+            ],
+        }]
+
+    def test_missing_route_map_is_pushed(self):
+        facts = _converged_facts()
+        facts["vrfs"]["lab-blue"]["neighbors"]["172.27.250.32"]["route_maps"] = {
+            "ipv4": {"out": "BLUE-OUT"}}
+        result = get_bgp_neighbor_changes(self._DESIRED, facts, 65015)
+        assert "neighbor 172.27.250.32 route-map GW-IN in" in result["push"][0]["commands"]
+
+    def test_send_community_both_satisfies_extended(self):
+        facts = _converged_facts()
+        facts["vrfs"]["default"]["neighbors"]["172.27.252.1"]["send_community"] = {"evpn": "both"}
+        assert get_bgp_neighbor_changes(self._DESIRED, facts, 65015)["push"] == []
+
+    def test_stale_route_map_removed_only_when_idempotent(self):
+        sessions = [dict(_LAB_SESSIONS[3], import_policies=[])]
+        desired = build_bgp_desired_neighbors(sessions)
+        facts = {"vrfs": {"lab-blue": {"neighbors": {
+            "172.27.250.32": _converged_facts()["vrfs"]["lab-blue"]["neighbors"]["172.27.250.32"]}}}}
+        assert get_bgp_neighbor_changes(desired, facts, 65015)["push"] == []
+        result = get_bgp_neighbor_changes(desired, facts, 65015, idempotent=True)
+        assert "no neighbor 172.27.250.32 route-map GW-IN in" in result["push"][0]["commands"]
+
+    def test_stale_route_reflector_client_removed(self):
+        facts = _converged_facts()
+        facts["vrfs"]["lab-blue"]["neighbors"]["172.27.4.3"]["route_reflector_client"] = ["ipv4"]
+        result = get_bgp_neighbor_changes(self._DESIRED, facts, 65015, idempotent=True)
+        assert "no neighbor 172.27.4.3 route-reflector-client" in result["push"][0]["commands"]
+
+    def test_remote_as_change_pushed(self):
+        facts = _converged_facts()
+        facts["vrfs"]["lab-blue"]["neighbors"]["172.27.250.32"]["remote_as"] = 65099
+        result = get_bgp_neighbor_changes(self._DESIRED, facts, 65015)
+        assert "neighbor 172.27.250.32 remote-as 65020" in result["push"][0]["commands"]
+
+    def test_stale_neighbors_removed_in_any_vrf(self):
+        facts = _converged_facts()
+        facts["vrfs"]["lab-blue"]["neighbors"]["10.9.9.9"] = _have(remote_as=65099)
+        facts["vrfs"]["lab-red"] = {"neighbors": {
+            "10.8.8.8": _have(remote_as=65015), "PEER-GROUP": _have()}}
+        result = get_bgp_neighbor_changes(self._DESIRED, facts, 65015, idempotent=True)
+        assert [(r["vrf"], r["ip"]) for r in result["remove"]] == [
+            ("lab-blue", "10.9.9.9"), ("lab-red", "10.8.8.8")]
+        assert result["remove"][1]["commands"] == [
+            "configure terminal", "router bgp 65015", "vrf lab-red",
+            "no neighbor 10.8.8.8", "exit-vrf", "end"]
+
+    def test_stale_neighbors_kept_when_not_idempotent(self):
+        facts = _converged_facts()
+        facts["vrfs"]["lab-blue"]["neighbors"]["10.9.9.9"] = _have(remote_as=65099)
+        assert get_bgp_neighbor_changes(self._DESIRED, facts, 65015)["remove"] == []
+
+
+class TestGetBgpRedistributeChanges:
+    """Tests for get_bgp_redistribute_changes"""
+
+    _CTX = {"lab-blue": {"ipv4": ["static"], "ipv6": ["static"]}}
+
+    def test_without_facts_all_added(self):
+        result = get_bgp_redistribute_changes(self._CTX, None, True)
+        assert result["source"] == "none"
+        assert len(result["add"]) == 2 and result["remove"] == []
+
+    def test_only_missing_added(self):
+        facts = {"vrfs": {"lab-blue": {"redistribute": {"ipv4": ["static"]}}}}
+        result = get_bgp_redistribute_changes(self._CTX, facts)
+        assert result["add"] == [{"vrf": "lab-blue", "af": "ipv6", "protocol": "static"}]
+        assert result["remove"] == []
+
+    def test_stale_removed_when_idempotent(self):
+        facts = {"vrfs": {
+            "lab-blue": {"redistribute": {"ipv4": ["connected", "static"], "ipv6": ["static"]}},
+            "default": {"redistribute": {"ipv4": ["local-loopback"]}},
+        }}
+        result = get_bgp_redistribute_changes(self._CTX, facts, True)
+        assert result["add"] == []
+        assert result["remove"] == [
+            {"vrf": "default", "af": "ipv4", "protocol": "local-loopback"},
+            {"vrf": "lab-blue", "af": "ipv4", "protocol": "connected"},
+        ]
+        assert get_bgp_redistribute_changes(self._CTX, facts, False)["remove"] == []

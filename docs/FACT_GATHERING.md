@@ -71,7 +71,7 @@ A single authenticated REST API session gathers:
 - **EVPN** - Global EVPN config and per-VLAN settings (when enabled)
 - **VXLAN/VNI** - VNI mappings (when enabled)
 
-Several features — OSPF, VSX, static routes, VRFs/route-targets, STP,
+Several features — OSPF, BGP, VSX, static routes, VRFs/route-targets, STP,
 port-access, DHCP relay, SNMP, interface split — also get their facts
 through this same REST API path; see "Selective fact gathering" below for
 when their queries run.
@@ -82,6 +82,16 @@ a NetBox 4.7+ interface has a `channels` value. Hardware or firmware
 without split support may reject these attributes; a non-200 answer only
 means no `aoscx_interface_split_facts`, and the split task then reads the
 running-config instead. See [INTERFACE_SPLIT.md](INTERFACE_SPLIT.md).
+
+BGP facts (`aoscx_bgp_facts`, devices with `device_bgp` when
+`aoscx_configure_bgp` or `aoscx_test_mode` is set) take three requests:
+`/system/vrfs?attributes=name,bgp_routers&depth=4` for the router in each
+VRF, one `.../bgp_routers/{asn}/bgp_neighbors?depth=2` per router
+(`bgp_neighbors` stays a URI at any depth), and
+`/system?attributes=bfd_enable` for the global `bfd`. The ASN comes from
+the device, so no NetBox data is needed. `rest_api_to_aoscx_bgp` turns
+these into `{asn, bfd_enable, vrfs: {vrf: {router_id, redistribute,
+neighbors}}}`; see [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md#change-detection-rest-facts).
 
 #### Interface MTU fields
 

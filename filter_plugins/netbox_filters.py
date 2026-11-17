@@ -100,6 +100,9 @@ from netbox_filters_lib.bgp_filters import (
     get_stale_bgp_neighbor_options,
     get_bgp_bfd_enabled,
     get_stale_bgp_bfd,
+    build_bgp_desired_neighbors,
+    get_bgp_neighbor_changes,
+    get_bgp_redistribute_changes,
 )
 from netbox_filters_lib.port_access import (
     port_access_diff,
@@ -198,6 +201,9 @@ class FilterModule:
             "get_stale_bgp_neighbor_options": get_stale_bgp_neighbor_options,
             "get_bgp_bfd_enabled": get_bgp_bfd_enabled,
             "get_stale_bgp_bfd": get_stale_bgp_bfd,
+            "build_bgp_desired_neighbors": build_bgp_desired_neighbors,
+            "get_bgp_neighbor_changes": get_bgp_neighbor_changes,
+            "get_bgp_redistribute_changes": get_bgp_redistribute_changes,
             # Port-access
             "port_access_diff": port_access_diff,
             "port_access_facts_from_device_profiles": port_access_facts_from_device_profiles,
