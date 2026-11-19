@@ -12,18 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BGP: routing-policy rules and prefix-list rules were read from the
   NetBox BGP plugin without `limit=0`, so NetBox returned only the first
   page (50 rules by default) and with more rules the role silently built
-  incomplete prefix lists and route-maps. The queries now pass `limit=0`.
+  incomplete prefix lists and route-maps. They are now read in full (see
+  Changed).
 
 ### Changed
 
-- BGP: routing-policy rules and prefix-list rules are fetched per device,
-  only for what that device needs: one `routing_policy_id=` query per policy
-  its sessions reference, then one `prefix_list_id=` query per prefix list
-  those rules match on. Before, every rule in NetBox was fetched once per
-  play. netbox-bgp (0.20.2) takes one value per filter, so ids cannot be
-  combined into one query. This also fixes the old `run_once` block being
-  skipped for every host when the first host had no address-family BGP
-  sessions.
+- BGP: the NetBox data comes from one GraphQL query per device instead of
+  REST. The query returns the device's sessions with their routing policies,
+  the policies' rules and the prefix lists those rules match on, all nested.
+  Before, every rule in NetBox was fetched once per play. Fetching only the
+  device's rules over REST would take one query per policy and per prefix
+  list, since netbox-bgp's id filters take one value. The new filter
+  `netbox_bgp_graphql_to_rest` converts the answer to the REST shapes, so the
+  other BGP filters are unchanged. GraphQL errors (which arrive with HTTP
+  200) fail the play instead of reading as "no BGP sessions". A NetBox
+  without the plugin still skips BGP. NetBox must have GraphQL enabled (the
+  default). Dropping the old `run_once` block also fixes it being skipped
+  for every host when the first host had no address-family BGP sessions.
 
 ## [0.18.11] - 2026-11-17
 

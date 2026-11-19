@@ -287,33 +287,18 @@ CLI commands ready to apply to the device.
 ### Usage in Playbooks
 
 ```yaml
-# 1. Fetch raw rules from NetBox BGP plugin API
-- name: Query routing policy rules
-  ansible.builtin.uri:
-    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/routing-policy-rule/"
-    headers:
-      Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-  register: netbox_policy_rules_raw
-  delegate_to: localhost
-  run_once: true
-
-- name: Query prefix list rules
-  ansible.builtin.uri:
-    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/prefix-list-rule/"
-    headers:
-      Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-  register: netbox_prefix_list_rules_raw
-  delegate_to: localhost
-  run_once: true
-
+# 1. Fetch the device's sessions, routing policy rules and prefix list rules:
+#    one GraphQL query, converted to REST shapes by netbox_bgp_graphql_to_rest
+#    (see tasks/configure_bgp.yml and the section below). Any source in the
+#    REST shapes works, e.g. the REST endpoints with limit=0.
 # 2. Collect policy config data for this device's eBGP VRF sessions
 - name: Collect routing policy config
   ansible.builtin.set_fact:
     bgp_policy_data: >-
       {{ bgp_vrf_sessions |
          collect_ebgp_vrf_policy_config(
-           netbox_policy_rules_raw.json.results | default([]),
-           netbox_prefix_list_rules_raw.json.results | default([])
+           netbox_policy_rules_all,
+           netbox_prefix_list_rules_all
          ) }}
 
 # 3. Configure prefix lists (must come before route-maps)
@@ -390,6 +375,47 @@ route-map contexts.
 | Rule's `prefix` FK is null | Falls back to `prefix_custom` string |
 | `match_ip_address` is empty | Route-map entry generated without match command |
 | `set_actions` dict is empty | Route-map entry generated without set commands |
+
+---
+
+## `netbox_bgp_graphql_to_rest(response)`
+
+Converts the netbox-bgp GraphQL answer for one device into the shapes the
+REST endpoints return, so `get_bgp_session_vrf_info`,
+`collect_ebgp_vrf_policy_config` and the change-detection filters work
+unchanged.
+
+`tasks/configure_bgp.yml` sends one query per device to `/graphql/`:
+`netbox_bgp_session_list` filtered on the device name, with
+`import_policies` / `export_policies` → `rules` → `match_ip_address` /
+`match_ipv6_address` → `prefrules` nested. Over REST this took a session
+query plus one query per routing policy and per prefix list, because
+netbox-bgp's `routing_policy_id` / `prefix_list_id` filters take a single
+value (a repeated parameter keeps only the last; `__in` is ignored).
+
+What the conversion does:
+
+- `id`, `index` and ASN values become ints (GraphQL returns `ID` and
+  `BigInt` as strings).
+- `status` becomes `{"value": ...}`, as REST returns it.
+- Session policies become `{id, name}` references; their rules go to
+  `policy_rules`, each with `routing_policy: {id, name}`.
+- Prefix lists matched by those rules go to `prefix_list_rules`, each with
+  `prefix_list: {id, name}`.
+- Policies and prefix lists used by several sessions appear once. They are
+  ordered by name, with rules in index order, matching the REST endpoints.
+
+Returns `{available, errors, sessions, policy_rules, prefix_list_rules}`:
+
+- `available` is false when the schema has no `netbox_bgp_session_list`,
+  which means the plugin is not installed. The old REST query treated a 404
+  the same way.
+- `errors` holds any other GraphQL error messages. GraphQL reports errors
+  with HTTP 200, so the task fails on them rather than treating the device
+  as having no BGP.
+
+NetBox caps every GraphQL list at `MAX_PAGE_SIZE` (default 1000), the same
+cap REST applies with `limit=0`.
 
 ---
 

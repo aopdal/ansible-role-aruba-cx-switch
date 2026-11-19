@@ -583,6 +583,10 @@ The `collect_ebgp_vrf_policy_config` filter generates commands using this syntax
 
 ### Query BGP Plugin and Configure Neighbors
 
+A minimal REST example. The role itself reads sessions, routing policies and
+prefix lists in one GraphQL query per device; see
+[NETBOX_INTEGRATION.md](NETBOX_INTEGRATION.md#how-the-role-queries-the-plugin).
+
 ```yaml
 ---
 # Query only this device's sessions; limit=0 returns all of them instead of

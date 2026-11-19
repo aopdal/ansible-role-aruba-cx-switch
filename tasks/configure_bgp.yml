@@ -1,37 +1,80 @@
 ---
 # Configure BGP using the netbox-bgp plugin
 #
-# Data Source: netbox-bgp plugin (via pynetbox API)
+# Data Source: netbox-bgp plugin (one NetBox GraphQL query per device)
 # Set aoscx_use_netbox_bgp_plugin: false to disable BGP configuration entirely.
 #
 # Route Reflector Configuration:
 # Automatically configured if device role is 'spine', 'route-reflector', or 'rr'.
 # All BGP neighbors become RR clients.
 
-- name: Get BGP sessions from NetBox BGP plugin
+# One GraphQL query per device returns its sessions with the routing
+# policies, their rules and the prefix lists those rules match on nested.
+# Over REST this took one session query plus one query per routing policy
+# and per prefix list (netbox-bgp's routing_policy_id / prefix_list_id
+# filters take a single value). netbox_bgp_graphql_to_rest turns the answer
+# into the REST shapes the other BGP filters expect. NetBox caps every list
+# at MAX_PAGE_SIZE (default 1000), as REST does with limit=0.
+- name: Get BGP sessions, routing policies and prefix lists from NetBox BGP plugin
   when: aoscx_use_netbox_bgp_plugin | default(true) | bool
   delegate_to: localhost
+  vars:
+    _bgp_prefix_list_fields: >-
+      id name prefrules { id index action prefix { id prefix } prefix_custom }
+    _bgp_policy_fields: >-
+      id name rules { id index action set_actions
+      match_ip_address { {{ _bgp_prefix_list_fields }} }
+      match_ipv6_address { {{ _bgp_prefix_list_fields }} } }
+    _bgp_graphql_query: >-
+      query ($device: String!) {
+      netbox_bgp_session_list(filters: {device: {name: {exact: $device}}}) {
+      id name description status
+      device { id name }
+      local_address { id address } remote_address { id address }
+      local_as { id asn } remote_as { id asn }
+      import_policies { {{ _bgp_policy_fields }} }
+      export_policies { {{ _bgp_policy_fields }} } } }
   block:
-    - name: Query NetBox BGP plugin for sessions for this device
+    - name: Query NetBox GraphQL for this device's BGP sessions and policies
       ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/?device={{ inventory_hostname }}&limit=0"
-        method: GET
+        url: "{{ lookup('env', 'NETBOX_API') }}/graphql/"
+        method: POST
         headers:
           Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
           Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          query: "{{ _bgp_graphql_query }}"
+          variables:
+            device: "{{ inventory_hostname }}"
         validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
-        status_code: [200, 404]
+        status_code: [200, 400]
         return_content: true
-      register: netbox_bgp_sessions_raw
+      register: netbox_bgp_graphql_raw
       no_log: true
 
-    - name: Set BGP session facts for this device
+    - name: Convert GraphQL BGP data to REST shapes
       ansible.builtin.set_fact:
-        netbox_bgp_plugin_available: "{{ netbox_bgp_sessions_raw.status == 200 }}"
+        _netbox_bgp: "{{ netbox_bgp_graphql_raw.json | default(None) | netbox_bgp_graphql_to_rest }}"
+
+    # A GraphQL error comes back as HTTP 200 with an 'errors' list. Fail
+    # instead of carrying on as if the device had no BGP sessions.
+    - name: Fail on NetBox GraphQL errors
+      ansible.builtin.assert:
+        that: _netbox_bgp.errors | length == 0
+        fail_msg: "NetBox GraphQL query for BGP data failed: {{ _netbox_bgp.errors }}"
+        quiet: true
+
+    - name: Set BGP session, routing policy and prefix list facts for this device
+      ansible.builtin.set_fact:
+        netbox_bgp_plugin_available: "{{ _netbox_bgp.available }}"
         device_bgp_sessions: >-
-          {{ netbox_bgp_sessions_raw.json.results | default([]) |
+          {{ _netbox_bgp.sessions |
              selectattr('status.value', 'in', ['active', 'staged', 'planned']) |
              list }}
+        netbox_policy_rules_all: "{{ _netbox_bgp.policy_rules }}"
+        netbox_prefix_list_rules_all: "{{ _netbox_bgp.prefix_list_rules }}"
 
     - name: Debug BGP plugin status
       ansible.builtin.debug:
@@ -116,78 +159,6 @@
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - _bgp_neighbor_changes is defined
-
-- name: Get BGP routing policy rules and prefix list rules from NetBox BGP plugin
-  when:
-    - aoscx_use_netbox_bgp_plugin | default(true) | bool
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-  delegate_to: localhost
-  # Per device: only the rules of the routing policies this device's sessions
-  # reference, and only the prefix lists those rules match on, are fetched.
-  # netbox-bgp's routing_policy_id / prefix_list_id filters take one value
-  # (a repeated parameter keeps only the last, '__in' is ignored), so there
-  # is one query per id. limit=0 so a policy with many rules is read whole.
-  # Ids are queried in name order, the order NetBox lists the objects in.
-  block:
-    - name: Collect routing policy ids referenced by this device's sessions
-      ansible.builtin.set_fact:
-        _bgp_policy_ids: >-
-          {{ ((bgp_vrf_sessions | map(attribute='import_policies', default=[]) | flatten) +
-              (bgp_vrf_sessions | map(attribute='export_policies', default=[]) | flatten)) |
-             select('mapping') | selectattr('id', 'defined') |
-             sort(attribute='name') | map(attribute='id') | unique | list }}
-
-    - name: Query NetBox BGP plugin for routing policy rules
-      ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/routing-policy-rule/?routing_policy_id={{ item }}&limit=0"
-        method: GET
-        headers:
-          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-          Content-Type: "application/json"
-        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
-        status_code: [200, 404]
-        return_content: true
-      loop: "{{ _bgp_policy_ids }}"
-      register: netbox_policy_rules_raw
-      no_log: true
-
-    - name: Set routing policy rule facts
-      ansible.builtin.set_fact:
-        netbox_policy_rules_all: >-
-          {{ netbox_policy_rules_raw.results | default([]) |
-             map(attribute='json', default={}) |
-             map(attribute='results', default=[]) | flatten(levels=1) }}
-
-    - name: Collect prefix list ids matched by those routing policy rules
-      ansible.builtin.set_fact:
-        _bgp_prefix_list_ids: >-
-          {{ ((netbox_policy_rules_all | map(attribute='match_ip_address', default=[]) | flatten) +
-              (netbox_policy_rules_all | map(attribute='match_ipv6_address', default=[]) | flatten)) |
-             select('mapping') | selectattr('id', 'defined') |
-             sort(attribute='name') | map(attribute='id') | unique | list }}
-
-    - name: Query NetBox BGP plugin for prefix list rules
-      ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/prefix-list-rule/?prefix_list_id={{ item }}&limit=0"
-        method: GET
-        headers:
-          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-          Content-Type: "application/json"
-        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
-        status_code: [200, 404]
-        return_content: true
-      loop: "{{ _bgp_prefix_list_ids }}"
-      register: netbox_prefix_list_rules_raw
-      no_log: true
-
-    - name: Set prefix list rule facts
-      ansible.builtin.set_fact:
-        netbox_prefix_list_rules_all: >-
-          {{ netbox_prefix_list_rules_raw.results | default([]) |
-             map(attribute='json', default={}) |
-             map(attribute='results', default=[]) | flatten(levels=1) }}
 
 - name: Debug raw routing policy and prefix list rule data
   ansible.builtin.debug:

@@ -971,34 +971,53 @@ source of BGP peers or ASN. See [BGP_CONFIGURATION.md](BGP_CONFIGURATION.md).
 
 #### API Endpoints Used
 
-```bash
-# Get BGP sessions for a device
-GET /api/plugins/bgp/session/?device=leaf1&status=active
+The role sends one GraphQL query per device to `/graphql/`. It returns the
+device's sessions with their routing policies, the policies' rules and the
+prefix lists those rules match on, all nested. Over REST the same data takes
+a session query plus one query per routing policy and per prefix list:
+netbox-bgp's `routing_policy_id` / `prefix_list_id` filters take a single
+value. GraphQL must be enabled in NetBox (`GRAPHQL_ENABLED`, the default),
+and the API token needs read access to the BGP plugin objects.
 
-# Get BGP sessions by device ID
-GET /api/plugins/bgp/session/?device_id=123&status=active
+```bash
+# The same data over REST, for checking by hand
+GET /api/plugins/bgp/session/?device=leaf1&limit=0
+GET /api/plugins/bgp/routing-policy-rule/?routing_policy_id=<id>&limit=0
+GET /api/plugins/bgp/prefix-list-rule/?prefix_list_id=<id>&limit=0
 ```
 
 #### How the Role Queries the Plugin
 
 ```yaml
-# tasks/configure_bgp.yml queries the plugin for this device's sessions...
-- name: Query NetBox BGP plugin for sessions for this device
+# tasks/configure_bgp.yml sends one GraphQL query for this device (the query
+# text is built in the block's vars: sessions -> import/export_policies ->
+# rules -> match_ip_address / match_ipv6_address -> prefrules)...
+- name: Query NetBox GraphQL for this device's BGP sessions and policies
   ansible.builtin.uri:
-    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/?device={{ inventory_hostname }}&limit=0"
+    url: "{{ lookup('env', 'NETBOX_API') }}/graphql/"
+    method: POST
     headers:
       Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-  register: netbox_bgp_sessions_raw
+    body_format: json
+    body:
+      query: "{{ _bgp_graphql_query }}"
+      variables:
+        device: "{{ inventory_hostname }}"
+  register: netbox_bgp_graphql_raw
   delegate_to: localhost
 
-# ...and records whether the plugin is available and which sessions are usable.
-- name: Set BGP session facts for this device
+# ...converts the answer to the REST shapes (netbox_bgp_graphql_to_rest),
+# fails on GraphQL errors (they arrive with HTTP 200), and records whether the
+# plugin is available and which sessions are usable.
+- name: Set BGP session, routing policy and prefix list facts for this device
   ansible.builtin.set_fact:
-    netbox_bgp_plugin_available: "{{ netbox_bgp_sessions_raw.status == 200 }}"
+    netbox_bgp_plugin_available: "{{ _netbox_bgp.available }}"
     device_bgp_sessions: >-
-      {{ netbox_bgp_sessions_raw.json.results | default([]) |
+      {{ _netbox_bgp.sessions |
          selectattr('status.value', 'in', ['active', 'staged', 'planned']) |
          list }}
+    netbox_policy_rules_all: "{{ _netbox_bgp.policy_rules }}"
+    netbox_prefix_list_rules_all: "{{ _netbox_bgp.prefix_list_rules }}"
 
 # Every subsequent BGP task in configure_bgp.yml requires both of these to be true.
 # If the plugin is unreachable or returns zero usable sessions, BGP is simply not
@@ -1069,7 +1088,7 @@ curl -H "Authorization: Token $NETBOX_TOKEN" \
 ```
 
 Note: BGP peers and ASN never appear in config_context — they only come from the netbox-bgp
-plugin's session data (`/api/plugins/bgp/session/`), queried separately by `configure_bgp.yml`.
+plugin's session data, queried separately (one GraphQL query per device) by `configure_bgp.yml`.
 
 ### Checking in Ansible Inventory
 
@@ -1183,14 +1202,20 @@ curl -H "Authorization: Token $TOKEN" \
 **Check:**
 
 ```bash
-# Test plugin API endpoint
+# Test the plugin's sessions for the device (the role reads the same data via GraphQL)
 curl -H "Authorization: Token $TOKEN" \
-  "$NETBOX_API/api/plugins/bgp/session/?device=DEVICE_NAME"
+  "$NETBOX_API/api/plugins/bgp/session/?device=DEVICE_NAME&limit=0"
+
+# Test the GraphQL query path the role uses
+curl -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+  -d '{"query": "{ netbox_bgp_session_list(filters: {device: {name: {exact: \"DEVICE_NAME\"}}}) { id name status } }"}' \
+  "$NETBOX_API/graphql/"
 ```
 
 **Common causes:**
 
 - Plugin not installed (all BGP tasks are skipped — there is no config_context fallback)
+- GraphQL disabled in NetBox (`GRAPHQL_ENABLED = False`): the query task fails
 - No BGP sessions created for the device
 - BGP sessions not in "active", "staged", or "planned" status
 - BGP sessions not assigned to the device
