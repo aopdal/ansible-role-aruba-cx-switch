@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.12] - 2026-11-19
+
 ### Fixed
 
 - BGP: routing-policy rules and prefix-list rules were read from the
