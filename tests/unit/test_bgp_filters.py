@@ -16,6 +16,7 @@ from netbox_filters_lib.bgp_filters import (
     get_bgp_redistribute_changes,
     get_bgp_policy_changes,
     get_missing_bgp_neighbor_options,
+    netbox_bgp_graphql_to_rest,
 )
 from rest_api_transforms import rest_api_to_aoscx_bgp
 
@@ -1956,3 +1957,157 @@ class TestGetMissingBgpNeighborOptions:
     def test_empty_options(self):
         assert get_missing_bgp_neighbor_options(
             {}, self._SESSIONS, _POLICY_RUNNING_CONFIG, 65015) == []
+
+
+# ---------------------------------------------------------------------------
+# netbox_bgp_graphql_to_rest
+# ---------------------------------------------------------------------------
+
+def _gql_prefix_list(pl_id, name, rules):
+    return {"id": str(pl_id), "name": name, "prefrules": rules}
+
+
+def _gql_session(sid, name, status="active", import_policies=None, export_policies=None):
+    """A session as netbox-bgp's GraphQL returns it: ids and ASNs as strings."""
+    return {
+        "id": str(sid),
+        "name": name,
+        "description": "",
+        "status": status,
+        "device": {"id": "444", "name": "ao-01"},
+        "local_address": {"id": "1832", "address": "172.27.250.33/31"},
+        "remote_address": {"id": "1831", "address": "172.27.250.32/31"},
+        "local_as": {"id": "11", "asn": "65015"},
+        "remote_as": {"id": "12", "asn": "65020"},
+        "import_policies": import_policies or [],
+        "export_policies": export_policies or [],
+    }
+
+
+_GQL_PL_BLUE = _gql_prefix_list(2, "LAB-BLUE-IPV4", [
+    {"id": "3", "index": "20", "action": "deny",
+     "prefix": None, "prefix_custom": "10.0.0.0/8"},
+    {"id": "2", "index": "10", "action": "permit",
+     "prefix": {"id": "756", "prefix": "172.27.4.0/24"}, "prefix_custom": None},
+])
+_GQL_PL_BLUE6 = _gql_prefix_list(5, "LAB-BLUE-IPV6", [
+    {"id": "9", "index": "10", "action": "permit",
+     "prefix": {"id": "900", "prefix": "2001:db8::/48"}, "prefix_custom": None},
+])
+_GQL_POLICY_OUT = {
+    "id": "2", "name": "LAB-BLUE-OUT-01",
+    "rules": [
+        {"id": "21", "index": "20", "action": "deny", "set_actions": None,
+         "match_ip_address": [], "match_ipv6_address": [_GQL_PL_BLUE6]},
+        {"id": "20", "index": "10", "action": "permit",
+         "set_actions": {"as-path prepend": [65015]},
+         "match_ip_address": [_GQL_PL_BLUE], "match_ipv6_address": []},
+    ],
+}
+_GQL_POLICY_IN = {
+    "id": "4", "name": "LAB-BLUE-IN-01",
+    "rules": [
+        {"id": "40", "index": "10", "action": "permit",
+         "set_actions": {"local-preference": 300},
+         "match_ip_address": [_GQL_PL_BLUE], "match_ipv6_address": []},
+    ],
+}
+
+
+def _gql_response(*sessions):
+    return {"data": {"netbox_bgp_session_list": list(sessions)}}
+
+
+class TestNetboxBgpGraphqlToRest:
+    """Tests for netbox_bgp_graphql_to_rest"""
+
+    def test_session_in_rest_shape(self):
+        result = netbox_bgp_graphql_to_rest(_gql_response(
+            _gql_session(13, "ao-01-ao-02", export_policies=[_GQL_POLICY_OUT])))
+        assert result["available"] is True
+        assert result["errors"] == []
+        assert result["sessions"] == [{
+            "id": 13,
+            "name": "ao-01-ao-02",
+            "description": "",
+            "status": {"value": "active"},
+            "device": {"id": 444, "name": "ao-01"},
+            "local_address": {"id": 1832, "address": "172.27.250.33/31"},
+            "remote_address": {"id": 1831, "address": "172.27.250.32/31"},
+            "local_as": {"id": 11, "asn": 65015},
+            "remote_as": {"id": 12, "asn": 65020},
+            "import_policies": [],
+            "export_policies": [{"id": 2, "name": "LAB-BLUE-OUT-01"}],
+        }]
+
+    def test_rules_flattened_deduplicated_and_ordered(self):
+        """Policies and prefix lists shared by sessions appear once, in name
+        order, with rules in index order (the REST endpoints' ordering)."""
+        result = netbox_bgp_graphql_to_rest(_gql_response(
+            _gql_session(13, "s1", import_policies=[_GQL_POLICY_IN],
+                         export_policies=[_GQL_POLICY_OUT]),
+            _gql_session(14, "s2", export_policies=[_GQL_POLICY_OUT])))
+        assert [(r["routing_policy"]["name"], r["index"]) for r in result["policy_rules"]] == [
+            ("LAB-BLUE-IN-01", 10), ("LAB-BLUE-OUT-01", 10), ("LAB-BLUE-OUT-01", 20)]
+        assert result["policy_rules"][1] == {
+            "id": 20, "index": 10, "action": "permit",
+            "routing_policy": {"id": 2, "name": "LAB-BLUE-OUT-01"},
+            "set_actions": {"as-path prepend": [65015]},
+            "match_ip_address": [{"id": 2, "name": "LAB-BLUE-IPV4"}],
+            "match_ipv6_address": [],
+        }
+        assert [(r["prefix_list"]["name"], r["index"]) for r in result["prefix_list_rules"]] == [
+            ("LAB-BLUE-IPV4", 10), ("LAB-BLUE-IPV4", 20), ("LAB-BLUE-IPV6", 10)]
+        assert result["prefix_list_rules"][0]["prefix"] == {"id": 756, "prefix": "172.27.4.0/24"}
+        assert result["prefix_list_rules"][1]["prefix"] is None
+        assert result["prefix_list_rules"][1]["prefix_custom"] == "10.0.0.0/8"
+
+    def test_output_feeds_collect_ebgp_vrf_policy_config(self):
+        result = netbox_bgp_graphql_to_rest(_gql_response(
+            _gql_session(13, "s1", import_policies=[_GQL_POLICY_IN],
+                         export_policies=[_GQL_POLICY_OUT])))
+        sessions = [dict(s, _vrf="lab-blue", _af="ipv4") for s in result["sessions"]]
+        policy = collect_ebgp_vrf_policy_config(
+            sessions, result["policy_rules"], result["prefix_list_rules"])
+        assert {pl["name"]: (pl["af"], [r["prefix"] for r in pl["rules"]])
+                for pl in policy["prefix_lists"]} == {
+            "LAB-BLUE-IPV4": ("ipv4", ["172.27.4.0/24", "10.0.0.0/8"]),
+            "LAB-BLUE-IPV6": ("ipv6", ["2001:db8::/48"]),
+        }
+        assert [r["commands"] for r in policy["route_map_rules"]] == [
+            ["route-map LAB-BLUE-IN-01 permit seq 10",
+             "match ip address prefix-list LAB-BLUE-IPV4",
+             "set local-preference 300"],
+            ["route-map LAB-BLUE-OUT-01 permit seq 10",
+             "match ip address prefix-list LAB-BLUE-IPV4",
+             "set as-path prepend 65015"],
+            ["route-map LAB-BLUE-OUT-01 deny seq 20",
+             "match ipv6 address prefix-list LAB-BLUE-IPV6"],
+        ]
+
+    def test_no_sessions(self):
+        result = netbox_bgp_graphql_to_rest(_gql_response())
+        assert result == {"available": True, "errors": [], "sessions": [],
+                          "policy_rules": [], "prefix_list_rules": []}
+
+    def test_plugin_not_installed(self):
+        """NetBox without netbox-bgp has no netbox_bgp_session_list field."""
+        result = netbox_bgp_graphql_to_rest({"data": None, "errors": [{
+            "message": "Cannot query field 'netbox_bgp_session_list' on type 'Query'."}]})
+        assert result["available"] is False
+        assert result["errors"] == []
+        assert result["sessions"] == []
+
+    def test_other_graphql_errors_are_returned(self):
+        """GraphQL errors arrive with HTTP 200; they must not read as 'no BGP'."""
+        result = netbox_bgp_graphql_to_rest({"data": None, "errors": [{
+            "message": "Cannot query field 'bogus' on type 'BGPSessionType'."}]})
+        assert result["available"] is True
+        assert result["errors"] == ["Cannot query field 'bogus' on type 'BGPSessionType'."]
+        assert result["sessions"] == []
+
+    @pytest.mark.parametrize("response", [None, "", []])
+    def test_non_json_response_is_an_error(self, response):
+        result = netbox_bgp_graphql_to_rest(response)
+        assert result["errors"]
+        assert result["sessions"] == []

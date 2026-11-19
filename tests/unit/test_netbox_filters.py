@@ -70,6 +70,7 @@ EXPECTED_FILTER_NAMES = {
     "build_l3_config_preview",
     "get_bgp_session_vrf_info",
     "collect_ebgp_vrf_policy_config",
+    "netbox_bgp_graphql_to_rest",
     "get_bgp_redistribute_config",
     "get_stale_bgp_redistribute",
     "get_bgp_neighbor_options_config",

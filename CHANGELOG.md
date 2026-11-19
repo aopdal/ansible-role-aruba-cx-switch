@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.12] - 2026-11-19
+
+### Fixed
+
+- BGP: routing-policy rules and prefix-list rules were read from the
+  NetBox BGP plugin without `limit=0`, so NetBox returned only the first
+  page (50 rules by default) and with more rules the role silently built
+  incomplete prefix lists and route-maps. They are now read in full (see
+  Changed).
+
+### Changed
+
+- BGP: the NetBox data comes from one GraphQL query per device instead of
+  REST. The query returns the device's sessions with their routing policies,
+  the policies' rules and the prefix lists those rules match on, all nested.
+  Before, every rule in NetBox was fetched once per play. Fetching only the
+  device's rules over REST would take one query per policy and per prefix
+  list, since netbox-bgp's id filters take one value. The new filter
+  `netbox_bgp_graphql_to_rest` converts the answer to the REST shapes, so the
+  other BGP filters are unchanged. GraphQL errors (which arrive with HTTP
+  200) fail the play instead of reading as "no BGP sessions". A NetBox
+  without the plugin still skips BGP. NetBox must have GraphQL enabled (the
+  default). Dropping the old `run_once` block also fixes it being skipped
+  for every host when the first host had no address-family BGP sessions.
+- BGP: the NetBox read (GraphQL query, conversion, error check) is its own
+  task file, `tasks/gather_netbox_bgp.yml`, included by `configure_bgp.yml`.
+  It only reads NetBox, so other playbooks can run it with
+  `include_role: tasks_from: gather_netbox_bgp` (the autotest BGP report
+  does, to check the role's GraphQL path).
+
 ## [0.18.11] - 2026-11-17
 
 ### Fixed

@@ -388,6 +388,144 @@ def collect_ebgp_vrf_policy_config(sessions, all_policy_rules, all_prefix_list_r
     }
 
 
+def _gql_int(value):
+    """GraphQL returns ``ID`` / ``BigInt`` values as strings; REST as ints."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return value
+
+
+def _gql_ref(obj, *keys):
+    """Copy ``keys`` from a GraphQL object, with ``id`` converted to int."""
+    if not isinstance(obj, dict):
+        return None
+    ref = {k: obj.get(k) for k in keys if k in obj}
+    if "id" in ref:
+        ref["id"] = _gql_int(ref["id"])
+    return ref
+
+
+def netbox_bgp_graphql_to_rest(response):
+    """
+    Convert the netbox-bgp GraphQL response for one device into the shapes
+    the REST endpoints return, so the other BGP filters work unchanged.
+
+    ``tasks/configure_bgp.yml`` sends one query per device to ``/graphql/``:
+    ``netbox_bgp_session_list`` filtered on the device name, with
+    ``import_policies`` / ``export_policies`` → ``rules`` →
+    ``match_ip_address`` / ``match_ipv6_address`` → ``prefrules`` nested.
+    That replaces the session query plus one REST query per routing policy
+    and per prefix list (netbox-bgp's REST id filters take one value).
+
+    Args:
+        response: The parsed JSON body (``{"data": ..., "errors": ...}``).
+
+    Returns:
+        dict:
+          - ``available`` (bool): False when the schema has no
+            ``netbox_bgp_session_list`` (plugin not installed). The REST
+            query treated a 404 the same way.
+          - ``errors`` (list of str): any other GraphQL error messages. A
+            GraphQL error still returns HTTP 200, so the caller must fail
+            on these instead of treating the device as having no BGP.
+          - ``sessions``: as ``/api/plugins/bgp/session/`` (``status`` as
+            ``{"value": ...}``, ids as ints, policies as ``{id, name}``).
+          - ``policy_rules``: as ``/api/plugins/bgp/routing-policy-rule/``,
+            for the referenced policies only, ordered by policy name, then
+            index (NetBox's ordering).
+          - ``prefix_list_rules``: as ``/api/plugins/bgp/prefix-list-rule/``,
+            for the prefix lists those rules match on, ordered the same way.
+    """
+    result = {
+        "available": True,
+        "errors": [],
+        "sessions": [],
+        "policy_rules": [],
+        "prefix_list_rules": [],
+    }
+    if not isinstance(response, dict):
+        result["errors"].append("empty or non-JSON GraphQL response")
+        return result
+
+    for err in response.get("errors") or []:
+        msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
+        if "netbox_bgp_session_list" in msg and "Cannot query field" in msg:
+            result["available"] = False
+        else:
+            result["errors"].append(msg)
+    if not result["available"] or result["errors"]:
+        return result
+
+    raw_sessions = (response.get("data") or {}).get("netbox_bgp_session_list") or []
+
+    policies = {}  # id -> GraphQL policy object (with rules)
+    prefix_lists = {}  # id -> GraphQL prefix list object (with prefrules)
+
+    for raw in raw_sessions:
+        if not isinstance(raw, dict):
+            continue
+        session = {
+            "id": _gql_int(raw.get("id")),
+            "name": raw.get("name"),
+            "description": raw.get("description"),
+            "status": {"value": raw.get("status")},
+            "device": _gql_ref(raw.get("device"), "id", "name"),
+            "local_address": _gql_ref(raw.get("local_address"), "id", "address"),
+            "remote_address": _gql_ref(raw.get("remote_address"), "id", "address"),
+            "local_as": _gql_ref(raw.get("local_as"), "id", "asn"),
+            "remote_as": _gql_ref(raw.get("remote_as"), "id", "asn"),
+        }
+        for asn_key in ("local_as", "remote_as"):
+            if session[asn_key] and "asn" in session[asn_key]:
+                session[asn_key]["asn"] = _gql_int(session[asn_key]["asn"])
+        for direction in ("import_policies", "export_policies"):
+            refs = []
+            for policy in raw.get(direction) or []:
+                if not isinstance(policy, dict):
+                    continue
+                pid = _gql_int(policy.get("id"))
+                refs.append({"id": pid, "name": policy.get("name")})
+                policies.setdefault(pid, policy)
+            session[direction] = refs
+        result["sessions"].append(session)
+
+    for pid, policy in sorted(policies.items(), key=lambda kv: kv[1].get("name") or ""):
+        for rule in sorted(policy.get("rules") or [], key=lambda r: _gql_int(r.get("index", 0))):
+            rest_rule = {
+                "id": _gql_int(rule.get("id")),
+                "index": _gql_int(rule.get("index", 0)),
+                "action": rule.get("action"),
+                "routing_policy": {"id": pid, "name": policy.get("name")},
+                "set_actions": rule.get("set_actions"),
+            }
+            for af_field in ("match_ip_address", "match_ipv6_address"):
+                refs = []
+                for plist in rule.get(af_field) or []:
+                    if not isinstance(plist, dict):
+                        continue
+                    pl_id = _gql_int(plist.get("id"))
+                    refs.append({"id": pl_id, "name": plist.get("name")})
+                    prefix_lists.setdefault(pl_id, plist)
+                rest_rule[af_field] = refs
+            result["policy_rules"].append(rest_rule)
+
+    for pl_id, plist in sorted(prefix_lists.items(), key=lambda kv: kv[1].get("name") or ""):
+        for rule in sorted(plist.get("prefrules") or [], key=lambda r: _gql_int(r.get("index", 0))):
+            result["prefix_list_rules"].append(
+                {
+                    "id": _gql_int(rule.get("id")),
+                    "index": _gql_int(rule.get("index", 0)),
+                    "action": rule.get("action"),
+                    "prefix_list": {"id": pl_id, "name": plist.get("name")},
+                    "prefix": _gql_ref(rule.get("prefix"), "id", "prefix"),
+                    "prefix_custom": rule.get("prefix_custom"),
+                }
+            )
+
+    return result
+
+
 def get_bgp_redistribute_config(bgp_redistribute):
     """
     Flatten the 'bgp_redistribute' NetBox config_context into a list of

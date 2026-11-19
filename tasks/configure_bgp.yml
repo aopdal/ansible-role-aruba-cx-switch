@@ -1,42 +1,26 @@
 ---
 # Configure BGP using the netbox-bgp plugin
 #
-# Data Source: netbox-bgp plugin (via pynetbox API)
+# Data Source: netbox-bgp plugin (one NetBox GraphQL query per device)
 # Set aoscx_use_netbox_bgp_plugin: false to disable BGP configuration entirely.
 #
 # Route Reflector Configuration:
 # Automatically configured if device role is 'spine', 'route-reflector', or 'rr'.
 # All BGP neighbors become RR clients.
 
-- name: Get BGP sessions from NetBox BGP plugin
+# 'apply' so the included tasks carry the tags main.yml gives this file
+# (a nested include does not inherit them, and --tags bgp would skip them).
+- name: Get BGP data for this device from NetBox
+  ansible.builtin.include_tasks:
+    file: gather_netbox_bgp.yml
+    apply:
+      tags:
+        - bgp
+        - routing
   when: aoscx_use_netbox_bgp_plugin | default(true) | bool
-  delegate_to: localhost
-  block:
-    - name: Query NetBox BGP plugin for sessions for this device
-      ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/?device={{ inventory_hostname }}&limit=0"
-        method: GET
-        headers:
-          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-          Content-Type: "application/json"
-        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
-        status_code: [200, 404]
-        return_content: true
-      register: netbox_bgp_sessions_raw
-      no_log: true
-
-    - name: Set BGP session facts for this device
-      ansible.builtin.set_fact:
-        netbox_bgp_plugin_available: "{{ netbox_bgp_sessions_raw.status == 200 }}"
-        device_bgp_sessions: >-
-          {{ netbox_bgp_sessions_raw.json.results | default([]) |
-             selectattr('status.value', 'in', ['active', 'staged', 'planned']) |
-             list }}
-
-    - name: Debug BGP plugin status
-      ansible.builtin.debug:
-        msg: "NetBox BGP plugin: {{ 'Available ✓' if netbox_bgp_plugin_available else 'Not available' }}"
-      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+  tags:
+    - bgp
+    - routing
 
 # Derive VRF and address-family for each session by looking up the local IP
 # on the device's interfaces (provided by the NetBox inventory plugin).
@@ -116,47 +100,6 @@
   when:
     - aoscx_debug | default(false) | bool or ansible_verbosity >= 1
     - _bgp_neighbor_changes is defined
-
-- name: Get BGP routing policy rules and prefix list rules from NetBox BGP plugin
-  when:
-    - aoscx_use_netbox_bgp_plugin | default(true) | bool
-    - netbox_bgp_plugin_available | default(false)
-    - bgp_vrf_sessions is defined
-    - bgp_vrf_sessions | length > 0
-  delegate_to: localhost
-  run_once: true
-  block:
-    - name: Query NetBox BGP plugin for routing policy rules
-      ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/routing-policy-rule/"
-        method: GET
-        headers:
-          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-          Content-Type: "application/json"
-        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
-        status_code: [200, 404]
-        return_content: true
-      register: netbox_policy_rules_raw
-      no_log: true
-
-    - name: Query NetBox BGP plugin for prefix list rules
-      ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/prefix-list-rule/"
-        method: GET
-        headers:
-          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-          Content-Type: "application/json"
-        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
-        status_code: [200, 404]
-        return_content: true
-      register: netbox_prefix_list_rules_raw
-      no_log: true
-
-    - name: Set routing policy and prefix list facts
-      ansible.builtin.set_fact:
-        netbox_policy_rules_all: "{{ netbox_policy_rules_raw.json.results | default([]) }}"
-        netbox_prefix_list_rules_all: "{{ netbox_prefix_list_rules_raw.json.results | default([]) }}"
-      run_once: true
 
 - name: Debug raw routing policy and prefix list rule data
   ansible.builtin.debug:
