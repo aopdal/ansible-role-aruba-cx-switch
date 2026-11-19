@@ -8,78 +8,19 @@
 # Automatically configured if device role is 'spine', 'route-reflector', or 'rr'.
 # All BGP neighbors become RR clients.
 
-# One GraphQL query per device returns its sessions with the routing
-# policies, their rules and the prefix lists those rules match on nested.
-# Over REST this took one session query plus one query per routing policy
-# and per prefix list (netbox-bgp's routing_policy_id / prefix_list_id
-# filters take a single value). netbox_bgp_graphql_to_rest turns the answer
-# into the REST shapes the other BGP filters expect. NetBox caps every list
-# at MAX_PAGE_SIZE (default 1000), as REST does with limit=0.
-- name: Get BGP sessions, routing policies and prefix lists from NetBox BGP plugin
+# 'apply' so the included tasks carry the tags main.yml gives this file
+# (a nested include does not inherit them, and --tags bgp would skip them).
+- name: Get BGP data for this device from NetBox
+  ansible.builtin.include_tasks:
+    file: gather_netbox_bgp.yml
+    apply:
+      tags:
+        - bgp
+        - routing
   when: aoscx_use_netbox_bgp_plugin | default(true) | bool
-  delegate_to: localhost
-  vars:
-    _bgp_prefix_list_fields: >-
-      id name prefrules { id index action prefix { id prefix } prefix_custom }
-    _bgp_policy_fields: >-
-      id name rules { id index action set_actions
-      match_ip_address { {{ _bgp_prefix_list_fields }} }
-      match_ipv6_address { {{ _bgp_prefix_list_fields }} } }
-    _bgp_graphql_query: >-
-      query ($device: String!) {
-      netbox_bgp_session_list(filters: {device: {name: {exact: $device}}}) {
-      id name description status
-      device { id name }
-      local_address { id address } remote_address { id address }
-      local_as { id asn } remote_as { id asn }
-      import_policies { {{ _bgp_policy_fields }} }
-      export_policies { {{ _bgp_policy_fields }} } } }
-  block:
-    - name: Query NetBox GraphQL for this device's BGP sessions and policies
-      ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/graphql/"
-        method: POST
-        headers:
-          Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
-          Content-Type: "application/json"
-          Accept: "application/json"
-        body_format: json
-        body:
-          query: "{{ _bgp_graphql_query }}"
-          variables:
-            device: "{{ inventory_hostname }}"
-        validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
-        status_code: [200, 400]
-        return_content: true
-      register: netbox_bgp_graphql_raw
-      no_log: true
-
-    - name: Convert GraphQL BGP data to REST shapes
-      ansible.builtin.set_fact:
-        _netbox_bgp: "{{ netbox_bgp_graphql_raw.json | default(None) | netbox_bgp_graphql_to_rest }}"
-
-    # A GraphQL error comes back as HTTP 200 with an 'errors' list. Fail
-    # instead of carrying on as if the device had no BGP sessions.
-    - name: Fail on NetBox GraphQL errors
-      ansible.builtin.assert:
-        that: _netbox_bgp.errors | length == 0
-        fail_msg: "NetBox GraphQL query for BGP data failed: {{ _netbox_bgp.errors }}"
-        quiet: true
-
-    - name: Set BGP session, routing policy and prefix list facts for this device
-      ansible.builtin.set_fact:
-        netbox_bgp_plugin_available: "{{ _netbox_bgp.available }}"
-        device_bgp_sessions: >-
-          {{ _netbox_bgp.sessions |
-             selectattr('status.value', 'in', ['active', 'staged', 'planned']) |
-             list }}
-        netbox_policy_rules_all: "{{ _netbox_bgp.policy_rules }}"
-        netbox_prefix_list_rules_all: "{{ _netbox_bgp.prefix_list_rules }}"
-
-    - name: Debug BGP plugin status
-      ansible.builtin.debug:
-        msg: "NetBox BGP plugin: {{ 'Available ✓' if netbox_bgp_plugin_available else 'Not available' }}"
-      when: aoscx_debug | default(false) | bool or ansible_verbosity >= 1
+  tags:
+    - bgp
+    - routing
 
 # Derive VRF and address-family for each session by looking up the local IP
 # on the device's interfaces (provided by the NetBox inventory plugin).
