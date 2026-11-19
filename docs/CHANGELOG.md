@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.12] - 2026-11-19
+
 ### Fixed
 
 - BGP: routing-policy rules and prefix-list rules were read from the
@@ -29,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without the plugin still skips BGP. NetBox must have GraphQL enabled (the
   default). Dropping the old `run_once` block also fixes it being skipped
   for every host when the first host had no address-family BGP sessions.
+- BGP: the NetBox read (GraphQL query, conversion, error check) is its own
+  task file, `tasks/gather_netbox_bgp.yml`, included by `configure_bgp.yml`.
+  It only reads NetBox, so other playbooks can run it with
+  `include_role: tasks_from: gather_netbox_bgp` (the autotest BGP report
+  does, to check the role's GraphQL path).
 
 ## [0.18.11] - 2026-11-17
 
