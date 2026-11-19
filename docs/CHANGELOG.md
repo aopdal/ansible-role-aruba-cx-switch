@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- BGP: routing-policy rules and prefix-list rules were read from the
+  NetBox BGP plugin without `limit=0`, so NetBox returned only the first
+  page (50 rules by default) and with more rules the role silently built
+  incomplete prefix lists and route-maps. The queries now pass `limit=0`.
+
+### Changed
+
+- BGP: routing-policy rules and prefix-list rules are fetched per device,
+  only for what that device needs: one `routing_policy_id=` query per policy
+  its sessions reference, then one `prefix_list_id=` query per prefix list
+  those rules match on. Before, every rule in NetBox was fetched once per
+  play. netbox-bgp (0.20.2) takes one value per filter, so ids cannot be
+  combined into one query. This also fixes the old `run_once` block being
+  skipped for every host when the first host had no address-family BGP
+  sessions.
+
 ## [0.18.11] - 2026-11-17
 
 ### Fixed

@@ -585,22 +585,22 @@ The `collect_ebgp_vrf_policy_config` filter generates commands using this syntax
 
 ```yaml
 ---
-- name: Get BGP sessions from NetBox BGP plugin
+# Query only this device's sessions; limit=0 returns all of them instead of
+# NetBox's first page (50 by default).
+- name: Get BGP sessions for this device from NetBox BGP plugin
   ansible.builtin.uri:
-    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/"
+    url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/session/?device={{ inventory_hostname }}&limit=0"
     method: GET
     headers:
       Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
     body_format: json
     return_content: true
-  register: all_bgp_sessions
+  register: device_bgp_sessions
   delegate_to: localhost
-  run_once: true
 
-- name: Filter sessions for this device
+- name: Keep active sessions
   ansible.builtin.set_fact:
-    my_bgp_sessions: "{{ all_bgp_sessions.json.results |
-      selectattr('device.name', 'equalto', inventory_hostname) |
+    my_bgp_sessions: "{{ device_bgp_sessions.json.results |
       selectattr('status.value', 'equalto', 'active') | list }}"
 
 - name: Configure BGP router process

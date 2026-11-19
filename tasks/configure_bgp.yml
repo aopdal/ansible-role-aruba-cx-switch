@@ -124,11 +124,24 @@
     - bgp_vrf_sessions is defined
     - bgp_vrf_sessions | length > 0
   delegate_to: localhost
-  run_once: true
+  # Per device: only the rules of the routing policies this device's sessions
+  # reference, and only the prefix lists those rules match on, are fetched.
+  # netbox-bgp's routing_policy_id / prefix_list_id filters take one value
+  # (a repeated parameter keeps only the last, '__in' is ignored), so there
+  # is one query per id. limit=0 so a policy with many rules is read whole.
+  # Ids are queried in name order, the order NetBox lists the objects in.
   block:
+    - name: Collect routing policy ids referenced by this device's sessions
+      ansible.builtin.set_fact:
+        _bgp_policy_ids: >-
+          {{ ((bgp_vrf_sessions | map(attribute='import_policies', default=[]) | flatten) +
+              (bgp_vrf_sessions | map(attribute='export_policies', default=[]) | flatten)) |
+             select('mapping') | selectattr('id', 'defined') |
+             sort(attribute='name') | map(attribute='id') | unique | list }}
+
     - name: Query NetBox BGP plugin for routing policy rules
       ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/routing-policy-rule/"
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/routing-policy-rule/?routing_policy_id={{ item }}&limit=0"
         method: GET
         headers:
           Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
@@ -136,12 +149,28 @@
         validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
         status_code: [200, 404]
         return_content: true
+      loop: "{{ _bgp_policy_ids }}"
       register: netbox_policy_rules_raw
       no_log: true
 
+    - name: Set routing policy rule facts
+      ansible.builtin.set_fact:
+        netbox_policy_rules_all: >-
+          {{ netbox_policy_rules_raw.results | default([]) |
+             map(attribute='json', default={}) |
+             map(attribute='results', default=[]) | flatten(levels=1) }}
+
+    - name: Collect prefix list ids matched by those routing policy rules
+      ansible.builtin.set_fact:
+        _bgp_prefix_list_ids: >-
+          {{ ((netbox_policy_rules_all | map(attribute='match_ip_address', default=[]) | flatten) +
+              (netbox_policy_rules_all | map(attribute='match_ipv6_address', default=[]) | flatten)) |
+             select('mapping') | selectattr('id', 'defined') |
+             sort(attribute='name') | map(attribute='id') | unique | list }}
+
     - name: Query NetBox BGP plugin for prefix list rules
       ansible.builtin.uri:
-        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/prefix-list-rule/"
+        url: "{{ lookup('env', 'NETBOX_API') }}/api/plugins/bgp/prefix-list-rule/?prefix_list_id={{ item }}&limit=0"
         method: GET
         headers:
           Authorization: "Token {{ lookup('env', 'NETBOX_TOKEN') }}"
@@ -149,14 +178,16 @@
         validate_certs: "{{ aoscx_netbox_validate_certs | default(true) }}"
         status_code: [200, 404]
         return_content: true
+      loop: "{{ _bgp_prefix_list_ids }}"
       register: netbox_prefix_list_rules_raw
       no_log: true
 
-    - name: Set routing policy and prefix list facts
+    - name: Set prefix list rule facts
       ansible.builtin.set_fact:
-        netbox_policy_rules_all: "{{ netbox_policy_rules_raw.json.results | default([]) }}"
-        netbox_prefix_list_rules_all: "{{ netbox_prefix_list_rules_raw.json.results | default([]) }}"
-      run_once: true
+        netbox_prefix_list_rules_all: >-
+          {{ netbox_prefix_list_rules_raw.results | default([]) |
+             map(attribute='json', default={}) |
+             map(attribute='results', default=[]) | flatten(levels=1) }}
 
 - name: Debug raw routing policy and prefix list rule data
   ansible.builtin.debug:
