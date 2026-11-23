@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.13] - 2026-11-23
+
+### Fixed
+
+- Sub-interfaces: the parent interface was only put into routed mode
+  (`routing`) by the physical-interface step, which carries the `layer1`
+  tag. A run limited to `--tags layer3` (or `l3_interfaces`) skipped it, so
+  on platforms that default ports to L2, such as the CX 6300, creating the
+  sub-interface failed. The parent check now runs in the L3 interface step,
+  right before the sub-interfaces are pushed, and also re-asserts the
+  parent's NetBox admin state after `routing`. The logic moved into the new
+  filter `get_subinterface_parents_needing_routing`.
+
 ## [0.18.12] - 2026-11-19
 
 ### Fixed

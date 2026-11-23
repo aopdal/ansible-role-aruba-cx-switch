@@ -410,7 +410,7 @@ Core utilities used across all modules (exposed filters: `collapse_vlan_list`, `
 
 ### `l3_config_helpers.py` - L3 Configuration Optimization *(New in January 2025)*
 
-Configuration building and helper functions for L3 interfaces (5 filters, 181 lines):
+Configuration building and helper functions for L3 interfaces:
 
 - **`format_interface_name(interface_name, interface_type)`**
     - Format interface names for AOS-CX CLI
@@ -450,6 +450,11 @@ Configuration building and helper functions for L3 interfaces (5 filters, 181 li
     - When `ip_helper_addresses` is provided and the interface has `custom_fields.if_ip_helper=True`, emits `ip helper-address <ip>` lines (one per server, ordered by string index key) after all IP/anycast lines and before `l3-counters`
     - Servers are looked up by the interface VRF name in `ip_helper_addresses` (a dict keyed by VRF, values are `{"0": "ip", "1": "ip", ...}`)
     - Returns: List of configuration commands
+
+- **`get_subinterface_parents_needing_routing(interfaces, device_interfaces=None)`**
+    - Parents of NetBox sub-interfaces (`virtual` with `parent`) whose device facts do not report `routing: true`
+    - Used by `tasks/configure_l3_interfaces.yml` to push `routing` (plus the NetBox admin state) on the parent right before the sub-interfaces, so platforms that default ports to L2 (CX 6300) are covered also in `--tags layer3` runs
+    - Returns: List of `{name, cli_name, enabled}` dicts sorted by name
 
 - **`should_add_interface_ip(interface, address)`**
     - Decide whether a single IP address on an interface must be pushed. Used by `tasks/configure_l3_interfaces.yml` to set the per-combo `_needs_add` flag consumed downstream by `group_interface_ips`.

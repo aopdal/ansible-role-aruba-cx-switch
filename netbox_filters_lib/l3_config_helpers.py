@@ -12,6 +12,7 @@ __all__ = [
     "build_l3_config_preview",
     "format_interface_name",
     "get_interface_vrf",
+    "get_subinterface_parents_needing_routing",
     "group_interface_ips",
     "is_ipv4_address",
     "is_ipv6_address",
@@ -48,6 +49,78 @@ def format_interface_name(interface_name, interface_type):
         return interface_name.replace("loopback", "loopback ")
     # Physical and sub-interfaces use the name as-is
     return interface_name
+
+
+def get_subinterface_parents_needing_routing(interfaces, device_interfaces=None):
+    """
+    Return the parents of NetBox sub-interfaces that are not yet routed.
+
+    A sub-interface (``1/1/3.2000``) can only be created when its parent is in
+    routed mode. Platforms such as the CX 6300 default physical ports to L2
+    (``no routing``), so ``routing`` must be pushed on the parent first.
+
+    A sub-interface is a NetBox interface of type ``virtual`` with a
+    ``parent``. A parent is skipped only when the device facts report
+    ``routing: true`` for it; a parent missing from the facts, or without a
+    ``routing`` key, is returned (the push is the safe default).
+
+    Args:
+        interfaces: NetBox interface list for the device.
+        device_interfaces: ``ansible_facts.network_resources.interfaces``
+            (dict keyed by interface name), or None.
+
+    Returns:
+        List of dicts sorted by name, one per parent needing ``routing``::
+
+            [{"name": "lag1", "cli_name": "lag 1", "enabled": True}]
+
+        ``cli_name`` is the name for the ``interface <cli_name>`` context and
+        ``enabled`` is the parent's NetBox ``enabled`` (default True), so the
+        caller can re-assert the admin state after ``routing``.
+    """
+    interfaces = interfaces or []
+    device_interfaces = device_interfaces or {}
+    by_name = {
+        intf.get("name"): intf
+        for intf in interfaces
+        if isinstance(intf, dict) and intf.get("name")
+    }
+
+    parent_names = set()
+    for intf in interfaces:
+        if not isinstance(intf, dict):
+            continue
+        if nb_choice_value(intf.get("type")) != "virtual":
+            continue
+        parent = intf.get("parent")
+        if isinstance(parent, dict):
+            parent = parent.get("name")
+        if parent:
+            parent_names.add(parent)
+
+    result = []
+    for name in sorted(parent_names):
+        device_intf = device_interfaces.get(name)
+        if isinstance(device_intf, dict) and device_intf.get("routing") is True:
+            _debug(f"Sub-interface parent {name} already routed")
+            continue
+        nb_parent = by_name.get(name, {})
+        is_lag = (
+            nb_choice_value(nb_parent.get("type")) == "lag"
+            or name.startswith("lag")
+        )
+        enabled = nb_parent.get("enabled")
+        result.append(
+            {
+                "name": name,
+                "cli_name": format_interface_name(
+                    name, "lag" if is_lag else "physical"
+                ),
+                "enabled": True if enabled is None else bool(enabled),
+            }
+        )
+        _debug(f"Sub-interface parent {name} needs routing")
+    return result
 
 
 def get_interface_vrf(interface_data):
@@ -398,8 +471,8 @@ def build_l3_config_lines(
     # encapsulation). Some AOS-CX hardware/firmware defaults physical and LAG
     # ports to L2 (switching) mode, so routed mode must be enabled explicitly.
     # VLAN SVIs and loopbacks are always L3 by nature on every platform and
-    # never need this; sub-interface parents are handled separately in
-    # tasks/configure_physical_interfaces.yml.
+    # never need this; sub-interface parents are handled separately by
+    # get_subinterface_parents_needing_routing (tasks/configure_l3_interfaces.yml).
     #
     # Immediately re-assert admin state (shutdown/no shutdown) after
     # 'routing'. AOS-CX has been observed to reset a physical/LAG

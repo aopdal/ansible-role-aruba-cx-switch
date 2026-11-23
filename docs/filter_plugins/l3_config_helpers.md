@@ -299,8 +299,8 @@ build_l3_config_lines(
    (switching) mode, so routed mode is explicitly enabled whenever the
    interface carries L3 config. VLAN SVIs and loopbacks are always L3 by
    nature and never emit `routing`; sub-interface parents are handled
-   separately in `tasks/configure_physical_interfaces.yml` (not by this
-   function).
+   separately by `get_subinterface_parents_needing_routing` (see below),
+   not by this function.
 
    The `shutdown`/`no shutdown` line immediately after `routing` is a
    deliberate duplicate of what `configure_physical_interfaces.yml`/
@@ -477,6 +477,51 @@ real `ip_helper_addresses` config_context is available.
     msg: "{{ l3_interfaces | build_l3_config_preview(aoscx_builtin_vrfs, aoscx_l3_counters_enable | default(true)) }}"
   when: aoscx_debug_l3_preview | default(false)
 ```
+
+### 9. `get_subinterface_parents_needing_routing`
+
+**Purpose**: Find the parents of NetBox sub-interfaces that the device does
+not report as routed, so `routing` can be pushed on them before the
+sub-interfaces are created.
+
+**Signature**:
+```python
+get_subinterface_parents_needing_routing(
+    interfaces: list, device_interfaces: dict = None
+) -> list
+```
+
+A sub-interface is a NetBox interface of type `virtual` with `parent` set.
+Platforms such as the CX 6300 default ports to L2 (`no routing`), and AOS-CX
+rejects a dot1q sub-interface on an L2 parent. A parent is skipped only when
+`device_interfaces[<name>].routing` is `true`; a parent missing from the
+facts, or without a `routing` key, is returned.
+
+**Returns**: list sorted by name, one dict per parent:
+`{"name": "lag1", "cli_name": "lag 1", "enabled": true}`. `cli_name` is the
+name for the `interface <cli_name>` context; `enabled` is the parent's NetBox
+`enabled` (default `true`).
+
+**Example** (from `tasks/configure_l3_interfaces.yml`, which runs it right
+before the sub-interface push, so `--tags layer3` / `l3_interfaces` runs are
+covered):
+```yaml
+- name: Enable routed mode on sub-interface parents
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - routing
+      - "{{ 'no shutdown' if item.enabled | bool else 'shutdown' }}"
+    parents: "interface {{ item.cli_name }}"
+  loop: >-
+    {{ interfaces | get_subinterface_parents_needing_routing(
+         ansible_facts.network_resources.interfaces | default({})) }}
+  vars:
+    ansible_connection: network_cli
+```
+
+The admin-state line after `routing` re-asserts the NetBox state, for the
+same reason as in `build_l3_config_lines`: AOS-CX can reset it when the
+routing mode changes.
 
 ---
 

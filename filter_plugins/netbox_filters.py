@@ -86,6 +86,7 @@ from netbox_filters_lib.l3_config_helpers import (
     is_ipv4_address,
     is_ipv6_address,
     get_interface_vrf,
+    get_subinterface_parents_needing_routing,
     group_interface_ips,
     build_l3_config_lines,
     should_add_interface_ip,
@@ -188,6 +189,7 @@ class FilterModule:
             "get_ospf_interface_changes": get_ospf_interface_changes,
             # L3 configuration helpers
             "format_interface_name": format_interface_name,
+            "get_subinterface_parents_needing_routing": get_subinterface_parents_needing_routing,
             "is_ipv4_address": is_ipv4_address,
             "is_ipv6_address": is_ipv6_address,
             "get_interface_vrf": get_interface_vrf,
