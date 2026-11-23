@@ -61,6 +61,7 @@ EXPECTED_FILTER_NAMES = {
     "get_ospf_router_changes",
     "get_ospf_interface_changes",
     "format_interface_name",
+    "get_subinterface_parents_needing_routing",
     "is_ipv4_address",
     "is_ipv6_address",
     "get_interface_vrf",

@@ -312,6 +312,42 @@
 # Configure L3 interfaces for every (type, VRF) category via a single common include.
 # Loopbacks are split by VRF here because categorize_l3_interfaces emits a single
 # `loopback` list; every other type is already pre-split into *_default_vrf / *_custom_vrf.
+# Sub-interfaces (dot1q, e.g. 1/1/3.2000) can only be created on a parent in
+# routed mode. Platforms such as the CX 6300 default ports to L2
+# ('no routing'), so push 'routing' on every parent the device facts do not
+# report as routed. This lives here, not in the physical-interface step, so
+# runs limited to --tags layer3 / l3_interfaces still prepare the parent.
+# The admin state is re-asserted from NetBox right after 'routing', because
+# AOS-CX can reset it when the routing mode changes (see
+# build_l3_config_lines in netbox_filters_lib/l3_config_helpers.py).
+- name: Find sub-interface parents that are not in routed mode
+  ansible.builtin.set_fact:
+    subinterface_parents_needing_routing: >-
+      {{
+        interfaces | default([])
+        | get_subinterface_parents_needing_routing(
+            ansible_facts.network_resources.interfaces
+            | default({}))
+      }}
+  when: >-
+    (l3_interfaces.subinterface_default_vrf | length > 0)
+    or (l3_interfaces.subinterface_custom_vrf | length > 0)
+
+- name: Enable routed mode on sub-interface parents
+  arubanetworks.aoscx.aoscx_config:
+    lines:
+      - routing
+      - "{{ 'no shutdown' if item.enabled | bool else 'shutdown' }}"
+    parents: "interface {{ item.cli_name }}"
+  loop: "{{ subinterface_parents_needing_routing | default([]) }}"
+  loop_control:
+    label: "Interface: {{ item.name }}"
+  when:
+    - (l3_interfaces.subinterface_default_vrf | length > 0)
+      or (l3_interfaces.subinterface_custom_vrf | length > 0)
+  vars:
+    ansible_connection: network_cli
+
 # Include order (physical → subinterface → vlan → lag → loopback) preserves prior behavior.
 # The loop var is renamed to `_l3_cat` so the outer `when:` (propagated to every inner
 # task by include_tasks) does not collide with the inner `item` used by

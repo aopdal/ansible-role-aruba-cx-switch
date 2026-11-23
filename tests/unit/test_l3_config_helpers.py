@@ -7,6 +7,7 @@ from netbox_filters_lib.l3_config_helpers import (
     is_ipv4_address,
     is_ipv6_address,
     get_interface_vrf,
+    get_subinterface_parents_needing_routing,
     group_interface_ips,
     build_l3_config_lines,
     should_add_interface_ip,
@@ -1646,3 +1647,101 @@ class TestBuildL3ConfigPreview:
         }
         result = build_l3_config_preview(l3, None)
         assert "loopback 0" in result
+
+
+class TestGetSubinterfaceParentsNeedingRouting:
+    """Tests for get_subinterface_parents_needing_routing"""
+
+    @staticmethod
+    def _sub(name, parent):
+        return {
+            "name": name,
+            "type": {"value": "virtual", "label": "Virtual"},
+            "parent": {"id": 1, "name": parent},
+        }
+
+    @staticmethod
+    def _phys(name, enabled=True, type_value="1000base-t"):
+        return {"name": name, "type": {"value": type_value}, "enabled": enabled}
+
+    def test_empty_and_none_input(self):
+        assert get_subinterface_parents_needing_routing(None) == []
+        assert get_subinterface_parents_needing_routing([], None) == []
+
+    def test_no_subinterfaces(self):
+        interfaces = [self._phys("1/1/1"), {"name": "vlan10", "type": "virtual"}]
+        assert get_subinterface_parents_needing_routing(interfaces, {}) == []
+
+    def test_parent_in_l2_mode_needs_routing(self):
+        """CX 6300: parent defaults to routing false"""
+        interfaces = [self._phys("1/1/3"), self._sub("1/1/3.2000", "1/1/3")]
+        facts = {"1/1/3": {"admin": "up", "routing": False}}
+        assert get_subinterface_parents_needing_routing(interfaces, facts) == [
+            {"name": "1/1/3", "cli_name": "1/1/3", "enabled": True}
+        ]
+
+    def test_parent_already_routed_is_skipped(self):
+        interfaces = [self._phys("1/1/3"), self._sub("1/1/3.2000", "1/1/3")]
+        facts = {"1/1/3": {"routing": True}}
+        assert get_subinterface_parents_needing_routing(interfaces, facts) == []
+
+    def test_missing_facts_or_routing_key_needs_routing(self):
+        interfaces = [
+            self._phys("1/1/3"),
+            self._phys("1/1/4"),
+            self._sub("1/1/3.10", "1/1/3"),
+            self._sub("1/1/4.10", "1/1/4"),
+        ]
+        facts = {"1/1/4": {"admin": "up"}}
+        result = get_subinterface_parents_needing_routing(interfaces, facts)
+        assert [p["name"] for p in result] == ["1/1/3", "1/1/4"]
+
+    def test_parent_listed_once_for_several_subinterfaces(self):
+        interfaces = [
+            self._sub("1/1/3.30", "1/1/3"),
+            self._sub("1/1/3.20", "1/1/3"),
+            self._phys("1/1/3"),
+        ]
+        result = get_subinterface_parents_needing_routing(interfaces, {})
+        assert [p["name"] for p in result] == ["1/1/3"]
+
+    def test_sorted_output(self):
+        interfaces = [
+            self._sub("1/1/9.1", "1/1/9"),
+            self._sub("1/1/2.1", "1/1/2"),
+        ]
+        result = get_subinterface_parents_needing_routing(interfaces, {})
+        assert [p["name"] for p in result] == ["1/1/2", "1/1/9"]
+
+    def test_disabled_parent_keeps_netbox_admin_state(self):
+        interfaces = [
+            self._phys("1/1/3", enabled=False),
+            self._sub("1/1/3.2000", "1/1/3"),
+        ]
+        result = get_subinterface_parents_needing_routing(interfaces, {})
+        assert result[0]["enabled"] is False
+
+    def test_parent_not_in_netbox_list_defaults_enabled(self):
+        interfaces = [self._sub("1/1/3.2000", "1/1/3")]
+        result = get_subinterface_parents_needing_routing(interfaces, {})
+        assert result == [{"name": "1/1/3", "cli_name": "1/1/3", "enabled": True}]
+
+    def test_lag_parent_cli_name(self):
+        interfaces = [
+            self._phys("lag1", type_value="lag"),
+            self._sub("lag1.100", "lag1"),
+        ]
+        result = get_subinterface_parents_needing_routing(interfaces, {})
+        assert result[0]["cli_name"] == "lag 1"
+
+    def test_plain_string_choice_and_parent(self):
+        """NetBox 4.7 choice fields / trimmed payloads may be plain strings"""
+        interfaces = [{"name": "1/1/5.7", "type": "virtual", "parent": "1/1/5"}]
+        result = get_subinterface_parents_needing_routing(interfaces, {})
+        assert [p["name"] for p in result] == ["1/1/5"]
+
+    def test_virtual_without_parent_ignored(self):
+        interfaces = [
+            {"name": "loopback0", "type": {"value": "virtual"}, "parent": None}
+        ]
+        assert get_subinterface_parents_needing_routing(interfaces, {}) == []
