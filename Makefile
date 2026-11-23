@@ -104,7 +104,7 @@ molecule-destroy: venv ## Destroy molecule test instance
 
 test-unit: ## Run unit tests for filter plugins
 	@echo "$(BLUE)Running unit tests...$(NC)"
-	@pytest tests/unit/ -v
+	@$(ACTIVATE) && pytest tests/unit/ -v
 	@echo "$(GREEN)✅ Unit tests passed$(NC)"
 
 audit: venv ## Audit Python dependencies (latest + minimum versions) for known CVEs
@@ -133,12 +133,12 @@ audit-repo: ## Scan repo for misconfigurations and secrets (requires trivy)
 
 test-unit-coverage: ## Run unit tests with coverage report
 	@echo "$(BLUE)Running unit tests with coverage...$(NC)"
-	@pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib --cov-report=term-missing --cov-report=html
+	@$(ACTIVATE) && pytest tests/unit/ --cov=filter_plugins --cov=netbox_filters_lib --cov-report=term-missing --cov-report=html
 	@echo "$(GREEN)✅ Unit tests passed. Coverage report: htmlcov/index.html$(NC)"
 
 test-unit-quick: ## Run unit tests without coverage (faster)
 	@echo "$(BLUE)Running unit tests (quick)...$(NC)"
-	@pytest tests/unit/ -v --tb=short
+	@$(ACTIVATE) && pytest tests/unit/ -v --tb=short
 	@echo "$(GREEN)✅ Unit tests passed$(NC)"
 
 integration: venv ## Run integration tests
