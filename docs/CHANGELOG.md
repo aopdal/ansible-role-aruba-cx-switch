@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.13] - 2026-11-23
+
 ### Fixed
 
 - Sub-interfaces: the parent interface was only put into routed mode
